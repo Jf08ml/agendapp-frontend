@@ -24,12 +24,12 @@ import { CustomLoader } from "./customLoader/CustomLoader";
 
 // Constantes para estilos reutilizables
 const gradientTextStyle: React.CSSProperties = {
-  background: "linear-gradient(180deg, #FFD700, #7928CA)",
+  background: "linear-gradient(180deg, #DE739E, #FFF5F7",
   WebkitBackgroundClip: "text",
   WebkitTextFillColor: "transparent",
 };
 
-const gradientPriceStyle = { from: "#FFD700", to: "#7928CA", deg: 182 };
+const gradientPriceStyle = { from: "#DE739E", to: "#FFF5F7", deg: 182 };
 
 // Definición de interfaces para los props
 interface ServiceItemProps {
@@ -145,7 +145,7 @@ const ServiceCategory: React.FC<ServiceCategoryProps> = ({
     my="sm"
     radius="md"
     withBorder
-    bg="#2A2E35"
+    bg="#DE739E"
     style={{ textAlign: "center" }}
   >
     <Title order={2}>
@@ -230,7 +230,7 @@ const ServicesAndPrices: React.FC = () => {
               services={filterServicesByType(type)}
             />
           ))}
-          <ServiceCategory
+          {/* <ServiceCategory
             title="Insumos para cejas y pestañas"
             services={[
               {
@@ -243,7 +243,7 @@ const ServicesAndPrices: React.FC = () => {
                 ],
               },
             ]}
-          />
+          /> */}
         </Flex>
       </Group>
     </Box>

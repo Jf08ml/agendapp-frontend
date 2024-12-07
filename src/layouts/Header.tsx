@@ -24,7 +24,7 @@ const Header = () => {
           size="xl"
           fw={900}
           variant="gradient"
-          gradient={{ from: "#FFD700", to: "#7928CA", deg: 182 }}
+          gradient={{ from: "#DE739E", to: "#FFF5F7", deg: 182 }}
         >
           <Link to="/" style={{ textDecoration: "none", color: "white" }}>
             {name}

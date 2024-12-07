@@ -83,7 +83,7 @@ const SearchClient: React.FC = () => {
   return (
     <Flex justify="center" align="center" style={{ height: "80vh" }}>
       <Box
-        bg="#1A202C"
+        bg="#DE739E"
         p="xl"
         style={{
           borderRadius: "8px",

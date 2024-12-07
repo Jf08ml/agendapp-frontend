@@ -98,13 +98,13 @@ function App() {
         }}
         header={{ height: 50 }}
       >
-        <AppShell.Header bg="#1A202C">
+        <AppShell.Header bg="#DE739E">
           <Flex align="center" px="sm">
             <Burger opened={opened} onClick={toggle} size="sm" color="white" />
             <Header />
           </Flex>
         </AppShell.Header>
-        <AppShell.Navbar p="md" bg="#1A202C">
+        <AppShell.Navbar p="md" bg="#DE739E">
           <NavbarLinks closeNavbar={close} />
         </AppShell.Navbar>
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>

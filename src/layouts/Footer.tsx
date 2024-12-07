@@ -65,7 +65,7 @@ export const Footer = () => {
   return (
     <Box
       component="footer"
-      bg="#1A202C"
+      bg="#DE739E"
       p="0.1rem 0"
       style={{
         width: "100%",

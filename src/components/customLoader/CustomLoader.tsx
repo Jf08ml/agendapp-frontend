@@ -14,13 +14,13 @@ export const CustomLoader: MantineLoaderComponent = forwardRef<
   <Center style={{ height: "100vh", flexDirection: "column" }}>
     <Stack align="center" m="md">
       <Image
-        src="/galaxia_glamour.png"
-        alt="Galaxia Glamour Logo"
+        src="/estudio_rosa.png"
+        alt="Estudio Rosa Logo"
         className={classes.imageLoader}
         {...others}
         ref={ref}
       />
-      <Text size="xl" fw={700} color="dark">
+      <Text size="xl" fw={700} c="dark">
         {loadingText}
       </Text>
     </Stack>

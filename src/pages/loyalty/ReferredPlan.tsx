@@ -9,7 +9,7 @@ interface ReferredPlanProps {
 const ReferredPlan: React.FC<ReferredPlanProps> = ({ referralsMade, totalReferrals }) => {
   return (
     <Box
-      bg="#1A202C"
+      bg="#DE739E"
       p="xl"
       m="auto"
         mt="sm"

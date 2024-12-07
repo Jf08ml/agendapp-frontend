@@ -11,7 +11,7 @@ const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({ servicesTaken, totalServices 
 
   return (
     <Box
-      bg="#1A202C"
+      bg="#DE739E"
       p="xl"
       m="auto"
       mt="sm"
