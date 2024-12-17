@@ -42,7 +42,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: message,
-      icon: "/galaxia_glamour.png",
+      icon: "/estudio_rosa.png",
     })
   );
 });

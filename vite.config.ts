@@ -17,26 +17,26 @@ export default defineConfig({
         "apple-touch-icon.png",
       ],
       manifest: {
-        name: "Galaxia Glamour",
-        short_name: "Galaxia",
-        description: "Galaxia glamour lashes",
+        name: "Estudio Rosa",
+        short_name: "Estudio Rosa",
+        description: "Estudio Rosa nails and lashes",
         display: "standalone",
         start_url: "/",
         background_color: "#ffffff",
         theme_color: "#ffffff",
         icons: [
           {
-            src: "galaxia_glamour.png",
+            src: "estudio_rosa.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "galaxia_glamour.png",
+            src: "estudio_rosa.png",
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: "galaxia_glamour.png",
+            src: "estudio_rosa.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",

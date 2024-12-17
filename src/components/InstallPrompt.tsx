@@ -28,8 +28,8 @@ const InstallPrompt = () => {
 
   const showInstallNotification = () => {
     showNotification({
-      title: 'Instala Galaxia Glamour',
-      message: 'Añade Galaxia Glamour a tu pantalla de inicio para un acceso rápido y fácil.',
+      title: 'Instala Estudio Rosa',
+      message: 'Añade Estudio Rosa a tu pantalla de inicio para un acceso rápido y fácil.',
       icon: <MdInstallMobile size={24} />,
       autoClose: false,
       actions: [
