@@ -12,6 +12,7 @@ import { Notifications } from "@mantine/notifications";
 import { Provider } from "react-redux";
 import { store } from "./app/store.ts";
 import { ModalsProvider } from "@mantine/modals";
+import GoogleMapsProvider from "./utils/GoogleMapsProvider.tsx"
 
 const theme = createTheme({
   fontFamily: "Playfair Display, serif",
@@ -24,18 +25,20 @@ const theme = createTheme({
     lg: "18px",
     xl: "20px",
     xxl: "24px",
-  }
+  },
 });
 
 createRoot(document.getElementById("root")!).render(
   // <StrictMode>
-    <Provider store={store}>
-      <MantineProvider theme={theme}>
-        <ModalsProvider>
-          <Notifications />
+  <Provider store={store}>
+    <MantineProvider theme={theme}>
+      <ModalsProvider>
+        <Notifications />
+        <GoogleMapsProvider>
           <App />
-        </ModalsProvider>
-      </MantineProvider>
-    </Provider>
+        </GoogleMapsProvider>
+      </ModalsProvider>
+    </MantineProvider>
+  </Provider>
   // </StrictMode>
 );

@@ -52,7 +52,7 @@ const BookingCompleted: React.FC<BookingCompletedProps> = ({
           <Group align="center">
             <BsCheckCircle size={32} color="green" />
             <Text size="xl" fw={700} c="green">
-              ¡Reserva Confirmada!
+              ¡Reserva Enviada!
             </Text>
           </Group>
           <Text size="md" c="blue">

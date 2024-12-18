@@ -13,10 +13,21 @@ import EmployeeInfo from "../pages/account/EmployeeInfo";
 import DailyCashbox from "../pages/account/DailyCashbox";
 import Booking from "../pages/onlineReservation/Booking";
 import ReservationsList from "../pages/admin/manageReservation";
+import Home from "../pages/Home";
+import Location from "../pages/location/location";
 
 const generalRoutes = [
   {
     path: "/",
+    component: Home,
+    MediaMetadata: {
+      title: "Inicio",
+      description: "Inicio de página.",
+      image: "/estudio_rosa.png",
+    },
+  },
+  {
+    path: "/search-client",
     component: SearchClient,
     MediaMetadata: {
       title: "Buscar Cliente",
@@ -38,7 +49,7 @@ const generalRoutes = [
     component: ServicesAndPrices,
     MediaMetadata: {
       title: "Servicios y Precios",
-      description: "Consulta nuestros servicios y precios en Estudio Rosa.",
+      description: "Consulta nuestros servicios y precios en Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -52,11 +63,20 @@ const generalRoutes = [
     },
   },
   {
+    path: "/location",
+    component: Location,
+    MediaMetadata: {
+      title: "Ubicación",
+      description: "Ubicación en google maps.",
+      image: "/estudio_rosa.png",
+    },
+  },
+  {
     path: "/login-admin",
     component: LoginAdmin,
     MediaMetadata: {
       title: "Administrar clientes",
-      description: "Administrar clientes en Estudio Rosa.",
+      description: "Administrar clientes en Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -69,7 +89,7 @@ const generalRoutes = [
     ),
     MediaMetadata: {
       title: "Dashboard",
-      description: "Dashboard de Estudio Rosa.",
+      description: "Dashboard de Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -82,7 +102,7 @@ const generalRoutes = [
     ),
     MediaMetadata: {
       title: "Gestionar Agenda",
-      description: "Gestiona la agenda de Estudio Rosa.",
+      description: "Gestiona la agenda de Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -95,7 +115,7 @@ const generalRoutes = [
     ),
     MediaMetadata: {
       title: "Gestionar Reservas Online",
-      description: "Gestiona las reservas de Estudio Rosa.",
+      description: "Gestiona las reservas de Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -108,7 +128,7 @@ const generalRoutes = [
     ),
     MediaMetadata: {
       title: "Gestionar Servicios",
-      description: "Gestiona los servicios de Estudio Rosa.",
+      description: "Gestiona los servicios de Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },
@@ -121,7 +141,7 @@ const generalRoutes = [
     ),
     MediaMetadata: {
       title: "Gestionar Empleados",
-      description: "Gestiona los empleados de Estudio Rosa.",
+      description: "Gestiona los empleados de Galaxia Glamour.",
       image: "/estudio_rosa.png",
     },
   },

@@ -1,14 +1,13 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { Box, Text, Flex, Divider, ScrollArea } from "@mantine/core";
-import { MdOutlineLoyalty, MdPriceCheck } from "react-icons/md";
+import { MdOutlineLoyalty } from "react-icons/md";
 // import { RiReservedLine } from "react-icons/ri";
 import { GrUserSettings } from "react-icons/gr";
-import { BiCalendarCheck } from "react-icons/bi";
-import { GiClawSlashes } from "react-icons/gi";
-import { FaCashRegister, FaUsers } from "react-icons/fa";
+import { BiCalendar, BiCalendarCheck } from "react-icons/bi";
+import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
+import { FaCashRegister, FaIdeal, FaUsers } from "react-icons/fa";
 import { usePermissions } from "../hooks/usePermissions";
-import { RiReservedFill } from "react-icons/ri";
 
 interface NavbarLinksProps {
   closeNavbar: () => void;
@@ -27,7 +26,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             style={{ textDecoration: "none" }}
           >
             <Flex align="center" justify="center" gap="sm">
-              <MdPriceCheck size={20} color="white" />
+              <GiPriceTag size={20} color="white" />
               <Text c="white" fw={600} my="md">
                 Precios y servicios
               </Text>
@@ -35,12 +34,12 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
           </NavLink>
 
           <NavLink
-            to="/"
+            to="/search-client"
             onClick={closeNavbar}
             style={{ textDecoration: "none" }}
           >
             <Flex align="center" justify="center" gap="sm">
-              <MdOutlineLoyalty size={20} color="white" />
+              <FaIdeal size={20} color="white" />
               <Text c="white" fw={600} my="md">
                 Plan de fidelidad
               </Text>
@@ -53,7 +52,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             style={{ textDecoration: "none" }}
           >
             <Flex align="center" justify="center" gap="sm">
-              <RiReservedFill size={20} color="white" />
+              <BiCalendar size={20} color="white" />
               <Text c="white" fw={600} my="md">
                 Reserva en linea
               </Text>

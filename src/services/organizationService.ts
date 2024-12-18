@@ -11,6 +11,11 @@ export interface Organization {
   _id?: string;
   name: string;
   email: string;
+  location: {
+    lat: number; // Latitud de la ubicación
+    lng: number; // Longitud de la ubicación
+  };
+  address?: string; // Dirección formateada (opcional)
   password?: string;
   phoneNumber: string;
   facebookUrl?: string;

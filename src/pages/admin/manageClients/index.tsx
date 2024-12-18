@@ -59,8 +59,16 @@ const Dashboard = () => {
       setClients(response);
       setError(null);
     } catch (err) {
-      console.log(err);
+      console.error(err);
       setError("Error al obtener la lista de clientes");
+      showNotification({
+        title: "Error al obtener clientes",
+        message:
+          "No fue posible cargar la lista de clientes. Por favor, intenta de nuevo.",
+        color: "red",
+        autoClose: 5000,
+        position: "top-right",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -98,6 +106,13 @@ const Dashboard = () => {
       fetchClients();
     } catch (error) {
       console.error(error);
+      showNotification({
+        title: "Error al registrar servicio",
+        message: "No fue posible registrar el servicio. Intenta nuevamente.",
+        color: "red",
+        autoClose: 5000,
+        position: "top-right",
+      });
     }
   };
 
@@ -114,13 +129,19 @@ const Dashboard = () => {
       fetchClients();
     } catch (error) {
       console.error(error);
+      showNotification({
+        title: "Error al registrar referido",
+        message: "No fue posible registrar el referido. Intenta nuevamente.",
+        color: "red",
+        autoClose: 5000,
+        position: "top-right",
+      });
     }
   };
 
   const handleDeleteClient = async (id: string) => {
     try {
       await deleteClient(id);
-
       showNotification({
         title: "Cliente eliminado",
         message: "El cliente ha sido eliminado correctamente",
@@ -131,6 +152,15 @@ const Dashboard = () => {
       fetchClients();
     } catch (error) {
       console.error(error);
+      const errorMessage =
+        (error as Error).message || "No fue posible eliminar el cliente.";
+      showNotification({
+        title: "Error al eliminar cliente",
+        message: `${errorMessage}`,
+        color: "red",
+        autoClose: 5000,
+        position: "top-right",
+      });
     }
   };
 

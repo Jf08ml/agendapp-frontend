@@ -30,7 +30,7 @@ interface CreateAppointmentPayload {
   service: Service;
   client: Client;
   employee: Employee;
-  employeeRequestedByClient: boolean,
+  employeeRequestedByClient: boolean;
   startDate: Date;
   endDate: Date;
   status: string;
@@ -297,13 +297,7 @@ const ScheduleView: React.FC = () => {
         status,
       } = newAppointment;
 
-      if (
-        service &&
-        employee &&
-        client &&
-        startDate &&
-        endDate
-      ) {
+      if (service && employee && client && startDate && endDate) {
         const appointmentPayload: CreateAppointmentPayload = {
           service,
           employee,
@@ -421,6 +415,7 @@ const ScheduleView: React.FC = () => {
         onEmployeeChange={handleEmployeeChange}
         onClientChange={handleClientChange}
         onSave={addOrUpdateAppointment}
+        fetchClients={fetchClients}
       />
     </Box>
   );

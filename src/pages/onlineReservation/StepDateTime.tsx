@@ -9,6 +9,7 @@ import {
   Group,
   Divider,
   Button,
+  Loader,
 } from "@mantine/core";
 import { DatePicker } from "@mantine/dates";
 import { BsExclamationCircle, BsClock } from "react-icons/bs";
@@ -33,21 +34,6 @@ interface StepDateTimeProps {
   employees: Employee[];
 }
 
-// Función para formatear la duración
-const formatDuration = (minutes: number): string => {
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  const hoursText =
-    hours > 0 ? `${hours} ${hours === 1 ? "hora" : "horas"}` : "";
-  const minutesText =
-    remainingMinutes > 0
-      ? `${remainingMinutes} ${remainingMinutes === 1 ? "minuto" : "minutos"}`
-      : "";
-
-  return `${hoursText}${hoursText && minutesText ? " y " : ""}${minutesText}`;
-};
-
 const StepDateTime: React.FC<StepDateTimeProps> = ({
   bookingData,
   setBookingData,
@@ -57,13 +43,15 @@ const StepDateTime: React.FC<StepDateTimeProps> = ({
   services,
   employees,
 }) => {
-  const [service, setService] = useState<Service>();
+  const [, setService] = useState<Service>();
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isLoadingTimes, setIsLoadingTimes] = useState(false);
 
-  const handleDateSelection = (date: Date) => {
+  const handleDateSelection = async (date: Date) => {
     setSelectedDate(date);
     setShowConfirmation(false);
+    setIsLoadingTimes(true);
 
     const selectedService = services.find(
       (s) => s._id === bookingData.serviceId
@@ -71,7 +59,7 @@ const StepDateTime: React.FC<StepDateTimeProps> = ({
 
     if (selectedService) {
       setService(selectedService);
-      fetchAppointmentsAndAvailableTimes(
+      await fetchAppointmentsAndAvailableTimes(
         bookingData.employeeId as string | null,
         date,
         selectedService.duration,
@@ -80,6 +68,8 @@ const StepDateTime: React.FC<StepDateTimeProps> = ({
         employees
       );
     }
+
+    setIsLoadingTimes(false);
   };
 
   const handleTimeSelection = (time: string) => {
@@ -123,19 +113,12 @@ const StepDateTime: React.FC<StepDateTimeProps> = ({
         <Divider />
 
         {/* Horarios Disponibles */}
-        {!showConfirmation && (
-          <Text size="lg" fw={600}>
-            Selecciona una Hora
-          </Text>
-        )}
-        {service && (
-          <Text c="dimmed" size="sm">
-            Duración del procedimiento: {formatDuration(service.duration)}
-          </Text>
-        )}
-        <Divider />
-
-        {showConfirmation && bookingData.startDate ? (
+        {isLoadingTimes ? (
+          <Flex direction="column" align="center" justify="center" mt="md">
+            <Loader size="lg" />
+            <Text>Cargando horarios</Text>
+          </Flex>
+        ) : showConfirmation && bookingData.startDate ? (
           // Mensaje de Confirmación
           <Stack align="center" m="md">
             <Text size="lg" ta="center">

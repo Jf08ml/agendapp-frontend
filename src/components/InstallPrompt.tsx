@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { showNotification } from '@mantine/notifications';
+import { Button, Group } from '@mantine/core';
 import { MdInstallMobile } from 'react-icons/md';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -17,27 +18,34 @@ const InstallPrompt = () => {
       setDeferredPrompt(e);
       showInstallNotification();
     };
-  
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
-  
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
     };
   }, []);
-  
 
   const showInstallNotification = () => {
     showNotification({
       title: 'Instala Estudio Rosa',
-      message: 'Añade Estudio Rosa a tu pantalla de inicio para un acceso rápido y fácil.',
+      message: (
+        <Group>
+          <span>
+            Añade Estudio Rosa a tu pantalla de inicio para un acceso rápido y fácil.
+          </span>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={handleInstallClick}
+            leftSection={<MdInstallMobile />}
+          >
+            Instalar
+          </Button>
+        </Group>
+      ),
       icon: <MdInstallMobile size={24} />,
       autoClose: false,
-      actions: [
-        {
-          label: 'Instalar',
-          onClick: handleInstallClick,
-        },
-      ],
     });
   };
 

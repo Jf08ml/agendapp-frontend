@@ -124,6 +124,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       opened={opened}
       onClose={onClose}
       title={client ? "Editar Cliente" : "Crear Cliente"}
+      zIndex={1000}
     >
       <Box>
         <TextInput
