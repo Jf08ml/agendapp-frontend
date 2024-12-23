@@ -68,7 +68,9 @@ const SearchClient: React.FC = () => {
             })
           );
         }
-        navigate("/plan-viewer", { state: { client } });
+        navigate("/plan-viewer", {
+          state: { client, organization: client.organizationId },
+        });
       }
     } catch (error) {
       console.error("Error searching client:", error);
@@ -83,7 +85,7 @@ const SearchClient: React.FC = () => {
   return (
     <Flex justify="center" align="center" style={{ height: "80vh" }}>
       <Box
-        bg="#DE739E"
+        bg="#1A202C"
         p="xl"
         style={{
           borderRadius: "8px",

@@ -12,10 +12,10 @@ export interface Organization {
   name: string;
   email: string;
   location: {
-    lat: number; // Latitud de la ubicación
-    lng: number; // Longitud de la ubicación
+    lat: number;
+    lng: number; 
   };
-  address?: string; // Dirección formateada (opcional)
+  address?: string; 
   password?: string;
   phoneNumber: string;
   facebookUrl?: string;
@@ -24,6 +24,14 @@ export interface Organization {
   tiktokUrl?: string;
   role: Role;
   isActive?: boolean;
+  referredCount?: number; 
+  referredReward?: string; 
+  serviceCount?: number; 
+  serviceReward?: string; 
+  openingHours?: { 
+    start: string; 
+    end: string; 
+  };
 }
 
 // Crear una nueva organización

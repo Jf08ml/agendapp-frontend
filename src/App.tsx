@@ -100,11 +100,21 @@ function App() {
       >
         <AppShell.Header bg="#DE739E">
           <Flex align="center" px="sm">
-            <Burger opened={opened} onClick={toggle} size="sm" color="white" />
+            <Burger
+              opened={opened}
+              onClick={toggle}
+              size="sm"
+              color="white"
+              onMouseEnter={() => opened || toggle()}
+            />
             <Header />
           </Flex>
         </AppShell.Header>
-        <AppShell.Navbar p="md" bg="#DE739E">
+        <AppShell.Navbar
+          p="md"
+          bg="#DE739E"
+          onMouseLeave={() => opened && close()}
+        >
           <NavbarLinks closeNavbar={close} />
         </AppShell.Navbar>
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>

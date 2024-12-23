@@ -1,7 +1,6 @@
 import React from "react";
 import {
   Paper,
-  Group,
   Text,
   Badge,
   Menu,
@@ -52,11 +51,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   return (
     <Paper
       shadow="xs"
-      p="sm"
       radius="sm"
       style={{
         backgroundColor: backgroundColor,
         color: "#333",
+        padding: "5px",
         borderLeft: `4px solid ${borderColor}`,
         display: "flex",
         flexDirection: "column",
@@ -70,12 +69,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       {appointment.employeeRequestedByClient && (
         <Badge
           color="violet"
-          size="xs"
+          size="xxs"
           radius="xxs"
           style={{
             position: "absolute",
             top: "-1px",
-            left: "0px",
+            right: "0px",
             fontSize: "8px",
             boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
           }}
@@ -85,16 +84,16 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       )}
 
       {/* Contenido principal */}
-      <Group justify="space-between" mb="xs">
-        <Text fw={500} size="sm" truncate>
-          {appointment.service.name}
-        </Text>
-        <Badge color="blue" variant="light">
-          {format(appointment.startDate, "h:mm a")} -{" "}
-          {format(appointment.endDate, "h:mm a")}
-        </Badge>
-      </Group>
-      <Text size="sm" c="dimmed" truncate>
+
+      <Text fw={500} size="xs" truncate>
+        {appointment.service.name}
+      </Text>
+      <Badge color="blue" size="xs" variant="light">
+        {format(appointment.startDate, "h:mm a")} -{" "}
+        {format(appointment.endDate, "h:mm a")}
+      </Badge>
+
+      {/* <Text size="sm" c="dimmed" truncate>
         <Flex gap="xs">
           <Avatar
             src={appointment.employee.profileImage}
@@ -111,7 +110,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           </Avatar>
           {appointment.employee.names}
         </Flex>
-      </Text>
+      </Text> */}
       <Text size="xs" c="dimmed" mt="xs" truncate>
         <Flex gap="xs">
           <Avatar

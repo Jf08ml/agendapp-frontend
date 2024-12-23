@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
-import { Organization, getOrganizationById } from "../../services/organizationService";
+import {
+  Organization,
+  getOrganizationById,
+} from "../../services/organizationService";
 
 interface OrganizationState {
   organization: Organization | null;
@@ -22,8 +25,10 @@ export const fetchOrganization = createAsyncThunk(
       const organization = await getOrganizationById(organizationId);
       return organization;
     } catch (error) {
-        console.log("Error al cargar la información de la organización:", error);
-      return rejectWithValue("Error al cargar la información de la organización");
+      console.log("Error al cargar la información de la organización:", error);
+      return rejectWithValue(
+        "Error al cargar la información de la organización"
+      );
     }
   }
 );
@@ -37,6 +42,9 @@ const organizationSlice = createSlice({
       state.loading = false;
       state.error = null;
     },
+    updateOrganizationState: (state, action: PayloadAction<Organization>) => {
+      state.organization = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -44,10 +52,13 @@ const organizationSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchOrganization.fulfilled, (state, action: PayloadAction<Organization | null>) => {
-        state.loading = false;
-        state.organization = action.payload;
-      })
+      .addCase(
+        fetchOrganization.fulfilled,
+        (state, action: PayloadAction<Organization | null>) => {
+          state.loading = false;
+          state.organization = action.payload;
+        }
+      )
       .addCase(fetchOrganization.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
@@ -55,6 +66,7 @@ const organizationSlice = createSlice({
   },
 });
 
-export const { clearOrganization } = organizationSlice.actions;
+export const { clearOrganization, updateOrganizationState } =
+  organizationSlice.actions;
 
 export default organizationSlice.reducer;

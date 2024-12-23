@@ -35,8 +35,7 @@ const Home = () => {
         ¡Holaaa! Bienvenido
       </Title>
       <Text ta="center" c="dimmed" mb="xl">
-        Estamos felices de tenerte aquí. Dale a tus uñas y pestañas el cuidado
-        que merecen. 🌟
+        Estamos felices de tenerte aquí. Tus uñas y pestañas merecen lo mejor, ¡y aquí lo encontrarás! ✨
       </Text>
 
       <Grid>

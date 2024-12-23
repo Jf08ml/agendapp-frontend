@@ -13,13 +13,19 @@ import {
   Button,
 } from "@mantine/core";
 import { Client as ClientType } from "../../services/clientService";
+import { Organization } from "../../services/organizationService";
 
 interface PlanInfoProps {
   client: ClientType;
+  organization: Organization | null;
   onLogout: () => void;
 }
 
-const PlanInfo: React.FC<PlanInfoProps> = ({ client, onLogout }) => {
+const PlanInfo: React.FC<PlanInfoProps> = ({
+  client,
+  organization,
+  onLogout,
+}) => {
   return (
     <Box p="md">
       <Group justify="center" grow>
@@ -66,7 +72,8 @@ const PlanInfo: React.FC<PlanInfoProps> = ({ client, onLogout }) => {
               </Badge>
               <LoyaltyPlan
                 servicesTaken={client.servicesTaken || 0}
-                totalServices={7}
+                totalServices={organization?.serviceCount as number}
+                serviceReward={organization?.serviceReward as string}
               />
             </Card.Section>
 
@@ -79,7 +86,8 @@ const PlanInfo: React.FC<PlanInfoProps> = ({ client, onLogout }) => {
               </Badge>
               <ReferredPlan
                 referralsMade={client.referralsMade || 0}
-                totalReferrals={5}
+                totalReferrals={organization?.referredCount as number}
+                referredReward={organization?.referredReward as string}
               />
             </Card.Section>
 

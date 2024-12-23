@@ -1,4 +1,15 @@
-import { Stack, Select, Group, Avatar, Text, Paper, Center } from "@mantine/core";
+import {
+  Stack,
+  Select,
+  Group,
+  Avatar,
+  Text,
+  Paper,
+  Center,
+  Modal,
+  Image,
+} from "@mantine/core";
+import { useState } from "react";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import { Reservation } from "../../services/reservationService";
@@ -21,6 +32,9 @@ const StepServiceEmployee: React.FC<StepServiceEmployeeProps> = ({
   bookingData,
   setBookingData,
 }) => {
+  const [modalOpened, setModalOpened] = useState(false); // Estado para controlar el modal
+  const [modalImage, setModalImage] = useState<string | null>(null); // Imagen a mostrar en el modal
+
   const handleServiceSelection = (serviceId: string) => {
     setBookingData({
       ...bookingData,
@@ -38,14 +52,38 @@ const StepServiceEmployee: React.FC<StepServiceEmployeeProps> = ({
     (e) => e._id === bookingData.employeeId
   );
 
+  const openImageModal = (imageSrc: string) => {
+    setModalImage(imageSrc);
+    setModalOpened(true);
+  };
+
   return (
     <Stack>
+      {/* Modal para ampliar la imagen */}
+      <Modal
+        opened={modalOpened}
+        onClose={() => setModalOpened(false)}
+        centered
+        size="lg"
+        title="Empleado"
+      >
+        {modalImage && (
+          <Image src={modalImage} alt="Empleado" height={400} fit="contain" />
+        )}
+      </Modal>
+
       {/* Mostrar información del empleado seleccionado */}
       {selectedEmployee && (
         <Paper shadow="sm" radius="md" p="md" withBorder>
           <Center>
             <Group>
-              <Avatar src={selectedEmployee.profileImage} size={80} radius="xl" />
+              <Avatar
+                src={selectedEmployee.profileImage}
+                size={120}
+                radius="xl"
+                style={{ cursor: "pointer" }}
+                onClick={() => openImageModal(selectedEmployee.profileImage!)}
+              />
               <Stack p={0}>
                 <Text size="lg" fw={500}>
                   {selectedEmployee.names}
@@ -82,7 +120,7 @@ const StepServiceEmployee: React.FC<StepServiceEmployeeProps> = ({
             label: employee.names,
           })),
         ]}
-        value={bookingData.employeeId as string || "none"}
+        value={(bookingData.employeeId as string) || "none"}
         disabled={!bookingData.serviceId}
         onChange={(value) =>
           handleEmployeeSelection(value === "none" ? null : value!)

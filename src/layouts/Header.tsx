@@ -1,11 +1,13 @@
-import { Text, Box, Group, ActionIcon } from "@mantine/core";
-import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { Text, Box, Group, ActionIcon, Menu } from "@mantine/core";
+import { FaFacebook, FaGlobe, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
+import { useMediaQuery } from "@mantine/hooks";
 
 const Header = () => {
+  const isVerySmallScreen = useMediaQuery("(max-width: 346px)");
   const [menuOpened] = useState(false);
 
   const organization = useSelector((state: RootState) => state.organization.organization);
@@ -23,8 +25,9 @@ const Header = () => {
         <Text
           size="xl"
           fw={900}
-          variant="gradient"
-          gradient={{ from: "#DE739E", to: "#FFF5F7", deg: 182 }}
+          style={{
+            textShadow: "2px 2px 4px rgba(0, 0, 0, 0.5)",
+          }}
         >
           <Link to="/" style={{ textDecoration: "none", color: "white" }}>
             {name}
@@ -54,43 +57,111 @@ const Header = () => {
           </Text>
         </Group>
 
-        <Group
-          gap="xs"
-          className="social-icons"
-          style={{
-            marginTop: menuOpened ? "1rem" : "0",
-            justifyContent: "center",
-          }}
-        >
-          {facebookUrl && (
-            <a href={facebookUrl} target="_blank" rel="noopener noreferrer">
-              <ActionIcon radius="xl" size="md" variant="light" color="blue">
-                <FaFacebook />
+        {/* Redes Sociales */}
+        {isVerySmallScreen ? (
+          // Mostrar menú en pantallas muy pequeñas
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <ActionIcon radius="xl" size="md" variant="filled" color="dark">
+                <FaGlobe />
               </ActionIcon>
-            </a>
-          )}
-          {instagramUrl && (
-            <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
-              <ActionIcon radius="xl" size="md" variant="light" color="pink">
-                <FaInstagram />
-              </ActionIcon>
-            </a>
-          )}
-          {whatsappUrl && (
-            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-              <ActionIcon radius="xl" size="md" variant="light" color="green">
-                <FaWhatsapp />
-              </ActionIcon>
-            </a>
-          )}
-          {tiktokUrl && (
-            <a href={tiktokUrl} target="_blank" rel="noopener noreferrer">
-              <ActionIcon radius="xl" size="md" variant="light" color="teal">
-                <FaTiktok />
-              </ActionIcon>
-            </a>
-          )}
-        </Group>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {facebookUrl && (
+                <Menu.Item
+                  leftSection={<FaFacebook />}
+                  component="a"
+                  href={facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Facebook
+                </Menu.Item>
+              )}
+              {instagramUrl && (
+                <Menu.Item
+                  leftSection={<FaInstagram />}
+                  component="a"
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Instagram
+                </Menu.Item>
+              )}
+              {whatsappUrl && (
+                <Menu.Item
+                  leftSection={<FaWhatsapp />}
+                  component="a"
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  WhatsApp
+                </Menu.Item>
+              )}
+              {tiktokUrl && (
+                <Menu.Item
+                  leftSection={<FaTiktok />}
+                  component="a"
+                  href={tiktokUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  TikTok
+                </Menu.Item>
+              )}
+            </Menu.Dropdown>
+          </Menu>
+        ) : (
+          // Mostrar íconos normalmente en pantallas más grandes
+          <Group
+            gap="xs"
+            className="social-icons"
+            style={{
+              justifyContent: "center",
+            }}
+          >
+            {facebookUrl && (
+              <a href={facebookUrl} target="_blank" rel="noopener noreferrer">
+                <ActionIcon radius="xl" size="md" variant="filled" color="blue">
+                  <FaFacebook />
+                </ActionIcon>
+              </a>
+            )}
+            {instagramUrl && (
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                <ActionIcon radius="xl" size="md" variant="filled" color="pink">
+                  <FaInstagram />
+                </ActionIcon>
+              </a>
+            )}
+            {whatsappUrl && (
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                <ActionIcon
+                  radius="xl"
+                  size="md"
+                  variant="filled"
+                  color="green"
+                >
+                  <FaWhatsapp />
+                </ActionIcon>
+              </a>
+            )}
+            {tiktokUrl && (
+              <a href={tiktokUrl} target="_blank" rel="noopener noreferrer">
+                <ActionIcon
+                  radius="xl"
+                  size="md"
+                  variant="filled"
+                  color="black"
+                >
+                  <FaTiktok />
+                </ActionIcon>
+              </a>
+            )}
+          </Group>
+        )}
       </Group>
     </Box>
   );

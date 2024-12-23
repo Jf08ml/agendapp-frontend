@@ -11,6 +11,8 @@ import {
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 
 interface DayModalProps {
   opened: boolean;
@@ -35,6 +37,9 @@ const DayModal: React.FC<DayModalProps> = ({
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
 
   if (!selectedDay) return null;
 
@@ -59,11 +64,19 @@ const DayModal: React.FC<DayModalProps> = ({
     ...appointments.map((app) => getHours(new Date(app.endDate)))
   );
 
-  const startHour = Math.min(earliestAppointment, 5);
-  const endHour = Math.max(22, latestAppointment);
+  const calculateStartHour = organization?.openingHours?.start
+    ? parseInt(organization.openingHours.start.split(":")[0], 10)
+    : 8;
+
+  const calculateEndHour = organization?.openingHours?.end
+    ? parseInt(organization.openingHours.end.split(":")[0], 10)
+    : 22;
+
+  const startHour = Math.min(earliestAppointment, calculateStartHour);
+  const endHour = Math.max(calculateEndHour, latestAppointment);
   const timeIntervals = generateTimeIntervals(startHour, endHour, selectedDay);
 
-  const HOUR_HEIGHT = 100;
+  const HOUR_HEIGHT = 60;
   const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
   const CARD_WIDTH = 180;
 

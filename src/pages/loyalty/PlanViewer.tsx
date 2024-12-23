@@ -3,15 +3,22 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Box } from "@mantine/core";
 import PlanInfo from "./PlanInfo";
 import { Client as ClientType } from "../../services/clientService";
+import { Organization } from "../../services/organizationService";
 
 const PlanViewer: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [client, setClient] = useState<ClientType | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>( null);
 
   useEffect(() => {
-    if (location.state && location.state.client) {
+    if (
+      location.state &&
+      location.state.client &&
+      location.state.organization
+    ) {
       setClient(location.state.client);
+      setOrganization(location.state.organization);
     } else {
       navigate("/");
     }
@@ -29,7 +36,11 @@ const PlanViewer: React.FC = () => {
 
   return (
     <Box style={{ margin: "auto" }}>
-      <PlanInfo client={client} onLogout={handleLogout} />
+      <PlanInfo
+        client={client}
+        organization={organization}
+        onLogout={handleLogout}
+      />
     </Box>
   );
 };

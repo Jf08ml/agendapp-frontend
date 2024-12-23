@@ -4,12 +4,13 @@ import { Box, Group, Text, Progress } from '@mantine/core';
 interface ReferredPlanProps {
   referralsMade: number;
   totalReferrals: number;
+  referredReward: string;
 }
 
-const ReferredPlan: React.FC<ReferredPlanProps> = ({ referralsMade, totalReferrals }) => {
+const ReferredPlan: React.FC<ReferredPlanProps> = ({ referralsMade, totalReferrals, referredReward }) => {
   return (
     <Box
-      bg="#DE739E"
+      bg="#1A202C"
       p="xl"
       m="auto"
         mt="sm"
@@ -37,11 +38,11 @@ const ReferredPlan: React.FC<ReferredPlanProps> = ({ referralsMade, totalReferra
 
       {referralsMade === totalReferrals ? (
         <Text mt="md" c="green" fw={500}>
-          ¡Felicidades! Has alcanzado {totalReferrals} referidos. Recibe tu montura nueva.
+          ¡Felicidades! Has alcanzado {totalReferrals} referidos. Recibe {referredReward}.
         </Text>
       ) : (
         <Text mt="md" c="dimmed">
-          Completa {totalReferrals - referralsMade} referido(s) más para obtener unas pestañas gratis.
+          Completa {totalReferrals - referralsMade} referido(s) más para obtener {referredReward}.
         </Text>
       )}
     </Box>
