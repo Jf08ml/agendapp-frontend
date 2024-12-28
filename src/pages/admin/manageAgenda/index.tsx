@@ -62,6 +62,7 @@ const ScheduleView: React.FC = () => {
     fetchClients();
     fetchEmployees();
     fetchAppointments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -168,17 +169,23 @@ const ScheduleView: React.FC = () => {
     return combinedDate;
   };
 
-  const openModal = (selectedDay: Date | null, interval?: Date) => {
+  const openModal = (
+    selectedDay: Date | null,
+    interval?: Date,
+    employeeId?: string
+  ) => {
     const startDate =
       combineDateAndTime(selectedDay, interval || new Date()) || new Date();
 
     if (clients.length > 0 && employees.length > 0) {
-      if (!newAppointment.startDate) {
-        setNewAppointment({
-          ...newAppointment,
-          startDate,
-        });
-      }
+      setNewAppointment((prev) => ({
+        ...prev,
+        startDate: prev.startDate || startDate,
+        employee: employeeId
+          ? employees.find((employee) => employee._id === employeeId) ||
+            prev.employee
+          : prev.employee,
+      }));
       setModalOpenedAppointment(true);
     } else {
       showNotification({
@@ -396,6 +403,7 @@ const ScheduleView: React.FC = () => {
         </Group>
       </Group>
       <CustomCalendar
+        employees={employees}
         appointments={appointments}
         onOpenModal={openModal}
         onEditAppointment={handleEditAppointment}

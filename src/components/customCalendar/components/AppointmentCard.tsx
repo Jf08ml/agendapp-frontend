@@ -139,6 +139,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             variant="transparent"
             color="dark"
             style={{ position: "absolute", bottom: 5, right: 5, zIndex: 10 }}
+            onClick={(event) => event.stopPropagation()} 
           >
             {appointment.status === "confirmed" ? (
               <BiLock />
@@ -147,7 +148,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             )}
           </ActionIcon>
         </Menu.Target>
-        <Menu.Dropdown>
+        <Menu.Dropdown onClick={(event) => event.stopPropagation()} >
           <Menu.Item
             leftSection={<BiEdit size={16} />}
             disabled={!hasPermission("appointments:update")}

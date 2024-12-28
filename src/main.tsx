@@ -12,7 +12,9 @@ import { Notifications } from "@mantine/notifications";
 import { Provider } from "react-redux";
 import { store } from "./app/store.ts";
 import { ModalsProvider } from "@mantine/modals";
-import GoogleMapsProvider from "./utils/GoogleMapsProvider.tsx"
+import GoogleMapsProvider from "./utils/GoogleMapsProvider.tsx";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 const theme = createTheme({
   fontFamily: "Playfair Display, serif",
@@ -35,7 +37,9 @@ createRoot(document.getElementById("root")!).render(
       <ModalsProvider>
         <Notifications />
         <GoogleMapsProvider>
-          <App />
+          <DndProvider backend={HTML5Backend}>
+            <App />
+          </DndProvider>
         </GoogleMapsProvider>
       </ModalsProvider>
     </MantineProvider>

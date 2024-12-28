@@ -17,8 +17,10 @@ import {
   isSameDay,
 } from "date-fns";
 import { useMediaQuery } from "@mantine/hooks";
+import { Employee } from "../../services/employeeService";
 
 interface CustomCalendarProps {
+  employees: Employee[];
   appointments: Appointment[];
   onOpenModal: (selectedDay: Date | null, interval: Date) => void;
   onEditAppointment: (appointment: Appointment) => void;
@@ -27,6 +29,7 @@ interface CustomCalendarProps {
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
+  employees,
   appointments,
   onOpenModal,
   onEditAppointment,
@@ -139,6 +142,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         selectedDay={selectedDay}
         onClose={() => setModalOpened(false)}
         onOpenModal={onOpenModal}
+        employees={employees}
         getAppointmentsForDay={getAppointmentsForDay}
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
