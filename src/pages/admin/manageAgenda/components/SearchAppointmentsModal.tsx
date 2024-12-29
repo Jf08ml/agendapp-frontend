@@ -1,4 +1,4 @@
-import React, { useState, FC, useMemo } from "react";
+import { useState, FC, useMemo } from "react";
 import {
   Modal,
   TextInput,
