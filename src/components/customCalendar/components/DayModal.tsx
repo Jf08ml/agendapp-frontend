@@ -1,12 +1,18 @@
-import { FC } from "react";
-import { Modal, Box, ScrollArea } from "@mantine/core";
-import { format, getHours } from "date-fns";
+import { FC, useState, useEffect } from "react";
+import {
+  Modal,
+  Box,
+  ScrollArea,
+  Button,
+  Text,
+} from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { format, getHours, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment } from "../../../services/appointmentService";
 import { Employee } from "../../../services/employeeService";
-
 import {
   generateTimeIntervals,
   organizeAppointmentsByEmployee,
@@ -20,6 +26,11 @@ import TimeColumn from "./subcomponents/DayModalTimeColumn";
 import TimeGrid from "./subcomponents/DayModalTimeGrid";
 import EmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
 
+/* Constantes de diseño */
+export const HOUR_HEIGHT = 60;
+export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
+export const CARD_WIDTH = 180;
+
 interface DayModalProps {
   opened: boolean;
   selectedDay: Date | null;
@@ -31,11 +42,6 @@ interface DayModalProps {
   onConfirmAppointment: (appointmentId: string) => void;
   employees: Employee[];
 }
-
-/* Constantes de diseño */
-export const HOUR_HEIGHT = 60;
-export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
-export const CARD_WIDTH = 180;
 
 const DayModal: FC<DayModalProps> = ({
   opened,
@@ -54,13 +60,33 @@ const DayModal: FC<DayModalProps> = ({
     (state: RootState) => state.organization.organization
   );
 
-  if (!selectedDay) return null;
+  // Hook de Mantine para saber si el viewport es menor a 768px
+  const isSmallScreen = useMediaQuery("(max-width: 768px)");
 
-  /* Obtener las citas y organizarlas por empleado */
-  const appointments = getAppointmentsForDay(selectedDay);
+  // Estado local para controlar el día
+  const [currentDay, setCurrentDay] = useState<Date | null>(selectedDay);
+
+  // Sincronizar el estado local cuando la prop selectedDay cambie
+  useEffect(() => {
+    setCurrentDay(selectedDay);
+  }, [selectedDay]);
+
+  if (!currentDay) return null;
+
+  // Funciones de navegación de día
+  const goToNextDay = () => {
+    setCurrentDay((prev) => (prev ? addDays(prev, 1) : null));
+  };
+
+  const goToPreviousDay = () => {
+    setCurrentDay((prev) => (prev ? addDays(prev, -1) : null));
+  };
+
+  // Obtener citas del día actual
+  const appointments = getAppointmentsForDay(currentDay);
   const appointmentsByEmployee = organizeAppointmentsByEmployee(appointments);
 
-  /* Calcular rango horario según las citas y horario de la organización */
+  // Calcular el rango horario
   const earliestAppointment = Math.min(
     ...appointments.map((app) => getHours(new Date(app.startDate)))
   );
@@ -78,16 +104,15 @@ const DayModal: FC<DayModalProps> = ({
   const startHour = Math.min(earliestAppointment, orgStartHour);
   const endHour = Math.max(orgEndHour, latestAppointment);
 
-  /* Generar intervalos de tiempo (e.g., cada hora) */
-  const timeIntervals = generateTimeIntervals(startHour, endHour, selectedDay);
+  // Generar intervalos de tiempo
+  const timeIntervals = generateTimeIntervals(startHour, endHour, currentDay);
 
-  /* Render principal */
   return (
     <Modal
       opened={opened}
       onClose={onClose}
       fullScreen
-      title={`Agenda para el ${format(selectedDay, "EEEE, d MMMM", {
+      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", {
         locale: es,
       })}`}
       size="xl"
@@ -103,25 +128,46 @@ const DayModal: FC<DayModalProps> = ({
         scrollbarSize={10}
         offsetScrollbars
       >
-        {/* Cabecera fija con los nombres de empleados */}
+        <Box
+          p="xs"
+          style={{
+            display: "flex",
+            alignItems: isSmallScreen ? "flex-start" : "center",
+            flexDirection: isSmallScreen ? "column" : "row",
+            justifyContent: "space-between",
+            gap: isSmallScreen ? 8 : 0,
+          }}
+        >
+          {/* Botones para cambiar día */}
+          <Box style={{ display: "flex", gap: 8 }}>
+            <Button size="xs" variant="outline" onClick={goToPreviousDay}>
+              Día anterior
+            </Button>
+            <Button size="xs" variant="outline" onClick={goToNextDay}>
+              Día siguiente
+            </Button>
+          </Box>
+
+          {/* Texto con el total de citas */}
+          <Text size="sm" mt={isSmallScreen ? 8 : 0}>
+            Total de citas para {format(currentDay, "d MMM", { locale: es })}:{" "}
+            <strong>{appointments.length}</strong>
+          </Text>
+        </Box>
+
         <Header employees={employees} />
 
-        {/* Contenedor de la línea de tiempo y citas */}
         <Box style={{ display: "flex", position: "relative" }}>
-          {/* Columna de Intervalos de Tiempo ocupando todo el alto */}
           <TimeColumn timeIntervals={timeIntervals} />
 
-          {/* Contenedor que ocupa el resto del espacio horizontal */}
           <Box style={{ flex: 1, position: "relative" }}>
-            {/* Las líneas de fondo (TimeGrid) siempre atrás (zIndex: 0) */}
             <TimeGrid
               timeIntervals={timeIntervals}
               hasPermission={hasPermission}
               onOpenModal={onOpenModal}
-              selectedDay={selectedDay}
+              selectedDay={currentDay}
             />
 
-            {/* Columnas de Empleados con citas */}
             <Box style={{ display: "flex", position: "relative", zIndex: 1 }}>
               {employees.map((employee) => (
                 <EmployeeColumn
@@ -131,7 +177,7 @@ const DayModal: FC<DayModalProps> = ({
                   timeIntervals={timeIntervals}
                   startHour={startHour}
                   endHour={endHour}
-                  selectedDay={selectedDay}
+                  selectedDay={currentDay}
                   isExpanded={isExpanded}
                   handleToggleExpand={handleToggleExpand}
                   onEditAppointment={onEditAppointment}

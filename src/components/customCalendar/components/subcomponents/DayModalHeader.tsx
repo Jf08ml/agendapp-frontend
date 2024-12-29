@@ -10,7 +10,6 @@ interface HeaderProps {
 const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
   return (
     <Box
-      bg="gray"
       style={{
         display: "flex",
         position: "sticky",
@@ -23,21 +22,25 @@ const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
       <Box style={{ width: "80px" }} />
 
       {/* Encabezados de cada empleado */}
-      {employees.map((employee) => (
-        <Box
-          bg="gray"
-          key={employee._id}
-          style={{
-            width: `${CARD_WIDTH}px`,
-            textAlign: "center",
-            marginLeft: "10px",
-            border: "1px solid gray",
-            borderRadius: "5px",
-          }}
-        >
-          <Text style={{ fontSize: "14px" }}>{employee.names}</Text>
-        </Box>
-      ))}
+      {employees.map((employee) => {
+        const color = employee.color || "#ccc";
+
+        return (
+          <Box
+            key={employee._id}
+            style={{
+              width: `${CARD_WIDTH}px`,
+              textAlign: "center",
+              marginLeft: "10px",
+              border: "1px solid gray",
+              borderRadius: "5px",
+              backgroundColor: color,
+            }}
+          >
+            <Text style={{ fontSize: "14px" }}>{employee.names}</Text>
+          </Box>
+        );
+      })}
     </Box>
   );
 };

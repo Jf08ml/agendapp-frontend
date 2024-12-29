@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
 import { Box, Button, Group, Title } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -25,6 +26,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
+import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
 
 interface CreateAppointmentPayload {
   service: Service;
@@ -49,8 +51,12 @@ const ScheduleView: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
 
+  // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
+
+  // Datos de la organización
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
@@ -62,10 +68,10 @@ const ScheduleView: React.FC = () => {
     fetchClients();
     fetchEmployees();
     fetchAppointments();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    // Cada vez que cambie el empleado seleccionado, ajustamos servicios
     if (newAppointment.employee) {
       const selectedEmployee = employees.find(
         (employee) => employee._id === newAppointment.employee?._id
@@ -76,8 +82,11 @@ const ScheduleView: React.FC = () => {
     } else {
       setFilteredServices([]);
     }
-  }, [newAppointment.employee, employees, setFilteredServices]);
+  }, [newAppointment.employee, employees]);
 
+  /**
+   * OBTENER CLIENTES
+   */
   const fetchClients = async () => {
     setLoadingAgenda(true);
     try {
@@ -92,6 +101,9 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * OBTENER EMPLEADOS
+   */
   const fetchEmployees = async () => {
     setLoadingAgenda(true);
     try {
@@ -99,8 +111,13 @@ const ScheduleView: React.FC = () => {
         organizationId as string
       );
 
-      // Filtrar los empleados que tengan isActive: true
-      const activeEmployees = response.filter((employee) => employee.isActive);
+      // Filtrar por "isActive" para ocultar los inactivos
+      let activeEmployees = response.filter((employee) => employee.isActive);
+
+      // Si NO tiene permisos para ver todos, filtrar solo el suyo
+      if (!hasPermission("appointments:view_all")) {
+        activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
+      }
 
       setEmployees(activeEmployees);
     } catch (error) {
@@ -110,15 +127,21 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * OBTENER CITAS
+   */
   const fetchAppointments = async () => {
     setLoadingAgenda(true);
     try {
       const response = await getAppointmentsByOrganizationId(
         organizationId as string
       );
+
+      // Si tiene permiso "view_all", mostramos todas
       if (hasPermission("appointments:view_all")) {
         setAppointments(response);
       } else {
+        // Caso contrario, solo las que correspondan a su empleado
         const filteredAppointments = response.filter(
           (appointment) => appointment.employee._id === userId
         );
@@ -131,6 +154,9 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * MANEJO DE SERVICIO
+   */
   const handleServiceChange = (serviceId: string | null) => {
     const selectedService = filteredServices.find(
       (service) => service._id === serviceId
@@ -138,6 +164,9 @@ const ScheduleView: React.FC = () => {
     setNewAppointment({ ...newAppointment, service: selectedService });
   };
 
+  /**
+   * MANEJO DE EMPLEADO
+   */
   const handleEmployeeChange = (value: string | null) => {
     const selectedEmployee = employees.find((emp) => emp._id === value);
     if (selectedEmployee) {
@@ -149,11 +178,17 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * MANEJO DE CLIENTE
+   */
   const handleClientChange = (clientId: string | null) => {
     const selectedClient = clients.find((client) => client._id === clientId);
     setNewAppointment({ ...newAppointment, client: selectedClient });
   };
 
+  /**
+   * COMBINAR FECHA + HORA
+   */
   const combineDateAndTime = (
     dateDay: Date | null,
     dateHour: Date
@@ -169,6 +204,9 @@ const ScheduleView: React.FC = () => {
     return combinedDate;
   };
 
+  /**
+   * ABRIR MODAL NUEVA CITA
+   */
   const openModal = (
     selectedDay: Date | null,
     interval?: Date,
@@ -188,6 +226,7 @@ const ScheduleView: React.FC = () => {
       }));
       setModalOpenedAppointment(true);
     } else {
+      // Notificación si no cargaron datos aún
       showNotification({
         title: "Error",
         message: "Los datos aún no se han cargado",
@@ -198,6 +237,9 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * CERRAR MODAL
+   */
   const closeModal = () => {
     setNewAppointment({});
     setModalOpenedAppointment(false);
@@ -205,6 +247,9 @@ const ScheduleView: React.FC = () => {
     setFilteredServices([]);
   };
 
+  /**
+   * EDITAR CITA
+   */
   const handleEditAppointment = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
     setNewAppointment({
@@ -218,12 +263,15 @@ const ScheduleView: React.FC = () => {
     setModalOpenedAppointment(true);
   };
 
+  /**
+   * CANCELAR CITA
+   */
   const handleCancelAppointment = (appointmentId: string) => {
     openConfirmModal({
       title: "Cancelar cita",
       children: (
         <p>
-          Al cancelar se <strong>elimina</strong> el registro de la cita ¿Estás
+          Al cancelar se <strong>elimina</strong> el registro de la cita. ¿Estás
           seguro de que deseas cancelar esta cita?
         </p>
       ),
@@ -232,10 +280,6 @@ const ScheduleView: React.FC = () => {
       confirmProps: { color: "red" },
       onConfirm: async () => {
         try {
-          // const response = await updateAppointment(appointmentId, {
-          //   status: "cancelled",
-          // });
-          // if (response && response.status === "cancelled") {
           await deleteAppointment(appointmentId);
           showNotification({
             title: "Éxito",
@@ -245,7 +289,6 @@ const ScheduleView: React.FC = () => {
             position: "top-right",
           });
           fetchAppointments();
-          // }
         } catch (error) {
           showNotification({
             title: "Error",
@@ -260,6 +303,9 @@ const ScheduleView: React.FC = () => {
     });
   };
 
+  /**
+   * CONFIRMAR CITA
+   */
   const handleConfirmAppointment = (appointmentId: string) => {
     openConfirmModal({
       title: "Confirmar cita",
@@ -292,6 +338,9 @@ const ScheduleView: React.FC = () => {
     });
   };
 
+  /**
+   * CREAR O ACTUALIZAR CITA
+   */
   const addOrUpdateAppointment = async () => {
     try {
       const {
@@ -317,6 +366,7 @@ const ScheduleView: React.FC = () => {
         };
 
         if (selectedAppointment) {
+          // Update existing
           try {
             const response = await updateAppointment(
               selectedAppointment._id,
@@ -343,6 +393,7 @@ const ScheduleView: React.FC = () => {
             console.error(error);
           }
         } else {
+          // Create new
           try {
             const response = await createAppointment(appointmentPayload);
             if (response) {
@@ -366,6 +417,7 @@ const ScheduleView: React.FC = () => {
             console.error(error);
           }
         }
+        // refrescamos la agenda
         fetchAppointments();
       }
     } catch (error) {
@@ -380,6 +432,7 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  // Muestra un loader si estamos cargando
   if (loadingAgenda) {
     return <CustomLoader />;
   }
@@ -389,11 +442,24 @@ const ScheduleView: React.FC = () => {
       <Group justify="space-between" mb="md">
         <Title order={2}>Gestionar Agenda</Title>
         <Group align="center">
-          <Button variant="outline" color="blue" onClick={fetchAppointments}>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setShowSearchModal(true)}
+          >
+            Buscar Citas
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            color="blue"
+            onClick={fetchAppointments}
+          >
             Actualizar agenda
           </Button>
           {hasPermission("appointments:create") && (
             <Button
+              size="xs"
               color="blue"
               onClick={() => openModal(new Date(), new Date())}
             >
@@ -402,14 +468,16 @@ const ScheduleView: React.FC = () => {
           )}
         </Group>
       </Group>
+
       <CustomCalendar
-        employees={employees}
-        appointments={appointments}
+        employees={employees} // ya filtrados según permisos
+        appointments={appointments} // también filtrados
         onOpenModal={openModal}
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}
         onConfirmAppointment={handleConfirmAppointment}
       />
+
       <AppointmentModal
         opened={modalOpenedAppointment}
         onClose={closeModal}
@@ -424,6 +492,11 @@ const ScheduleView: React.FC = () => {
         onClientChange={handleClientChange}
         onSave={addOrUpdateAppointment}
         fetchClients={fetchClients}
+      />
+      <SearchAppointmentsModal
+        opened={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        appointments={appointments}
       />
     </Box>
   );

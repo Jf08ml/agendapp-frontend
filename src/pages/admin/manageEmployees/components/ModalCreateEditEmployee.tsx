@@ -16,7 +16,10 @@ import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { IoEyeOff } from "react-icons/io5";
 import { FaEye } from "react-icons/fa";
 import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
-import { uploadImage } from "../../../../services/imageService"; // Importa el servicio de carga
+
+import { ColorInput } from "@mantine/core"; // <--- Agrega esta importación
+
+import { uploadImage } from "../../../../services/imageService"; 
 import { Employee } from "../../../../services/employeeService";
 import { Service } from "../../../../services/serviceService";
 
@@ -51,9 +54,11 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     customPermissions: [],
     isActive: true,
     profileImage: "",
+    color: "", // <--- Aseguramos el campo color
   });
-  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar contraseña
-  const [isUploading, setIsUploading] = useState(false); // Indicador de carga de imagen
+
+  const [showPassword, setShowPassword] = useState(false); 
+  const [isUploading, setIsUploading] = useState(false); 
 
   useEffect(() => {
     if (employee) {
@@ -73,6 +78,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         customPermissions: employee.customPermissions || [],
         isActive: employee.isActive ?? true,
         profileImage: employee.profileImage || "",
+        color: employee.color || "", // <-- tomamos el color actual (si existe)
       });
     } else {
       resetForm();
@@ -80,9 +86,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
   }, [employee]);
 
   const handleSave = () => {
-    if (isUploading) {
-      return;
-    }
+    if (isUploading) return;
     onSave(editingEmployee);
     handleClose();
   };
@@ -91,7 +95,10 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     setIsUploading(true); 
     try {
       const imageUrl = await uploadImage(files[0]);
-      setEditingEmployee({ ...editingEmployee, profileImage: imageUrl as string }); 
+      setEditingEmployee({
+        ...editingEmployee,
+        profileImage: imageUrl as string,
+      });
     } catch (error) {
       console.error("Error al cargar la imagen:", error);
     } finally {
@@ -125,6 +132,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
       customPermissions: [],
       isActive: true,
       profileImage: "",
+      color: "",
     });
   };
 
@@ -147,6 +155,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             })
           }
         />
+
         <TextInput
           label="Posición"
           value={editingEmployee.position}
@@ -157,6 +166,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             })
           }
         />
+
         <TextInput
           label="Número de teléfono"
           value={editingEmployee.phoneNumber}
@@ -175,13 +185,14 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             value: service._id,
             label: service.name,
           }))}
-          value={(editingEmployee.services || []).map((service) => service._id)}
+          value={(editingEmployee.services || []).map((srv) => srv._id)}
           onChange={(selectedServiceIds) => {
             setEditingEmployee({
               ...editingEmployee,
-              services: selectedServiceIds.map(
-                (id) => services.find((service) => service._id === id)!
-              ),
+              services: selectedServiceIds.map((id) => {
+                const found = services.find((srv) => srv._id === id);
+                return found!;
+              }),
             });
           }}
           searchable
@@ -220,6 +231,33 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
           }
         />
 
+        {/* Selector de color (ColorInput) */}
+        <ColorInput
+          label="Color identificador"
+          value={editingEmployee.color || ""}
+          onChange={(newColor) => {
+            setEditingEmployee({
+              ...editingEmployee,
+              color: newColor,
+            });
+          }}
+          format="hex"    // Podrías usar 'rgba', 'hsl', etc.
+          withPicker
+          swatches={[
+            "#FFB6C1",
+            "#FFD700",
+            "#98FB98",
+            "#AFEEEE",
+            "#7B68EE",
+            "#FF69B4",
+            "#FFA07A",
+            "#E6E6FA",
+            "#FFFACD",
+            "#C0C0C0",
+          ]}
+          swatchesPerRow={5}
+        />
+
         <Text>Imagen de perfil</Text>
         <Dropzone
           onDrop={handleDrop}
@@ -238,7 +276,9 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             ) : (
               <>
                 <BiImageAdd size={50} color="#228be6" />
-                <Text size="lg">Arrastra una imagen aquí o haz clic para cargar</Text>
+                <Text size="lg">
+                  Arrastra una imagen aquí o haz clic para cargar
+                </Text>
               </>
             )}
           </Group>

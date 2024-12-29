@@ -21,6 +21,7 @@ export interface Employee {
   customPermissions: string[];
   isActive: boolean;
   profileImage: string;
+  color: string;
 }
 
 interface CreateEmployeePayload {

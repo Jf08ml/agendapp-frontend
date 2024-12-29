@@ -110,6 +110,8 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
     }),
   }));
 
+  const columnColor = employee.color || "transparent";
+
   return (
     <div
       ref={(node) => {
@@ -121,8 +123,8 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         marginLeft: "10px",
         borderRight: "1px solid #e0e0e0",
         position: "relative",
-        border: isOver ? "2px dashed #4caf50" : "1px solid transparent",
-        backgroundColor: "transparent",
+        border: isOver ? "2px dashed #4caf50" : "1px solid #e0e0e0",
+        backgroundColor: columnColor,
       }}
       onClick={(event) => {
         // Ejemplo: crear una cita con onOpenModal al hacer clic vacío
