@@ -70,45 +70,35 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       );
       if (!originalAppointment) return;
 
-      // 2) Calcular la posición vertical (borde superior)
-      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      // Ajustar posición para dispositivos táctiles
+      const scrollOffset = columnRef.current.scrollTop || 0;
+      const correctedY = mousePos.y / window.devicePixelRatio;
+      const yTop = correctedY - boundingRect.top - item.offsetY + scrollOffset;
 
-      const yTop = isTouchDevice
-        ? (mousePos.y - boundingRect.top - item.offsetY) /
-          window.devicePixelRatio
-        : mousePos.y - boundingRect.top - item.offsetY;
-
-
-      // 3) Convertir yTop a minutos exactos desde startHour
-      //    asumiendo 1 hora = HOUR_HEIGHT px => 1 min = (HOUR_HEIGHT/60) px
-      //    => minutesOffset = (yTop / HOUR_HEIGHT) * 60
-      const minutesOffset = (yTop / HOUR_HEIGHT) * 60;
-
-      // a) Hora offset (cuántas horas más allá de startHour)
+      // Convertir posición a minutos desde startHour
+      const minutesOffset = Math.round((yTop / HOUR_HEIGHT) * 62);
       const hourOffset = Math.floor(minutesOffset / 60);
-      // b) Minutos sobrantes
-      const minuteOffset = Math.round(minutesOffset % 60);
+      const minuteOffset = minutesOffset % 60;
 
-      // 4) Generar la nueva hora de inicio
+      // Generar nueva fecha de inicio
       const newStartDate = new Date(selectedDay);
       newStartDate.setHours(startHour + hourOffset);
       newStartDate.setMinutes(minuteOffset, 0, 0);
 
-      // 5) Mantener la duración
+      // Mantener duración de la cita
       const originalStart = new Date(originalAppointment.startDate);
       const originalEnd = new Date(originalAppointment.endDate);
       const durationMs = originalEnd.getTime() - originalStart.getTime();
       const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
-      // 6) Cita actualizada
+      // Actualizar la cita
       const updatedAppointment: Appointment = {
         ...originalAppointment,
-        employee, // o employeeId: employee._id
+        employee,
         startDate: newStartDate,
         endDate: newEndDate,
       };
 
-      // 7) Llamar al callback para editar
       onEditAppointment(updatedAppointment);
     },
     collect: (monitor) => ({
