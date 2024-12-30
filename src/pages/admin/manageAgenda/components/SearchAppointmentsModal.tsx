@@ -13,7 +13,7 @@ import { Appointment } from "../../../../services/appointmentService";
 interface SearchAppointmentsModalProps {
   opened: boolean;
   onClose: () => void;
-  appointments: Appointment[]; // Recibe la lista completa de citas para filtrar y ordenar
+  appointments: Appointment[];
 }
 
 const SearchAppointmentsModal: FC<SearchAppointmentsModalProps> = ({

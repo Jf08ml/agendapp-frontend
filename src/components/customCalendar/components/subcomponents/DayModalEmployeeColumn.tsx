@@ -11,9 +11,9 @@ import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 interface EmployeeColumnProps {
   employee: Employee;
   appointmentsByEmployee: Record<string, Appointment[]>;
-  /** 
-   * No usamos `timeIntervals` para “snap”, 
-   * pero sí podrías necesitarlo si deseas generar un fondo de líneas, 
+  /**
+   * No usamos `timeIntervals` para “snap”,
+   * pero sí podrías necesitarlo si deseas generar un fondo de líneas,
    * o al hacer clic en un hueco.
    */
   timeIntervals: Date[];
@@ -71,7 +71,13 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       if (!originalAppointment) return;
 
       // 2) Calcular la posición vertical (borde superior)
-      const yTop = mousePos.y - boundingRect.top - item.offsetY;
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+
+      const yTop = isTouchDevice
+        ? (mousePos.y - boundingRect.top - item.offsetY) /
+          window.devicePixelRatio
+        : mousePos.y - boundingRect.top - item.offsetY;
+
 
       // 3) Convertir yTop a minutos exactos desde startHour
       //    asumiendo 1 hora = HOUR_HEIGHT px => 1 min = (HOUR_HEIGHT/60) px
@@ -112,6 +118,19 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
 
   const columnColor = employee.color || "transparent";
 
+  const convertToTransparent = (hexColor: string, alpha: number): string => {
+    // Quita el "#" si existe
+    const hex = hexColor.replace("#", "");
+
+    // Divide el color en componentes R, G, B
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Retorna el color en formato rgba
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   return (
     <div
       ref={(node) => {
@@ -124,7 +143,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         borderRight: "1px solid #e0e0e0",
         position: "relative",
         border: isOver ? "2px dashed #4caf50" : "1px solid #e0e0e0",
-        backgroundColor: columnColor,
+        backgroundColor: convertToTransparent(columnColor, 0.3),
       }}
       onClick={(event) => {
         // Ejemplo: crear una cita con onOpenModal al hacer clic vacío

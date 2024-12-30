@@ -9,7 +9,17 @@ interface TimeColumnProps {
 
 const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals }) => {
   return (
-    <Box style={{ width: "80px" }}>
+    <Box
+      style={{
+        position: "sticky",
+        left: 0,
+        top: 0,
+        zIndex: 2,
+        backgroundColor: "#fff",
+        borderRight: "1px solid #e0e0e0",
+        width: "80px"
+      }}
+    >
       {timeIntervals.map((interval, index) => (
         <Box
           key={index}

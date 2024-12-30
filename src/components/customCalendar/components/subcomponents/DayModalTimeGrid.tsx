@@ -24,7 +24,7 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 0, // Un z-index menor para que quede detrás de las citas
+        zIndex: 0, 
       }}
     >
       {timeIntervals.map((interval, index) => (
@@ -35,8 +35,7 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
             top: `${index * HOUR_HEIGHT}px`,
             left: 0,
             right: 0,
-            borderTop: "1px solid #e0e0e0",
-            // Puedes ajustar el estilo, grosor, color, etc. a tu gusto
+            borderTop: "1px solid #e0e0e0"
           }}
           onClick={() =>
             hasPermission("appointments:create") &&
