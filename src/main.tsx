@@ -37,7 +37,7 @@ createRoot(document.getElementById("root")!).render(
       <ModalsProvider>
         <Notifications />
         <GoogleMapsProvider>
-          <DndProvider backend={HTML5Backend} options={{ enableMouseEvents: true }}>
+          <DndProvider backend={HTML5Backend}>
             <App />
           </DndProvider>
         </GoogleMapsProvider>
