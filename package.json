@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dnd-kit/accessibility": "^3.1.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@emotion/react": "^11.13.3",
+    "@hello-pangea/dnd": "^17.0.0",
     "@mantine/carousel": "^7.13.4",
     "@mantine/core": "^7.13.4",
     "@mantine/dates": "^7.13.4",

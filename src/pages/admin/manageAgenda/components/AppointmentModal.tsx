@@ -9,6 +9,7 @@ import {
   Text,
   Group,
   Checkbox,
+  NumberInput,
 } from "@mantine/core";
 import DateSelector from "./DateSelector";
 import TimeSelector from "./TimeSelector";
@@ -176,6 +177,22 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             onChange={(value) => onServiceChange(value)}
             searchable
             required
+          />
+
+          <NumberInput
+            label="Monto del Abono"
+            placeholder="Ingresa el monto del abono"
+            prefix="$ "
+            thousandSeparator
+            min={0}
+            value={newAppointment.advancePayment || 0}
+            onChange={(value) =>
+              setNewAppointment((prev) => ({
+                ...prev,
+                advancePayment: typeof value === "number" ? value : 0, 
+              }))
+            }
+            mb="sm"
           />
 
           {/* Controles para fechas y horas */}

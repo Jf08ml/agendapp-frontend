@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
-import { Box, Button, Group, Title } from "@mantine/core";
+import { Box, Button, Group, Text, Title } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -37,6 +37,7 @@ interface CreateAppointmentPayload {
   endDate: Date;
   status: string;
   organizationId: string;
+  advancePayment: number;
 }
 
 const ScheduleView: React.FC = () => {
@@ -131,7 +132,6 @@ const ScheduleView: React.FC = () => {
    * OBTENER CITAS
    */
   const fetchAppointments = async () => {
-    setLoadingAgenda(true);
     try {
       const response = await getAppointmentsByOrganizationId(
         organizationId as string
@@ -307,9 +307,43 @@ const ScheduleView: React.FC = () => {
    * CONFIRMAR CITA
    */
   const handleConfirmAppointment = (appointmentId: string) => {
+    const appointment = appointments.find((a) => a._id === appointmentId); // Buscar la cita seleccionada
+
+    if (!appointment) {
+      showNotification({
+        title: "Error",
+        message: "No se encontró la cita seleccionada.",
+        color: "red",
+        autoClose: 3000,
+        position: "top-right",
+      });
+      return;
+    }
+
     openConfirmModal({
       title: "Confirmar cita",
-      children: <p>¿Estás seguro de que deseas confirmar esta cita?</p>,
+      children: (
+        <div>
+          <p>¿Estás seguro de que deseas confirmar esta cita?</p>
+          <Box mt="md">
+            <Text size="sm" fw={500}>
+              Resumen de la cita:
+            </Text>
+            <Text size="sm">Cliente: {appointment.client?.name}</Text>
+            <Text size="sm">Servicio: {appointment.service?.name}</Text>
+            <Text size="sm">
+              Fecha y hora:{" "}
+              {new Date(appointment.startDate).toLocaleString("es-CO")}
+            </Text>
+            <Text size="sm">
+              Empleado: {appointment.employee?.names || "No asignado"}
+            </Text>
+            <Text size="sm">
+              Abono: ${appointment.advancePayment?.toLocaleString("es-CO")}
+            </Text>
+          </Box>
+        </div>
+      ),
       centered: true,
       labels: { confirm: "Confirmar", cancel: "Cancelar" },
       confirmProps: { color: "green" },
@@ -351,9 +385,17 @@ const ScheduleView: React.FC = () => {
         startDate,
         endDate,
         status,
+        advancePayment,
       } = newAppointment;
 
-      if (service && employee && client && startDate && endDate) {
+      if (
+        service &&
+        employee &&
+        client &&
+        startDate &&
+        endDate &&
+        advancePayment
+      ) {
         const appointmentPayload: CreateAppointmentPayload = {
           service,
           employee,
@@ -363,6 +405,7 @@ const ScheduleView: React.FC = () => {
           endDate,
           status: status || "pending",
           organizationId: organizationId as string,
+          advancePayment,
         };
 
         if (selectedAppointment) {

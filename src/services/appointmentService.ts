@@ -15,6 +15,7 @@ export interface Appointment {
   endDate: Date;
   status: string;
   organizationId: string;
+  advancePayment: number;
 }
 
 interface CreateAppointmentPayload {
