@@ -189,7 +189,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             onChange={(value) =>
               setNewAppointment((prev) => ({
                 ...prev,
-                advancePayment: typeof value === "number" ? value : 0, 
+                advancePayment: typeof value === "number" ? value : 0,
               }))
             }
             mb="sm"
