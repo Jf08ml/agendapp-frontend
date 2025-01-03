@@ -19,6 +19,7 @@ import { Employee } from "../../../../services/employeeService";
 import { Client } from "../../../../services/clientService";
 import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
+import dayjs from "dayjs";
 
 interface AppointmentModalProps {
   opened: boolean;
@@ -53,6 +54,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
+
+                    const today = dayjs();
 
   useEffect(() => {
     if (appointment) {
@@ -107,10 +110,23 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             placeholder="Selecciona un cliente"
             searchable
             data={[
-              ...clients.map((client) => ({
-                value: client._id,
-                label: client.name,
-              })),
+              ...clients.map((client) => {
+                let isBirthday = false;
+                if (client.birthDate) {
+                  const birthDate = dayjs(client.birthDate);
+                  if (birthDate.isValid()) {
+                    isBirthday =
+                      birthDate.month() === today.month() &&
+                      birthDate.date() === today.date();
+                  }
+                }
+
+                return {
+                  value: client._id,
+                  label: isBirthday ? `🎉 ${client.name} 🎉` : client.name,
+                  isBirthday, 
+                };
+              }),
               { value: "create-client", label: "+ Crear nuevo cliente" },
             ]}
             value={newAppointment.client?._id || ""}
@@ -189,7 +205,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             onChange={(value) =>
               setNewAppointment((prev) => ({
                 ...prev,
-                advancePayment: typeof value === "number" ? value : 0,
+                advancePayment: typeof value === "number" ? value : 0, 
               }))
             }
             mb="sm"
@@ -254,3 +270,5 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 };
 
 export default AppointmentModal;
+
+

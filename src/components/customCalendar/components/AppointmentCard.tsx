@@ -8,15 +8,11 @@ import {
   Avatar,
   Flex,
 } from "@mantine/core";
-import {
-  BiDotsVertical,
-  BiEdit,
-  BiTrash,
-  BiCheck
-} from "react-icons/bi";
+import { BiDotsVertical, BiEdit, BiTrash, BiCheck } from "react-icons/bi";
 import { format } from "date-fns";
 import { Appointment } from "../../../services/appointmentService";
 import { usePermissions } from "../../../hooks/usePermissions";
+import dayjs from "dayjs";
 
 interface AppointmentCardProps {
   appointment: Appointment;
@@ -46,6 +42,22 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 }) => {
   const { backgroundColor, borderColor } = getStatusStyles(appointment.status);
   const { hasPermission } = usePermissions();
+
+  const getIsBirthday = (
+    birthDate: string | number | dayjs.Dayjs | Date | null | undefined
+  ): boolean => {
+    if (!birthDate) return false;
+
+    const today = dayjs();
+    const birthDateClient = dayjs(birthDate);
+
+    if (!birthDateClient.isValid()) return false;
+
+    return (
+      birthDateClient.month() === today.month() &&
+      birthDateClient.date() === today.date()
+    );
+  };
 
   return (
     <Paper
@@ -110,7 +122,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           {appointment.employee.names}
         </Flex>
       </Text> */}
-      <Text size="xs" c="dimmed" mt="xs" truncate>
+      <Text size="xs" c="dimmed" mt="xs">
         <Flex gap="xs">
           <Avatar
             alt={appointment.client.name}
@@ -123,7 +135,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
               .map((word) => word[0])
               .join("")}
           </Avatar>{" "}
-          {appointment.client.name}
+          {getIsBirthday(appointment.client.birthDate)
+            ? `🎉 ${appointment.client.name} 🎉`
+            : appointment.client.name}
         </Flex>
       </Text>
 
@@ -138,7 +152,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             variant="transparent"
             color="dark"
             style={{ position: "absolute", bottom: 5, right: 5, zIndex: 10 }}
-            onClick={(event) => event.stopPropagation()} 
+            onClick={(event) => event.stopPropagation()}
           >
             {/* {appointment.status === "confirmed" ? (
               <BiLock />
@@ -148,7 +162,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <BiDotsVertical />
           </ActionIcon>
         </Menu.Target>
-        <Menu.Dropdown onClick={(event) => event.stopPropagation()} >
+        <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
           <Menu.Item
             leftSection={<BiEdit size={16} />}
             disabled={!hasPermission("appointments:update")}

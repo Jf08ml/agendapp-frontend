@@ -37,7 +37,7 @@ interface CreateAppointmentPayload {
   endDate: Date;
   status: string;
   organizationId: string;
-  advancePayment: number;
+  advancePayment?: number;
 }
 
 const ScheduleView: React.FC = () => {
@@ -393,8 +393,7 @@ const ScheduleView: React.FC = () => {
         employee &&
         client &&
         startDate &&
-        endDate &&
-        advancePayment
+        endDate
       ) {
         const appointmentPayload: CreateAppointmentPayload = {
           service,
