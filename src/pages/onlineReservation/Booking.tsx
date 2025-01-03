@@ -44,6 +44,7 @@ const Booking = () => {
       name: "",
       email: "",
       phone: "",
+      birthDate: new Date()
     },
     organizationId: organization?._id,
     status: "pending",

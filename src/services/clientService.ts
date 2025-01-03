@@ -10,6 +10,7 @@ export interface Client {
   servicesTaken: number;
   referralsMade: number;
   organizationId: string;
+  birthDate: Date | null;
 }
 
 interface CreateClientPayload {
@@ -17,6 +18,7 @@ interface CreateClientPayload {
   phoneNumber: string;
   email?: string;
   organizationId: string;
+  birthDate: Date | null;
 }
 
 interface Response<T> {

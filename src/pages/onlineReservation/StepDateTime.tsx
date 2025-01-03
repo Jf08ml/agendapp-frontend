@@ -106,6 +106,7 @@ const StepDateTime: React.FC<StepDateTimeProps> = ({
             value={selectedDate}
             onChange={(date) => date && handleDateSelection(date)}
             minDate={new Date()}
+            locale="es"
             size="sm"
           />
         </Flex>

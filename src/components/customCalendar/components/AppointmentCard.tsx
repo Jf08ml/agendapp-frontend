@@ -12,8 +12,7 @@ import {
   BiDotsVertical,
   BiEdit,
   BiTrash,
-  BiCheck,
-  BiLock,
+  BiCheck
 } from "react-icons/bi";
 import { format } from "date-fns";
 import { Appointment } from "../../../services/appointmentService";
@@ -130,7 +129,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
       {/* Menú de acciones */}
       <Menu
-        disabled={appointment.status === "confirmed"}
+        // disabled={appointment.status === "confirmed"}
         position="top-end"
         withArrow
       >
@@ -141,11 +140,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             style={{ position: "absolute", bottom: 5, right: 5, zIndex: 10 }}
             onClick={(event) => event.stopPropagation()} 
           >
-            {appointment.status === "confirmed" ? (
+            {/* {appointment.status === "confirmed" ? (
               <BiLock />
             ) : (
               <BiDotsVertical />
-            )}
+            )} */}
+            <BiDotsVertical />
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown onClick={(event) => event.stopPropagation()} >

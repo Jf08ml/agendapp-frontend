@@ -8,6 +8,7 @@ import {
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
+import { DateInput } from "@mantine/dates";
 
 interface ClientFormModalProps {
   opened: boolean;
@@ -25,6 +26,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [name, setName] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
@@ -36,6 +38,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setName(client.name.trim());
       setPhoneNumber(formatPhoneNumber(client.phoneNumber.trim()));
       setEmail(client.email?.trim() || "");
+      setBirthDate(client.birthDate ? new Date(client.birthDate) : null);
     } else {
       setName("");
       setPhoneNumber("");
@@ -49,7 +52,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         throw new Error("Organization ID is required");
       }
 
-      const formattedPhoneNumber = phoneNumber.replace(/\s/g, ""); // Eliminar espacios antes de guardar
+      const formattedPhoneNumber = phoneNumber.replace(/\s/g, "");
 
       if (client) {
         // Modo edición: actualizar cliente
@@ -57,6 +60,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           name: name.trim(),
           phoneNumber: formattedPhoneNumber,
           email: email.trim(),
+          birthDate: birthDate || null,
         };
         await updateClient(client._id, updatedData);
         showNotification({
@@ -73,6 +77,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           phoneNumber: formattedPhoneNumber,
           email: email.trim(),
           organizationId,
+          birthDate: birthDate || new Date(),
         };
         await createClient(newClient);
         showNotification({
@@ -124,7 +129,6 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       opened={opened}
       onClose={onClose}
       title={client ? "Editar Cliente" : "Crear Cliente"}
-      zIndex={1000}
     >
       <Box>
         <TextInput
@@ -146,6 +150,16 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           label="Correo Electrónico"
           value={email}
           onChange={handleInputChange(setEmail)}
+        />
+        <DateInput
+          mt="md"
+          label="Fecha de Nacimiento"
+          value={birthDate}
+          locale="es"
+          valueFormat="DD/MM/YYYY"
+          onChange={setBirthDate}
+          placeholder="Selecciona una fecha"
+          maxDate={new Date()}
         />
         <Button mt="md" color="blue" onClick={handleSubmit}>
           {client ? "Actualizar Cliente" : "Crear Cliente"}

@@ -13,6 +13,7 @@ export interface Reservation {
     name: string;
     email: string;
     phone: string;
+    birthDate: Date | null;
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected";
@@ -28,6 +29,7 @@ interface CreateReservationPayload {
     name: string;
     email: string;
     phone: string;
+    birthDate: Date | null;
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected";
