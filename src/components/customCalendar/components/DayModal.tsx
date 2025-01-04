@@ -147,6 +147,7 @@ const DayModal: FC<DayModalProps> = ({
     >
       <div
         style={{
+
           width: "100%",
           height: "80vh",
           overflowX: "auto",
@@ -206,6 +207,10 @@ const DayModal: FC<DayModalProps> = ({
         <Box
           style={{
             display: "flex",
+            position: "sticky",
+            top: 0,
+            zIndex: 100,
+            backgroundColor: "white",
           }}
         >
           <Header employees={employees} />
@@ -214,17 +219,21 @@ const DayModal: FC<DayModalProps> = ({
         <Box
           style={{
             display: "flex",
-            position: "relative",
+            position: "relative"
           }}
         >
           <Box
             style={{
               display: "flex",
+              position: "sticky",
+              left: 0,
+              zIndex: 100,
+              backgroundColor: "white",
             }}
           >
-            {" "}
             <TimeColumn timeIntervals={timeIntervals} />
           </Box>
+
           <Box style={{ flex: 1, position: "relative" }}>
             {currentLinePosition !== null && (
               <div
@@ -249,7 +258,6 @@ const DayModal: FC<DayModalProps> = ({
                     borderBottom: "8px solid transparent",
                     borderTop: "8px solid transparent",
                     position: "absolute",
-                    left: "-8px", // Ajusta para posicionar el triángulo fuera de la línea
                   }}
                 />
               </div>
