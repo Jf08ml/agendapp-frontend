@@ -1,4 +1,3 @@
-// DayModalTimeGrid.tsx
 import { FC } from "react";
 import { Box } from "@mantine/core";
 import { HOUR_HEIGHT } from "../DayModal";
@@ -24,7 +23,7 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 0, 
+        zIndex: 0,
       }}
     >
       {timeIntervals.map((interval, index) => (
@@ -35,13 +34,35 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
             top: `${index * HOUR_HEIGHT}px`,
             left: 0,
             right: 0,
-            borderTop: "1px solid #e0e0e0"
           }}
-          onClick={() =>
-            hasPermission("appointments:create") &&
-            onOpenModal(selectedDay, interval)
-          }
-        />
+        >
+          {/* Línea sólida para la hora principal */}
+          <Box
+            style={{
+              borderTop: "1px solid #e0e0e0",
+              height: `${HOUR_HEIGHT / 4}px`,
+            }}
+            onClick={() =>
+              hasPermission("appointments:create") &&
+              onOpenModal(selectedDay, interval)
+            }
+          />
+
+          {/* Líneas punteadas para las mini-marcaciones */}
+          {[15, 30, 45].map((_, miniIndex) => (
+            <Box
+              key={miniIndex}
+              style={{
+                borderTop: "1px dashed rgb(171, 171, 173)",
+                height: `${HOUR_HEIGHT / 4}px`,
+              }}
+              onClick={() =>
+                hasPermission("appointments:create") &&
+                onOpenModal(selectedDay, interval)
+              }
+            />
+          ))}
+        </Box>
       ))}
     </Box>
   );

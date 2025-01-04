@@ -64,7 +64,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
 
       // Convertir posición a minutos desde startHour
       const totalMinutes = (yTop / HOUR_HEIGHT) * 60;
-      const snappedMinutes = Math.round(totalMinutes / 5) * 5; // Snap a intervalos de 5 minutos
+      const snappedMinutes = Math.round(totalMinutes / 15) * 15; 
       const hourOffset = Math.floor(snappedMinutes / 60);
       const minuteOffset = snappedMinutes % 60;
 
@@ -118,7 +118,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       }}
       style={{
         width: `${CARD_WIDTH}px`,
-        marginLeft: "10px",
+        marginLeft: "2px",
         borderRight: "1px solid #e0e0e0",
         position: "relative",
         border: isOver ? "2px dashed #4caf50" : "1px solid #e0e0e0",

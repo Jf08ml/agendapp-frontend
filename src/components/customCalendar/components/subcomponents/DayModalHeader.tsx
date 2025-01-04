@@ -33,15 +33,18 @@ const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
       {/* Encabezados de cada empleado */}
       {employees.map((employee) => {
         const color = employee.color || "#ccc";
-        const textColor = getTextColor(color); // Determinar el color del texto
+        const textColor = getTextColor(color); 
 
         return (
           <Box
             key={employee._id}
             style={{
               width: `${CARD_WIDTH}px`,
+              display: "flex", 
+              alignItems: "center",
+              justifyContent: "center",
               textAlign: "center",
-              marginLeft: "10px",
+              marginLeft: "2px",
               border: "1px solid gray",
               borderRadius: "5px",
               backgroundColor: color,
@@ -49,7 +52,7 @@ const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
           >
             <Text
               style={{
-                fontSize: "12px",
+                fontSize: "10px",
                 color: textColor,
               }}
             >

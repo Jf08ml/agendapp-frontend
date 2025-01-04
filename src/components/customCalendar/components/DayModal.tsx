@@ -23,7 +23,7 @@ import EmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
 /* Constantes de diseño */
 export const HOUR_HEIGHT = 60;
 export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
-export const CARD_WIDTH = 130;
+export const CARD_WIDTH = 80;
 
 interface DayModalProps {
   opened: boolean;

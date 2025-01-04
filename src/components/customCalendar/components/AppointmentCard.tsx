@@ -90,7 +90,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <Flex
           direction="column"
           gap="md"
-          onClick={(event) => event.stopPropagation()} // Detener propagación en el modal
+          onClick={(event) => event.stopPropagation()} 
         >
           <Text fw={700} size="md">
             Servicio: {appointment.service.name}
@@ -100,6 +100,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             {dayjs(appointment.startDate).format("dddd, D MMMM YYYY, h:mm A")} -{" "}
             {dayjs(appointment.endDate).format("h:mm A")}
           </Text>
+          <Text size="sm">Abono: {appointment.advancePayment}</Text>
           <Text size="sm">Empleado: {appointment.employee.names}</Text>
           <Text size="sm">Estado: {appointment.status}</Text>
           <Text size="sm">Cliente: {appointment.client.name}</Text>
@@ -156,18 +157,13 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             🌟Cita con {appointment.employee.names}
           </Badge>
         )}
-
-        <Text fw={800} size="xs" truncate>
-          {appointment.service.name}
-        </Text>
-        <Badge color="blue" size="xs" variant="light">
-          {format(appointment.startDate, "h:mm a")} -{" "}
+        <Text mt="xs" c="blue" style={{ fontSize: "9px" }}>
+          {format(appointment.startDate, "h:mm")}{" - "}
           {format(appointment.endDate, "h:mm a")}
-        </Badge>
+        </Text>
 
-        <Text size="xs" style={{ color: textColor }} mt="xs">
+        <Text style={{ color: textColor, fontSize: "12px" }}>
           <Flex gap="xs">
-
             {getIsBirthday(appointment.client.birthDate)
               ? `🎉 ${appointment.client.name} 🎉`
               : appointment.client.name}
@@ -179,7 +175,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <ActionIcon
               variant="transparent"
               color="dark"
-              style={{ position: "absolute", bottom: 5, right: 5, zIndex: 10 }}
+              style={{ position: "absolute", bottom: -5, left: -12, zIndex: 10 }}
               onClick={(event) => event.stopPropagation()}
             >
               <BiDotsVertical />
