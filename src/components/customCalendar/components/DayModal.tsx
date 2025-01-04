@@ -1,11 +1,5 @@
-import { FC, useState, useEffect } from "react";
-import {
-  Modal,
-  Box,
-  ScrollArea,
-  Button,
-  Text,
-} from "@mantine/core";
+import { FC, useState, useEffect, useMemo } from "react";
+import { Modal, Box, Button, Text } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, getHours, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -60,52 +54,85 @@ const DayModal: FC<DayModalProps> = ({
     (state: RootState) => state.organization.organization
   );
 
-  // Hook de Mantine para saber si el viewport es menor a 768px
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
+  const [currentDay, setCurrentDay] = useState<Date>(
+    selectedDay || new Date() // Usa la fecha actual si no hay `selectedDay`
+  );
+  const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(
+    null
+  );
 
-  // Estado local para controlar el día
-  const [currentDay, setCurrentDay] = useState<Date | null>(selectedDay);
-
-  // Sincronizar el estado local cuando la prop selectedDay cambie
   useEffect(() => {
-    setCurrentDay(selectedDay);
+    if (selectedDay) {
+      setCurrentDay(selectedDay);
+    }
   }, [selectedDay]);
 
-  if (!currentDay) return null;
-
-  // Funciones de navegación de día
-  const goToNextDay = () => {
-    setCurrentDay((prev) => (prev ? addDays(prev, 1) : null));
-  };
-
-  const goToPreviousDay = () => {
-    setCurrentDay((prev) => (prev ? addDays(prev, -1) : null));
-  };
-
-  // Obtener citas del día actual
-  const appointments = getAppointmentsForDay(currentDay);
-  const appointmentsByEmployee = organizeAppointmentsByEmployee(appointments);
-
-  // Calcular el rango horario
-  const earliestAppointment = Math.min(
-    ...appointments.map((app) => getHours(new Date(app.startDate)))
-  );
-  const latestAppointment = Math.max(
-    ...appointments.map((app) => getHours(new Date(app.endDate)))
+  const appointments = useMemo(
+    () => getAppointmentsForDay(currentDay),
+    [currentDay, getAppointmentsForDay]
   );
 
-  const orgStartHour = organization?.openingHours?.start
-    ? parseInt(organization.openingHours.start.split(":")[0], 10)
-    : 8;
-  const orgEndHour = organization?.openingHours?.end
-    ? parseInt(organization.openingHours.end.split(":")[0], 10)
-    : 22;
+  const appointmentsByEmployee = useMemo(
+    () => organizeAppointmentsByEmployee(appointments),
+    [appointments]
+  );
 
-  const startHour = Math.min(earliestAppointment, orgStartHour);
-  const endHour = Math.max(orgEndHour, latestAppointment);
+  // Cálculo de las horas de inicio y fin
+  const { startHour, endHour } = useMemo(() => {
+    const orgStartHour = organization?.openingHours?.start
+      ? parseInt(organization.openingHours.start.split(":")[0], 10)
+      : 8;
+    const orgEndHour = organization?.openingHours?.end
+      ? parseInt(organization.openingHours.end.split(":")[0], 10)
+      : 22;
 
-  // Generar intervalos de tiempo
-  const timeIntervals = generateTimeIntervals(startHour, endHour, currentDay);
+    const earliestAppointment = appointments.length
+      ? Math.min(
+          ...appointments.map((app) => getHours(new Date(app.startDate)))
+        )
+      : orgStartHour;
+
+    const latestAppointment = appointments.length
+      ? Math.max(...appointments.map((app) => getHours(new Date(app.endDate))))
+      : orgEndHour;
+
+    return {
+      startHour: Math.min(earliestAppointment, orgStartHour),
+      endHour: Math.max(orgEndHour, latestAppointment),
+    };
+  }, [appointments, organization]);
+
+  const timeIntervals = useMemo(
+    () => generateTimeIntervals(startHour, endHour, currentDay),
+    [startHour, endHour, currentDay]
+  );
+
+  // Actualización de la posición de la línea actual
+  useEffect(() => {
+    const updateCurrentLinePosition = () => {
+      const now = new Date();
+      if (
+        now >= new Date(currentDay.setHours(startHour, 0, 0)) &&
+        now <= new Date(currentDay.setHours(endHour, 0, 0))
+      ) {
+        const totalMinutes =
+          (now.getHours() - startHour) * 60 + now.getMinutes();
+        const position = (totalMinutes / 60) * HOUR_HEIGHT;
+        setCurrentLinePosition(position);
+      } else {
+        setCurrentLinePosition(null);
+      }
+    };
+
+    updateCurrentLinePosition();
+    const intervalId = setInterval(updateCurrentLinePosition, 60000); // Actualizar cada minuto
+
+    return () => clearInterval(intervalId);
+  }, [currentDay, startHour, endHour]);
+
+  const goToNextDay = () => setCurrentDay((prev) => addDays(prev, 1));
+  const goToPreviousDay = () => setCurrentDay((prev) => addDays(prev, -1));
 
   return (
     <Modal
@@ -118,15 +145,39 @@ const DayModal: FC<DayModalProps> = ({
       size="xl"
       styles={{ body: { padding: 0 } }}
     >
-      <ScrollArea
+      <div
         style={{
           width: "100%",
           height: "80vh",
           overflowX: "auto",
           overflowY: "auto",
         }}
-        scrollbarSize={10}
-        offsetScrollbars
+        onClick={(event) => event.stopPropagation()}
+        onDragOver={(event) => {
+          event.preventDefault();
+          const scrollArea = event.currentTarget as HTMLDivElement;
+
+          const { clientX, clientY } = event;
+          const rect = scrollArea.getBoundingClientRect();
+
+          // Detectar bordes cercanos para el desplazamiento
+          const threshold = 100; // Distancia desde el borde para activar el desplazamiento
+          const scrollSpeed = 50; // Velocidad de desplazamiento
+
+          // Desplazamiento horizontal
+          if (clientX < rect.left + threshold) {
+            scrollArea.scrollBy({ left: -scrollSpeed, behavior: "smooth" });
+          } else if (clientX > rect.right - threshold) {
+            scrollArea.scrollBy({ left: scrollSpeed, behavior: "smooth" });
+          }
+
+          // Desplazamiento vertical
+          if (clientY < rect.top + threshold) {
+            scrollArea.scrollBy({ top: -scrollSpeed, behavior: "smooth" });
+          } else if (clientY > rect.bottom - threshold) {
+            scrollArea.scrollBy({ top: scrollSpeed, behavior: "smooth" });
+          }
+        }}
       >
         <Box
           p="xs"
@@ -138,7 +189,6 @@ const DayModal: FC<DayModalProps> = ({
             gap: isSmallScreen ? 8 : 0,
           }}
         >
-          {/* Botones para cambiar día */}
           <Box style={{ display: "flex", gap: 8 }}>
             <Button size="xs" variant="outline" onClick={goToPreviousDay}>
               Día anterior
@@ -148,27 +198,76 @@ const DayModal: FC<DayModalProps> = ({
             </Button>
           </Box>
 
-          {/* Texto con el total de citas */}
           <Text size="sm" mt={isSmallScreen ? 8 : 0}>
             Total de citas para {format(currentDay, "d MMM", { locale: es })}:{" "}
             <strong>{appointments.length}</strong>
           </Text>
         </Box>
+        <Box
+          style={{
+            display: "flex",
+          }}
+        >
+          <Header employees={employees} />
+        </Box>
 
-        <Header employees={employees} />
-
-        <Box style={{ display: "flex", position: "relative" }}>
-          <TimeColumn timeIntervals={timeIntervals} />
-
+        <Box
+          style={{
+            display: "flex",
+            position: "relative",
+          }}
+        >
+          <Box
+            style={{
+              display: "flex",
+            }}
+          >
+            {" "}
+            <TimeColumn timeIntervals={timeIntervals} />
+          </Box>
           <Box style={{ flex: 1, position: "relative" }}>
+            {currentLinePosition !== null && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: `${currentLinePosition}px`,
+                  width: "100%",
+                  height: "2px",
+                  backgroundColor: "red",
+                  zIndex: 10,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {/* Flecha (Triángulo) */}
+                <div
+                  style={{
+                    width: 0,
+                    height: 0,
+                    borderLeft: "8px solid red",
+                    borderRight: "8px solid transparent",
+                    borderBottom: "8px solid transparent",
+                    borderTop: "8px solid transparent",
+                    position: "absolute",
+                    left: "-8px", // Ajusta para posicionar el triángulo fuera de la línea
+                  }}
+                />
+              </div>
+            )}
+
             <TimeGrid
               timeIntervals={timeIntervals}
               hasPermission={hasPermission}
               onOpenModal={onOpenModal}
               selectedDay={currentDay}
             />
-
-            <Box style={{ display: "flex", position: "relative", zIndex: 1 }}>
+            <Box
+              style={{
+                display: "flex",
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
               {employees.map((employee) => (
                 <EmployeeColumn
                   key={employee._id}
@@ -190,7 +289,7 @@ const DayModal: FC<DayModalProps> = ({
             </Box>
           </Box>
         </Box>
-      </ScrollArea>
+      </div>
     </Modal>
   );
 };

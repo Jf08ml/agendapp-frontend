@@ -100,15 +100,15 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
     }),
   }));
 
-  const columnColor = employee.color || "transparent";
+  // const columnColor = employee.color || "transparent";
 
-  const convertToTransparent = (hexColor: string, alpha: number): string => {
-    const hex = hexColor.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
+  // const convertToTransparent = (hexColor: string, alpha: number): string => {
+  //   const hex = hexColor.replace("#", "");
+  //   const r = parseInt(hex.substring(0, 2), 16);
+  //   const g = parseInt(hex.substring(2, 4), 16);
+  //   const b = parseInt(hex.substring(4, 6), 16);
+  //   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  // };
 
   return (
     <div
@@ -122,7 +122,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         borderRight: "1px solid #e0e0e0",
         position: "relative",
         border: isOver ? "2px dashed #4caf50" : "1px solid #e0e0e0",
-        backgroundColor: convertToTransparent(columnColor, 0.3),
+        // backgroundColor: convertToTransparent(columnColor, 0.3),
       }}
       onClick={(event) => {
         const clickedElement = event.target as HTMLElement;
