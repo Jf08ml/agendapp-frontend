@@ -5,7 +5,6 @@ import {
   Badge,
   Menu,
   ActionIcon,
-  Avatar,
   Flex,
   Modal,
   Button,
@@ -105,7 +104,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <Text size="sm">Estado: {appointment.status}</Text>
           <Text size="sm">Cliente: {appointment.client.name}</Text>
           {getIsBirthday(appointment.client.birthDate) && (
-            <Text size="sm" color="orange">
+            <Text size="sm" c="orange">
               🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
             </Text>
           )}
@@ -168,17 +167,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
         <Text size="xs" style={{ color: textColor }} mt="xs">
           <Flex gap="xs">
-            <Avatar
-              alt={appointment.client.name}
-              size={24}
-              radius="xl"
-              color="blue"
-            >
-              {appointment.client.name
-                .split(" ")
-                .map((word) => word[0])
-                .join("")}
-            </Avatar>{" "}
+
             {getIsBirthday(appointment.client.birthDate)
               ? `🎉 ${appointment.client.name} 🎉`
               : appointment.client.name}

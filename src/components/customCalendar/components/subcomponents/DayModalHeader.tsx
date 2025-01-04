@@ -49,7 +49,7 @@ const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
           >
             <Text
               style={{
-                fontSize: "14px",
+                fontSize: "12px",
                 color: textColor,
               }}
             >
