@@ -10,6 +10,7 @@ import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 
 interface EmployeeColumnProps {
   employee: Employee;
+  appoinments: Appointment[];
   appointmentsByEmployee: Record<string, Appointment[]>;
   timeIntervals: Date[];
   startHour: number;
@@ -32,6 +33,7 @@ interface DraggedItem {
 
 const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   employee,
+  appoinments,
   appointmentsByEmployee,
   timeIntervals,
   startHour,
@@ -167,6 +169,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             >
               <DraggableAppointmentCard
                 appointment={appointment}
+                appoinments={appoinments}
                 onEditAppointment={onEditAppointment}
                 onCancelAppointment={onCancelAppointment}
                 onConfirmAppointment={onConfirmAppointment}

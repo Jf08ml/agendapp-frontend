@@ -212,6 +212,7 @@ const DayView: React.FC<DayViewProps> = ({
                                 }
                               >
                                 <AppointmentCard
+                                  appoinments={appointments}
                                   appointment={appointment}
                                   onEditAppointment={onEditAppointment}
                                   onCancelAppointment={onCancelAppointment}

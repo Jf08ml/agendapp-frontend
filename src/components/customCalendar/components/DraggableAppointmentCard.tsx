@@ -17,6 +17,7 @@ import { Paper } from "@mantine/core";
 
 interface DraggableAppointmentCardProps {
   appointment: Appointment;
+  appoinments: Appointment[];
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
@@ -24,6 +25,7 @@ interface DraggableAppointmentCardProps {
 
 const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
   appointment,
+  appoinments,
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
@@ -90,6 +92,7 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
     >
       <AppointmentCard
         appointment={appointment}
+        appoinments={appoinments}
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}

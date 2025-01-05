@@ -280,6 +280,7 @@ const DayModal: FC<DayModalProps> = ({
                 <EmployeeColumn
                   key={employee._id}
                   employee={employee}
+                  appoinments={appointments}
                   appointmentsByEmployee={appointmentsByEmployee}
                   timeIntervals={timeIntervals}
                   startHour={startHour}

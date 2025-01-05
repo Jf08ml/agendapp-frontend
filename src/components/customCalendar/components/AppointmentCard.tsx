@@ -8,20 +8,31 @@ import {
   Flex,
   Modal,
   Button,
+  Box,
+  CopyButton,
+  Tooltip,
 } from "@mantine/core";
-import { BiDotsVertical, BiEdit, BiTrash, BiCheck } from "react-icons/bi";
+import {
+  BiDotsVertical,
+  BiEdit,
+  BiTrash,
+  BiCheck,
+  BiCheckCircle,
+} from "react-icons/bi";
 import { format } from "date-fns";
 import { Appointment } from "../../../services/appointmentService";
 import { usePermissions } from "../../../hooks/usePermissions";
 import dayjs from "dayjs";
-import "dayjs/locale/es"; // Importar el idioma español
+import "dayjs/locale/es";
 import localizedFormat from "dayjs/plugin/localizedFormat";
+import { FaWhatsapp } from "react-icons/fa";
 
-dayjs.extend(localizedFormat); // Extender con el plugin de formatos localizados
-dayjs.locale("es"); // Configurar el idioma español
+dayjs.extend(localizedFormat);
+dayjs.locale("es");
 
 interface AppointmentCardProps {
   appointment: Appointment;
+  appoinments: Appointment[];
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
@@ -52,6 +63,7 @@ const getStatusStyles = (status: string) => {
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
+  appoinments,
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
@@ -61,6 +73,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const textColor = getTextColor(appointment.employee.color || "#ffffff");
 
   const [modalOpened, setModalOpened] = useState(false);
+
+  const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
 
   const getIsBirthday = (
     birthDate: string | number | dayjs.Dayjs | Date | null | undefined
@@ -78,6 +92,28 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     );
   };
 
+  const generateAppointmentDetails = (
+    appointment: Appointment,
+    appoinments: Appointment[]
+  ) => {
+    const clientServices = appoinments
+      .filter((appt) => appt.client._id === appointment.client._id)
+      .map(
+        (appt) =>
+          `⭐ *Servicio:* ${appt.service.name}\n👤 *Empleado:* ${appt.employee.names}`
+      )
+      .join("\n\n"); // Salto de línea adicional entre servicios
+
+    return `*DETALLES DE LA CITA*
+  👩‍🦰 *Cliente:* ${appointment.client.name}
+  📅 *Horario:* ${dayjs(appointment.startDate).format(
+    "dddd, D MMMM YYYY, h:mm A"
+  )} - ${dayjs(appointment.endDate).format("h:mm A")}
+  💵 *Abono:* ${appointment.advancePayment}
+  
+  ${clientServices}`;
+  };
+
   return (
     <>
       {/* Modal para mostrar detalles de la cita */}
@@ -90,25 +126,90 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <Flex
           direction="column"
           gap="md"
-          onClick={(event) => event.stopPropagation()} 
+          onClick={(event) => event.stopPropagation()}
         >
-          <Text fw={700} size="md">
-            Servicio: {appointment.service.name}
-          </Text>
-          <Text size="sm">
-            Horario:{" "}
-            {dayjs(appointment.startDate).format("dddd, D MMMM YYYY, h:mm A")} -{" "}
-            {dayjs(appointment.endDate).format("h:mm A")}
-          </Text>
-          <Text size="sm">Abono: {appointment.advancePayment}</Text>
-          <Text size="sm">Empleado: {appointment.employee.names}</Text>
-          <Text size="sm">Estado: {appointment.status}</Text>
-          <Text size="sm">Cliente: {appointment.client.name}</Text>
-          {getIsBirthday(appointment.client.birthDate) && (
-            <Text size="sm" c="orange">
-              🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
+          {/* Botón para copiar al portapapeles */}
+          <Box
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text fw={700} size="md">
+              Detalles de la Cita
             </Text>
-          )}
+            <CopyButton
+              value={generateAppointmentDetails(appointment, appoinments)} // Texto dinámico
+              timeout={2000}
+            >
+              {({ copied, copy }) => (
+                <Tooltip
+                  label={
+                    copied
+                      ? "Copiado para WhatsApp"
+                      : "Copiar en formato para WhatsApp"
+                  }
+                  withArrow
+                >
+                  <ActionIcon
+                    color={copied ? "green" : "blue"}
+                    onClick={copy}
+                    size="lg"
+                    variant="filled"
+                    style={{
+                      backgroundColor: copied ? "#25D366" : "#007bff", // Verde WhatsApp al copiar
+                      color: "#fff",
+                    }}
+                  >
+                    {copied ? <BiCheckCircle /> : <FaWhatsapp />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          </Box>
+          {/* Servicios asociados */}
+          <Box>
+            <Text fw={700} size="sm">
+              Servicios:
+            </Text>
+            {appoinments
+              .filter((appt) => appt.client._id === appointment.client._id)
+              .map((appt, index) => (
+                <Flex
+                  key={index}
+                  direction="row"
+                  gap="sm"
+                  align="center"
+                  style={{
+                    padding: "4px 0",
+                    borderBottom: "1px solid #e0e0e0",
+                  }}
+                >
+                  <Text size="sm">- {appt.service.name}</Text>
+                  <Text size="sm" color="dimmed">
+                    (Empleado: {appt.employee.names})
+                  </Text>
+                </Flex>
+              ))}
+          </Box>
+
+          {/* Horario y otros detalles */}
+          <Box>
+            <Text size="sm">
+              Horario:{" "}
+              {dayjs(appointment.startDate).format("dddd, D MMMM YYYY, h:mm A")}{" "}
+              - {dayjs(appointment.endDate).format("h:mm A")}
+            </Text>
+            <Text size="sm">Abono: {appointment.advancePayment}</Text>
+            <Text size="sm">Estado: {appointment.status}</Text>
+            <Text size="sm">Cliente: {appointment.client.name}</Text>
+            {getIsBirthday(appointment.client.birthDate) && (
+              <Text size="sm" c="orange">
+                🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
+              </Text>
+            )}
+          </Box>
         </Flex>
         <Button
           mt="md"
@@ -127,9 +228,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         shadow="xs"
         radius="sm"
         style={{
-          backgroundColor: appointment.employee.color,
+          backgroundColor: isPastAppointment
+            ? "#ffffff"
+            : appointment.employee.color,
           color: textColor,
-          padding: "10px",
+          paddingTop: "10px",
+          paddingLeft: "5PX",
           borderLeft: `4px solid ${borderColor}`,
           display: "flex",
           flexDirection: "column",
@@ -157,8 +261,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             🌟Cita con {appointment.employee.names}
           </Badge>
         )}
-        <Text mt="xs" c="blue" style={{ fontSize: "9px" }}>
-          {format(appointment.startDate, "h:mm")}{" - "}
+        <Text mt="xs" fw={800} style={{ fontSize: "10px" }}>
+          {format(appointment.startDate, "h:mm")}
+          {" - "}
           {format(appointment.endDate, "h:mm a")}
         </Text>
 
@@ -175,7 +280,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <ActionIcon
               variant="transparent"
               color="dark"
-              style={{ position: "absolute", bottom: -5, left: -12, zIndex: 10 }}
+              style={{
+                position: "absolute",
+                bottom: -5,
+                left: -12,
+                zIndex: 10,
+              }}
               onClick={(event) => event.stopPropagation()}
             >
               <BiDotsVertical />
