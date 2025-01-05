@@ -247,6 +247,7 @@ const WeekView: React.FC<WeekViewProps> = ({
                                     >
                                       <AppointmentCard
                                         appointment={appointment}
+                                        appoinments={appointments}
                                         onEditAppointment={onEditAppointment}
                                         onCancelAppointment={
                                           onCancelAppointment
