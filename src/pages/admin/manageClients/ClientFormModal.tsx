@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { TextInput, Button, Box, Modal } from "@mantine/core";
 import {
@@ -15,6 +16,7 @@ interface ClientFormModalProps {
   onClose: () => void;
   fetchClients: () => void;
   client?: Client | null;
+  setClient?: React.Dispatch<React.SetStateAction<Client | null>>;
 }
 
 const ClientFormModal: React.FC<ClientFormModalProps> = ({
@@ -22,6 +24,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   onClose,
   fetchClients,
   client,
+  setClient,
 }) => {
   const [name, setName] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
@@ -32,6 +35,17 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     (state: RootState) => state.auth.organizationId
   );
 
+  // Función para restablecer los valores del formulario
+  const resetForm = () => {
+    setName("");
+    setPhoneNumber("");
+    setEmail("");
+    setBirthDate(null);
+    if (setClient) {
+      setClient(null); // Restablecer el cliente
+    }
+  };
+
   // Cargar datos del cliente cuando esté en modo edición
   useEffect(() => {
     if (client) {
@@ -40,9 +54,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setEmail(client.email?.trim() || "");
       setBirthDate(client.birthDate ? new Date(client.birthDate) : null);
     } else {
-      setName("");
-      setPhoneNumber("");
-      setEmail("");
+      resetForm();
     }
   }, [client]);
 
@@ -77,7 +89,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           phoneNumber: formattedPhoneNumber,
           email: email.trim(),
           organizationId,
-          birthDate: birthDate || new Date(),
+          birthDate: birthDate || null,
         };
         await createClient(newClient);
         showNotification({
@@ -89,8 +101,9 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         });
       }
 
-      // Refrescar la lista de clientes y cerrar el modal
+      // Refrescar la lista de clientes, restablecer el formulario y cerrar el modal
       fetchClients();
+      resetForm();
       onClose();
     } catch (err) {
       console.error(err);
@@ -111,9 +124,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setter(event.target.value);
     };
 
-  // Formatear números telefónicos con espacios
   const formatPhoneNumber = (value: string): string => {
-    // Ejemplo de formato: "123 456 7890"
     return value
       .replace(/\D/g, "")
       .replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3");
@@ -127,7 +138,10 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={() => {
+        resetForm(); // Restablecer valores al cerrar el modal
+        onClose();
+      }}
       title={client ? "Editar Cliente" : "Crear Cliente"}
       zIndex={1000}
     >
@@ -158,9 +172,10 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           value={birthDate}
           locale="es"
           valueFormat="DD/MM/YYYY"
-          onChange={setBirthDate}
+          onChange={(value) => setBirthDate(value || null)}
           placeholder="Selecciona una fecha"
           maxDate={new Date()}
+          clearable
         />
         <Button mt="md" color="blue" onClick={handleSubmit}>
           {client ? "Actualizar Cliente" : "Crear Cliente"}

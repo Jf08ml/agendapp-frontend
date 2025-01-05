@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import {
   Box,
   Flex,
@@ -204,6 +205,7 @@ const Dashboard = () => {
         onClose={handleCloseModal}
         fetchClients={fetchClients}
         client={editCLient}
+        setClient={setEditClient}
       />
       <div>
         <ClientTable
