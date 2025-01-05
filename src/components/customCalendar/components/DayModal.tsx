@@ -78,6 +78,16 @@ const DayModal: FC<DayModalProps> = ({
     [appointments]
   );
 
+  // Contar cuántos clientes únicos hay en las citas del día:
+  const totalUniqueClients = useMemo(() => {
+    // Recuerda filtrar citas que tengan un client válido
+    const clientIds = appointments
+      .map((app) => app.client?._id)
+      .filter(Boolean); // Elimina nulos/undefined
+
+    return new Set(clientIds).size;
+  }, [appointments]);
+
   // Cálculo de las horas de inicio y fin
   const { startHour, endHour } = useMemo(() => {
     const orgStartHour = organization?.openingHours?.start
@@ -147,7 +157,6 @@ const DayModal: FC<DayModalProps> = ({
     >
       <div
         style={{
-
           width: "100%",
           height: "80vh",
           overflowX: "auto",
@@ -200,8 +209,10 @@ const DayModal: FC<DayModalProps> = ({
           </Box>
 
           <Text size="sm" mt={isSmallScreen ? 8 : 0}>
-            Total de citas para {format(currentDay, "d MMM", { locale: es })}:{" "}
+            Total de citas:{" "}
             <strong>{appointments.length}</strong>
+            {"  "}•{"  "}
+            Total de clientes: <strong>{totalUniqueClients}</strong>
           </Text>
         </Box>
         <Box
@@ -219,7 +230,7 @@ const DayModal: FC<DayModalProps> = ({
         <Box
           style={{
             display: "flex",
-            position: "relative"
+            position: "relative",
           }}
         >
           <Box
