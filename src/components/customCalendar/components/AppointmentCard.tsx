@@ -18,6 +18,7 @@ import {
   BiTrash,
   BiCheck,
   BiCheckCircle,
+  BiCopy,
 } from "react-icons/bi";
 import { format } from "date-fns";
 import { Appointment } from "../../../services/appointmentService";
@@ -26,6 +27,8 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import { FaWhatsapp } from "react-icons/fa";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 
 dayjs.extend(localizedFormat);
 dayjs.locale("es");
@@ -76,6 +79,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
 
+  const { role } = useSelector((state: RootState) => state.auth);
+
   const getIsBirthday = (
     birthDate: string | number | dayjs.Dayjs | Date | null | undefined
   ): boolean => {
@@ -114,13 +119,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   ${clientServices}`;
   };
 
+  const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
+
   return (
     <>
       {/* Modal para mostrar detalles de la cita */}
       <Modal
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
-        title="Detalles de la Cita"
         size="lg"
       >
         <Flex
@@ -139,34 +145,52 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <Text fw={700} size="md">
               Detalles de la Cita
             </Text>
-            <CopyButton
-              value={generateAppointmentDetails(appointment, appoinments)} // Texto dinámico
-              timeout={2000}
-            >
-              {({ copied, copy }) => (
-                <Tooltip
-                  label={
-                    copied
-                      ? "Copiado para WhatsApp"
-                      : "Copiar en formato para WhatsApp"
-                  }
-                  withArrow
-                >
-                  <ActionIcon
-                    color={copied ? "green" : "blue"}
-                    onClick={copy}
-                    size="lg"
-                    variant="filled"
-                    style={{
-                      backgroundColor: copied ? "#25D366" : "#007bff", // Verde WhatsApp al copiar
-                      color: "#fff",
-                    }}
+            <Flex gap="md">
+              {/* Ícono para copiar texto */}
+              <CopyButton
+                value={generateAppointmentDetails(appointment, appoinments)}
+                timeout={2000}
+              >
+                {({ copied, copy }) => (
+                  <Tooltip
+                    label={copied ? "Copiado" : "Copiar en formato WhatsApp"}
+                    withArrow
                   >
-                    {copied ? <BiCheckCircle /> : <FaWhatsapp />}
-                  </ActionIcon>
-                </Tooltip>
+                    <ActionIcon
+                      color={copied ? "green" : "blue"}
+                      onClick={copy}
+                      size="lg"
+                      variant="filled"
+                      style={{
+                        backgroundColor: copied ? "#25D366" : "#007bff",
+                        color: "#fff",
+                      }}
+                    >
+                      {copied ? (
+                        <BiCheckCircle size={16} />
+                      ) : (
+                        <BiCopy size={16} />
+                      )}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+
+              {/* Ícono para enviar por WhatsApp */}
+              {role === "admin" && (
+                <ActionIcon
+                  color="green"
+                  size="lg"
+                  variant="filled"
+                  style={{ backgroundColor: "#25D366", color: "#fff" }}
+                  onClick={() => {
+                    window.open(whatsappURL, "_blank");
+                  }}
+                >
+                  <FaWhatsapp size={16} />
+                </ActionIcon>
               )}
-            </CopyButton>
+            </Flex>
           </Box>
           {/* Servicios asociados */}
           <Box>
