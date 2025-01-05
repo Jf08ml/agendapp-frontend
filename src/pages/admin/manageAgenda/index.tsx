@@ -27,9 +27,11 @@ import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
 import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
+import { addMinutes } from "date-fns";
 
-interface CreateAppointmentPayload {
-  service: Service;
+export interface CreateAppointmentPayload {
+  service: Service,
+  services: Service[];
   client: Client;
   employee: Employee;
   employeeRequestedByClient: boolean;
@@ -44,7 +46,10 @@ const ScheduleView: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [newAppointment, setNewAppointment] = useState<
     Partial<CreateAppointmentPayload>
-  >({});
+  >({
+    services: [],
+  });
+
   const [modalOpenedAppointment, setModalOpenedAppointment] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -157,12 +162,12 @@ const ScheduleView: React.FC = () => {
   /**
    * MANEJO DE SERVICIO
    */
-  const handleServiceChange = (serviceId: string | null) => {
-    const selectedService = filteredServices.find(
-      (service) => service._id === serviceId
-    );
-    setNewAppointment({ ...newAppointment, service: selectedService });
-  };
+  // const handleServiceChange = (serviceId: string | null) => {
+  //   const selectedService = filteredServices.find(
+  //     (service) => service._id === serviceId
+  //   );
+  //   setNewAppointment({ ...newAppointment, services: selectedService });
+  // };
 
   /**
    * MANEJO DE EMPLEADO
@@ -378,7 +383,7 @@ const ScheduleView: React.FC = () => {
   const addOrUpdateAppointment = async () => {
     try {
       const {
-        service,
+        services,
         employee,
         employeeRequestedByClient,
         client,
@@ -388,79 +393,81 @@ const ScheduleView: React.FC = () => {
         advancePayment,
       } = newAppointment;
 
+      // Verifica que tengas datos
       if (
-        service &&
+        services && // Array de servicios
+        services.length > 0 &&
         employee &&
         client &&
         startDate &&
         endDate
       ) {
-        const appointmentPayload: CreateAppointmentPayload = {
-          service,
-          employee,
-          client,
-          employeeRequestedByClient: employeeRequestedByClient ?? false,
-          startDate,
-          endDate,
-          status: status || "pending",
-          organizationId: organizationId as string,
-          advancePayment,
-        };
-
         if (selectedAppointment) {
-          // Update existing
-          try {
-            const response = await updateAppointment(
-              selectedAppointment._id,
-              appointmentPayload
-            );
-            if (response) {
-              showNotification({
-                title: "Éxito",
-                message: "Cita actualizada correctamente",
-                color: "green",
-                autoClose: 3000,
-                position: "top-right",
-              });
-              closeModal();
-            }
-          } catch (error) {
-            showNotification({
-              title: "Error",
-              message: (error as Error).message,
-              color: "red",
-              autoClose: 3000,
-              position: "top-right",
-            });
-            console.error(error);
-          }
+          // MODO EDICIÓN
+          // Solo tomamos el primer servicio (o el que estuviera antes)
+          // porque en backend sigues teniendo 1 cita = 1 servicio.
+
+          const firstService = services[0]; // tomamos solo el primero
+          const payload = {
+            services: [firstService], // en la BD tu endpoint quizás espera 'service' suelto
+            employee,
+            client,
+            employeeRequestedByClient: employeeRequestedByClient ?? false,
+            startDate,
+            endDate,
+            status: status || "pending",
+            organizationId: organizationId as string,
+            advancePayment,
+          };
+
+          await updateAppointment(selectedAppointment._id, payload);
+          showNotification({
+            title: "Éxito",
+            message: "Cita actualizada correctamente",
+            color: "green",
+            autoClose: 3000,
+            position: "top-right",
+          });
         } else {
-          // Create new
-          try {
-            const response = await createAppointment(appointmentPayload);
-            if (response) {
-              showNotification({
-                title: "Éxito",
-                message: "Cita creada correctamente",
-                color: "green",
-                autoClose: 3000,
-                position: "top-right",
-              });
-              closeModal();
-            }
-          } catch (error) {
-            showNotification({
-              title: "Error",
-              message: (error as Error).message,
-              color: "red",
-              autoClose: 3000,
-              position: "top-right",
-            });
-            console.error(error);
+          // MODO CREACIÓN
+          let currentStart = startDate; // Hora de inicio de la PRIMER cita
+
+          for (const service of services) {
+            // Calculamos la hora de fin para este servicio
+            // usando su duración (en minutos).
+            const serviceEnd = addMinutes(currentStart, service.duration || 0);
+
+            // Construimos el payload para ESTA cita
+            const payload = {
+              service,
+              employee,
+              client,
+              employeeRequestedByClient: employeeRequestedByClient ?? false,
+              startDate: currentStart, // Empieza donde terminó el anterior
+              endDate: serviceEnd, // Termina después de su duración
+              status: status || "pending",
+              organizationId: organizationId as string,
+              advancePayment,
+            };
+
+            await createAppointment(payload);
+
+            // El próximo servicio empieza donde terminó éste
+            currentStart = serviceEnd;
           }
+
+          showNotification({
+            title: "Éxito",
+            message:
+              "Citas creadas correctamente para los servicios seleccionados",
+            color: "green",
+            autoClose: 3000,
+            position: "top-right",
+          });
         }
-        // refrescamos la agenda
-        fetchAppointments();
+
+        closeModal(); // cierra el modal
+        fetchAppointments(); // refresca la agenda
       }
     } catch (error) {
       showNotification({
@@ -529,7 +536,7 @@ const ScheduleView: React.FC = () => {
         services={filteredServices}
         employees={employees}
         clients={clients}
-        onServiceChange={handleServiceChange}
+        // onServiceChange={handleServiceChange}
         onEmployeeChange={handleEmployeeChange}
         onClientChange={handleClientChange}
         onSave={addOrUpdateAppointment}

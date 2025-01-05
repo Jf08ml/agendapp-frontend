@@ -10,6 +10,7 @@ import {
   Group,
   Checkbox,
   NumberInput,
+  MultiSelect,
 } from "@mantine/core";
 import DateSelector from "./DateSelector";
 import TimeSelector from "./TimeSelector";
@@ -20,17 +21,18 @@ import { Client } from "../../../../services/clientService";
 import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
+import { CreateAppointmentPayload } from "..";
 
 interface AppointmentModalProps {
   opened: boolean;
   onClose: () => void;
   appointment: Appointment | null;
-  newAppointment: Partial<Appointment>;
-  setNewAppointment: React.Dispatch<React.SetStateAction<Partial<Appointment>>>;
+  newAppointment: Partial<CreateAppointmentPayload>;
+  setNewAppointment: React.Dispatch<React.SetStateAction<Partial<CreateAppointmentPayload>>>;
   services: Service[];
   employees: Employee[];
   clients: Client[];
-  onServiceChange: (value: string | null) => void;
+  // onServiceChange: (value: string | null) => void;
   onEmployeeChange: (value: string | null) => void;
   onClientChange: (value: string | null) => void;
   onSave: () => void;
@@ -46,7 +48,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   services,
   employees,
   clients,
-  onServiceChange,
+  // onServiceChange,
   onEmployeeChange,
   onClientChange,
   onSave,
@@ -55,7 +57,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
 
-                    const today = dayjs();
+  const today = dayjs();
 
   useEffect(() => {
     if (appointment) {
@@ -69,27 +71,31 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   }, [appointment, setNewAppointment]);
 
   useEffect(() => {
-    if (newAppointment.startDate && newAppointment.service) {
-      const selectedService = services.find(
-        (s) => s._id === newAppointment.service?._id
-      );
-
-      if (selectedService?.duration) {
-        const endDate = addMinutes(
-          newAppointment.startDate,
-          selectedService.duration
+    if (appointment) {
+      // MODO EDICIÓN
+      // Recalcular endDate con base en un solo servicio
+      const service = newAppointment.services?.[0];
+      if (newAppointment.startDate && service) {
+        // Asumiendo que 'service.duration' es minutos
+        const end = addMinutes(newAppointment.startDate, service.duration);
+        setNewAppointment((prev) => ({ ...prev, endDate: end }));
+      }
+    } else {
+      // MODO CREACIÓN
+      // Sumar la duración de todos los servicios
+      if (newAppointment.startDate && newAppointment.services) {
+        const totalDuration = newAppointment.services.reduce(
+          (acc, s) => acc + (s.duration || 0),
+          0
         );
-
-        setNewAppointment((prev) => ({
-          ...prev,
-          endDate: new Date(endDate),
-        }));
+        const end = addMinutes(newAppointment.startDate, totalDuration);
+        setNewAppointment((prev) => ({ ...prev, endDate: end }));
       }
     }
   }, [
+    appointment,
     newAppointment.startDate,
-    newAppointment.service,
-    services,
+    newAppointment.services,
     setNewAppointment,
   ]);
 
@@ -124,7 +130,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 return {
                   value: client._id,
                   label: isBirthday ? `🎉 ${client.name} 🎉` : client.name,
-                  isBirthday, 
+                  isBirthday,
                 };
               }),
               { value: "create-client", label: "+ Crear nuevo cliente" },
@@ -153,7 +159,6 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               </Box>
             }
           />
-
           {/* Otros Selects */}
           <Select
             label="Empleado"
@@ -167,7 +172,6 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             searchable
             required
           />
-
           <Checkbox
             size="xs"
             my="xs"
@@ -182,19 +186,56 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             }
           />
 
-          <Select
-            label="Servicio"
-            placeholder="Selecciona un servicio"
-            data={services.map((service) => ({
-              value: service._id,
-              label: service.name,
-            }))}
-            value={newAppointment.service?._id || ""}
-            onChange={(value) => onServiceChange(value)}
-            searchable
-            required
-          />
-
+          {appointment ? (
+            // MODO EDICIÓN: Solo un servicio
+            <Select
+              label="Servicio"
+              placeholder="Selecciona un servicio"
+              data={services.map((service) => ({
+                value: service._id,
+                label: service.name,
+              }))}
+              // El value es un string con el ID del servicio
+              value={newAppointment.services?.[0]?._id || ""}
+              onChange={(value) => {
+                // value es el ID del servicio
+                const selected = services.find((s) => s._id === value);
+                setNewAppointment((prev) => ({
+                  ...prev,
+                  services: selected ? [selected] : [],
+                }));
+              }}
+              required
+            />
+          ) : (
+            // MODO CREACIÓN: Múltiples servicios
+            <MultiSelect
+              label="Servicios"
+              placeholder="Selecciona uno o varios servicios"
+              data={services.map((service) => ({
+                value: service._id,
+                label: service.name,
+              }))}
+              value={
+                // array de IDs
+                newAppointment.services
+                  ? newAppointment.services.map((s) => s._id)
+                  : []
+              }
+              onChange={(selectedIds) => {
+                // selectedIds es un array de IDs
+                const selectedServices = services.filter((s) =>
+                  selectedIds.includes(s._id)
+                );
+                setNewAppointment((prev) => ({
+                  ...prev,
+                  services: selectedServices,
+                }));
+              }}
+              searchable
+              required
+            />
+          )}
           <NumberInput
             label="Monto del Abono"
             placeholder="Ingresa el monto del abono"
@@ -205,12 +246,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             onChange={(value) =>
               setNewAppointment((prev) => ({
                 ...prev,
-                advancePayment: typeof value === "number" ? value : 0, 
+                advancePayment: typeof value === "number" ? value : 0,
               }))
             }
             mb="sm"
           />
-
           {/* Controles para fechas y horas */}
           <Grid mt="md" gutter="sm">
             <Grid.Col span={6}>
@@ -247,7 +287,6 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               />
             </Grid.Col>
           </Grid>
-
           <Group mt="lg" justify="flex-end">
             <Button variant="default" onClick={onClose}>
               Cancelar
@@ -270,5 +309,3 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 };
 
 export default AppointmentModal;
-
-
