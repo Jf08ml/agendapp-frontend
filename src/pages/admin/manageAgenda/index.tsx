@@ -519,8 +519,8 @@ const ScheduleView: React.FC = () => {
       </Group>
 
       <CustomCalendar
-        employees={employees} // ya filtrados según permisos
-        appointments={appointments} // también filtrados
+        employees={employees}
+        appointments={appointments}
         onOpenModal={openModal}
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}

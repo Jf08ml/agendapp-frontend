@@ -56,7 +56,7 @@ const DayModal: FC<DayModalProps> = ({
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
   const [currentDay, setCurrentDay] = useState<Date>(
-    selectedDay || new Date() // Usa la fecha actual si no hay `selectedDay`
+    selectedDay || new Date()
   );
   const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(
     null
@@ -67,11 +67,14 @@ const DayModal: FC<DayModalProps> = ({
       setCurrentDay(selectedDay);
     }
   }, [selectedDay]);
+  
 
-  const appointments = useMemo(
-    () => getAppointmentsForDay(currentDay),
-    [currentDay, getAppointmentsForDay]
-  );
+  const appointments = useMemo(() => {
+    const result = getAppointmentsForDay(currentDay);
+    return result;
+  }, [currentDay, getAppointmentsForDay]);
+  
+  
 
   const appointmentsByEmployee = useMemo(
     () => organizeAppointmentsByEmployee(appointments),

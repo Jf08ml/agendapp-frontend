@@ -138,6 +138,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
       </Group>
 
       <DayModal
+        key={selectedDay?.toISOString()}
         opened={modalOpened}
         selectedDay={selectedDay}
         onClose={() => setModalOpened(false)}
