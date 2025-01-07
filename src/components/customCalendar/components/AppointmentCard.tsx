@@ -11,6 +11,8 @@ import {
   Box,
   CopyButton,
   Tooltip,
+  Group,
+  Divider,
 } from "@mantine/core";
 import {
   BiDotsVertical,
@@ -126,25 +128,25 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       {/* Modal para mostrar detalles de la cita */}
       <Modal
         opened={modalOpened}
-        onClose={() => setModalOpened(false)}
+        onClose={() => setModalOpened(false)} 
+        withCloseButton={false}
         size="lg"
+        title={null} 
+        centered 
       >
+        {/* Contenedor principal */}
         <Flex
           direction="column"
           gap="md"
+          // Evita que se cierre el modal si hacen clic en estos hijos
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Botón para copiar al portapapeles */}
-          <Box
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text fw={700} size="md">
+          {/* Encabezado de la sección (title, copiar y WhatsApp) */}
+          <Flex justify="space-between" align="center">
+            <Text fw={700} size="lg">
               Detalles de la Cita
             </Text>
+
             <Flex gap="md">
               {/* Ícono para copiar texto */}
               <CopyButton
@@ -191,11 +193,15 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 </ActionIcon>
               )}
             </Flex>
-          </Box>
-          {/* Servicios asociados */}
+          </Flex>
+
+          {/* Línea divisoria */}
+          <Divider />
+
+          {/* Sección de Servicios asociados */}
           <Box>
-            <Text fw={700} size="sm">
-              Servicios:
+            <Text fw={700} size="sm" mb="xs">
+              Servicios
             </Text>
             {appoinments
               .filter((appt) => appt.client._id === appointment.client._id)
@@ -203,48 +209,78 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Flex
                   key={index}
                   direction="row"
-                  gap="sm"
+                  gap="xs"
                   align="center"
-                  style={{
-                    padding: "4px 0",
-                    borderBottom: "1px solid #e0e0e0",
-                  }}
+                  py={5}
+                  style={{ borderBottom: "1px solid #e0e0e0" }}
                 >
-                  <Text size="sm">- {appt.service.name}</Text>
-                  <Text size="sm" color="dimmed">
-                    (Empleado: {appt.employee.names})
+                  {/* Nombre del servicio */}
+                  <Text size="sm" fw={500}>
+                    {appt.service.name}
+                  </Text>
+
+                  {/* Empleado */}
+                  <Text size="sm" c="dimmed">
+                    (Empleado:{" "}
+                    {appt.employeeRequestedByClient ? (
+                      <strong style={{ color: "purple" }}>
+                        {appt.employee.names} (solicitado)
+                      </strong>
+                    ) : (
+                      appt.employee.names
+                    )}
+                    )
                   </Text>
                 </Flex>
               ))}
           </Box>
 
-          {/* Horario y otros detalles */}
+          {/* Segunda línea divisoria */}
+          <Divider />
+
+          {/* Sección de Horario y detalles */}
           <Box>
-            <Text size="sm">
-              Horario:{" "}
-              {dayjs(appointment.startDate).format("dddd, D MMMM YYYY, h:mm A")}{" "}
-              - {dayjs(appointment.endDate).format("h:mm A")}
-            </Text>
-            <Text size="sm">Abono: {appointment.advancePayment}</Text>
-            <Text size="sm">Estado: {appointment.status}</Text>
-            <Text size="sm">Cliente: {appointment.client.name}</Text>
-            {getIsBirthday(appointment.client.birthDate) && (
-              <Text size="sm" c="orange">
-                🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
+            <Flex direction="column" gap="xs">
+              <Text size="sm">
+                <strong>Horario:</strong>{" "}
+                {dayjs(appointment.startDate).format(
+                  "dddd, D MMMM YYYY, h:mm A"
+                )}{" "}
+                - {dayjs(appointment.endDate).format("h:mm A")}
               </Text>
-            )}
+              <Text size="sm">
+                <strong>Abono:</strong> {appointment.advancePayment}
+              </Text>
+              <Text size="sm">
+                <strong>Estado:</strong> {appointment.status}
+              </Text>
+              <Text size="sm">
+                <strong>Cliente:</strong> {appointment.client.name}
+              </Text>
+
+              {getIsBirthday(appointment.client.birthDate) && (
+                <Text size="sm" c="orange">
+                  🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
+                </Text>
+              )}
+            </Flex>
           </Box>
+
+          {/* Tercera línea divisoria */}
+          <Divider />
+
+          {/* Botón para cerrar */}
+          <Group justify="right" mt="md">
+            <Button
+              onClick={(event) => {
+                event.stopPropagation();
+                setModalOpened(false);
+              }}
+            >
+              Cerrar
+            </Button>
+          </Group>
         </Flex>
-        <Button
-          mt="md"
-          fullWidth
-          onClick={(event) => {
-            event.stopPropagation();
-            setModalOpened(false);
-          }}
-        >
-          Cerrar
-        </Button>
       </Modal>
 
       {/* Card de la cita */}
@@ -263,11 +299,19 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           flexDirection: "column",
           justifyContent: "space-between",
           height: "100%",
-          overflow: "hidden",
+          overflow: "visible",
           position: "relative",
           cursor: "pointer",
         }}
-        onClick={() => setModalOpened(true)}
+        onClick={(e) => {
+          // Para saber si el usuario hizo clic en el ícono
+          const isIconClick = (e.target as HTMLElement).closest(
+            ".ignore-modal"
+          );
+          if (!isIconClick) {
+            setModalOpened(true);
+          }
+        }}
       >
         {appointment.employeeRequestedByClient && (
           <Badge
@@ -301,19 +345,21 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
         <Menu position="top-end" withArrow>
           <Menu.Target>
-            <ActionIcon
-              variant="transparent"
-              color="dark"
-              style={{
-                position: "absolute",
-                bottom: -5,
-                left: -12,
-                zIndex: 10,
-              }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <BiDotsVertical />
-            </ActionIcon>
+            <Tooltip label="Opciones" withArrow>
+              <ActionIcon
+                className="ignore-modal"
+                variant="transparent"
+                color="dark"
+                style={{
+                  position: "absolute",
+                  top: -5,
+                  left: -17,
+                  zIndex: 10,
+                }}
+              >
+                <BiDotsVertical size={24} />
+              </ActionIcon>
+            </Tooltip>
           </Menu.Target>
           <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
             <Menu.Item

@@ -17,7 +17,7 @@ const getTextColor = (backgroundColor: string): string => {
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? "#000000" : "#FFFFFF"; // Negro para fondos claros, blanco para fondos oscuros
+  return brightness > 128 ? "#000000" : "#FFFFFF";
 };
 
 const DayModalHeader: FC<HeaderProps> = ({
@@ -57,26 +57,26 @@ const DayModalHeader: FC<HeaderProps> = ({
               border: "1px solid gray",
               borderRadius: "5px",
               backgroundColor: isHidden ? "#f2f2f2" : color,
-              position: "relative",  // para posicionar el ícono
-              padding: "4px",        // un poco de padding
+              position: "relative",
+              padding: "4px",
             }}
           >
             {/* Nombre del empleado */}
-            <Text style={{ fontSize: "10px", color: textColor }}>
+            <Text style={{ fontSize: "10px", color: isHidden ? "#000000" : textColor }}>
               {employee.names}
             </Text>
 
             {/* Ícono para ocultar/mostrar */}
-            <Box style={{ position: "absolute", top: 0, right: 1 }}>
+            <Box style={{ position: "absolute", top: -6, right: -2 }}>
               <ActionIcon
                 variant="transparent"
                 onClick={() => onToggleEmployeeHidden(employee._id)}
                 title={isHidden ? "Mostrar empleado" : "Ocultar empleado"}
               >
                 {isHidden ? (
-                  <IoEyeOff size={16} color={textColor} />
+                  <IoEyeOff size={16} color="black" />
                 ) : (
-                  <IoEye size={16} color={textColor} />
+                  <IoEye size={16} color="black" />
                 )}
               </ActionIcon>
             </Box>
