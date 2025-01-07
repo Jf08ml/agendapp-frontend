@@ -1,10 +1,13 @@
 import { FC } from "react";
-import { Box, Text } from "@mantine/core";
+import { Box, Text, ActionIcon } from "@mantine/core";
 import { Employee } from "../../../../services/employeeService";
 import { CARD_WIDTH } from "../DayModal";
+import { IoEye, IoEyeOff } from "react-icons/io5";
 
 interface HeaderProps {
   employees: Employee[];
+  hiddenEmployeeIds: string[];
+  onToggleEmployeeHidden: (employeeId: string) => void;
 }
 
 // Función para calcular el contraste del color
@@ -17,7 +20,11 @@ const getTextColor = (backgroundColor: string): string => {
   return brightness > 128 ? "#000000" : "#FFFFFF"; // Negro para fondos claros, blanco para fondos oscuros
 };
 
-const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
+const DayModalHeader: FC<HeaderProps> = ({
+  employees,
+  hiddenEmployeeIds,
+  onToggleEmployeeHidden,
+}) => {
   return (
     <Box
       style={{
@@ -33,31 +40,46 @@ const DayModalHeader: FC<HeaderProps> = ({ employees }) => {
       {/* Encabezados de cada empleado */}
       {employees.map((employee) => {
         const color = employee.color || "#ccc";
-        const textColor = getTextColor(color); 
+        const textColor = getTextColor(color);
+        const isHidden = hiddenEmployeeIds.includes(employee._id);
 
         return (
           <Box
             key={employee._id}
             style={{
               width: `${CARD_WIDTH}px`,
-              display: "flex", 
+              display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexDirection: "column",
               textAlign: "center",
               marginLeft: "2px",
               border: "1px solid gray",
               borderRadius: "5px",
-              backgroundColor: color,
+              backgroundColor: isHidden ? "#f2f2f2" : color,
+              position: "relative",  // para posicionar el ícono
+              padding: "4px",        // un poco de padding
             }}
           >
-            <Text
-              style={{
-                fontSize: "10px",
-                color: textColor,
-              }}
-            >
+            {/* Nombre del empleado */}
+            <Text style={{ fontSize: "10px", color: textColor }}>
               {employee.names}
             </Text>
+
+            {/* Ícono para ocultar/mostrar */}
+            <Box style={{ position: "absolute", top: 0, right: 1 }}>
+              <ActionIcon
+                variant="transparent"
+                onClick={() => onToggleEmployeeHidden(employee._id)}
+                title={isHidden ? "Mostrar empleado" : "Ocultar empleado"}
+              >
+                {isHidden ? (
+                  <IoEyeOff size={16} color={textColor} />
+                ) : (
+                  <IoEye size={16} color={textColor} />
+                )}
+              </ActionIcon>
+            </Box>
           </Box>
         );
       })}

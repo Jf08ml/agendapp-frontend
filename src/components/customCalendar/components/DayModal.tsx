@@ -55,31 +55,59 @@ const DayModal: FC<DayModalProps> = ({
   );
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
-  const [currentDay, setCurrentDay] = useState<Date>(
-    selectedDay || new Date()
-  );
+  const [currentDay, setCurrentDay] = useState<Date>(selectedDay || new Date());
   const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(
     null
   );
+  // 1. Estado de empleados ocultos
+  const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedDay) {
       setCurrentDay(selectedDay);
     }
   }, [selectedDay]);
-  
 
   const appointments = useMemo(() => {
     const result = getAppointmentsForDay(currentDay);
     return result;
   }, [currentDay, getAppointmentsForDay]);
-  
-  
 
   const appointmentsByEmployee = useMemo(
     () => organizeAppointmentsByEmployee(appointments),
     [appointments]
   );
+
+  // 2. Función para alternar la visibilidad de un empleado
+  const handleToggleEmployeeHidden = (employeeId: string) => {
+    setHiddenEmployeeIds((prev) => {
+      // Si ya está oculto, lo quitamos del array
+      if (prev.includes(employeeId)) {
+        return prev.filter((id) => id !== employeeId);
+      }
+      // Si no estaba oculto, lo agregamos
+      return [...prev, employeeId];
+    });
+  };
+
+  // 3. Ordenamos los empleados: primero los visibles, luego los ocultos
+  const employeesSorted = useMemo(() => {
+    return [...employees].sort((a, b) => {
+      const aHidden = hiddenEmployeeIds.includes(a._id);
+      const bHidden = hiddenEmployeeIds.includes(b._id);
+      // Los ocultos se van al final
+      if (aHidden && !bHidden) return 1;
+      if (!aHidden && bHidden) return -1;
+      return 0;
+    });
+  }, [employees, hiddenEmployeeIds]);
+
+  // 4. Empleados visibles (los que pintaremos como columnas)
+  const visibleEmployees = useMemo(() => {
+    return employeesSorted.filter(
+      (emp) => !hiddenEmployeeIds.includes(emp._id)
+    );
+  }, [employeesSorted, hiddenEmployeeIds]);
 
   // Contar cuántos clientes únicos hay en las citas del día:
   const totalUniqueClients = useMemo(() => {
@@ -212,8 +240,7 @@ const DayModal: FC<DayModalProps> = ({
           </Box>
 
           <Text size="sm" mt={isSmallScreen ? 8 : 0}>
-            Total de citas:{" "}
-            <strong>{appointments.length}</strong>
+            Total de citas: <strong>{appointments.length}</strong>
             {"  "}•{"  "}
             Total de clientes: <strong>{totalUniqueClients}</strong>
           </Text>
@@ -227,7 +254,11 @@ const DayModal: FC<DayModalProps> = ({
             backgroundColor: "white",
           }}
         >
-          <Header employees={employees} />
+          <Header
+            employees={employeesSorted}
+            hiddenEmployeeIds={hiddenEmployeeIds}
+            onToggleEmployeeHidden={handleToggleEmployeeHidden}
+          />
         </Box>
 
         <Box
@@ -290,7 +321,7 @@ const DayModal: FC<DayModalProps> = ({
                 zIndex: 1,
               }}
             >
-              {employees.map((employee) => (
+              {visibleEmployees.map((employee) => (
                 <EmployeeColumn
                   key={employee._id}
                   employee={employee}
