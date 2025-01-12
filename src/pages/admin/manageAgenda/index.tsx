@@ -605,6 +605,7 @@ const ScheduleView: React.FC = () => {
         onClose={() => setReorderModalOpened(false)}
         employees={employees}
         onSave={handleSaveReorderedEmployees}
+        onFetchEmployees={fetchEmployees}
       />
     </Box>
   );

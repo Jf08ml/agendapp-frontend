@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Modal, Button, Box, Text, Group } from "@mantine/core";
+import { Modal, Button, Box, Text, Group, Title } from "@mantine/core";
 import { useDrag, useDrop } from "react-dnd";
 import { Employee } from "../../../../services/employeeService";
 
@@ -12,6 +12,7 @@ interface ReorderEmployeesModalProps {
   onClose: () => void;
   employees: Employee[];
   onSave: (updatedEmployees: Employee[]) => void;
+  onFetchEmployees: () => void;
 }
 
 interface DraggableEmployee {
@@ -50,7 +51,7 @@ const DraggableItem: React.FC<{
         cursor: "move",
       }}
     >
-      <Text>{employee.names}</Text>
+      <Text>{index + 1} - {employee.names}</Text>
     </Box>
   );
 };
@@ -60,6 +61,7 @@ const ReorderEmployeesModal: React.FC<ReorderEmployeesModalProps> = ({
   onClose,
   employees,
   onSave,
+  onFetchEmployees,
 }) => {
   const [localEmployees, setLocalEmployees] = useState(employees);
 
@@ -76,7 +78,13 @@ const ReorderEmployeesModal: React.FC<ReorderEmployeesModalProps> = ({
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Reordenar Empleados">
+    <Modal opened={opened} onClose={onClose} withCloseButton={false}>
+      <Group justify="space-between" mb="md">
+        <Title order={4}>Re ordenar empleados</Title>
+        <Button variant="light" size="xs" onClick={() => onFetchEmployees()}>
+          Refrescar
+        </Button>
+      </Group>
       <Box>
         {localEmployees.map((employee, index) => (
           <DraggableItem
