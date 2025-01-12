@@ -34,3 +34,18 @@ export const getSubscriptionByEndpoint = async (endpoint: string): Promise<unkno
   }
 };
 
+export const deleteSubscription = async (
+  endpoint: string,
+  userId: string
+): Promise<void> => {
+  try {
+    await apiSubscribe.delete("/", {
+      data: {
+        endpoint,
+        userId,
+      },
+    });
+  } catch (error) {
+    handleAxiosError(error, "Error al eliminar la suscripción de notificación");
+  }
+};

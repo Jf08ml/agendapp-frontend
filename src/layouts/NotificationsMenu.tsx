@@ -21,6 +21,7 @@ import {
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt } from "react-icons/fa";
+import NotificationToggle from "./NotificationToggle";
 
 const NotificationsMenu = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -62,11 +63,20 @@ const NotificationsMenu = () => {
       }
     };
 
-    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+    navigator.serviceWorker.addEventListener(
+      "message",
+      (event) => {
+        console.log("Mensaje recibido del Service Worker:", event.data);
+        handleServiceWorkerMessage(event);
+      }
+    );
 
     // Cleanup the event listener on unmount
     return () => {
-      navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+      navigator.serviceWorker.removeEventListener(
+        "message",
+        handleServiceWorkerMessage
+      );
     };
   }, []);
 
@@ -97,7 +107,10 @@ const NotificationsMenu = () => {
       await markAllNotificationsAsRead(auth.userId, type);
       setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
     } catch (error) {
-      console.error("Error al marcar todas las notificaciones como leídas:", error);
+      console.error(
+        "Error al marcar todas las notificaciones como leídas:",
+        error
+      );
     }
   };
 
@@ -132,9 +145,8 @@ const NotificationsMenu = () => {
       </Menu.Target>
       <Menu.Dropdown>
         <Flex justify="space-between" align="center" px="sm">
-          <Text size="xs" fw={600}>
-            Notificaciones
-          </Text>
+          <NotificationToggle userId={auth.userId ? auth.userId : ""} />
+
           <Button
             variant="subtle"
             size="xs"
