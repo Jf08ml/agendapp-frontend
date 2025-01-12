@@ -41,6 +41,9 @@ const apiCron: AxiosInstance = createAxiosInstance(
 const apiReservation: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/reservations`
 );
+const apiNotification: AxiosInstance = createAxiosInstance(
+  `${API_BASE_URL}/notifications`
+);
 
 export {
   apiClient,
@@ -53,5 +56,6 @@ export {
   apiOrganization,
   apiSubscribe,
   apiCron,
-  apiReservation
+  apiReservation,
+  apiNotification
 };

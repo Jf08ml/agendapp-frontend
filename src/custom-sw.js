@@ -39,12 +39,23 @@ self.addEventListener("push", (event) => {
   const data = event.data.json();
   const { title, message } = data;
 
+  // Mostrar la notificación
   event.waitUntil(
     self.registration.showNotification(title, {
       body: message,
       icon: "/estudio_rosa.png",
     })
   );
+
+  // Enviar un mensaje a los clientes abiertos
+  self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({
+        type: "NEW_NOTIFICATION",
+        payload: data,
+      });
+    });
+  });
 });
 
 // Manejo de clic en las notificaciones
