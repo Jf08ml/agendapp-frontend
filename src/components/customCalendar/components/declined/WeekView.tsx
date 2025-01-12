@@ -10,15 +10,15 @@ import {
 } from "@mantine/core";
 import { startOfWeek, addDays, format, getHours, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { Appointment } from "../../../services/appointmentService";
-import AppointmentCard from "./AppointmentCard";
+import { Appointment } from "../../../../services/appointmentService";
+import AppointmentCard from "../AppointmentCard";
 import {
   generateTimeIntervals,
   organizeAppointmentsByEmployee,
   calculateAppointmentPosition,
-} from "../utils/scheduleUtils";
-import { useExpandAppointment } from "../hooks/useExpandAppointment";
-import { usePermissions } from "../../../hooks/usePermissions";
+} from "../../utils/scheduleUtils";
+import { useExpandAppointment } from "../../hooks/useExpandAppointment";
+import { usePermissions } from "../../../../hooks/usePermissions";
 
 interface WeekViewProps {
   currentDate: Date;

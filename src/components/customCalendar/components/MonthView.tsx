@@ -6,7 +6,7 @@ import {
   endOfMonth,
   format,
   isSameDay,
-  formatDate,
+  format as formatDate,
 } from "date-fns";
 import {
   startOfWeek as startOfCalendarWeek,
@@ -20,6 +20,7 @@ interface MonthViewProps {
   isMobile: boolean;
   handleDayClick: (day: Date) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
+  appointmentsLoaded: boolean; // Nueva prop para indicar si las citas están cargadas
 }
 
 const MonthView: React.FC<MonthViewProps> = ({
@@ -27,6 +28,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   isMobile,
   handleDayClick,
   getAppointmentsForDay,
+  appointmentsLoaded,
 }) => {
   const daysOfWeek = [
     "Domingo",
@@ -81,9 +83,9 @@ const MonthView: React.FC<MonthViewProps> = ({
               radius="md"
               p="xs"
               withBorder
-              onClick={() => handleDayClick(day)}
+              onClick={() => appointmentsLoaded && handleDayClick(day)}
               style={{
-                cursor: "pointer",
+                cursor: appointmentsLoaded ? "pointer" : "not-allowed",
                 position: "relative",
                 height: "100%",
                 backgroundColor: isSameDay(day, currentDate)
@@ -93,12 +95,19 @@ const MonthView: React.FC<MonthViewProps> = ({
                   ? "#007bff"
                   : undefined,
                 borderWidth: isSameDay(day, currentDate) ? 2 : 1,
+                opacity: appointmentsLoaded ? 1 : 0.5,
               }}
             >
-              <Text size={isMobile ? "xs" : "sm"} c="dimmed" mb="xs" ta="center" fw={800}>
+              <Text
+                size={isMobile ? "xs" : "sm"}
+                c="dimmed"
+                mb="xs"
+                ta="center"
+                fw={800}
+              >
                 {format(day, "d", { locale: es })}
               </Text>
-              {getAppointmentsForDay(day).length > 0 && (
+              {appointmentsLoaded && getAppointmentsForDay(day).length > 0 && (
                 <Text
                   ta="center"
                   c="dimmed"

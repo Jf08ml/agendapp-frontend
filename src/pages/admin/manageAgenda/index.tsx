@@ -14,6 +14,7 @@ import AppointmentModal from "./components/AppointmentModal";
 import {
   Employee,
   getEmployeesByOrganizationId,
+  updateEmployee,
 } from "../../../services/employeeService";
 import {
   Client,
@@ -28,9 +29,11 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
 import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
 import { addMinutes } from "date-fns";
+import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
+import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
 
 export interface CreateAppointmentPayload {
-  service: Service,
+  service: Service;
   services: Service[];
   client: Client;
   employee: Employee;
@@ -58,6 +61,7 @@ const ScheduleView: React.FC = () => {
     useState<Appointment | null>(null);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
+  const [reorderModalOpened, setReorderModalOpened] = useState(false);
 
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
@@ -481,6 +485,41 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  /**
+   * ACTUALIZAR ORDEN DE EMPLEADOS
+   */
+  const handleSaveReorderedEmployees = async (updatedEmployees: Employee[]) => {
+    try {
+      const updates = updatedEmployees.map((employee, index) => ({
+        ...employee,
+        order: index + 1, // Actualizar el orden basado en la posición
+      }));
+
+      // Actualizar en la base de datos
+      await Promise.all(
+        updates.map((employee) => updateEmployee(employee._id, employee))
+      );
+
+      setEmployees(updates);
+      showNotification({
+        title: "Éxito",
+        message: "Empleados reordenados correctamente.",
+        color: "green",
+        autoClose: 3000,
+        position: "top-right",
+      });
+    } catch (error) {
+      console.error(error);
+      showNotification({
+        title: "Error",
+        message: "No se pudo guardar el nuevo orden de los empleados.",
+        color: "red",
+        autoClose: 3000,
+        position: "top-right",
+      });
+    }
+  };
+
   // Muestra un loader si estamos cargando
   if (loadingAgenda) {
     return <CustomLoader />;
@@ -489,32 +528,46 @@ const ScheduleView: React.FC = () => {
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Title order={2}>Gestionar Agenda</Title>
-        <Group align="center">
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => setShowSearchModal(true)}
-          >
-            Buscar Citas
-          </Button>
-          <Button
-            size="xs"
-            variant="outline"
-            color="blue"
-            onClick={fetchAppointments}
-          >
-            Actualizar agenda
-          </Button>
-          {hasPermission("appointments:create") && (
+        <Group justify="space-between" mb="md">
+          <Title order={2}>Gestionar Agenda</Title>
+          <Group align="center">
             <Button
               size="xs"
-              color="blue"
-              onClick={() => openModal(new Date(), new Date())}
+              variant="outline"
+              color="teal"
+              leftSection={<BiSearch size={16} />}
+              onClick={() => setShowSearchModal(true)}
             >
-              Añadir Cita
+              Buscar Citas
             </Button>
-          )}
+            <Button
+              size="xs"
+              variant="filled"
+              color="blue"
+              leftSection={<BiRefresh size={16} />}
+              onClick={fetchAppointments}
+            >
+              Actualizar
+            </Button>
+            {hasPermission("appointments:create") && (
+              <Button
+                size="xs"
+                color="green"
+                leftSection={<BiPlus size={16} />}
+                onClick={() => openModal(new Date(), new Date())}
+              >
+                Añadir Cita
+              </Button>
+            )}
+            <Button
+              size="xs"
+              color="orange"
+              leftSection={<BiSort size={16} />}
+              onClick={() => setReorderModalOpened(true)}
+            >
+              Reordenar Empleados
+            </Button>
+          </Group>
         </Group>
       </Group>
 
@@ -546,6 +599,12 @@ const ScheduleView: React.FC = () => {
         opened={showSearchModal}
         onClose={() => setShowSearchModal(false)}
         appointments={appointments}
+      />
+      <ReorderEmployeesModal
+        opened={reorderModalOpened}
+        onClose={() => setReorderModalOpened(false)}
+        employees={employees}
+        onSave={handleSaveReorderedEmployees}
       />
     </Box>
   );

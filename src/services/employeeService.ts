@@ -22,6 +22,7 @@ export interface Employee {
   isActive: boolean;
   profileImage: string;
   color: string;
+  order: number;
 }
 
 interface CreateEmployeePayload {
