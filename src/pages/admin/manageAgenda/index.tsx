@@ -60,6 +60,7 @@ const ScheduleView: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [reorderModalOpened, setReorderModalOpened] = useState(false);
 
@@ -385,6 +386,7 @@ const ScheduleView: React.FC = () => {
    * CREAR O ACTUALIZAR CITA
    */
   const addOrUpdateAppointment = async () => {
+    setCreatingAppointment(true);
     try {
       const {
         services,
@@ -469,7 +471,7 @@ const ScheduleView: React.FC = () => {
             position: "top-right",
           });
         }
-
+        setCreatingAppointment(false);
         closeModal(); // cierra el modal
         fetchAppointments(); // refresca la agenda
       }
@@ -481,6 +483,7 @@ const ScheduleView: React.FC = () => {
         autoClose: 3000,
         position: "top-right",
       });
+      setCreatingAppointment(false);
       console.error(error);
     }
   };
@@ -594,6 +597,7 @@ const ScheduleView: React.FC = () => {
         onClientChange={handleClientChange}
         onSave={addOrUpdateAppointment}
         fetchClients={fetchClients}
+        creatingAppointment={creatingAppointment}
       />
       <SearchAppointmentsModal
         opened={showSearchModal}

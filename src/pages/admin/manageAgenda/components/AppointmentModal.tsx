@@ -41,6 +41,7 @@ interface AppointmentModalProps {
   onClientChange: (value: string | null) => void;
   onSave: () => void;
   fetchClients: () => void;
+  creatingAppointment: boolean;
 }
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -57,6 +58,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   onClientChange,
   onSave,
   fetchClients,
+  creatingAppointment,
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
@@ -331,7 +333,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             <Button variant="default" onClick={onClose}>
               Cancelar
             </Button>
-            <Button onClick={onSave}>
+            <Button
+              onClick={onSave}
+              disabled={creatingAppointment}
+              loading={creatingAppointment}
+            >
               {appointment ? "Actualizar Cita" : "Crear Cita"}
             </Button>
           </Group>

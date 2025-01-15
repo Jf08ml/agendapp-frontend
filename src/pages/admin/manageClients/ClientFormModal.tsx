@@ -30,6 +30,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [loading, setLoading] = useState<boolean>(false); // Estado de carga
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
@@ -59,6 +60,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   }, [client]);
 
   const handleSubmit = async (): Promise<void> => {
+    setLoading(true); // Activar el estado de carga
     try {
       if (!organizationId) {
         throw new Error("Organization ID is required");
@@ -115,6 +117,8 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         color: "red",
         autoClose: 3000,
       });
+    } finally {
+      setLoading(false); // Desactivar el estado de carga
     }
   };
 
@@ -177,7 +181,12 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           maxDate={new Date()}
           clearable
         />
-        <Button mt="md" color="blue" onClick={handleSubmit}>
+        <Button
+          mt="md"
+          color="blue"
+          onClick={handleSubmit}
+          loading={loading} // Indicador de carga en el botón
+        >
           {client ? "Actualizar Cliente" : "Crear Cliente"}
         </Button>
       </Box>
