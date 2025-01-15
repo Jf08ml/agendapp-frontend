@@ -12,7 +12,7 @@ interface EmployeeColumnProps {
   employee: Employee;
   appoinments: Appointment[]; // todas las citas (no solo de este empleado)
   appointmentsByEmployee: Record<string, Appointment[]>;
-  timeIntervals: Date[];
+  // timeIntervals: Date[];
   startHour: number;
   endHour: number;
   selectedDay: Date;
@@ -45,7 +45,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   employee,
   appoinments,
   appointmentsByEmployee,
-  timeIntervals,
+  // timeIntervals,
   startHour,
   endHour,
   selectedDay,
@@ -145,15 +145,27 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
     if (clickedElement.closest(".appointment-card")) {
       return;
     }
-
-    const clickedIntervalIndex = Math.floor(
-      event.nativeEvent.offsetY / HOUR_HEIGHT
-    );
-    const clickedInterval = timeIntervals[clickedIntervalIndex];
+  
+    const boundingRect = columnRef.current?.getBoundingClientRect();
+    if (!boundingRect) return;
+  
+    const clickedY = event.clientY - boundingRect.top;
+  
+    // Calcula el tiempo basado en la posición vertical del clic
+    const totalMinutes = (clickedY / HOUR_HEIGHT) * 60;
+    const snappedMinutes = snapToQuarter(totalMinutes); // Redondea al bloque de 15 minutos más cercano
+    const hourOffset = Math.floor(snappedMinutes / 60);
+    const minuteOffset = snappedMinutes % 60;
+  
+    // Genera la hora de inicio ajustada
+    const clickedInterval = new Date(selectedDay);
+    clickedInterval.setHours(startHour + hourOffset, minuteOffset, 0, 0);
+  
     if (hasPermission("appointments:create") && clickedInterval) {
       onOpenModal(selectedDay, clickedInterval, employee._id);
     }
   };
+  
 
   /**
    * Pintamos las citas del empleado (absolutas en el contenedor).
