@@ -21,8 +21,9 @@ const theme = createTheme({
   fontFamilyMonospace: "Monaco, Courier, monospace",
   headings: { fontFamily: "Playfair Display, serif" },
   fontSizes: {
-    xs: "16px",
-    sm: "16px",
+    xxs: "10px",
+    xs: "12px",
+    sm: "14px",
     md: "16px",
     lg: "18px",
     xl: "20px",

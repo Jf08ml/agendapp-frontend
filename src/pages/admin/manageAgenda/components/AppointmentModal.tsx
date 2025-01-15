@@ -10,7 +10,9 @@ import {
   Group,
   Checkbox,
   NumberInput,
-  MultiSelect,
+  MultiSelectProps,
+  Avatar,
+  Card,
 } from "@mantine/core";
 import DateSelector from "./DateSelector";
 import TimeSelector from "./TimeSelector";
@@ -28,7 +30,9 @@ interface AppointmentModalProps {
   onClose: () => void;
   appointment: Appointment | null;
   newAppointment: Partial<CreateAppointmentPayload>;
-  setNewAppointment: React.Dispatch<React.SetStateAction<Partial<CreateAppointmentPayload>>>;
+  setNewAppointment: React.Dispatch<
+    React.SetStateAction<Partial<CreateAppointmentPayload>>
+  >;
   services: Service[];
   employees: Employee[];
   clients: Client[];
@@ -101,6 +105,28 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     setNewAppointment,
   ]);
 
+  const renderMultiSelectOption: MultiSelectProps["renderOption"] = ({
+    option,
+  }) => {
+    const employee = employees.find((e) => e._id === option.value);
+
+    if (!employee) {
+      return null; // Si no se encuentra el empleado, no renderizar nada
+    }
+
+    return (
+      <Group gap="sm">
+        <Avatar src={employee.profileImage} size={36} radius="xl" />
+        <div>
+          <Text size="sm">{employee.names}</Text>
+          <Text size="xs" opacity={0.5}>
+            {employee.position}
+          </Text>
+        </div>
+      </Group>
+    );
+  };
+
   return (
     <>
       <Modal
@@ -115,6 +141,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
           {/* Selector de clientes */}
           <Select
             label="Cliente"
+            size="md"
             placeholder="Selecciona un cliente"
             searchable
             data={[
@@ -164,7 +191,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
           {/* Otros Selects */}
           <Select
             label="Empleado"
+            size="md"
             placeholder="Selecciona un empleado"
+            renderOption={renderMultiSelectOption}
             data={employees.map((employee) => ({
               value: employee._id,
               label: employee.names,
@@ -174,8 +203,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             searchable
             required
           />
+
           <Checkbox
-            size="xs"
+            size="sm"
             my="xs"
             mb="md"
             label="Empleado solicitado por el cliente"
@@ -188,58 +218,65 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             }
           />
 
-          {appointment ? (
-            // MODO EDICIÓN: Solo un servicio
-            <Select
-              label="Servicio"
-              placeholder="Selecciona un servicio"
-              data={services.map((service) => ({
-                value: service._id,
-                label: service.name,
-              }))}
-              // El value es un string con el ID del servicio
-              value={newAppointment.services?.[0]?._id || ""}
-              onChange={(value) => {
-                // value es el ID del servicio
-                const selected = services.find((s) => s._id === value);
-                setNewAppointment((prev) => ({
-                  ...prev,
-                  services: selected ? [selected] : [],
-                }));
-              }}
-              required
-            />
-          ) : (
-            // MODO CREACIÓN: Múltiples servicios
-            <MultiSelect
-              label="Servicios"
-              placeholder="Selecciona uno o varios servicios"
-              data={services.map((service) => ({
-                value: service._id,
-                label: service.name,
-              }))}
-              value={
-                // array de IDs
-                newAppointment.services
-                  ? newAppointment.services.map((s) => s._id)
-                  : []
-              }
-              onChange={(selectedIds) => {
-                // selectedIds es un array de IDs
-                const selectedServices = services.filter((s) =>
-                  selectedIds.includes(s._id)
-                );
-                setNewAppointment((prev) => ({
-                  ...prev,
-                  services: selectedServices,
-                }));
-              }}
-              searchable
-              required
-            />
-          )}
+          <Checkbox.Group
+            label="Servicios"
+            size="lg"
+            required
+            value={
+              // Array de IDs seleccionados
+              newAppointment.services
+                ? newAppointment.services.map((s) => s._id)
+                : []
+            }
+            onChange={(selectedIds) => {
+              // selectedIds es un array de IDs
+              const selectedServices = services.filter((s) =>
+                selectedIds.includes(s._id)
+              );
+              setNewAppointment((prev) => ({
+                ...prev,
+                services: selectedServices,
+              }));
+            }}
+          >
+            {services.map((service) => {
+              const isSelected = newAppointment.services
+                ? newAppointment.services.some((s) => s._id === service._id)
+                : false;
+
+              return (
+                <Card
+                  key={service._id}
+                  shadow={isSelected ? "lg" : "sm"}
+                  padding="xxs"
+                  withBorder
+                  style={{
+                    backgroundColor: isSelected ? "#f0f9ff" : "white",
+                    borderColor: isSelected ? "#3b82f6" : "#e2e8f0",
+                  }}
+                >
+                  <Group>
+                    <Checkbox
+                      size="xs"
+                      value={service._id}
+                      label={
+                        <div>
+                          <Text size="xs" fw={500}>
+                            {service.name}
+                          </Text>
+                        </div>
+                      }
+                    />
+                  </Group>
+                </Card>
+              );
+            })}
+          </Checkbox.Group>
+
+          {/**Entrada para abono de citas */}
           <NumberInput
             label="Monto del Abono"
+            size="md"
             placeholder="Ingresa el monto del abono"
             prefix="$ "
             thousandSeparator
@@ -251,8 +288,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 advancePayment: typeof value === "number" ? value : 0,
               }))
             }
-            mb="sm"
+            my="sm"
           />
+
           {/* Controles para fechas y horas */}
           <Grid mt="md" gutter="sm">
             <Grid.Col span={6}>

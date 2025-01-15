@@ -128,11 +128,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       {/* Modal para mostrar detalles de la cita */}
       <Modal
         opened={modalOpened}
-        onClose={() => setModalOpened(false)} 
+        onClose={() => setModalOpened(false)}
         withCloseButton={false}
         size="lg"
-        title={null} 
-        centered 
+        title={null}
+        centered
       >
         {/* Contenedor principal */}
         <Flex
@@ -198,41 +198,48 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           {/* Línea divisoria */}
           <Divider />
 
-          {/* Sección de Servicios asociados */}
+          {/* Lista de citas del cliente */}
           <Box>
-            <Text fw={700} size="sm" mb="xs">
-              Servicios
-            </Text>
             {appoinments
               .filter((appt) => appt.client._id === appointment.client._id)
-              .map((appt, index) => (
-                <Flex
-                  key={index}
-                  direction="row"
-                  gap="xs"
-                  align="center"
-                  py={5}
-                  style={{ borderBottom: "1px solid #e0e0e0" }}
-                >
-                  {/* Nombre del servicio */}
-                  <Text size="sm" fw={500}>
-                    {appt.service.name}
-                  </Text>
-
-                  {/* Empleado */}
-                  <Text size="sm" c="dimmed">
-                    (Empleado:{" "}
-                    {appt.employeeRequestedByClient ? (
-                      <strong style={{ color: "purple" }}>
-                        {appt.employee.names} (solicitado)
-                      </strong>
-                    ) : (
-                      appt.employee.names
-                    )}
-                    )
-                  </Text>
-                </Flex>
-              ))}
+              .map((appt, index) => {
+                const isCurrentAppointment = appt._id === appointment._id; // Resaltar la cita actual
+                return (
+                  <Flex
+                    key={index}
+                    direction="row"
+                    gap="xs"
+                    align="center"
+                    py={5}
+                    style={{
+                      borderBottom: "1px solid #e0e0e0",
+                      backgroundColor: isCurrentAppointment
+                        ? "#d4f5ff"
+                        : "transparent",
+                      padding: isCurrentAppointment ? "5px" : "2px",
+                      borderRadius: isCurrentAppointment ? "4px" : "0",
+                      border: isCurrentAppointment
+                        ? "2px solid #007bff"
+                        : "none",
+                    }}
+                  >
+                    <Text size="sm" fw={isCurrentAppointment ? 700 : 500}>
+                      {appt.service.name}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      (Empleado:{" "}
+                      {appt.employeeRequestedByClient ? (
+                        <strong style={{ color: "purple" }}>
+                          {appt.employee.names} (solicitado)
+                        </strong>
+                      ) : (
+                        appt.employee.names
+                      )}
+                      )
+                    </Text>
+                  </Flex>
+                );
+              })}
           </Box>
 
           {/* Segunda línea divisoria */}
@@ -254,9 +261,38 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
               <Text size="sm">
                 <strong>Estado:</strong> {appointment.status}
               </Text>
-              <Text size="sm">
-                <strong>Cliente:</strong> {appointment.client.name}
-              </Text>
+
+              {role === "admin" && (
+                <Flex align="center">
+                  <Text size="sm">
+                    <strong>Cliente:</strong> {appointment.client.phoneNumber}
+                  </Text>
+                  <CopyButton
+                    value={appointment.client.phoneNumber}
+                    timeout={2000}
+                  >
+                    {({ copied, copy }) => (
+                      <Tooltip
+                        label={copied ? "Copiado" : "Copiar número"}
+                        withArrow
+                      >
+                        <ActionIcon
+                          color={copied ? "green" : "blue"}
+                          onClick={copy}
+                          size="md"
+                          variant="subtle"
+                        >
+                          {copied ? (
+                            <BiCheckCircle size={16} />
+                          ) : (
+                            <BiCopy size={16} />
+                          )}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                </Flex>
+              )}
 
               {getIsBirthday(appointment.client.birthDate) && (
                 <Text size="sm" c="orange">

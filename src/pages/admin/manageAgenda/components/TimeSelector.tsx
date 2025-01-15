@@ -54,7 +54,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
           data={hours}
           comboboxProps={{ zIndex: 1000 }}
           placeholder="Hora"
-          size="xs"
+          size="sm"
           value={date ? format(date, "h") : ""}
           onChange={(value) =>
             handleTimeChange(
@@ -69,7 +69,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
           data={minutes}
           comboboxProps={{ zIndex: 1000 }}
           placeholder="Minutos"
-          size="xs"
+          size="sm"
           value={date ? format(date, "mm") : ""}
           onChange={(value) =>
             handleTimeChange(
@@ -85,7 +85,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
         data={ampm}
         comboboxProps={{ zIndex: 1000 }}
         placeholder="AM/PM"
-        size="xs"
+        size="sm"
         value={date && date.getHours() >= 12 ? "PM" : "AM"}
         onChange={(value) =>
           handleTimeChange(

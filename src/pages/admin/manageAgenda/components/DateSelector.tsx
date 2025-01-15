@@ -8,7 +8,11 @@ interface DateSelectorProps {
   onChange: (date: Date) => void;
 }
 
-const DateSelector: React.FC<DateSelectorProps> = ({ label, value, onChange }) => {
+const DateSelector: React.FC<DateSelectorProps> = ({
+  label,
+  value,
+  onChange,
+}) => {
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const [year, month, day] = e.currentTarget.value.split("-").map(Number);
     const updatedDate = set(value || new Date(), {
@@ -24,6 +28,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ label, value, onChange }) =
       <Text>{label}</Text>
       <Input
         type="date"
+        size="md"
         value={value ? format(value, "yyyy-MM-dd") : ""}
         onChange={handleDateChange}
       />
