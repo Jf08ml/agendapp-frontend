@@ -107,7 +107,6 @@ const DailyCashbox: React.FC = () => {
         endDate.toISOString()
       );
 
-      // Ordenar las citas por fecha (de más reciente a más antigua)
       const sortedAppointments = response.sort(
         (a, b) =>
           new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
@@ -115,11 +114,22 @@ const DailyCashbox: React.FC = () => {
 
       setAppointments(sortedAppointments);
 
-      // Calcular el total de ingresos
-      const total = sortedAppointments.reduce(
-        (sum, appointment) => sum + (appointment.service?.price || 0),
-        0
-      );
+      const total = sortedAppointments.reduce((sum, appointment) => {
+        const additionalTotal =
+          appointment.additionalItems?.reduce(
+            (acc, item) => acc + (item.price || 0),
+            0
+          ) || 0;
+
+        const usedPrice =
+          appointment.customPrice ||
+          appointment.totalPrice ||
+          appointment.service?.price ||
+          0;
+
+        return sum + usedPrice + additionalTotal;
+      }, 0);
+
       setTotalIncome(total);
     } catch (error) {
       console.error("Error al obtener citas:", error);
@@ -128,7 +138,10 @@ const DailyCashbox: React.FC = () => {
     }
   };
 
-  const handleConfirmAppointment = (appointmentId: string, clientId: string) => {
+  const handleConfirmAppointment = (
+    appointmentId: string,
+    clientId: string
+  ) => {
     openConfirmModal({
       title: "Confirmar cita",
       children: <p>¿Estás seguro de que deseas confirmar esta cita?</p>,
@@ -202,7 +215,10 @@ const DailyCashbox: React.FC = () => {
             onChange={(value) => setInterval(value || "daily")}
           />
           <Text size="lg" fw={800} ta="right">
-            Total Ingresos: <Badge variant="light" size="xl">{formatCurrency(totalIncome)}</Badge>
+            Total Ingresos:{" "}
+            <Badge variant="light" size="xl">
+              {formatCurrency(totalIncome)}
+            </Badge>
           </Text>
         </Flex>
         {interval === "custom" && (
@@ -246,30 +262,51 @@ const DailyCashbox: React.FC = () => {
               </Table.Thead>
               <Table.Tbody>
                 {appointments.length > 0 ? (
-                  appointments.map((appointment) => (
-                    <Table.Tr key={appointment._id} style={getRowStyles(appointment.status)}>
-                      <Table.Td>
-                        {new Date(appointment.startDate).toLocaleDateString()}
-                      </Table.Td>
-                      <Table.Td>{appointment.client?.name}</Table.Td>
-                      <Table.Td>{appointment.service?.name}</Table.Td>
-                      <Table.Td>
-                        {formatCurrency(appointment.service?.price || 0)}
-                      </Table.Td>
-                      <Table.Td align="center">
-                        {appointment.status !== "confirmed" && (
-                          <ActionIcon
-                            color="green"
-                            onClick={() =>
-                              handleConfirmAppointment(appointment._id, appointment.client._id)
-                            }
-                          >
-                            <CheckIcon />
-                          </ActionIcon>
-                        )}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))
+                  appointments.map((appointment) => {
+                    const additionalTotal =
+                      appointment.additionalItems?.reduce(
+                        (sum, item) => sum + (item.price || 0),
+                        0
+                      ) || 0;
+
+                    const usedPrice =
+                      appointment.customPrice ||
+                      appointment.totalPrice ||
+                      appointment.service?.price ||
+                      0;
+
+                    const total = usedPrice + additionalTotal;
+
+                    return (
+                      <Table.Tr
+                        key={appointment._id}
+                        style={getRowStyles(appointment.status)}
+                      >
+                        <Table.Td>
+                          {new Date(appointment.startDate).toLocaleDateString()}
+                        </Table.Td>
+                        <Table.Td>{appointment.client?.name}</Table.Td>
+                        <Table.Td>{appointment.service?.name}</Table.Td>
+                        <Table.Td>{formatCurrency(total)}</Table.Td>
+
+                        <Table.Td align="center">
+                          {appointment.status !== "confirmed" && (
+                            <ActionIcon
+                              color="green"
+                              onClick={() =>
+                                handleConfirmAppointment(
+                                  appointment._id,
+                                  appointment.client._id
+                                )
+                              }
+                            >
+                              <CheckIcon />
+                            </ActionIcon>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })
                 ) : (
                   <Table.Tr>
                     <Table.Td colSpan={5}>

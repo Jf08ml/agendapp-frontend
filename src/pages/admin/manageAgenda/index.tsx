@@ -577,6 +577,7 @@ const ScheduleView: React.FC = () => {
       <CustomCalendar
         employees={employees}
         appointments={appointments}
+        setAppointments={setAppointments}
         onOpenModal={openModal}
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}

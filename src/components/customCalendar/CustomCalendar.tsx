@@ -16,6 +16,9 @@ interface CustomCalendarProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  setAppointments: React.Dispatch<
+      React.SetStateAction<Appointment[]>
+    >;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -24,7 +27,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   onOpenModal,
   onEditAppointment,
   onCancelAppointment,
-  onConfirmAppointment
+  onConfirmAppointment,
+  setAppointments
 }) => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -91,6 +95,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}
+        setAppointments={setAppointments}
       />
     </Container>
   );

@@ -4,7 +4,11 @@ import { Service } from "./serviceService";
 import { Employee } from "./employeeService";
 import { Client } from "./clientService";
 
-// Definir la estructura de una cita
+export interface AdditionalItem {
+  name: string; 
+  price: number; 
+}
+
 export interface Appointment {
   _id: string;
   client: Client;
@@ -13,20 +17,30 @@ export interface Appointment {
   employeeRequestedByClient: boolean;
   startDate: Date;
   endDate: Date;
-  status: string;
+  status: string; // Puede ser "pending", "confirmed", o "cancelled"
   organizationId: string;
   advancePayment: number;
+  customPrice?: number | null; // Precio personalizado definido por el usuario
+  additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos
+  totalPrice: number; // Precio total calculado para la cita
+  createdAt: Date;
+  updatedAt: Date; 
 }
 
-interface CreateAppointmentPayload {
-  service: Service;
-  client: Client;
-  employee: Employee;
+
+export interface CreateAppointmentPayload {
+  service: Service | string; // ID del servicio
+  client: Client | string; // ID del cliente
+  employee: Employee | string; // ID del empleado
   startDate: Date;
   endDate: Date;
-  status: string;
+  status: string; // Puede ser "pending", "confirmed", o "cancelled"
   organizationId: string;
+  advancePayment: number | undefined;
+  customPrice?: number; // Precio personalizado (opcional)
+  additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos (opcional)
 }
+
 
 interface Response<T> {
   code: number;

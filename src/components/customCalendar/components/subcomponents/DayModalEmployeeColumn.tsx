@@ -11,6 +11,7 @@ import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 interface EmployeeColumnProps {
   employee: Employee;
   appoinments: Appointment[]; // todas las citas (no solo de este empleado)
+  setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   appointmentsByEmployee: Record<string, Appointment[]>;
   // timeIntervals: Date[];
   startHour: number;
@@ -44,6 +45,7 @@ function snapToQuarter(minutes: number) {
 const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   employee,
   appoinments,
+  setAppointments,
   appointmentsByEmployee,
   // timeIntervals,
   startHour,
@@ -197,6 +199,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
           <DraggableAppointmentCard
             appointment={appointment}
             appoinments={appoinments}
+            setAppointments={setAppointments}
             onEditAppointment={onEditAppointment}
             onCancelAppointment={onCancelAppointment}
             onConfirmAppointment={onConfirmAppointment}

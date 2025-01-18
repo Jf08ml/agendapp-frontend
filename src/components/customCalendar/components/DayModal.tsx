@@ -35,6 +35,7 @@ interface DayModalProps {
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   employees: Employee[];
+  setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
 }
 
 const DayModal: FC<DayModalProps> = ({
@@ -47,6 +48,7 @@ const DayModal: FC<DayModalProps> = ({
   onCancelAppointment,
   onConfirmAppointment,
   employees,
+  setAppointments
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
@@ -326,6 +328,7 @@ const DayModal: FC<DayModalProps> = ({
                   key={employee._id}
                   employee={employee}
                   appoinments={appointments}
+                  setAppointments={setAppointments}
                   appointmentsByEmployee={appointmentsByEmployee}
                   // timeIntervals={timeIntervals}
                   startHour={startHour}
