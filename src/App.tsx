@@ -1,4 +1,5 @@
-import { AppShell, Burger, Flex } from "@mantine/core";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { AppShell, Burger, Flex, Select } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -10,10 +11,11 @@ import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "./app/store";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fetchOrganization } from "./features/organization/sliceOrganization";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
+import { getOrganizationById } from "./services/organizationService";
 
 function App() {
   const dispatch: AppDispatch = useDispatch();
@@ -27,10 +29,44 @@ function App() {
 
   const [opened, { toggle, close }] = useDisclosure(false);
 
+  const [availableOrganizations, setAvailableOrganizations] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>("");
+
+  const organizationIds = [
+    import.meta.env.VITE_ORGANIZATION_ID,
+    import.meta.env.VITE_ORGANIZATION_ID_2,
+  ].filter(Boolean);
+
   useEffect(() => {
-    const organizationId = import.meta.env.VITE_ORGANIZATION_ID;
-    dispatch(fetchOrganization(organizationId));
+    const loadOrganizations = async () => {
+      try {
+        const organizations = await Promise.all(
+          organizationIds.map(async (id) => {
+            const organization = await getOrganizationById(id);
+            return { value: id, label: organization?.name || "Sin nombre" };
+          })
+        );
+        setAvailableOrganizations(organizations);
+
+        if (organizations.length > 0) {
+          setSelectedOrganization(organizations[0].value);
+          dispatch(fetchOrganization(organizations[0].value));
+        }
+      } catch (error) {
+        console.error("Error al cargar las organizaciones:", error);
+      }
+    };
+
+    loadOrganizations();
   }, [dispatch]);
+
+  useEffect(() => {
+    if (selectedOrganization) {
+      dispatch(fetchOrganization(selectedOrganization));
+    }
+  }, [selectedOrganization, dispatch]);
 
   useAuthInitializer();
 
@@ -108,6 +144,17 @@ function App() {
               onMouseEnter={() => opened || toggle()}
             />
             <Header />
+            {/* Mostrar el selector solo si hay más de una organización */}
+            {organizationIds.length > 1 && (
+              <Select
+                label="Cambiar sede"
+                placeholder="Seleccionar sede"
+                data={availableOrganizations}
+                value={selectedOrganization}
+                onChange={(value) => setSelectedOrganization(value || "")}
+                style={{ position: "fixed", bottom: 30 }}
+              />
+            )}
           </Flex>
         </AppShell.Header>
         <AppShell.Navbar
