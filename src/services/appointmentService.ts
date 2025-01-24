@@ -5,8 +5,8 @@ import { Employee } from "./employeeService";
 import { Client } from "./clientService";
 
 export interface AdditionalItem {
-  name: string; 
-  price: number; 
+  name: string;
+  price: number;
 }
 
 export interface Appointment {
@@ -24,9 +24,8 @@ export interface Appointment {
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos
   totalPrice: number; // Precio total calculado para la cita
   createdAt: Date;
-  updatedAt: Date; 
+  updatedAt: Date;
 }
-
 
 export interface CreateAppointmentPayload {
   service: Service | string; // ID del servicio
@@ -40,7 +39,6 @@ export interface CreateAppointmentPayload {
   customPrice?: number; // Precio personalizado (opcional)
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos (opcional)
 }
-
 
 interface Response<T> {
   code: number;
@@ -109,6 +107,20 @@ export const getAppointmentsByEmployee = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al obtener las citas");
+    return [];
+  }
+};
+
+export const getAppointmentsByClient = async (
+  clientId: string
+): Promise<Appointment[]> => {
+  try {
+    const response = await apiAppointment.get<Response<Appointment[]>>(
+      `/client/${clientId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener las citas, por cliente.");
     return [];
   }
 };
