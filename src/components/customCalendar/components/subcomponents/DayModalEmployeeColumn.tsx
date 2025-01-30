@@ -181,7 +181,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         selectedDay,
         MINUTE_HEIGHT
       );
-
+  
       return (
         <Box
           key={appointment._id}
@@ -194,7 +194,6 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             overflow: "hidden",
             cursor: "move",
           }}
-          onClick={() => handleToggleExpand(appointment._id)}
         >
           <DraggableAppointmentCard
             appointment={appointment}
@@ -203,11 +202,14 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             onEditAppointment={onEditAppointment}
             onCancelAppointment={onCancelAppointment}
             onConfirmAppointment={onConfirmAppointment}
+            isExpanded={isExpanded}
+            handleToggleExpand={handleToggleExpand}
           />
         </Box>
       );
     });
   };
+  
 
   return (
     <div

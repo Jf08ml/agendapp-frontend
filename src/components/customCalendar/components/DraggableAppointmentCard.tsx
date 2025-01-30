@@ -3,17 +3,9 @@ import { useDrag } from "react-dnd";
 import { ItemTypes } from "./subcomponents/ItemTypes";
 import AppointmentCard from "./AppointmentCard";
 import { Appointment } from "../../../services/appointmentService";
-import { Paper } from "@mantine/core";
-
-/** 
- * Definimos la forma que tendrá el objeto `item` que viaja 
- * al hacer drag. Incluirá el appointmentId y offsetY. 
- */
-// interface DraggedItem {
-//   appointmentId: string;
-//   offsetY: number;
-//   cardHeightPx: number
-// }
+import { Paper, Button } from "@mantine/core";
+import { BiExpand } from "react-icons/bi";
+import { MdExpandMore } from "react-icons/md";
 
 interface DraggableAppointmentCardProps {
   appointment: Appointment;
@@ -22,6 +14,8 @@ interface DraggableAppointmentCardProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  isExpanded: (appointment: Appointment) => boolean;
+  handleToggleExpand: (appointmentId: string) => void;
 }
 
 const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
@@ -31,6 +25,8 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  isExpanded,
+  handleToggleExpand,
 }) => {
   // Ref local para acceder al DOM de la tarjeta
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -71,27 +67,49 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
     }),
   }));
 
-
   /**
    * Combinar ref local (cardRef) con la ref de React DnD (drag).
    * Así podemos acceder al DOM y también hacer draggable la tarjeta.
    */
   const setRefs = (node: HTMLDivElement | null) => {
     cardRef.current = node; // nuestro ref
-    drag(node);             // ref de React DnD
+    drag(node); // ref de React DnD
   };
 
   return (
     <Paper
       ref={setRefs}
       className="appointment-card"
-      withBorder 
+      withBorder
       style={{
         opacity: isDragging ? 0.5 : 1,
         cursor: "move",
-        height: "100%", 
+        height: "100%",
+        position: "relative",
       }}
     >
+      {/* Botón para expandir */}
+      <Button
+        size="compact-xs"
+        variant="subtle"
+        style={{
+          position: "absolute",
+          top: 0,
+          right: -5,
+          zIndex: 10, // Asegura que esté por encima del contenido
+        }}
+        onClick={(e) => {
+          e.stopPropagation(); // Evita interferencias con el drag and drop
+          handleToggleExpand(appointment._id);
+        }}
+      >
+        {isExpanded(appointment) ? (
+          <MdExpandMore size={16} />
+        ) : (
+          <BiExpand size={16} />
+        )}
+      </Button>
+
       <AppointmentCard
         appointment={appointment}
         setAppointments={setAppointments}
