@@ -216,7 +216,7 @@ const Booking = () => {
       </Stepper>
       <Divider my="xs" />
       {renderStepContent()}
-      <Group justify="space-between" my="xl">
+      <Group justify="flex-end" my="xl">
         {currentStep > 1 && currentStep < 4 && (
           <Button
             variant="outline"

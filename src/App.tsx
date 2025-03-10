@@ -148,11 +148,12 @@ function App() {
             {organizationIds.length > 1 && (
               <Select
                 label="Cambiar sede"
+                size="xs"
                 placeholder="Seleccionar sede"
                 data={availableOrganizations}
                 value={selectedOrganization}
                 onChange={(value) => setSelectedOrganization(value || "")}
-                style={{ position: "fixed", bottom: 30 }}
+                style={{ position: "fixed", bottom: 20 }}
               />
             )}
           </Flex>
