@@ -24,6 +24,8 @@ import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
 import { CreateAppointmentPayload } from "..";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../app/store";
 
 interface AppointmentModalProps {
   opened: boolean;
@@ -62,6 +64,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
+  const auth = useSelector((state: RootState) => state.auth);
 
   const today = dayjs();
 
@@ -160,7 +163,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
                 return {
                   value: client._id,
-                  label: isBirthday ? `🎉 ${client.name} 🎉` : client.name,
+                  label: isBirthday
+                    ? `🎉 ${client.name} 🎉`
+                    : auth.role === "admin"
+                    ? client.name + " - " + client.phoneNumber
+                    : client.name,
                   isBirthday,
                 };
               }),
