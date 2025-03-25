@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { TextInput, Button, Text, Card, Flex, Checkbox, Loader } from "@mantine/core";
+import {
+  TextInput,
+  Button,
+  Text,
+  Card,
+  Flex,
+  Checkbox,
+  Loader,
+} from "@mantine/core";
 import colors from "../../theme/colores";
 import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { loginSuccess } from "../../features/auth/sliceAuth";
 import { login } from "../../services/authService";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import { useMediaQuery } from "@mantine/hooks";
+import { RootState } from "../../app/store";
 
 const LoginAdmin: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -17,6 +26,9 @@ const LoginAdmin: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigate();
   const dispatch = useDispatch();
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
 
   const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
 
@@ -29,10 +41,17 @@ const LoginAdmin: React.FC = () => {
   }, []);
 
   const handleLogin = async () => {
-    setIsLoading(true); 
+    setIsLoading(true);
     setError("");
     try {
-      const data = await login(email, password);
+      if (!organization?._id) {
+        setError("No se ha cargado la organización correctamente.");
+        setIsLoading(false);
+        return;
+      }
+      const organizationId = organization?._id as string;
+
+      const data = await login(email, password, organizationId);
       if (data) {
         const organizationId =
           data.userType === "admin" ? data.userId : data.organizationId;
@@ -59,7 +78,7 @@ const LoginAdmin: React.FC = () => {
       console.error("Error al iniciar sesión:", error);
       setError("Error al iniciar sesión. Intenta nuevamente.");
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
   };
 
@@ -122,8 +141,8 @@ const LoginAdmin: React.FC = () => {
         <Button
           fullWidth
           onClick={handleLogin}
-          disabled={isLoading} 
-          leftSection={isLoading && <Loader size="xs" />} 
+          disabled={isLoading}
+          leftSection={isLoading && <Loader size="xs" />}
         >
           {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
         </Button>

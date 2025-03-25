@@ -13,7 +13,8 @@ interface LoginResponse {
 // Función para iniciar sesión
 export const login = async (
   email: string,
-  password: string
+  password: string,
+  organizationId: string
 ): Promise<LoginResponse | null> => {
   try {
     const response: AxiosResponse<{ data: LoginResponse }> = await apiAuth.post(
@@ -21,6 +22,7 @@ export const login = async (
       {
         email,
         password,
+        organizationId
       }
     );
     return response.data.data;

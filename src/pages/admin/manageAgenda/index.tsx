@@ -155,6 +155,7 @@ const ScheduleView: React.FC = () => {
         const filteredAppointments = response.filter(
           (appointment) => appointment.employee._id === userId
         );
+        console.log(filteredAppointments);
         setAppointments(filteredAppointments);
       }
     } catch (error) {
