@@ -6,7 +6,7 @@ import { MdOutlineLoyalty } from "react-icons/md";
 import { GrUserSettings } from "react-icons/gr";
 import { BiCalendar, BiCalendarCheck } from "react-icons/bi";
 import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
-import { FaCashRegister, FaIdeal, FaUsers } from "react-icons/fa";
+import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { usePermissions } from "../hooks/usePermissions";
 
 interface NavbarLinksProps {
@@ -187,6 +187,21 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
                 <FaUsers size={20} color="white" />
                 <Text c="white" fw={600} my="md">
                   Gestionar empleados
+                </Text>
+              </Flex>
+            </NavLink>
+          )}
+          
+          {hasPermission("whatsapp:read") && (
+            <NavLink
+              to="/gestionar-whatsapp"
+              onClick={closeNavbar}
+              style={{ textDecoration: "none" }}
+            >
+              <Flex align="center" justify="center" gap="sm">
+                <FaWhatsapp size={20} color="white" />
+                <Text c="white" fw={600} my="md">
+                  Gestionar Whatsapp
                 </Text>
               </Flex>
             </NavLink>

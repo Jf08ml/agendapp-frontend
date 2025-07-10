@@ -8,6 +8,7 @@ interface OrganizationState {
   organization: Organization | null;
   loading: boolean;
   error: string | null;
+  whatsappStatus: string; // <-- NUEVO CAMPO
 }
 
 // Estado inicial
@@ -15,6 +16,7 @@ const initialState: OrganizationState = {
   organization: null,
   loading: true,
   error: null,
+  whatsappStatus: "", // <-- INICIALIZA VACÍO
 };
 
 // Thunk para obtener la organización
@@ -41,9 +43,13 @@ const organizationSlice = createSlice({
       state.organization = null;
       state.loading = false;
       state.error = null;
+      state.whatsappStatus = ""; // limpia también el estado de WhatsApp
     },
     updateOrganizationState: (state, action: PayloadAction<Organization>) => {
       state.organization = action.payload;
+    },
+    setWhatsappStatus: (state, action: PayloadAction<string>) => {
+      state.whatsappStatus = action.payload; // NUEVA ACCIÓN
     },
   },
   extraReducers: (builder) => {
@@ -66,7 +72,7 @@ const organizationSlice = createSlice({
   },
 });
 
-export const { clearOrganization, updateOrganizationState } =
+export const { clearOrganization, updateOrganizationState, setWhatsappStatus } =
   organizationSlice.actions;
 
 export default organizationSlice.reducer;

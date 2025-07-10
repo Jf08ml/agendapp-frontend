@@ -15,6 +15,7 @@ import Booking from "../pages/onlineReservation/Booking";
 import ReservationsList from "../pages/admin/manageReservation";
 import Home from "../pages/Home";
 import Location from "../pages/location/location";
+import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 
 const generalRoutes = [
   {
@@ -168,6 +169,19 @@ const generalRoutes = [
         <DailyCashbox {...props} />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/gestionar-whatsapp",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <WhatsappMultiSession {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Gestionar Empleados",
+      description: "Gestiona los empleados de Galaxia Glamour.",
+      image: "/estudio_rosa.png",
+    },
   },
 ];
 

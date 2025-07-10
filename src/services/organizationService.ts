@@ -32,6 +32,7 @@ export interface Organization {
     start: string; 
     end: string; 
   };
+  clientIdWhatsapp?: string | null;
 }
 
 // Crear una nueva organización

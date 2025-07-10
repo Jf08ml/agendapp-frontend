@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useState } from "react";
-import { Box, Button, Group, Text, Title } from "@mantine/core";
+import React, { useEffect, useRef, useState } from "react";
+import { Box, Button, Group, Loader, Text, Title } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import io, { Socket } from "socket.io-client";
+import { setWhatsappStatus } from "../../../features/organization/sliceOrganization";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
@@ -23,7 +25,7 @@ import {
 import { Service } from "../../../services/serviceService";
 import { showNotification } from "@mantine/notifications";
 import { openConfirmModal } from "@mantine/modals";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
@@ -31,6 +33,9 @@ import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
 import { addMinutes } from "date-fns";
 import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
 import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
+import { FaCheck } from "react-icons/fa";
+import { IoAlertCircleOutline } from "react-icons/io5";
+import { useNavigate } from "react-router-dom";
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -53,6 +58,8 @@ const ScheduleView: React.FC = () => {
     services: [],
   });
 
+  const navigate = useNavigate();
+
   const [modalOpenedAppointment, setModalOpenedAppointment] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -67,11 +74,22 @@ const ScheduleView: React.FC = () => {
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
+  const dispatch = useDispatch();
+
+  const BACKEND_URL = import.meta.env.VITE_API_URL_WHATSAPP;
+  // const [localWhatsappStatus, setLocalWhatsappStatus] = useState(""); // opcional, solo si quieres local también
+  const socketRef = useRef<Socket | null>(null);
+
   // Datos de la organización
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
   const organizationId = organization?._id;
+  const clientIdWhatsapp =
+    organization?.clientIdWhatsapp || organization?._id || "";
+  const whatsappStatus = useSelector(
+    (state: RootState) => state.organization.whatsappStatus
+  );
 
   const { hasPermission } = usePermissions();
 
@@ -80,6 +98,31 @@ const ScheduleView: React.FC = () => {
     fetchEmployees();
     fetchAppointments();
   }, []);
+
+  useEffect(() => {
+    if (!clientIdWhatsapp) return;
+
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    const socket: Socket = io(BACKEND_URL, { transports: ["websocket"] });
+    socketRef.current = socket;
+
+    // Fuerza crear (o verificar) sesión en el backend WhatsApp
+    socket.emit("join", { clientId: clientIdWhatsapp });
+
+    // Recibe eventos de status
+    socket.on("status", (data: { status: string }) => {
+      // setLocalWhatsappStatus(data.status); // opcional
+      dispatch(setWhatsappStatus(data.status)); // ACTUALIZA REDUX
+    });
+
+    // Limpieza al desmontar
+    return () => {
+      socket.disconnect();
+    };
+  }, [clientIdWhatsapp, BACKEND_URL, dispatch]);
 
   useEffect(() => {
     // Cada vez que cambie el empleado seleccionado, ajustamos servicios
@@ -574,6 +617,112 @@ const ScheduleView: React.FC = () => {
           </Group>
         </Group>
       </Group>
+      {hasPermission("whatsapp:read") && (
+        <Group align="center" gap="xs" mt={-10}>
+          <Text size="sm" fw={500}>
+            WhatsApp:
+          </Text>
+
+          {whatsappStatus === "ready" && (
+            <Group gap="xs">
+              <FaCheck color="green" />
+              <Text size="sm" c="green" fw={700}>
+                Conectado
+              </Text>
+            </Group>
+          )}
+
+          {whatsappStatus === "pending" && (
+            <Group gap="xs">
+              <Loader size="xs" color="orange" />
+              <Text size="sm" c="orange" fw={700}>
+                Pendiente
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {whatsappStatus === "authenticated" && (
+            <Group gap="xs">
+              <Loader size="xs" color="blue" />
+              <Text size="sm" c="blue" fw={700}>
+                Autenticando
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {whatsappStatus === "auth_failure" && (
+            <Group gap="xs">
+              <IoAlertCircleOutline color="red" />
+              <Text size="sm" c="red" fw={700}>
+                Error autenticación
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {whatsappStatus === "disconnected" && (
+            <Group gap="xs">
+              <IoAlertCircleOutline color="red" />
+              <Text size="sm" c="red" fw={700}>
+                Desconectado
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {!whatsappStatus && (
+            <Group gap="xs">
+              <IoAlertCircleOutline color="gray" />
+              <Text size="sm" c="gray" fw={700}>
+                Sin información
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+        </Group>
+      )}
 
       <CustomCalendar
         employees={employees}
