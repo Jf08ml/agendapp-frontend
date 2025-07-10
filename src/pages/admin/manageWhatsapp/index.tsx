@@ -262,31 +262,70 @@ const WhatsappOrgSession: React.FC = () => {
             title="¿Para qué se usa esta cuenta de WhatsApp?"
             mb="md"
           >
-            Esta cuenta de WhatsApp será usada para enviar{" "}
-            <b>mensajes, recordatorios y notificaciones a tus clientes</b> en
-            nombre de <b>{organization.name}</b>.
+            Esta cuenta será usada para enviar{" "}
+            <b>mensajes y recordatorios automáticos</b> a tus clientes en nombre
+            de <b>{organization.name}</b>.
             <br />
+            <br />
+            <Text size="sm" c="dimmed">
+              {/** Puedes mostrar el siguiente texto solo si NO está lista la sesión */}
+              {!status || status !== "ready"
+                ? "En unos segundos aparecerá un código QR para que vincules tu WhatsApp. Por favor, espera y escanea el código con tu celular."
+                : "¡Todo listo! Tu WhatsApp está vinculado y listo para enviar mensajes automáticos."}
+            </Text>
             <Text size="sm" c="dimmed" mt={4}>
               <b>¡Debes mantener la sesión conectada!</b> Si la cierras o
               expira, deja de funcionar el envío automático.
             </Text>
           </Alert>
 
-          <Group gap="xs" justify="center">
-            <Text fw={500}>ID sesión:</Text>
-            <Text c="blue">{clientId}</Text>
-          </Group>
           <Text size="sm" c={status === "ready" ? "green" : "gray"}>
             Status: {status}
           </Text>
           {qr && (
-            <Stack align="center" gap={0}>
-              <QRCodeCanvas value={qr} size={220} style={{ margin: "auto" }} />
-              <Text size="xs" c="gray" mt={4}>
-                Escanea rápido antes de que expire
-              </Text>
-            </Stack>
+            <>
+              <Alert
+                color="teal"
+                title="Escanea este código QR con tu WhatsApp"
+                mb="md"
+                style={{ maxWidth: 400, width: "100%" }}
+              >
+                <Text size="sm">
+                  <b>1. Abre WhatsApp</b> en tu teléfono.
+                  <br />
+                  <b>
+                    2. Ve a <u>Menú</u>{" "}
+                    <span style={{ fontWeight: 700 }}>⋮</span> {">"}{" "}
+                    <u>Dispositivos vinculados</u> o{" "}
+                    <u>Configuración {">"} Dispositivos vinculados</u> (en
+                    iPhone).
+                  </b>
+                  <br />
+                  <b>
+                    3. Pulsa <u>Vincular un dispositivo</u> y escanea el QR de
+                    esta pantalla.
+                  </b>
+                  <br />
+                  <br />
+                </Text>
+                <Text size="xs" c="dimmed" mt={8}>
+                  <b>Importante:</b> Mantén tu teléfono con conexión a internet
+                  para no perder la sesión.
+                </Text>
+              </Alert>
+              <Stack align="center" gap={0}>
+                <QRCodeCanvas
+                  value={qr}
+                  size={220}
+                  style={{ margin: "auto" }}
+                />
+                <Text size="xs" c="gray" mt={4}>
+                  Escanea rápido antes de que expire
+                </Text>
+              </Stack>
+            </>
           )}
+
           {!qr && status !== "ready" && <Loader size="md" />}
           {/* --- Formulario para enviar mensajes --- */}
           {status === "ready" && (
@@ -354,6 +393,10 @@ const WhatsappOrgSession: React.FC = () => {
             </Notification>
           )}
         </Stack>
+        <Group gap="xs" mt="sm" justify="center">
+          <Text fw={500}>ID sesión:</Text>
+          <Text c="blue">{clientId}</Text>
+        </Group>
       </Paper>
     </Container>
   );
