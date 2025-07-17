@@ -16,6 +16,7 @@ export default defineConfig({
         "robots.txt",
         "apple-touch-icon.png",
       ],
+      manifest: false,
       // manifest: {
       //   name: "Estudio Rosa",
       //   short_name: "Estudio Rosa",
