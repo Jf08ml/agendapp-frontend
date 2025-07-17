@@ -89,8 +89,8 @@ const LoginAdmin: React.FC = () => {
           width: isMobile ? "90%" : "auto",
           margin: "auto",
           padding: "2rem",
-          backgroundColor: colors.cardBackground,
-          color: colors.primaryText,
+          backgroundColor: organization?.branding?.primaryColor,
+          color: organization?.branding?.secondaryColor,
           borderRadius: "8px",
           boxShadow: "0 0 20px rgba(0, 0, 0, 1)",
         }}
@@ -134,12 +134,13 @@ const LoginAdmin: React.FC = () => {
           mb="md"
         />
         {error && (
-          <Text color={colors.errorText} mb="md">
+          <Text c={colors.errorText} mb="md">
             {error}
           </Text>
         )}
         <Button
           fullWidth
+          variant="gradient"
           onClick={handleLogin}
           disabled={isLoading}
           leftSection={isLoading && <Loader size="xs" />}

@@ -1,4 +1,4 @@
-import { apiOrganization } from "./axiosConfig";
+import { apiGeneral, apiOrganization } from "./axiosConfig";
 import { AxiosResponse } from "axios";
 
 interface Role {
@@ -13,9 +13,9 @@ export interface Organization {
   email: string;
   location: {
     lat: number;
-    lng: number; 
+    lng: number;
   };
-  address?: string; 
+  address?: string;
   password?: string;
   phoneNumber: string;
   facebookUrl?: string;
@@ -24,15 +24,28 @@ export interface Organization {
   tiktokUrl?: string;
   role: Role;
   isActive?: boolean;
-  referredCount?: number; 
-  referredReward?: string; 
-  serviceCount?: number; 
-  serviceReward?: string; 
-  openingHours?: { 
-    start: string; 
-    end: string; 
+  referredCount?: number;
+  referredReward?: string;
+  serviceCount?: number;
+  serviceReward?: string;
+  openingHours?: {
+    start: string;
+    end: string;
   };
   clientIdWhatsapp?: string | null;
+  branding?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    logoUrl?: string;
+    faviconUrl?: string;
+    themeColor?: string;
+    pwaName?: string;
+    pwaShortName?: string;
+    pwaDescription?: string;
+    pwaIcon?: string;
+    footerTextColor?: string;
+  };
+  domain?: string; // Para branding automático
 }
 
 // Crear una nueva organización
@@ -98,5 +111,18 @@ export const deleteOrganization = async (
     await apiOrganization.delete(`/${organizationId}`);
   } catch (error) {
     console.error("Error al eliminar la organización:", error);
+  }
+};
+
+// Obtener organización según el dominio actual (branding automático)
+export const getOrganizationConfig = async (): Promise<Organization | null> => {
+  try {
+    const response: AxiosResponse<Organization> = await apiGeneral.get(
+      "/organization-config"
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener la organización por dominio:", error);
+    return null;
   }
 };

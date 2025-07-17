@@ -1,5 +1,5 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import { AppShell, Burger, Flex, Select } from "@mantine/core";
+// src/App.tsx
+import { AppShell, Burger, Flex } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -9,67 +9,32 @@ import Footer from "./layouts/Footer";
 import NavbarLinks from "./layouts/NavbarLinks";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
-import { useDispatch, useSelector } from "react-redux";
-import { AppDispatch, RootState } from "./app/store";
-import { useEffect, useState } from "react";
-import { fetchOrganization } from "./features/organization/sliceOrganization";
+import { useSelector } from "react-redux";
+import { RootState } from "./app/store";
+import { useEffect } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
-import { getOrganizationById } from "./services/organizationService";
 
 function App() {
-  const dispatch: AppDispatch = useDispatch();
   const { userId, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
-  const organizationLoading = useSelector(
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
+  const loading = useSelector(
     (state: RootState) => state.organization.loading
   );
-  const loading = useSelector((state: RootState) => state.organization.loading);
-
   const [opened, { toggle, close }] = useDisclosure(false);
 
-  const [availableOrganizations, setAvailableOrganizations] = useState<
-    { value: string; label: string }[]
-  >([]);
-  const [selectedOrganization, setSelectedOrganization] = useState<string>("");
+  // Branding dinámico
+  const color = organization?.branding?.primaryColor || "#DE739E";
+  const logoUrl = organization?.branding?.logoUrl || "/logo-default.png";
 
-  const organizationIds = [
-    import.meta.env.VITE_ORGANIZATION_ID,
-    import.meta.env.VITE_ORGANIZATION_ID_2,
-  ].filter(Boolean);
-
-  useEffect(() => {
-    const loadOrganizations = async () => {
-      try {
-        const organizations = await Promise.all(
-          organizationIds.map(async (id) => {
-            const organization = await getOrganizationById(id);
-            return { value: id, label: organization?.name || "Sin nombre" };
-          })
-        );
-        setAvailableOrganizations(organizations);
-
-        if (organizations.length > 0) {
-          setSelectedOrganization(organizations[0].value);
-          dispatch(fetchOrganization(organizations[0].value));
-        }
-      } catch (error) {
-        console.error("Error al cargar las organizaciones:", error);
-      }
-    };
-
-    loadOrganizations();
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (selectedOrganization) {
-      dispatch(fetchOrganization(selectedOrganization));
-    }
-  }, [selectedOrganization, dispatch]);
-
+  // Inicializa autenticación en el cliente
   useAuthInitializer();
 
+  // Push notification setup (igual que antes)
   useEffect(() => {
     const requestNotificationPermission = async () => {
       if (isAuthenticated && userId) {
@@ -97,7 +62,7 @@ function App() {
     requestNotificationPermission();
   }, [isAuthenticated, userId]);
 
-  // Recarga automática cuando haya un nuevo service worker activo
+  // Actualización automática de Service Worker
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/custom-sw.js").then((registration) => {
@@ -117,8 +82,14 @@ function App() {
     }
   }, []);
 
-  if (loading || organizationLoading) {
-    return <CustomLoader />;
+  // Loader mientras carga la organización/branding
+  if (loading || !organization) {
+    return (
+      <CustomLoader
+        loadingText={`Cargando ${organization?.name || "organización"}...`}
+        logoUrl={organization?.branding?.logoUrl}
+      />
+    );
   }
 
   return (
@@ -134,8 +105,8 @@ function App() {
         }}
         header={{ height: 50 }}
       >
-        <AppShell.Header bg="#DE739E">
-          <Flex align="center" px="sm">
+        <AppShell.Header bg={color}>
+          <Flex align="center" px="sm" style={{ height: 50 }}>
             <Burger
               opened={opened}
               onClick={toggle}
@@ -143,24 +114,25 @@ function App() {
               color="white"
               onMouseEnter={() => opened || toggle()}
             />
-            <Header />
-            {/* Mostrar el selector solo si hay más de una organización */}
-            {organizationIds.length > 1 && (
-              <Select
-                label="Cambiar sede"
-                size="xs"
-                placeholder="Seleccionar sede"
-                data={availableOrganizations}
-                value={selectedOrganization}
-                onChange={(value) => setSelectedOrganization(value || "")}
-                style={{ position: "fixed", bottom: 20 }}
-              />
-            )}
+            {/* Logo de la organización */}
+            <img
+              src={logoUrl}
+              alt={organization?.name}
+              style={{
+                height: 36,
+                width: 36,
+                objectFit: "cover",
+                borderRadius: "50%",
+                background: "#fff",
+              }}
+            />
+            {/* Nombre dinámico y contenido extra del Header */}
+            <Header organization={organization} />
           </Flex>
         </AppShell.Header>
         <AppShell.Navbar
           p="md"
-          bg="#DE739E"
+          bg={color}
           onMouseLeave={() => opened && close()}
         >
           <NavbarLinks closeNavbar={close} />

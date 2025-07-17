@@ -198,7 +198,6 @@ const ScheduleView: React.FC = () => {
         const filteredAppointments = response.filter(
           (appointment) => appointment.employee._id === userId
         );
-        console.log(filteredAppointments);
         setAppointments(filteredAppointments);
       }
     } catch (error) {
@@ -269,7 +268,7 @@ const ScheduleView: React.FC = () => {
     const startDate =
       combineDateAndTime(selectedDay, interval || new Date()) || new Date();
 
-    if (clients.length > 0 && employees.length > 0) {
+    if (employees.length > 0) {
       setNewAppointment((prev) => ({
         ...prev,
         startDate: prev.startDate || startDate,
@@ -283,7 +282,7 @@ const ScheduleView: React.FC = () => {
       // Notificación si no cargaron datos aún
       showNotification({
         title: "Error",
-        message: "Los datos aún no se han cargado",
+        message: "Debes tener al menos un empleado activo para agendar citas.",
         color: "red",
         autoClose: 3000,
         position: "top-right",

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Text, Box, Center, ActionIcon, Button } from "@mantine/core";
+import { Text, Box, Center, ActionIcon, Button, Group, Image } from "@mantine/core";
 import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
 import { MdInstallMobile } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../app/store";
-import { logout } from "../features/auth/sliceAuth"; 
+import { logout } from "../features/auth/sliceAuth";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => void;
@@ -13,14 +13,16 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const Footer = () => {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const navigate = useNavigate();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
-  const dispatch = useDispatch(); 
+  const dispatch = useDispatch();
 
   const organization = useSelector((state: RootState) => state.organization.organization);
-  const { name } = organization || {};
+  const { name, branding } = organization || {};
+  const footerColor = branding?.primaryColor || branding?.themeColor || "#DE739E";
+  const logoUrl = branding?.logoUrl || "/logo-default.png";
+  const textColor = branding?.footerTextColor || "#E2E8F0";
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
@@ -65,7 +67,7 @@ export const Footer = () => {
   return (
     <Box
       component="footer"
-      bg="#DE739E"
+      bg={footerColor}
       p="0.1rem 0"
       style={{
         width: "100%",
@@ -86,27 +88,43 @@ export const Footer = () => {
             bottom: "-8px",
           }}
           onClick={handleInstallClick}
-        ></Button>
-      )}
-      <Center>
-        <Text
-          size="xs"
-          style={{
-            color: "#E2E8F0",
-            fontWeight: 500,
-          }}
         >
-          © {name}.
-        </Text>
+          Instalar app
+        </Button>
+      )}
+
+      <Center>
+        <Group gap="xs" style={{ paddingTop: 4, paddingBottom: 2 }}>
+          {/* Logo */}
+          {logoUrl && (
+            <Image
+              src={logoUrl}
+              alt={name}
+              width={22}
+              height={22}
+              fit="contain"
+              style={{ borderRadius: 8, background: "#fff" }}
+            />
+          )}
+          <Text
+            size="xs"
+            style={{
+              color: textColor,
+              fontWeight: 500,
+              letterSpacing: 1,
+            }}
+          >
+            © {name || "Organización"}.
+          </Text>
+        </Group>
       </Center>
 
-      {/* Si el usuario está autenticado, muestra el icono de logout, de lo contrario, el de admin */}
       <ActionIcon
         style={{
           position: "absolute",
           right: "5px",
           bottom: "5px",
-          color: "#E2E8F0",
+          color: textColor,
         }}
         radius="lg"
         onClick={isAuthenticated ? handleLogout : () => navigate("/login-admin")}

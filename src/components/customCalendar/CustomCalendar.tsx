@@ -16,9 +16,7 @@ interface CustomCalendarProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
-  setAppointments: React.Dispatch<
-      React.SetStateAction<Appointment[]>
-    >;
+  setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -28,7 +26,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
-  setAppointments
+  setAppointments,
 }) => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -36,7 +34,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
 
   // Determina si las citas están cargadas
-  const appointmentsLoaded = appointments.length > 0;
+  const appointmentsLoaded = appointments ? true : false;
 
   const handleNavigation = (direction: "prev" | "next") => {
     const adjustDate = direction === "prev" ? subMonths : addMonths;

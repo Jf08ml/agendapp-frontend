@@ -12,15 +12,15 @@ import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useMediaQuery } from "@mantine/hooks";
 import NotificationsMenu from "./NotificationsMenu";
+import { Organization } from "../services/organizationService";
 
-const Header = () => {
+const Header = ({ organization }: { organization: Organization | null}) => {
   const isVerySmallScreen = useMediaQuery("(max-width: 390px)");
   const [menuOpened] = useState(false);
 
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
-  );
-
+  // const organization = useSelector(
+  //   (state: RootState) => state.organization.organization
+  // );
   const auth = useSelector((state: RootState) => state.auth);
 
   const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl } =

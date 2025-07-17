@@ -37,17 +37,16 @@ registerRoute(
 // Manejo de eventos push para notificaciones
 self.addEventListener("push", (event) => {
   const data = event.data.json();
-  const { title, message } = data;
+  const { title, message, icon } = data; 
 
-  // Mostrar la notificación
   event.waitUntil(
     self.registration.showNotification(title, {
       body: message,
-      icon: "/estudio_rosa.png",
+      icon: icon || "/logo_default.png",
     })
   );
 
-  // Enviar un mensaje a los clientes abiertos
+  // Notificar a los clientes abiertos
   self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
     clients.forEach((client) => {
       client.postMessage({
@@ -57,6 +56,7 @@ self.addEventListener("push", (event) => {
     });
   });
 });
+
 
 // Manejo de clic en las notificaciones
 self.addEventListener("notificationclick", (event) => {

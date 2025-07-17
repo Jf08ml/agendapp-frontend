@@ -24,7 +24,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Inicio",
       description: "Inicio de página.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -33,7 +32,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Buscar Cliente",
       description: "Búsqueda de cliente para el plan de fidelidad.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -42,7 +40,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Plan de fidelidad",
       description: "Visualización del plan de fidelidad del cliente.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -51,7 +48,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Servicios y Precios",
       description: "Consulta nuestros servicios y precios en Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -60,7 +56,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Reserva en linea",
       description: "Reserva con nosotros rápido y facíl.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -69,7 +64,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Ubicación",
       description: "Ubicación en google maps.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -78,7 +72,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Administrar clientes",
       description: "Administrar clientes en Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -91,7 +84,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Dashboard",
       description: "Dashboard de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -104,7 +96,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Agenda",
       description: "Gestiona la agenda de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -117,7 +108,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Reservas Online",
       description: "Gestiona las reservas de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -130,7 +120,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Servicios",
       description: "Gestiona los servicios de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -143,7 +132,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
   {
@@ -180,7 +168,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
-      image: "/estudio_rosa.png",
     },
   },
 ];

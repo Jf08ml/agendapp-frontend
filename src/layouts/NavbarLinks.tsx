@@ -8,6 +8,9 @@ import { BiCalendar, BiCalendarCheck } from "react-icons/bi";
 import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
 import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { usePermissions } from "../hooks/usePermissions";
+import { useSelector } from "react-redux";
+import { RootState } from "../app/store";
+import CustomLoader from "../components/customLoader/CustomLoader";
 
 interface NavbarLinksProps {
   closeNavbar: () => void;
@@ -15,6 +18,22 @@ interface NavbarLinksProps {
 
 const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
   const { hasPermission } = usePermissions();
+
+  const isAuthenticated = useSelector(
+    (state: RootState) => state.auth.isAuthenticated
+  );
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
+
+  if (!isAuthenticated) {
+    return (
+      <CustomLoader
+        loadingText={`Cargando ${organization?.name || "organización"}...`}
+        logoUrl={organization?.branding?.logoUrl}
+      />
+    );
+  }
 
   return (
     <ScrollArea>
@@ -79,6 +98,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             </Flex>
           </NavLink>
         )}
+
         {(hasPermission("appointments:view_all") ||
           hasPermission("appointments:view_own")) && (
           <NavLink
@@ -94,6 +114,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             </Flex>
           </NavLink>
         )}
+
         {hasPermission("reservationOnline:read") && (
           <NavLink
             to="/gestionar-reservas-online"
@@ -108,6 +129,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             </Flex>
           </NavLink>
         )}
+
         {hasPermission("businessInformation:read") && (
           <NavLink
             to="/informacion-negocio"
@@ -122,6 +144,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             </Flex>
           </NavLink>
         )}
+
         {hasPermission("employeeInformation:read") && (
           <NavLink
             to="/informacion-empleado"
@@ -136,6 +159,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
             </Flex>
           </NavLink>
         )}
+
         {(hasPermission("clients:read") ||
           hasPermission("services:read") ||
           hasPermission("employees:read")) && (
@@ -191,7 +215,7 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
               </Flex>
             </NavLink>
           )}
-          
+
           {hasPermission("whatsapp:read") && (
             <NavLink
               to="/gestionar-whatsapp"
