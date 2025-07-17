@@ -1,6 +1,12 @@
 {
   "rewrites": [
-    { "source": "/manifest.webmanifest", "destination": "/api/manifest.webmanifest" },
-    { "source": "/favicon.ico", "destination": "/api/favicon.ico" }
+    {
+      "source": "/manifest.webmanifest",
+      "destination": "https://agendapp-backend.vercel.app/manifest.webmanifest"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "https://agendapp-backend.vercel.app/favicon.ico"
+    }
   ]
 }
