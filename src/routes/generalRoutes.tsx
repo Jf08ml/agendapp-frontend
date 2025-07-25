@@ -16,6 +16,7 @@ import ReservationsList from "../pages/admin/manageReservation";
 import Home from "../pages/Home";
 import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
+import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
 
 const generalRoutes = [
   {
@@ -168,6 +169,20 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
+    },
+  },
+
+  // Superadmin routes
+  {
+    path: "/superadmin-organizations",
+    component: (props: JSX.IntrinsicAttributes) => (
+
+        <SuperadminOrganizations {...props} />
+
+    ),
+    MediaMetadata: {
+      title: "Superadmin Organizaciones",
+      description: "Administra todas las organizaciones.",
     },
   },
 ];

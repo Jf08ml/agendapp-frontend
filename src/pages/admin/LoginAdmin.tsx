@@ -49,6 +49,9 @@ const LoginAdmin: React.FC = () => {
         setIsLoading(false);
         return;
       }
+
+      console.log(organization);
+
       const organizationId = organization?._id as string;
 
       const data = await login(email, password, organizationId);
