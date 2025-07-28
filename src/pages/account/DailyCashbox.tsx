@@ -5,6 +5,7 @@ import {
   Table,
   Text,
   Select,
+  MultiSelect,
   ScrollArea,
   Flex,
   Loader,
@@ -12,6 +13,8 @@ import {
   ActionIcon,
   Badge,
   CheckIcon,
+  Accordion,
+  Stack,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
@@ -39,6 +42,11 @@ const DailyCashbox: React.FC = () => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [totalIncome, setTotalIncome] = useState<number>(0);
+
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [servicesSummary, setServicesSummary] = useState<
+    Record<string, { count: number; total: number }>
+  >({});
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
@@ -130,6 +138,31 @@ const DailyCashbox: React.FC = () => {
         return sum + usedPrice + additionalTotal;
       }, 0);
 
+      // Agrupar servicios
+      const summary: Record<string, { count: number; total: number }> = {};
+
+      sortedAppointments.forEach((appt) => {
+        const serviceName = appt.service?.name || "Otro";
+
+        const additional =
+          appt.additionalItems?.reduce(
+            (sum, item) => sum + (item.price || 0),
+            0
+          ) || 0;
+
+        const price =
+          appt.customPrice || appt.totalPrice || appt.service?.price || 0;
+
+        if (!summary[serviceName]) {
+          summary[serviceName] = { count: 0, total: 0 };
+        }
+
+        summary[serviceName].count += 1;
+        summary[serviceName].total += price + additional;
+      });
+
+      setServicesSummary(summary);
+
       setTotalIncome(total);
     } catch (error) {
       console.error("Error al obtener citas:", error);
@@ -200,7 +233,20 @@ const DailyCashbox: React.FC = () => {
       </Title>
 
       <Card shadow="lg" radius="md" withBorder>
-        <Flex justify="space-between" align="center">
+        <Stack
+          p="md"
+          // Por defecto stackea en columna (mobile), pero en pantallas grandes usa fila
+          styles={{
+            root: {
+              [`@media (min-width: 768px)`]: {
+                flexDirection: "row",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              },
+            },
+          }}
+        >
           <Select
             label="Intervalo de tiempo"
             placeholder="Selecciona intervalo"
@@ -213,16 +259,33 @@ const DailyCashbox: React.FC = () => {
             ]}
             value={interval}
             onChange={(value) => setInterval(value || "daily")}
+            w="100%"
           />
-          <Text size="lg" fw={800} ta="right">
+
+          <MultiSelect
+            label="Filtrar por servicio"
+            placeholder="Todos los servicios"
+            data={Object.keys(servicesSummary).map((name) => ({
+              value: name,
+              label: name,
+            }))}
+            value={selectedServices}
+            onChange={setSelectedServices}
+            clearable
+            searchable
+            w="100%"
+          />
+
+          <Text size="lg" fw={800} ta="right" w="100%">
             Total Ingresos:{" "}
             <Badge variant="light" size="xl">
               {formatCurrency(totalIncome)}
             </Badge>
           </Text>
-        </Flex>
+        </Stack>
+
         {interval === "custom" && (
-          <Flex justify="center" mt="md">
+          <Flex justify="center" mt="md" gap="md" wrap="wrap">
             <DatePickerInput
               label="Inicio"
               locale="es"
@@ -239,7 +302,33 @@ const DailyCashbox: React.FC = () => {
         )}
       </Card>
 
-      <Card shadow="lg" radius="md" withBorder my="xl">
+      <Card shadow="sm" mt="md" withBorder>
+        <Accordion variant="separated">
+          <Accordion.Item value="resumen">
+            <Accordion.Control>
+              <Title order={4}>Resumen por servicio</Title>
+            </Accordion.Control>
+            <Accordion.Panel>
+              {Object.entries(servicesSummary).length > 0 ? (
+                Object.entries(servicesSummary).map(([serviceName, data]) => (
+                  <Flex key={serviceName} justify="space-between" my="xs">
+                    <Text>{serviceName}</Text>
+                    <Text>
+                      {data.count} cita(s) – {formatCurrency(data.total)}
+                    </Text>
+                  </Flex>
+                ))
+              ) : (
+                <Text color="dimmed" ta="center">
+                  No hay servicios en este intervalo.
+                </Text>
+              )}
+            </Accordion.Panel>
+          </Accordion.Item>
+        </Accordion>
+      </Card>
+
+      <Card shadow="lg" radius="md" withBorder my="md">
         <Title order={3} mb="sm">
           Citas Registradas
         </Title>
@@ -262,51 +351,59 @@ const DailyCashbox: React.FC = () => {
               </Table.Thead>
               <Table.Tbody>
                 {appointments.length > 0 ? (
-                  appointments.map((appointment) => {
-                    const additionalTotal =
-                      appointment.additionalItems?.reduce(
-                        (sum, item) => sum + (item.price || 0),
-                        0
-                      ) || 0;
+                  appointments
+                    .filter((appointment) => {
+                      if (selectedServices.length === 0) return true;
+                      const name = appointment.service?.name || "Otro";
+                      return selectedServices.includes(name);
+                    })
+                    .map((appointment) => {
+                      const additionalTotal =
+                        appointment.additionalItems?.reduce(
+                          (sum, item) => sum + (item.price || 0),
+                          0
+                        ) || 0;
 
-                    const usedPrice =
-                      appointment.customPrice ||
-                      appointment.totalPrice ||
-                      appointment.service?.price ||
-                      0;
+                      const usedPrice =
+                        appointment.customPrice ||
+                        appointment.totalPrice ||
+                        appointment.service?.price ||
+                        0;
 
-                    const total = usedPrice + additionalTotal;
+                      const total = usedPrice + additionalTotal;
 
-                    return (
-                      <Table.Tr
-                        key={appointment._id}
-                        style={getRowStyles(appointment.status)}
-                      >
-                        <Table.Td>
-                          {new Date(appointment.startDate).toLocaleDateString()}
-                        </Table.Td>
-                        <Table.Td>{appointment.client?.name}</Table.Td>
-                        <Table.Td>{appointment.service?.name}</Table.Td>
-                        <Table.Td>{formatCurrency(total)}</Table.Td>
+                      return (
+                        <Table.Tr
+                          key={appointment._id}
+                          style={getRowStyles(appointment.status)}
+                        >
+                          <Table.Td>
+                            {new Date(
+                              appointment.startDate
+                            ).toLocaleDateString()}
+                          </Table.Td>
+                          <Table.Td>{appointment.client?.name}</Table.Td>
+                          <Table.Td>{appointment.service?.name}</Table.Td>
+                          <Table.Td>{formatCurrency(total)}</Table.Td>
 
-                        <Table.Td align="center">
-                          {appointment.status !== "confirmed" && (
-                            <ActionIcon
-                              color="green"
-                              onClick={() =>
-                                handleConfirmAppointment(
-                                  appointment._id,
-                                  appointment.client._id
-                                )
-                              }
-                            >
-                              <CheckIcon />
-                            </ActionIcon>
-                          )}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })
+                          <Table.Td align="center">
+                            {appointment.status !== "confirmed" && (
+                              <ActionIcon
+                                color="green"
+                                onClick={() =>
+                                  handleConfirmAppointment(
+                                    appointment._id,
+                                    appointment.client._id
+                                  )
+                                }
+                              >
+                                <CheckIcon />
+                              </ActionIcon>
+                            )}
+                          </Table.Td>
+                        </Table.Tr>
+                      );
+                    })
                 ) : (
                   <Table.Tr>
                     <Table.Td colSpan={5}>
