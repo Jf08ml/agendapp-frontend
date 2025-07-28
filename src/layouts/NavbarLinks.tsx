@@ -19,14 +19,15 @@ interface NavbarLinksProps {
 const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
   const { hasPermission } = usePermissions();
 
-  const isAuthenticated = useSelector(
-    (state: RootState) => state.auth.isAuthenticated
-  );
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
+  // const isAuthenticated = useSelector(
+  //   (state: RootState) => state.auth.isAuthenticated
+  // );
+
+  const { organization, loading } = useSelector(
+    (state: RootState) => state.organization
   );
 
-  if (!isAuthenticated) {
+  if (loading || !organization) {
     return (
       <CustomLoader
         loadingText={`Cargando ${organization?.name || "organización"}...`}
