@@ -264,9 +264,16 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                               : "none",
                           }}
                         >
-                          <Text size="sm" fw={isCurrentAppointment ? 700 : 500}>
-                            {appt.service.name}
-                          </Text>
+                          <Table.Td>
+                            {appt.service ? (
+                              appt.service.name
+                            ) : (
+                              <Text c="red" fw={700} size="sm">
+                                Sin Servicio
+                              </Text>
+                            )}
+                          </Table.Td>
+
                           <Text size="sm" c="dimmed">
                             (Empleado:{" "}
                             {appt.employeeRequestedByClient ? (
@@ -539,7 +546,15 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
                           return (
                             <Table.Tr key={index}>
                               {/* Servicio */}
-                              <Table.Td>{appt.service.name}</Table.Td>
+                              <Table.Td>
+                                {appt.service ? (
+                                  appt.service.name
+                                ) : (
+                                  <Text color="red" fw={700} size="sm">
+                                    Sin Servicio
+                                  </Text>
+                                )}
+                              </Table.Td>
 
                               {/* Precio Base */}
                               <Table.Td>
