@@ -12,40 +12,12 @@ import {
   ActionIcon,
   Group,
   Text,
-  Select,
   Autocomplete,
   Box,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
-import {
-  FaSpa,
-  FaPaintBrush,
-  FaEye,
-  FaSmile,
-  FaQuestion,
-} from "react-icons/fa";
-import { FaScissors } from "react-icons/fa6";
 import { Service } from "../../../../services/serviceService";
-
-// Mapea el nombre del icono a su componente real
-const iconMap = {
-  FaSpa: <FaSpa style={{ color: "#DE739E" }} />,
-  FaScissors: <FaScissors style={{ color: "#DE739E" }} />,
-  FaPaintBrush: <FaPaintBrush style={{ color: "#DE739E" }} />,
-  FaEye: <FaEye style={{ color: "#DE739E" }} />,
-  FaSmile: <FaSmile style={{ color: "#DE739E" }} />,
-  FaQuestion: <FaQuestion style={{ color: "#DE739E" }} />,
-};
-
-const iconOptions = [
-  { value: "FaSpa", label: "Spa" },
-  { value: "FaScissors", label: "Peluquería" },
-  { value: "FaPaintBrush", label: "Uñas" },
-  { value: "FaEye", label: "Cejas" },
-  { value: "FaSmile", label: "Belleza" },
-  { value: "FaQuestion", label: "Otro" },
-];
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -66,7 +38,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     _id: "",
     name: "",
     type: "",
-    icon: "",
     description: "",
     price: 0,
     duration: 0,
@@ -83,7 +54,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         _id: "",
         name: "",
         type: "",
-        icon: "",
         description: "",
         price: 0,
         duration: 0,
@@ -108,7 +78,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     onClose();
   };
 
-
   return (
     <Modal
       opened={isOpen}
@@ -132,9 +101,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         <Autocomplete
           label="Tipo de servicio"
           value={editingService.type}
-          onChange={(type) =>
-            setEditingService({ ...editingService, type })
-          }
+          onChange={(type) => setEditingService({ ...editingService, type })}
           data={allTypes}
           placeholder="Ejemplo: Uñas, Spa, Cejas..."
           limit={10}
@@ -144,25 +111,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
           <Text size="sm" fw={500} mb={4}>
             Ícono
           </Text>
-          <Group gap={8} align="center">
-            {/* Preview del ícono grande */}
-            <Box style={{ fontSize: 28, minWidth: 36, minHeight: 36 }}>
-              {editingService.icon
-                ? iconMap[editingService.icon as keyof typeof iconMap]
-                : <FaQuestion style={{ color: "#bbb" }} />}
-            </Box>
-            <Select
-              data={iconOptions}
-              value={editingService.icon || ""}
-              onChange={(icon) =>
-                setEditingService({ ...editingService, icon: icon as string })
-              }
-              placeholder="Selecciona un ícono"
-              searchable
-              clearable
-              style={{ flex: 1 }}
-            />
-          </Group>
         </Box>
         <NumberInput
           label="Precio"

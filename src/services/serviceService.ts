@@ -7,7 +7,6 @@ export interface Service {
   images?: string[];
   name: string;
   type: string;
-  icon: string;
   description?: string;
   price: number;
   duration: number;
@@ -18,7 +17,6 @@ interface CreateServicePayload {
   images?: (string | File)[];
   name: string;
   type: string;
-  icon?: string;
   description?: string;
   price: number;
   duration: number;
