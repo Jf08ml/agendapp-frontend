@@ -265,16 +265,13 @@ ${clientServices}`;
                               : "none",
                           }}
                         >
-                          <Table.Td>
-                            {appt.service ? (
-                              appt.service.name
-                            ) : (
-                              <Text c="red" fw={700} size="sm">
-                                Sin Servicio
-                              </Text>
-                            )}
-                          </Table.Td>
-
+                          {appt.service ? (
+                            appt.service.name
+                          ) : (
+                            <Text c="red" fw={700} size="sm">
+                              Sin Servicio
+                            </Text>
+                          )}
                           <Text size="sm" c="dimmed">
                             (Empleado:{" "}
                             {appt.employeeRequestedByClient ? (
@@ -548,10 +545,11 @@ ${clientServices}`;
                             <Table.Tr key={index}>
                               {/* Servicio */}
                               <Table.Td>
+                                {" "}
                                 {appt.service ? (
                                   appt.service.name
                                 ) : (
-                                  <Text color="red" fw={700} size="sm">
+                                  <Text c="red" fw={700} size="sm">
                                     Sin Servicio
                                   </Text>
                                 )}
