@@ -1,12 +1,24 @@
 import { apiGeneral, apiOrganization } from "./axiosConfig";
 import { AxiosResponse } from "axios";
-
-interface Role {
+export interface Role {
   name: string;
   permissions: string[];
 }
 
-// Definir la estructura de la organización
+export interface Branding {
+  primaryColor?: string;
+  secondaryColor?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  themeColor?: string;
+  pwaName?: string;
+  pwaShortName?: string;
+  pwaDescription?: string;
+  pwaIcon?: string;
+  footerTextColor?: string;
+  manifest?: object;
+}
+
 export interface Organization {
   _id?: string;
   name: string;
@@ -33,19 +45,8 @@ export interface Organization {
     end: string;
   };
   clientIdWhatsapp?: string | null;
-  branding?: {
-    primaryColor?: string;
-    secondaryColor?: string;
-    logoUrl?: string;
-    faviconUrl?: string;
-    themeColor?: string;
-    pwaName?: string;
-    pwaShortName?: string;
-    pwaDescription?: string;
-    pwaIcon?: string;
-    footerTextColor?: string;
-  };
-  domain?: string; // Para branding automático
+  branding?: Branding;
+  domains?: string[];
 }
 
 // Crear una nueva organización

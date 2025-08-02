@@ -1,59 +1,124 @@
 import React from "react";
-import { Box, Group, Text, Progress } from "@mantine/core";
+import { Box, Text, Progress, Center, Stack, useMantineTheme, Card } from "@mantine/core";
+import { FaMedal } from "react-icons/fa";
 
 interface LoyaltyPlanProps {
   servicesTaken: number;
   totalServices: number;
   serviceReward: string;
+  primaryColor?: string;
 }
 
 const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({
   servicesTaken,
   totalServices,
   serviceReward,
+  primaryColor,
 }) => {
-  const progress = (servicesTaken / totalServices) * 100;
+  const theme = useMantineTheme();
+  const colorProgress =
+    primaryColor?.startsWith("#") && primaryColor.length >= 4
+      ? primaryColor
+      : theme.colors[theme.primaryColor][6];
+
+  const completed = totalServices > 0 && servicesTaken >= totalServices;
+  const safeTotal = totalServices > 0 ? totalServices : 1;
+  const progress = Math.min(100, (servicesTaken / safeTotal) * 100);
 
   return (
-    <Box
-      bg="#1A202C"
-      p="xl"
+    <Card
+      shadow="lg"
+      radius="2xl"
+      withBorder
+      miw={260}
+      maw={420}
       m="auto"
-      mt="sm"
+      mt="xl"
       style={{
-        borderRadius: "8px",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-        color: "#E2E8F0",
+        border: completed
+          ? `2px solid ${theme.colors[theme.primaryColor][6]}`
+          : `1.5px solid ${theme.colors.gray[3]}`,
+        transition: "all .4s",
       }}
     >
-      <Group>
-        <Text size="xl" fw={700}>
+      <Stack gap="xs" align="center">
+        <Text
+          fw={900}
+          size="xl"
+          style={{
+            color: completed
+              ? colorProgress
+              : theme.colors[theme.primaryColor][6],
+            letterSpacing: 0.4,
+            textAlign: "center",
+          }}
+        >
           Plan de Lealtad
         </Text>
-        <Text size="md" c="dimmed">
-          {servicesTaken} de {totalServices} servicios tomados
-        </Text>
-      </Group>
 
-      <Progress
-        value={progress}
-        size="lg"
-        mt="md"
-        color={servicesTaken === totalServices ? "green" : "blue"}
-      />
+        <Text c="dimmed" size="md" style={{ textAlign: "center" }}>
+          <b>{servicesTaken}</b> / {totalServices} servicios
+        </Text>
 
-      {servicesTaken === totalServices ? (
-        <Text mt="md" c="green" fw={500}>
-          ¡Felicidades! Has completado {totalServices} servicios. Recibe{" "}
-          {serviceReward}.
-        </Text>
-      ) : (
-        <Text mt="md" c="dimmed">
-          Completa {totalServices - servicesTaken} servicio(s) más para obtener{" "}
-          {serviceReward}.
-        </Text>
-      )}
-    </Box>
+        <Progress
+          value={progress}
+          size="lg"
+          radius="xl"
+          striped
+          animated
+          color={primaryColor ? undefined : theme.primaryColor}
+          style={{
+            width: "85%",
+            margin: "0 auto",
+            marginTop: 6,
+            marginBottom: 4,
+            transition: "all .4s",
+          }}
+        />
+
+        <Box mt="sm" w="100%">
+          {completed ? (
+            <Center>
+              <FaMedal
+                color={colorProgress}
+                size={32}
+                style={{ marginRight: 12, verticalAlign: "middle" }}
+              />
+              <Text
+                fw={700}
+                size="lg"
+                ml={4}
+                ta="center"
+                style={{ color: colorProgress }}
+              >
+                ¡Felicidades! Completaste tu plan.
+                <br />
+                <Text span fw={800}>
+                  Recompensa: <b>{serviceReward}</b>
+                </Text>
+              </Text>
+            </Center>
+          ) : totalServices > 0 ? (
+            <Text c="dimmed" size="sm" ta="center" mt={4}>
+              Te faltan{" "}
+              <Text span fw={700}>
+                {Math.max(totalServices - servicesTaken, 0)}
+              </Text>{" "}
+              servicio
+              {totalServices - servicesTaken === 1 ? "" : "s"} para obtener{" "}
+              <Text span fw={800}>
+                {serviceReward}
+              </Text>
+              .
+            </Text>
+          ) : (
+            <Text c="dimmed" size="sm" ta="center" mt={4}>
+              Este plan aún no tiene meta configurada.
+            </Text>
+          )}
+        </Box>
+      </Stack>
+    </Card>
   );
 };
 

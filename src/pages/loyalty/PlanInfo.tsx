@@ -1,17 +1,7 @@
 import React from "react";
 import LoyaltyPlan from "./LoyaltyPlan";
 import ReferredPlan from "./ReferredPlan";
-import {
-  Box,
-  Card,
-  Flex,
-  Group,
-  Text,
-  Avatar,
-  Divider,
-  Badge,
-  Button,
-} from "@mantine/core";
+import { Card, Flex, Group, Text, Avatar, Button, Center, Stack } from "@mantine/core";
 import { Client as ClientType } from "../../services/clientService";
 import { Organization } from "../../services/organizationService";
 
@@ -26,75 +16,108 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
   organization,
   onLogout,
 }) => {
+  // Defaults para evitar NaN/undefined en props de componentes hijos
+  const totalServices = organization?.serviceCount ?? 0;
+  const serviceReward = organization?.serviceReward ?? "Sin recompensa";
+  const totalReferrals = organization?.referredCount ?? 0;
+  const referredReward = organization?.referredReward ?? "Sin recompensa";
+
+  // Branding: color de fondo para avatar, si existe
+  const avatarBg =
+    organization?.branding?.primaryColor ||
+    organization?.branding?.secondaryColor ||
+    "blue";
+
+  // Si organization no existe, muestra mensaje amigable
+  if (!organization) {
+    return (
+      <Center mih={300}>
+        <Card shadow="sm" p="lg" radius="md" withBorder>
+          <Text size="xl" fw={700} ta="center" mb="md">
+            Organización no encontrada
+          </Text>
+          <Text c="dimmed" ta="center">
+            Hubo un problema cargando los datos de la organización.
+          </Text>
+          <Button mt="xl" color="red" fullWidth onClick={onLogout}>
+            Salir
+          </Button>
+        </Card>
+      </Center>
+    );
+  }
+
   return (
-    <Box p="md">
+    <>
       <Group justify="center" grow>
         <Flex direction="column" align="center" style={{ width: "100%" }}>
           <Card
-            shadow="sm"
-            padding="lg"
-            radius="md"
+            shadow="lg"
+            padding="xl"
+            radius="2xl"
             withBorder
-            style={{ maxWidth: 400, width: "100%" }}
+            style={{
+              width: "100%",
+              margin: "auto",
+            }}
           >
             {/* Sección de perfil */}
-            <Card.Section withBorder inheritPadding py="xs">
-              <Flex justify="center" align="center" direction="column">
+            <Card.Section withBorder inheritPadding py={10}>
+              <Stack align="center" gap={4}>
                 <Avatar
                   radius="xl"
-                  size="lg"
-                  mb="sm"
-                  color="blue"
-                  variant="filled"
+                  size={64}
+                  color={avatarBg}
+                  style={{ fontSize: 24 }}
                 >
                   {client.name?.[0]?.toUpperCase() || "?"}
                 </Avatar>
-                <Text size="xl" fw={700}>
+                <Text size="lg" fw={700} ta="center" mt={2}>
                   {client.name || "Cliente desconocido"}
                 </Text>
-                <Text c="dimmed" size="sm">
-                  {client.phoneNumber || "Teléfono no disponible"}
-                </Text>
-                {client.email && (
-                  <Text c="dimmed" size="xs" mt="xs">
-                    {client.email}
+                <Group gap={8} justify="center">
+                  <Text c="dimmed" size="sm">
+                    {client.phoneNumber || "Sin teléfono"}
                   </Text>
-                )}
-              </Flex>
+                  {client.email && (
+                    <>
+                      <Text c="dimmed" size="xs">
+                        •
+                      </Text>
+                      <Text
+                        c="dimmed"
+                        size="xs"
+                        style={{ maxWidth: 140 }}
+                        truncate="end"
+                      >
+                        {client.email}
+                      </Text>
+                    </>
+                  )}
+                </Group>
+              </Stack>
             </Card.Section>
-
-            <Divider my="sm" variant="dashed" />
 
             {/* Sección de servicios tomados */}
-            <Card.Section inheritPadding py="xs">
-              <Badge color="teal" variant="light" size="lg">
-                Servicios Tomados: {client.servicesTaken || 0}
-              </Badge>
+            <Card.Section inheritPadding>
               <LoyaltyPlan
                 servicesTaken={client.servicesTaken || 0}
-                totalServices={organization?.serviceCount as number}
-                serviceReward={organization?.serviceReward as string}
+                totalServices={totalServices}
+                serviceReward={serviceReward}
               />
             </Card.Section>
-
-            <Divider my="sm" variant="dashed" />
 
             {/* Sección de referidos */}
-            <Card.Section inheritPadding py="xs">
-              <Badge color="indigo" variant="light" size="lg">
-                Referidos Hechos: {client.referralsMade || 0}
-              </Badge>
+            <Card.Section inheritPadding>
               <ReferredPlan
                 referralsMade={client.referralsMade || 0}
-                totalReferrals={organization?.referredCount as number}
-                referredReward={organization?.referredReward as string}
+                totalReferrals={totalReferrals}
+                referredReward={referredReward}
               />
             </Card.Section>
 
-            <Divider my="sm" variant="dashed" />
-
             {/* Botón de logout */}
-            <Card.Section inheritPadding py="xs" mt="md">
+            <Card.Section p="lg" ta="center">
               <Button fullWidth color="red" variant="light" onClick={onLogout}>
                 Salir
               </Button>
@@ -102,7 +125,7 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
           </Card>
         </Flex>
       </Group>
-    </Box>
+    </>
   );
 };
 

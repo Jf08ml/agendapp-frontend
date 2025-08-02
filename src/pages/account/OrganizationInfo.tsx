@@ -57,13 +57,25 @@ const OrganizationInfo = () => {
 
   const iconStyle = { width: rem(12), height: rem(12) };
 
+  // Helper: branding nunca undefined
+  const ensureBranding = (branding?: Organization["branding"]) =>
+    branding ?? {};
+
+  // Helper: domains nunca undefined
+  const ensureDomains = (domains?: string[]) =>
+    Array.isArray(domains) ? domains : [];
+
   useEffect(() => {
     const fetchOrganization = async () => {
       try {
         if (organizationId) {
           const response = await getOrganizationById(organizationId);
           if (response) {
-            setOrganization(response);
+            setOrganization({
+              ...response,
+              branding: ensureBranding(response.branding),
+              domains: ensureDomains(response.domains),
+            });
           }
         }
       } catch (error) {
@@ -78,7 +90,6 @@ const OrganizationInfo = () => {
         setLoading(false);
       }
     };
-
     fetchOrganization();
   }, [organizationId]);
 
@@ -88,9 +99,7 @@ const OrganizationInfo = () => {
       if (place.geometry) {
         const location = place.geometry.location;
         const formattedAddress = place.formatted_address || "";
-        if (!location) {
-          return;
-        }
+        if (!location) return;
         setOrganization((prev) => ({
           ...prev,
           location: {
@@ -106,14 +115,17 @@ const OrganizationInfo = () => {
   const handleSave = async () => {
     try {
       if (organizationId) {
+        const orgToUpdate = {
+          ...organization,
+          branding: ensureBranding(organization.branding),
+          domains: ensureDomains(organization.domains),
+        };
         const updatedOrganization = await updateOrganization(
           organizationId,
-          organization
+          orgToUpdate
         );
-
-        if (!updatedOrganization) {
+        if (!updatedOrganization)
           throw new Error("La organización actualizada es null");
-        }
 
         showNotification({
           title: "Éxito",
@@ -124,7 +136,6 @@ const OrganizationInfo = () => {
         });
 
         dispatch(updateOrganizationState(updatedOrganization));
-
         setIsEditing(false);
       }
     } catch (error) {
@@ -138,6 +149,33 @@ const OrganizationInfo = () => {
   };
 
   if (loading) return <CustomLoader />;
+
+  // Helpers para actualizar branding
+  const updateBrandingField = (
+    field: keyof NonNullable<Organization["branding"]>,
+    value: string
+  ) => {
+    setOrganization((prev) => ({
+      ...prev,
+      branding: {
+        ...ensureBranding(prev.branding),
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateBrandingColor = (
+    field: keyof NonNullable<Organization["branding"]>,
+    color: string
+  ) => {
+    setOrganization((prev) => ({
+      ...prev,
+      branding: {
+        ...ensureBranding(prev.branding),
+        [field]: color,
+      },
+    }));
+  };
 
   return (
     <Container>
@@ -214,10 +252,7 @@ const OrganizationInfo = () => {
               value={organization.email || ""}
               disabled={!isEditing}
               onChange={(e) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  email: e.target.value,
-                }))
+                setOrganization((prev) => ({ ...prev, email: e.target.value }))
               }
             />
             <TextInput
@@ -234,6 +269,7 @@ const OrganizationInfo = () => {
           </Stack>
         </Tabs.Panel>
 
+        {/* Tab: Horario de atención */}
         <Tabs.Panel value="openingsHours">
           <Group grow>
             <TimeInput
@@ -493,7 +529,7 @@ const OrganizationInfo = () => {
                   setOrganization((prev) => ({
                     ...prev,
                     branding: {
-                      ...prev.branding,
+                      ...ensureBranding(prev.branding),
                       logoUrl,
                       faviconUrl: prev.branding?.faviconUrl ?? logoUrl,
                       pwaIcon: prev.branding?.pwaIcon ?? logoUrl,
@@ -503,7 +539,6 @@ const OrganizationInfo = () => {
                 description="Aparece en el encabezado, notificaciones y páginas principales. Tamaño sugerido: 256x256px, fondo transparente o blanco."
               />
             </Group>
-
             {/* Favicon */}
             <Text fw={600}>Favicon</Text>
             <Group gap="md" align="center">
@@ -531,7 +566,7 @@ const OrganizationInfo = () => {
                   setOrganization((prev) => ({
                     ...prev,
                     branding: {
-                      ...prev.branding,
+                      ...ensureBranding(prev.branding),
                       faviconUrl,
                     },
                   }));
@@ -539,7 +574,6 @@ const OrganizationInfo = () => {
                 description="Ícono que aparece en la pestaña del navegador. Tamaño recomendado: 32x32px."
               />
             </Group>
-
             {/* Icono PWA */}
             <Text fw={600}>Icono PWA</Text>
             <Group gap="md" align="center">
@@ -571,7 +605,7 @@ const OrganizationInfo = () => {
                   setOrganization((prev) => ({
                     ...prev,
                     branding: {
-                      ...prev.branding,
+                      ...ensureBranding(prev.branding),
                       pwaIcon,
                     },
                   }));
@@ -579,86 +613,43 @@ const OrganizationInfo = () => {
                 description="Ícono principal que verán los usuarios al instalar la app (PWA). Fondo blanco o transparente. Tamaño 192x192px o 512x512px."
               />
             </Group>
-
             {/* Colores */}
             <ColorInput
               label="Color primario"
               value={organization.branding?.primaryColor || "#ff007a"}
               disabled={!isEditing}
-              onChange={(color) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    primaryColor: color,
-                  },
-                }))
-              }
+              onChange={(color) => updateBrandingColor("primaryColor", color)}
               description="Color principal de la marca (usado en botones, headers y enlaces principales)."
             />
-
             <ColorInput
               label="Color secundario"
               value={organization.branding?.secondaryColor || "#ffffff"}
               disabled={!isEditing}
-              onChange={(color) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    secondaryColor: color,
-                  },
-                }))
-              }
+              onChange={(color) => updateBrandingColor("secondaryColor", color)}
               description="Color secundario de la marca (para fondos y elementos secundarios)."
             />
-
             <ColorInput
               label="Color para el navegador / themeColor"
               value={organization.branding?.themeColor || "#DE739E"}
               disabled={!isEditing}
-              onChange={(color) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    themeColor: color,
-                  },
-                }))
-              }
+              onChange={(color) => updateBrandingColor("themeColor", color)}
               description="Color de la barra del navegador y temas oscuros."
             />
-
             <ColorInput
               label="Color del texto del footer"
               value={organization.branding?.footerTextColor || "#E2E8F0"}
               disabled={!isEditing}
               onChange={(color) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    footerTextColor: color,
-                  },
-                }))
+                updateBrandingColor("footerTextColor", color)
               }
               description="Color del texto que aparece en el footer. Ej: blanco o gris claro"
             />
-
             {/* Datos de la PWA */}
             <TextInput
               label="Nombre de la app (PWA)"
               value={organization.branding?.pwaName || ""}
               disabled={!isEditing}
-              onChange={(e) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    pwaName: e.target.value,
-                  },
-                }))
-              }
+              onChange={(e) => updateBrandingField("pwaName", e.target.value)}
               description="Nombre completo de la app que aparecerá al instalarla en el dispositivo."
             />
 
@@ -667,13 +658,7 @@ const OrganizationInfo = () => {
               value={organization.branding?.pwaShortName || ""}
               disabled={!isEditing}
               onChange={(e) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    pwaShortName: e.target.value,
-                  },
-                }))
+                updateBrandingField("pwaShortName", e.target.value)
               }
               description="Nombre corto que se muestra debajo del ícono en el escritorio/móvil."
             />
@@ -683,23 +668,17 @@ const OrganizationInfo = () => {
               value={organization.branding?.pwaDescription || ""}
               disabled={!isEditing}
               onChange={(e) =>
-                setOrganization((prev) => ({
-                  ...prev,
-                  branding: {
-                    ...prev.branding,
-                    pwaDescription: e.target.value,
-                  },
-                }))
+                updateBrandingField("pwaDescription", e.target.value)
               }
               description="Breve descripción de la app (se usa en el manifest y al instalar en el móvil)."
             />
 
-            {/* Dominio propio, solo lectura */}
+            {/* Dominio propio, solo lectura, ahora usando domains */}
             <TextInput
-              label="Dominio propio"
-              value={organization.domain || ""}
+              label="Dominios propios"
+              value={ensureDomains(organization.domains).join(", ")}
               disabled
-              description="Solo visible para planes premium. El dominio donde se despliega tu organización."
+              description="Dominios donde se despliega tu organización. Solo visible para planes premium."
             />
           </Stack>
         </Tabs.Panel>

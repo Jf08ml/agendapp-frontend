@@ -7,120 +7,144 @@ import {
   Stack,
   Center,
   Button,
-  Group,
+  Card,
+  Box,
+  useMantineTheme,
+  Paper,
+  rem,
 } from "@mantine/core";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { getOrganizationById } from "../../services/organizationService";
 import CustomLoader from "../../components/customLoader/CustomLoader";
-import { FaAndroid, FaApple } from "react-icons/fa";
+import { MdLocationOn } from "react-icons/md";
 
 const mapContainerStyle = {
   width: "100%",
-  height: "400px",
+  height: "320px",
+  borderRadius: "18px",
+  overflow: "hidden",
 };
 
 const defaultCenter = { lat: 6.2442, lng: -75.5812 };
 
+function getPlatformMapUrl(lat: number, lng: number) {
+  const ua = window.navigator.userAgent.toLowerCase();
+  if (/iphone|ipad|ipod/.test(ua)) {
+    return `https://maps.apple.com/?q=${lat},${lng}`;
+  }
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
 const Location: React.FC = () => {
-  // Obtener el `id` de la organización desde Redux
+  const theme = useMantineTheme();
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
 
-  // Estados para la información de la organización
   const [loading, setLoading] = useState(true);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [address, setAddress] = useState<string>("");
 
-  // Efecto para cargar la información de la organización
   useEffect(() => {
     const fetchOrganization = async () => {
       if (!organization?._id) {
         setLoading(false);
         return;
       }
-
       try {
         const response = await getOrganizationById(organization._id);
         if (response) {
-          // Configura la ubicación y dirección desde la respuesta
           setLocation(response.location);
           setAddress(response.address || "Dirección no disponible");
         }
       } catch (error) {
-        console.error("Error al cargar la organización:", error);
+        console.error(error)
         setAddress("No se pudo cargar la dirección");
       } finally {
         setLoading(false);
       }
     };
-
     fetchOrganization();
   }, [organization]);
 
-  // Generar URL para Google Maps
-  const getGoogleMapsUrl = () => {
-    if (!location) return "#";
-    return `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-  };
-
-  // Generar URL para Apple Maps
-  const getAppleMapsUrl = () => {
-    if (!location) return "#";
-    return `https://maps.apple.com/?q=${location.lat},${location.lng}`;
+  // Un solo botón inteligente
+  const handleOpenMap = () => {
+    if (!location) return;
+    const url = getPlatformMapUrl(location.lat, location.lng);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   if (loading) return <CustomLoader />;
 
   return (
-    <Container>
-      <Stack>
-        <Title order={3}>Ubicación</Title>
-        <Text>Dirección: {address}</Text>
+    <Container size="sm" p={0} mt="lg">
+      <Card
+        shadow="lg"
+        radius="xl"
+        withBorder
+        p={rem(28)}
+        style={{
+          maxWidth: 500,
+          margin: "0 auto",
+        }}
+      >
+        <Stack gap="md">
+          <Title
+            order={2}
+            style={{
+              textAlign: "center",
+              fontWeight: 900,
+              color: theme.colors[theme.primaryColor][6],
+              marginBottom: 2,
+            }}
+          >
+            Nuestra ubicación
+          </Title>
 
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={location || defaultCenter}
-          zoom={15}
-        >
-          {/* Marcador en la ubicación */}
-          {location && <Marker position={location} />}
-        </GoogleMap>
-        {!location && (
-          <Center>
-            <Text c="red">No se pudo cargar la ubicación</Text>
-          </Center>
-        )}
+          <Text c="dimmed" ta="center" mb={2}>
+            {address}
+          </Text>
 
-        {/* Botones para abrir en Google Maps y Apple Maps */}
-        {location && (
-          <Group justify="center" mt="md">
-            <Button
-              component="a"
-              href={getGoogleMapsUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="outline"
-              leftSection={<FaAndroid />}
-            >
-              Abrir en Google Maps
-            </Button>
-            <Button
-              component="a"
-              href={getAppleMapsUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="outline"
-              leftSection={<FaApple />}
-            >
-              Abrir en Apple Maps
-            </Button>
-          </Group>
-        )}
-      </Stack>
+          <Paper
+            shadow="sm"
+            radius="lg"
+            style={{ overflow: "hidden", margin: "0 auto", width: "100%" }}
+            mb={10}
+          >
+            <Box style={mapContainerStyle}>
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={location || defaultCenter}
+                zoom={15}
+              >
+                {location && <Marker position={location} />}
+              </GoogleMap>
+            </Box>
+          </Paper>
+
+          {!location && (
+            <Center>
+              <Text c="red">No se pudo cargar la ubicación</Text>
+            </Center>
+          )}
+
+          <Button
+            leftSection={<MdLocationOn />}
+            onClick={handleOpenMap}
+            size="md"
+            radius="xl"
+            fullWidth
+            color={theme.primaryColor}
+            variant="filled"
+            style={{ fontWeight: 700, fontSize: 17, letterSpacing: 0.2 }}
+            disabled={!location}
+            mt={6}
+          >
+            Abrir en el mapa
+          </Button>
+        </Stack>
+      </Card>
     </Container>
   );
 };

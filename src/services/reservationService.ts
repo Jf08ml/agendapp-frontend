@@ -24,7 +24,6 @@ interface CreateReservationPayload {
   serviceId: Service | string;
   employeeId: Employee | string | null;
   startDate: Date | string;
-  customer: string | null;
   customerDetails: {
     name: string;
     email: string;
@@ -40,6 +39,26 @@ interface Response<T> {
   status: string;
   data: T;
   message: string;
+}
+
+interface MultipleReservationServiceItem {
+  serviceId: string;
+  employeeId: string | null;
+  duration?: number; // Opcional si el backend lo obtiene
+}
+
+// Payload para el endpoint múltiple
+interface CreateMultipleReservationsPayload {
+  services: MultipleReservationServiceItem[];
+  startDate: Date | string; // hora inicial de la secuencia
+  customerDetails: {
+    name: string;
+    email: string;
+    phone: string;
+    birthDate: Date | null;
+  };
+  organizationId: string;
+  // status? Por defecto puede ser 'pending'
 }
 
 // Obtener todas las reservas de una organización
@@ -69,6 +88,20 @@ export const createReservation = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al crear la reserva");
+  }
+};
+
+export const createMultipleReservations = async (
+  data: CreateMultipleReservationsPayload
+): Promise<Reservation[] | undefined> => {
+  try {
+    const response = await apiReservation.post<Response<Reservation[]>>(
+      "/multi",
+      data
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al crear reservas múltiples");
   }
 };
 
