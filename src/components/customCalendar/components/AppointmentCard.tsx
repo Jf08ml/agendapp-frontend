@@ -186,20 +186,21 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   ) => {
     const clientServices = appoinments
       .filter((appt) => appt.client._id === appointment.client._id)
-      .map(
-        (appt) =>
-          `⭐ *Servicio:* ${appt.service.name}\n👤 *Empleado:* ${appt.employee.names}`
+      .map((appt) =>
+        appt.service
+          ? `⭐ *Servicio:* ${appt.service.name}\n👤 *Empleado:* ${appt.employee.names}`
+          : `⭐ *Servicio:* [Eliminado]\n👤 *Empleado:* ${appt.employee.names}`
       )
       .join("\n\n"); // Salto de línea adicional entre servicios
 
     return `*DETALLES DE LA CITA*
-  👩‍🦰 *Cliente:* ${appointment.client.name}
-  📅 *Horario:* ${dayjs(appointment.startDate).format(
-    "dddd, D MMMM YYYY, h:mm A"
-  )} - ${dayjs(appointment.endDate).format("h:mm A")}
-  💵 *Abono:* ${appointment.advancePayment}
-  
-  ${clientServices}`;
+👩‍🦰 *Cliente:* ${appointment.client.name}
+📅 *Horario:* ${dayjs(appointment.startDate).format(
+      "dddd, D MMMM YYYY, h:mm A"
+    )} - ${dayjs(appointment.endDate).format("h:mm A")}
+💵 *Abono:* ${appointment.advancePayment}
+
+${clientServices}`;
   };
 
   const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
