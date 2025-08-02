@@ -12,25 +12,47 @@ import {
   ActionIcon,
   Group,
   Text,
+  Select,
+  Autocomplete,
+  Box,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
+import {
+  FaSpa,
+  FaPaintBrush,
+  FaEye,
+  FaSmile,
+  FaQuestion,
+} from "react-icons/fa";
+import { FaScissors } from "react-icons/fa6";
+import { Service } from "../../../../services/serviceService";
 
-interface Service {
-  _id: string;
-  images?: (File | string)[]; 
-  name: string;
-  type: string;
-  description?: string;
-  price: number;
-  duration: number;
-}
+// Mapea el nombre del icono a su componente real
+const iconMap = {
+  FaSpa: <FaSpa style={{ color: "#DE739E" }} />,
+  FaScissors: <FaScissors style={{ color: "#DE739E" }} />,
+  FaPaintBrush: <FaPaintBrush style={{ color: "#DE739E" }} />,
+  FaEye: <FaEye style={{ color: "#DE739E" }} />,
+  FaSmile: <FaSmile style={{ color: "#DE739E" }} />,
+  FaQuestion: <FaQuestion style={{ color: "#DE739E" }} />,
+};
+
+const iconOptions = [
+  { value: "FaSpa", label: "Spa" },
+  { value: "FaScissors", label: "Peluquería" },
+  { value: "FaPaintBrush", label: "Uñas" },
+  { value: "FaEye", label: "Cejas" },
+  { value: "FaSmile", label: "Belleza" },
+  { value: "FaQuestion", label: "Otro" },
+];
 
 interface ModalCreateEditProps {
   isOpen: boolean;
   onClose: () => void;
   service: Service | null;
   onSave: (service: Service) => void;
+  allTypes: string[];
 }
 
 const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
@@ -38,11 +60,13 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   onClose,
   service,
   onSave,
+  allTypes,
 }) => {
   const [editingService, setEditingService] = useState<Service>({
     _id: "",
     name: "",
     type: "",
+    icon: "",
     description: "",
     price: 0,
     duration: 0,
@@ -59,6 +83,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         _id: "",
         name: "",
         type: "",
+        icon: "",
         description: "",
         price: 0,
         duration: 0,
@@ -79,9 +104,10 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   };
 
   const handleSave = () => {
-    onSave({ ...editingService, images: imageFiles });
+    onSave({ ...editingService, images: imageFiles as string[] });
     onClose();
   };
+
 
   return (
     <Modal
@@ -101,17 +127,43 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
               name: e.currentTarget.value,
             })
           }
+          required
         />
-        <TextInput
+        <Autocomplete
           label="Tipo de servicio"
           value={editingService.type}
-          onChange={(e) =>
-            setEditingService({
-              ...editingService,
-              type: e.currentTarget.value,
-            })
+          onChange={(type) =>
+            setEditingService({ ...editingService, type })
           }
+          data={allTypes}
+          placeholder="Ejemplo: Uñas, Spa, Cejas..."
+          limit={10}
+          required
         />
+        <Box>
+          <Text size="sm" fw={500} mb={4}>
+            Ícono
+          </Text>
+          <Group gap={8} align="center">
+            {/* Preview del ícono grande */}
+            <Box style={{ fontSize: 28, minWidth: 36, minHeight: 36 }}>
+              {editingService.icon
+                ? iconMap[editingService.icon as keyof typeof iconMap]
+                : <FaQuestion style={{ color: "#bbb" }} />}
+            </Box>
+            <Select
+              data={iconOptions}
+              value={editingService.icon || ""}
+              onChange={(icon) =>
+                setEditingService({ ...editingService, icon: icon as string })
+              }
+              placeholder="Selecciona un ícono"
+              searchable
+              clearable
+              style={{ flex: 1 }}
+            />
+          </Group>
+        </Box>
         <NumberInput
           label="Precio"
           prefix="$ "
@@ -123,6 +175,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
               price: typeof value === "number" ? value : 0,
             })
           }
+          required
         />
         <div>
           <NumberInput
@@ -134,13 +187,16 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 duration: typeof value === "number" ? value : 0,
               })
             }
+            required
+            min={1}
           />
-          <Flex justify="center">
+          <Flex justify="center" mt={4}>
             <Chip.Group>
               {[15, 30, 60, 90].map((duration) => (
                 <Chip
                   key={duration}
                   size="xs"
+                  checked={editingService.duration === duration}
                   onChange={() =>
                     setEditingService({ ...editingService, duration })
                   }
@@ -160,6 +216,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
               description: e.currentTarget.value,
             })
           }
+          minRows={2}
         />
         <Dropzone
           onDrop={handleDrop}
@@ -179,17 +236,17 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
             <BiImageAdd size={50} color="#228be6" />
             <div>
               <Text size="lg" inline>
-                Arrastra las imágenes del servicio aquí o haz clic para cargar
+                Arrastra las imágenes aquí o haz clic para cargar
               </Text>
               <Text size="sm" color="dimmed" inline mt={7}>
-                Solo se permiten archivos de imagen (jpeg, png, etc.)
+                Solo imágenes (jpeg, png, etc.)
               </Text>
             </div>
           </Group>
         </Dropzone>
         <div>
           {imageFiles.length > 0 && (
-            <Flex wrap="wrap" gap="sm">
+            <Flex wrap="wrap" gap="sm" mt={4}>
               {imageFiles.map((file, index) => (
                 <div key={index} style={{ position: "relative" }}>
                   <Image
@@ -222,7 +279,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
             </Flex>
           )}
         </div>
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} fullWidth>
           {service ? "Guardar Cambios" : "Agregar Servicio"}
         </Button>
       </Stack>

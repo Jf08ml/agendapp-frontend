@@ -30,9 +30,15 @@ import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
 import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
-import { addMinutes } from "date-fns";
+import {
+  addMinutes,
+  endOfDay,
+  endOfMonth,
+  startOfDay,
+  startOfMonth,
+} from "date-fns";
 import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
-import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
+import { BiPlus, BiSearch, BiSort } from "react-icons/bi";
 import { FaCheck } from "react-icons/fa";
 import { IoAlertCircleOutline } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
@@ -67,9 +73,12 @@ const ScheduleView: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [loadingMonth, setLoadingMonth] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [reorderModalOpened, setReorderModalOpened] = useState(false);
+
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
@@ -96,7 +105,7 @@ const ScheduleView: React.FC = () => {
   useEffect(() => {
     fetchClients();
     fetchEmployees();
-    fetchAppointments();
+    fetchAppointmentsForMonth(currentDate);
   }, []);
 
   useEffect(() => {
@@ -184,28 +193,44 @@ const ScheduleView: React.FC = () => {
   /**
    * OBTENER CITAS
    */
-  const fetchAppointments = async () => {
+  const fetchAppointmentsForMonth = async (date: Date) => {
+    setLoadingMonth(true);
     try {
+      const start = startOfMonth(date).toISOString();
+      const end = endOfMonth(date).toISOString();
       const response = await getAppointmentsByOrganizationId(
-        organizationId as string
+        organizationId as string,
+        start,
+        end
       );
-
-      // Si tiene permiso "view_all", mostramos todas
-      if (hasPermission("appointments:view_all")) {
-        setAppointments(response);
-      } else {
-        // Caso contrario, solo las que correspondan a su empleado
-        const filteredAppointments = response.filter(
-          (appointment) => appointment.employee._id === userId
-        );
-        setAppointments(filteredAppointments);
-      }
-    } catch (error) {
-      console.error(error);
+      setAppointments(
+        hasPermission("appointments:view_all")
+          ? response
+          : response.filter((a) => a.employee._id === userId)
+      );
     } finally {
-      setLoadingAgenda(false);
+      setLoadingMonth(false);
     }
   };
+
+const fetchAppointmentsForDay = async (date: Date): Promise<Appointment[]> => {
+  try {
+    const start = startOfDay(date).toISOString();
+    const end = endOfDay(date).toISOString();
+    const response = await getAppointmentsByOrganizationId(
+      organizationId as string,
+      start,
+      end
+    );
+
+    return hasPermission("appointments:view_all")
+      ? response
+      : response.filter((a) => a.employee._id === userId);
+  } catch {
+    console.error("Error al obtener citas del día");
+    return []; // <- Siempre retorna un array
+  }
+};
 
   /**
    * MANEJO DE SERVICIO
@@ -341,7 +366,7 @@ const ScheduleView: React.FC = () => {
             autoClose: 3000,
             position: "top-right",
           });
-          fetchAppointments();
+          fetchAppointmentsForMonth(currentDate);
         } catch (error) {
           showNotification({
             title: "Error",
@@ -410,7 +435,7 @@ const ScheduleView: React.FC = () => {
             autoClose: 3000,
             position: "top-right",
           });
-          fetchAppointments();
+          fetchAppointmentsForMonth(currentDate);
         } catch (error) {
           showNotification({
             title: "Error",
@@ -516,7 +541,7 @@ const ScheduleView: React.FC = () => {
         }
         setCreatingAppointment(false);
         closeModal(); // cierra el modal
-        fetchAppointments(); // refresca la agenda
+        fetchAppointmentsForMonth(currentDate); // refresca la agenda
       }
     } catch (error) {
       showNotification({
@@ -568,52 +593,50 @@ const ScheduleView: React.FC = () => {
 
   // Muestra un loader si estamos cargando
   if (loadingAgenda) {
-    return <CustomLoader />;
+    return <CustomLoader overlay />;
   }
 
   return (
     <Box>
       <Group justify="space-between" mb="md">
-        <Group justify="space-between" mb="md">
-          <Title order={2}>Gestionar Agenda</Title>
-          <Group align="center">
+        <Title order={2}>Gestionar Agenda</Title>
+        <Group align="center">
+          <Button
+            size="xs"
+            variant="outline"
+            color="teal"
+            leftSection={<BiSearch size={16} />}
+            onClick={() => setShowSearchModal(true)}
+          >
+            Buscar Citas
+          </Button>
+          {/* <Button
+            size="xs"
+            variant="filled"
+            color="blue"
+            leftSection={<BiRefresh size={16} />}
+            onClick={fetchAppointmentsForMonth}
+          >
+            Actualizar
+          </Button> */}
+          {hasPermission("appointments:create") && (
             <Button
               size="xs"
-              variant="outline"
-              color="teal"
-              leftSection={<BiSearch size={16} />}
-              onClick={() => setShowSearchModal(true)}
+              color="green"
+              leftSection={<BiPlus size={16} />}
+              onClick={() => openModal(new Date(), new Date())}
             >
-              Buscar Citas
+              Añadir Cita
             </Button>
-            <Button
-              size="xs"
-              variant="filled"
-              color="blue"
-              leftSection={<BiRefresh size={16} />}
-              onClick={fetchAppointments}
-            >
-              Actualizar
-            </Button>
-            {hasPermission("appointments:create") && (
-              <Button
-                size="xs"
-                color="green"
-                leftSection={<BiPlus size={16} />}
-                onClick={() => openModal(new Date(), new Date())}
-              >
-                Añadir Cita
-              </Button>
-            )}
-            <Button
-              size="xs"
-              color="orange"
-              leftSection={<BiSort size={16} />}
-              onClick={() => setReorderModalOpened(true)}
-            >
-              Reordenar Empleados
-            </Button>
-          </Group>
+          )}
+          <Button
+            size="xs"
+            color="orange"
+            leftSection={<BiSort size={16} />}
+            onClick={() => setReorderModalOpened(true)}
+          >
+            Reordenar Empleados
+          </Button>
         </Group>
       </Group>
       {hasPermission("whatsapp:read") && (
@@ -726,11 +749,16 @@ const ScheduleView: React.FC = () => {
       <CustomCalendar
         employees={employees}
         appointments={appointments}
+        currentDate={currentDate}
+        setCurrentDate={setCurrentDate}
         setAppointments={setAppointments}
         onOpenModal={openModal}
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}
         onConfirmAppointment={handleConfirmAppointment}
+        fetchAppointmentsForMonth={fetchAppointmentsForMonth}
+        loadingMonth={loadingMonth}
+        fetchAppointmentsForDay={fetchAppointmentsForDay}
       />
 
       <AppointmentModal

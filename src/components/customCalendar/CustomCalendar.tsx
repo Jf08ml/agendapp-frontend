@@ -12,38 +12,48 @@ import { Employee } from "../../services/employeeService";
 interface CustomCalendarProps {
   employees: Employee[];
   appointments: Appointment[];
+  currentDate: Date;
+  setCurrentDate: React.Dispatch<React.SetStateAction<Date>>;
   onOpenModal: (selectedDay: Date | null, interval: Date) => void;
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
+  fetchAppointmentsForMonth: (currentDate: Date) => void;
+  loadingMonth: boolean;
+  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
   employees,
   appointments,
+  currentDate,
+  setCurrentDate,
   onOpenModal,
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
   setAppointments,
+  fetchAppointmentsForMonth,
+  loadingMonth,
+  fetchAppointmentsForDay,
 }) => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
   const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
 
-  // Determina si las citas están cargadas
-  const appointmentsLoaded = appointments ? true : false;
-
+  // Decide si filtrar localmente o pedir por día
   const handleNavigation = (direction: "prev" | "next") => {
     const adjustDate = direction === "prev" ? subMonths : addMonths;
-    setCurrentDate(adjustDate(currentDate, 1));
+    const newDate = adjustDate(currentDate, 1);
+    setCurrentDate(newDate);
+    fetchAppointmentsForMonth(newDate);
   };
 
   const handleDayClick = (day: Date) => {
     setSelectedDay(day);
     setModalOpened(true);
+    // Si no, solo filtras local
   };
 
   const getAppointmentsForDay = (day: Date) => {
@@ -62,7 +72,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         isMobile={isMobile}
         handleDayClick={handleDayClick}
         getAppointmentsForDay={getAppointmentsForDay}
-        appointmentsLoaded={appointmentsLoaded} // Envía la nueva prop aquí
+        loadingMonth={loadingMonth}
       />
 
       <Group justify="center" my="md">
@@ -94,6 +104,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}
         setAppointments={setAppointments}
+        fetchAppointmentsForDay={fetchAppointmentsForDay}
       />
     </Container>
   );

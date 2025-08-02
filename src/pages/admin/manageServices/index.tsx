@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -13,30 +14,26 @@ import {
   Grid,
   TextInput,
 } from "@mantine/core";
-import { BsTrash, BsPencil, BsSearch, BsToggleOn, BsToggleOff } from "react-icons/bs";
+import {
+  BsTrash,
+  BsPencil,
+  BsSearch,
+  BsToggleOn,
+  BsToggleOff,
+} from "react-icons/bs";
 import { showNotification } from "@mantine/notifications";
 import {
   createService,
   updateService,
   deleteService,
   getServicesByOrganizationId,
+  Service,
 } from "../../../services/serviceService";
 import ModalCreateEdit from "./components/ModalCreateEdit";
 import { uploadImage } from "../../../services/imageService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
-
-interface Service {
-  _id: string;
-  images?: (File | string)[];
-  name: string;
-  type: string;
-  description?: string;
-  price: number;
-  duration: number;
-  isActive?: boolean;
-}
 
 const AdminServices: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
@@ -101,12 +98,15 @@ const AdminServices: React.FC = () => {
 
       service.images = service.images || [];
 
-      const filesToUpload = service.images.filter(
-        (image) => image instanceof File
-      ) as File[];
+      const filesToUpload = service.images.filter((image) => image) as (
+        | File
+        | string
+      )[];
 
       if (filesToUpload.length > 0) {
-        const uploadPromises = filesToUpload.map((file) => uploadImage(file));
+        const uploadPromises = filesToUpload.map((file) =>
+          uploadImage(file as File)
+        );
         const uploadedUrls = await Promise.all(uploadPromises);
 
         const validUploadedUrls = uploadedUrls.filter(
@@ -231,6 +231,10 @@ const AdminServices: React.FC = () => {
     }
   };
 
+  const allTypes = Array.from(
+    new Set(services.map((s) => s.type).filter(Boolean))
+  );
+
   if (isLoading && !isInitialLoadingExec) {
     return <CustomLoader />;
   }
@@ -265,6 +269,7 @@ const AdminServices: React.FC = () => {
         onClose={onCloseModal}
         service={editingService}
         onSave={handleSaveService}
+        allTypes={allTypes}
       />
 
       <Grid>

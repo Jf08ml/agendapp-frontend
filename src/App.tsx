@@ -106,11 +106,11 @@ function App() {
         header={{ height: 50 }}
       >
         <AppShell.Header bg={color}>
-          <Flex align="center" px="sm" style={{ height: 50 }}>
+          <Flex align="center" style={{ height: 50 }}>
             <Burger
               opened={opened}
               onClick={toggle}
-              size="sm"
+              size="md"
               color="white"
               onMouseEnter={() => opened || toggle()}
             />
@@ -123,7 +123,6 @@ function App() {
                 width: 36,
                 objectFit: "cover",
                 borderRadius: "50%",
-                background: "#fff",
               }}
             />
             {/* Nombre dinámico y contenido extra del Header */}

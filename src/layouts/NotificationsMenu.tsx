@@ -18,6 +18,7 @@ import {
   Flex,
   Button,
   Divider,
+  Box,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt } from "react-icons/fa";
@@ -63,13 +64,10 @@ const NotificationsMenu = () => {
       }
     };
 
-    navigator.serviceWorker.addEventListener(
-      "message",
-      (event) => {
-        console.log("Mensaje recibido del Service Worker:", event.data);
-        handleServiceWorkerMessage(event);
-      }
-    );
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      console.log("Mensaje recibido del Service Worker:", event.data);
+      handleServiceWorkerMessage(event);
+    });
 
     // Cleanup the event listener on unmount
     return () => {
@@ -146,7 +144,6 @@ const NotificationsMenu = () => {
       <Menu.Dropdown>
         <Flex justify="space-between" align="center" px="sm">
           <NotificationToggle userId={auth.userId ? auth.userId : ""} />
-
           <Button
             variant="subtle"
             size="xs"
@@ -157,44 +154,51 @@ const NotificationsMenu = () => {
           </Button>
         </Flex>
         <Divider my="xs" />
-        {notifications.length > 0 ? (
-          notifications.map((notification, index) => (
-            <Menu.Item
-              key={index}
-              onClick={() => handleNotificationClick(notification)}
-              style={{
-                position: "relative",
-                backgroundColor:
-                  notification.status === "unread" ? "#f9f9f9" : "white",
-                borderLeft:
-                  notification.status === "unread"
-                    ? "4px solid #00b894"
-                    : "4px solid transparent",
-                padding: "8px 12px",
-              }}
-            >
-              <Flex direction="row" gap="xs" align="center">
-                <Avatar radius="xl" size="sm">
-                  {getNotificationIcon(notification.type)}
-                </Avatar>
-                <div style={{ flex: 1 }}>
-                  <Text
-                    fw={notification.status === "unread" ? 700 : 500}
-                    size="sm"
-                  >
-                    {notification.title}
-                  </Text>
-                  <Text
-                    c={notification.status === "unread" ? "dark" : "dimmed"}
-                    size="xs"
-                  >
-                    {notification.message}
-                  </Text>
-                </div>
-              </Flex>
-            </Menu.Item>
-          ))
-        ) : (
+        <Box style={{ maxHeight: 320, overflowY: "auto" }}>
+          {[...notifications]
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime()
+            )
+            .map((notification, index) => (
+              <Menu.Item
+                key={index}
+                onClick={() => handleNotificationClick(notification)}
+                style={{
+                  position: "relative",
+                  backgroundColor:
+                    notification.status === "unread" ? "#f9f9f9" : "white",
+                  borderLeft:
+                    notification.status === "unread"
+                      ? "4px solid #00b894"
+                      : "4px solid transparent",
+                  padding: "8px 12px",
+                }}
+              >
+                <Flex direction="row" gap="xs" align="center">
+                  <Avatar radius="xl" size="sm">
+                    {getNotificationIcon(notification.type)}
+                  </Avatar>
+                  <div style={{ flex: 1 }}>
+                    <Text
+                      fw={notification.status === "unread" ? 700 : 500}
+                      size="sm"
+                    >
+                      {notification.title}
+                    </Text>
+                    <Text
+                      c={notification.status === "unread" ? "dark" : "dimmed"}
+                      size="xs"
+                    >
+                      {notification.message}
+                    </Text>
+                  </div>
+                </Flex>
+              </Menu.Item>
+            ))}
+        </Box>
+        {notifications.length === 0 && (
           <Menu.Item>
             <Text size="sm" c="dimmed" ta="center">
               No tienes notificaciones

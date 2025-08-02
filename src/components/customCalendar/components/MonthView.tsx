@@ -14,13 +14,14 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Appointment } from "../../../services/appointmentService";
+import CustomLoader from "../../customLoader/CustomLoader";
 
 interface MonthViewProps {
   currentDate: Date;
   isMobile: boolean;
   handleDayClick: (day: Date) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
-  appointmentsLoaded: boolean; // Nueva prop para indicar si las citas están cargadas
+  loadingMonth: boolean;
 }
 
 const MonthView: React.FC<MonthViewProps> = ({
@@ -28,7 +29,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   isMobile,
   handleDayClick,
   getAppointmentsForDay,
-  appointmentsLoaded,
+  loadingMonth,
 }) => {
   const daysOfWeek = [
     "Domingo",
@@ -47,7 +48,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   });
 
   return (
-    <Box>
+    <Box style={{ position: "relative" }}>
       <Paper withBorder>
         <Text
           ta="center"
@@ -75,6 +76,7 @@ const MonthView: React.FC<MonthViewProps> = ({
           ))}
         </Grid>
       </Paper>
+      {/* Calendario SIEMPRE visible */}
       <Grid gutter="xs">
         {daysInMonth.map((day) => (
           <Grid.Col span={1.7} key={day.toISOString()}>
@@ -83,9 +85,9 @@ const MonthView: React.FC<MonthViewProps> = ({
               radius="md"
               p="xs"
               withBorder
-              onClick={() => appointmentsLoaded && handleDayClick(day)}
+              onClick={() => handleDayClick(day)}
               style={{
-                cursor: appointmentsLoaded ? "pointer" : "not-allowed",
+                cursor: "pointer",
                 position: "relative",
                 height: "100%",
                 backgroundColor: isSameDay(day, currentDate)
@@ -95,7 +97,9 @@ const MonthView: React.FC<MonthViewProps> = ({
                   ? "#007bff"
                   : undefined,
                 borderWidth: isSameDay(day, currentDate) ? 2 : 1,
-                opacity: appointmentsLoaded ? 1 : 0.5,
+                transition: "background 0.2s, border-color 0.2s",
+                opacity: loadingMonth ? 0.7 : 1, // Suaviza el fondo en loading
+                filter: loadingMonth ? "blur(0.5px)" : "none",
               }}
             >
               <Text
@@ -107,7 +111,7 @@ const MonthView: React.FC<MonthViewProps> = ({
               >
                 {format(day, "d", { locale: es })}
               </Text>
-              {appointmentsLoaded && getAppointmentsForDay(day).length > 0 && (
+              {getAppointmentsForDay(day).length > 0 && (
                 <Text
                   ta="center"
                   c="dimmed"
@@ -126,6 +130,29 @@ const MonthView: React.FC<MonthViewProps> = ({
           </Grid.Col>
         ))}
       </Grid>
+
+      {/* Overlay sólo cuando loadingMonth */}
+      {loadingMonth && (
+        <Box
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            zIndex: 10,
+            background: "rgba(255,255,255,0.70)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "auto",
+            borderRadius: 12,
+          }}
+        >
+          <CustomLoader loadingText="Obteniendo citas..." overlay />
+        </Box>
+      )}
     </Box>
   );
 };

@@ -1,11 +1,13 @@
-import { Text, Box, Group, ActionIcon, Menu, Flex } from "@mantine/core";
 import {
-  FaFacebook,
-  FaGlobe,
-  FaInstagram,
-  FaTiktok,
-  FaWhatsapp,
-} from "react-icons/fa";
+  Text,
+  Box,
+  Group,
+  ActionIcon,
+  Menu,
+  Flex,
+  SimpleGrid,
+} from "@mantine/core";
+import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -14,8 +16,8 @@ import { useMediaQuery } from "@mantine/hooks";
 import NotificationsMenu from "./NotificationsMenu";
 import { Organization } from "../services/organizationService";
 
-const Header = ({ organization }: { organization: Organization | null}) => {
-  const isVerySmallScreen = useMediaQuery("(max-width: 390px)");
+const Header = ({ organization }: { organization: Organization | null }) => {
+  const isVerySmallScreen = useMediaQuery("(max-width: 428px)");
   const [menuOpened] = useState(false);
 
   // const organization = useSelector(
@@ -29,12 +31,12 @@ const Header = ({ organization }: { organization: Organization | null}) => {
   return (
     <Box
       component="header"
-      p="0.5rem 0"
+      px="xs"
       style={{
         width: "100%",
       }}
     >
-      <Group justify="space-between" px="sm" style={{ flexWrap: "wrap" }}>
+      <Group justify="space-between" style={{ flexWrap: "wrap" }}>
         <Flex gap="xs">
           <Text
             size="xl"
@@ -49,6 +51,7 @@ const Header = ({ organization }: { organization: Organization | null}) => {
           </Text>
           {auth.isAuthenticated && <NotificationsMenu />}
         </Flex>
+
         <Group
           gap="xl"
           className="menu-links"
@@ -77,9 +80,24 @@ const Header = ({ organization }: { organization: Organization | null}) => {
           // Mostrar menú en pantallas muy pequeñas
           <Menu shadow="md" width={200}>
             <Menu.Target>
-              <ActionIcon radius="xl" size="md" variant="filled" color="dark">
-                <FaGlobe />
-              </ActionIcon>
+              <Box
+                style={{
+                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                  padding: "0.5rem",
+                  borderRadius: "8px",
+                }}
+              >
+                <SimpleGrid
+                  cols={2}
+                  spacing={4}
+                  style={{ width: 36, height: 36 }}
+                >
+                  {facebookUrl && <FaFacebook color="#1877f3" size={18} />}
+                  {instagramUrl && <FaInstagram color="#e1306c" size={18} />}
+                  {whatsappUrl && <FaWhatsapp color="#25D366" size={18} />}
+                  {tiktokUrl && <FaTiktok color="#000" size={18} />}
+                </SimpleGrid>
+              </Box>
             </Menu.Target>
             <Menu.Dropdown>
               {facebookUrl && (

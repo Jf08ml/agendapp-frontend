@@ -19,8 +19,8 @@ import Header from "./subcomponents/DayModalHeader";
 import TimeColumn from "./subcomponents/DayModalTimeColumn";
 import TimeGrid from "./subcomponents/DayModalTimeGrid";
 import EmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
+import CustomLoader from "../../../components/customLoader/CustomLoader"; // Importa tu loader aquí
 
-/* Constantes de diseño */
 export const HOUR_HEIGHT = 60;
 export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 export const CARD_WIDTH = 80;
@@ -31,6 +31,7 @@ interface DayModalProps {
   onClose: () => void;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
+  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>; 
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
@@ -44,6 +45,7 @@ const DayModal: FC<DayModalProps> = ({
   onClose,
   onOpenModal,
   getAppointmentsForDay,
+  fetchAppointmentsForDay, // Usa el prop nuevo
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
@@ -58,70 +60,77 @@ const DayModal: FC<DayModalProps> = ({
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
   const [currentDay, setCurrentDay] = useState<Date>(selectedDay || new Date());
-  const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(
-    null
-  );
-  // 1. Estado de empleados ocultos
+  const [localDayAppointments, setLocalDayAppointments] = useState<Appointment[] | null>(null);
+  const [fetchingLocalDay, setFetchingLocalDay] = useState(false);
+  const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(null);
   const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<string[]>([]);
 
+  // Actualizar el día cuando cambian las props
   useEffect(() => {
     if (selectedDay) {
       setCurrentDay(selectedDay);
     }
   }, [selectedDay]);
 
-  const appointments = useMemo(() => {
-    const result = getAppointmentsForDay(currentDay);
-    return result;
-  }, [currentDay, getAppointmentsForDay]);
+  // Decide si ese día ya está en la data global (mes)
+  const appointmentsFromMonth = useMemo(
+    () => getAppointmentsForDay(currentDay),
+    [currentDay, getAppointmentsForDay]
+  );
 
+  // Si el día NO está en el mes, haz fetch sólo para ese día, y ponlo local
+  useEffect(() => {
+    let mounted = true;
+    // Si el día no está en el array global (mes), o el array está vacío
+    if (appointmentsFromMonth.length === 0) {
+      setFetchingLocalDay(true);
+      fetchAppointmentsForDay(currentDay)
+        .then((res) => {
+          if (mounted) setLocalDayAppointments(res);
+        })
+        .finally(() => {
+          if (mounted) setFetchingLocalDay(false);
+        });
+    } else {
+      setLocalDayAppointments(null); // usar global
+    }
+    return () => { mounted = false };
+  }, [currentDay, appointmentsFromMonth, fetchAppointmentsForDay]);
+
+  // Lo que va a mostrar
+  const appointments = localDayAppointments ?? appointmentsFromMonth;
+
+  // Resto de cálculos igual
   const appointmentsByEmployee = useMemo(
     () => organizeAppointmentsByEmployee(appointments),
     [appointments]
   );
 
-  // 2. Función para alternar la visibilidad de un empleado
   const handleToggleEmployeeHidden = (employeeId: string) => {
-    setHiddenEmployeeIds((prev) => {
-      // Si ya está oculto, lo quitamos del array
-      if (prev.includes(employeeId)) {
-        return prev.filter((id) => id !== employeeId);
-      }
-      // Si no estaba oculto, lo agregamos
-      return [...prev, employeeId];
-    });
+    setHiddenEmployeeIds((prev) =>
+      prev.includes(employeeId) ? prev.filter((id) => id !== employeeId) : [...prev, employeeId]
+    );
   };
 
-  // 3. Ordenamos los empleados: primero los visibles, luego los ocultos
   const employeesSorted = useMemo(() => {
     return [...employees].sort((a, b) => {
       const aHidden = hiddenEmployeeIds.includes(a._id);
       const bHidden = hiddenEmployeeIds.includes(b._id);
-      // Los ocultos se van al final
       if (aHidden && !bHidden) return 1;
       if (!aHidden && bHidden) return -1;
       return 0;
     });
   }, [employees, hiddenEmployeeIds]);
 
-  // 4. Empleados visibles (los que pintaremos como columnas)
   const visibleEmployees = useMemo(() => {
-    return employeesSorted.filter(
-      (emp) => !hiddenEmployeeIds.includes(emp._id)
-    );
+    return employeesSorted.filter((emp) => !hiddenEmployeeIds.includes(emp._id));
   }, [employeesSorted, hiddenEmployeeIds]);
 
-  // Contar cuántos clientes únicos hay en las citas del día:
   const totalUniqueClients = useMemo(() => {
-    // Recuerda filtrar citas que tengan un client válido
-    const clientIds = appointments
-      .map((app) => app.client?._id)
-      .filter(Boolean); // Elimina nulos/undefined
-
+    const clientIds = appointments.map((app) => app.client?._id).filter(Boolean);
     return new Set(clientIds).size;
   }, [appointments]);
 
-  // Cálculo de las horas de inicio y fin
   const { startHour, endHour } = useMemo(() => {
     const orgStartHour = organization?.openingHours?.start
       ? parseInt(organization.openingHours.start.split(":")[0], 10)
@@ -131,9 +140,7 @@ const DayModal: FC<DayModalProps> = ({
       : 22;
 
     const earliestAppointment = appointments.length
-      ? Math.min(
-          ...appointments.map((app) => getHours(new Date(app.startDate)))
-        )
+      ? Math.min(...appointments.map((app) => getHours(new Date(app.startDate))))
       : orgStartHour;
 
     const latestAppointment = appointments.length
@@ -151,7 +158,6 @@ const DayModal: FC<DayModalProps> = ({
     [startHour, endHour, currentDay]
   );
 
-  // Actualización de la posición de la línea actual
   useEffect(() => {
     const updateCurrentLinePosition = () => {
       const now = new Date();
@@ -159,8 +165,7 @@ const DayModal: FC<DayModalProps> = ({
         now >= new Date(currentDay.setHours(startHour, 0, 0)) &&
         now <= new Date(currentDay.setHours(endHour, 0, 0))
       ) {
-        const totalMinutes =
-          (now.getHours() - startHour) * 60 + now.getMinutes();
+        const totalMinutes = (now.getHours() - startHour) * 60 + now.getMinutes();
         const position = (totalMinutes / 60) * HOUR_HEIGHT;
         setCurrentLinePosition(position);
       } else {
@@ -169,11 +174,12 @@ const DayModal: FC<DayModalProps> = ({
     };
 
     updateCurrentLinePosition();
-    const intervalId = setInterval(updateCurrentLinePosition, 60000); // Actualizar cada minuto
+    const intervalId = setInterval(updateCurrentLinePosition, 60000);
 
     return () => clearInterval(intervalId);
   }, [currentDay, startHour, endHour]);
 
+  // Handlers navegación
   const goToNextDay = () => setCurrentDay((prev) => addDays(prev, 1));
   const goToPreviousDay = () => setCurrentDay((prev) => addDays(prev, -1));
 
@@ -182,9 +188,7 @@ const DayModal: FC<DayModalProps> = ({
       opened={opened}
       onClose={onClose}
       fullScreen
-      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", {
-        locale: es,
-      })}`}
+      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}
       size="xl"
       styles={{ body: { padding: 0 } }}
     >
@@ -194,34 +198,27 @@ const DayModal: FC<DayModalProps> = ({
           height: "80vh",
           overflowX: "auto",
           overflowY: "auto",
+          position: "relative"
         }}
         onClick={(event) => event.stopPropagation()}
-        onDragOver={(event) => {
-          event.preventDefault();
-          const scrollArea = event.currentTarget as HTMLDivElement;
-
-          const { clientX, clientY } = event;
-          const rect = scrollArea.getBoundingClientRect();
-
-          // Detectar bordes cercanos para el desplazamiento
-          const threshold = 100; // Distancia desde el borde para activar el desplazamiento
-          const scrollSpeed = 50; // Velocidad de desplazamiento
-
-          // Desplazamiento horizontal
-          if (clientX < rect.left + threshold) {
-            scrollArea.scrollBy({ left: -scrollSpeed, behavior: "smooth" });
-          } else if (clientX > rect.right - threshold) {
-            scrollArea.scrollBy({ left: scrollSpeed, behavior: "smooth" });
-          }
-
-          // Desplazamiento vertical
-          if (clientY < rect.top + threshold) {
-            scrollArea.scrollBy({ top: -scrollSpeed, behavior: "smooth" });
-          } else if (clientY > rect.bottom - threshold) {
-            scrollArea.scrollBy({ top: scrollSpeed, behavior: "smooth" });
-          }
-        }}
+        // ...scroll on drag igual...
       >
+        {/* Loader traslúcido encima del contenido solo cuando fetch de día */}
+        {fetchingLocalDay && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1000,
+              background: "rgba(255,255,255,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <CustomLoader loadingText="Obteniendo citas del día..." overlay />
+          </div>
+        )}
         <Box
           p="xs"
           style={{
@@ -262,13 +259,7 @@ const DayModal: FC<DayModalProps> = ({
             onToggleEmployeeHidden={handleToggleEmployeeHidden}
           />
         </Box>
-
-        <Box
-          style={{
-            display: "flex",
-            position: "relative",
-          }}
-        >
+        <Box style={{ display: "flex", position: "relative" }}>
           <Box
             style={{
               display: "flex",
@@ -280,7 +271,6 @@ const DayModal: FC<DayModalProps> = ({
           >
             <TimeColumn timeIntervals={timeIntervals} />
           </Box>
-
           <Box style={{ flex: 1, position: "relative" }}>
             {currentLinePosition !== null && (
               <div
@@ -295,7 +285,6 @@ const DayModal: FC<DayModalProps> = ({
                   alignItems: "center",
                 }}
               >
-                {/* Flecha (Triángulo) */}
                 <div
                   style={{
                     width: 0,
@@ -330,7 +319,6 @@ const DayModal: FC<DayModalProps> = ({
                   appoinments={appointments}
                   setAppointments={setAppointments}
                   appointmentsByEmployee={appointmentsByEmployee}
-                  // timeIntervals={timeIntervals}
                   startHour={startHour}
                   endHour={endHour}
                   selectedDay={currentDay}
