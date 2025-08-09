@@ -101,7 +101,7 @@ export default function SuperadminOrganizations() {
                 <Table.Td>{org.name}</Table.Td>
                 <Table.Td>{org.email}</Table.Td>
                 <Table.Td>{org.phoneNumber}</Table.Td>
-                <Table.Td>{org.domain || "-"}</Table.Td>
+                <Table.Td>{org.domains || "-"}</Table.Td>
                 <Table.Td>
                   <Button
                     size="xs"
