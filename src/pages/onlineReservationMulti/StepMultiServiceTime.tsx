@@ -25,7 +25,10 @@ import {
   getAppointmentsByOrganizationId,
   Appointment,
 } from "../../services/appointmentService";
-import { generateAvailableTimes, findAvailableMultiServiceSlots } from "./bookingUtilsMulti";
+import {
+  generateAvailableTimes,
+  findAvailableMultiServiceSlots,
+} from "./bookingUtilsMulti";
 
 interface StepMultiServiceTimeProps {
   organizationId: string;
@@ -68,6 +71,31 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     (d, _i, arr) => d.date?.toDateString() !== arr[0].date?.toDateString()
   );
 
+  // 🔹 Seed inicial en modo split: copiar employeeId y date desde "dates"
+  useEffect(() => {
+    if (!splitDates) return;
+    const val = Array.isArray(value) ? (value as ServiceTimeSelection[]) : [];
+    const needsInit =
+      val.length !== selectedServices.length ||
+      selectedServices.some(
+        (s) => !val.find((v) => v.serviceId === s.serviceId)
+      );
+
+    if (needsInit) {
+      const seeded: ServiceTimeSelection[] = selectedServices.map((s) => {
+        const d = dates.find((x) => x.serviceId === s.serviceId);
+        return {
+          serviceId: s.serviceId,
+          employeeId: d?.employeeId ?? null,
+          date: d?.date ?? null, // 👈 incluye date
+          time: null,
+        };
+      });
+      onChange(seeded);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitDates, selectedServices, dates]);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -101,7 +129,6 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
           };
         });
 
-        // Esta función debe estar en bookingUtilsMulti.ts
         const bloques = findAvailableMultiServiceSlots(
           dates[0].date!,
           chainServices,
@@ -153,8 +180,14 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       setLoading(false);
     };
     load();
-    // eslint-disable-next-line
-  }, [dates, selectedServices, services, employees, organizationId]);
+  }, [
+    dates,
+    selectedServices,
+    services,
+    employees,
+    organizationId,
+    splitDates,
+  ]);
 
   // Handler para bloque único (todos el mismo día)
   const handleBlockSelect = (start: Date, intervals: any[]) => {
@@ -166,9 +199,23 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
   // Handler para selección de hora individual (días distintos)
   const handleTimeSelect = (serviceId: string, time: string) => {
-    const next = (value as ServiceTimeSelection[]).map((v) =>
-      v.serviceId === serviceId ? { ...v, time } : v
-    );
+    const current =
+      (Array.isArray(value) ? (value as ServiceTimeSelection[]) : []) || [];
+    const existing = current.find((v) => v.serviceId === serviceId);
+
+    const fromDates = dates.find((d) => d.serviceId === serviceId);
+    const empFromDates = fromDates?.employeeId ?? existing?.employeeId ?? null;
+    const dateFromDates = fromDates?.date ?? existing?.date ?? null;
+
+    const next: ServiceTimeSelection[] = [
+      ...current.filter((v) => v.serviceId !== serviceId),
+      {
+        serviceId,
+        time,
+        employeeId: empFromDates,
+        date: dateFromDates, // 👈 añade date para cumplir el tipo
+      },
+    ];
     onChange(next);
   };
 
@@ -205,10 +252,11 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                     style={{
                       cursor: "pointer",
                       background:
-                        value &&
+                        !Array.isArray(value) &&
+                        (value as MultiServiceBlockSelection)?.startTime &&
                         (
                           value as MultiServiceBlockSelection
-                        ).startTime?.toString() === block.start.toString()
+                        ).startTime!.getTime() === block.start.getTime()
                           ? "#e6f4ea"
                           : undefined,
                     }}
@@ -247,16 +295,30 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       {/* Servicios en días diferentes */}
       {splitDates &&
         serviceTimes.map((s) => {
-          const sel = (value as ServiceTimeSelection[]).find(
-            (v) => v.serviceId === s.serviceId
-          );
+          const arr = Array.isArray(value)
+            ? (value as ServiceTimeSelection[])
+            : [];
+          const sel = arr.find((v) => v.serviceId === s.serviceId);
+
           const service = services.find((sv) => sv._id === s.serviceId);
-          const emp = employees.find((e) => e._id === sel?.employeeId);
+
+          // Fallback: si el value no trae employeeId, uso el de "dates"
+          const fallbackEmpId =
+            dates.find((x) => x.serviceId === s.serviceId)?.employeeId ?? null;
+          const effectiveEmpId = sel?.employeeId ?? fallbackEmpId;
+          const emp = employees.find((e) => e._id === effectiveEmpId);
 
           return (
             <Paper key={s.serviceId} withBorder p="md" mt="sm">
               <Text fw={600}>
-                {service?.name} ({emp?.names ?? "Sin preferencia"})
+                {service?.name}
+                {" — "}
+                {sel?.date
+                  ? dayjs(sel.date).format("DD/MM/YYYY")
+                  : dayjs(
+                      dates.find((x) => x.serviceId === s.serviceId)?.date
+                    ).format("DD/MM/YYYY")}
+                {" — "}({emp?.names ?? "Sin preferencia"})
               </Text>
               {s.options.length === 0 ? (
                 <Text color="red" size="sm">
