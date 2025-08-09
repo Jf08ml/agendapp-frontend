@@ -19,7 +19,7 @@ export interface Reservation {
   status: "pending" | "approved" | "rejected";
 }
 
-interface CreateReservationPayload {
+export interface CreateReservationPayload {
   _id?: string;
   serviceId: Service | string;
   employeeId: Employee | string | null;
@@ -48,7 +48,7 @@ interface MultipleReservationServiceItem {
 }
 
 // Payload para el endpoint múltiple
-interface CreateMultipleReservationsPayload {
+export interface CreateMultipleReservationsPayload {
   services: MultipleReservationServiceItem[];
   startDate: Date | string; // hora inicial de la secuencia
   customerDetails: {

@@ -17,6 +17,7 @@ import Home from "../pages/Home";
 import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
+import MultiBookingWizard from "../pages/onlineReservationMulti";
 
 const generalRoutes = [
   {
@@ -54,6 +55,15 @@ const generalRoutes = [
   {
     path: "/online-reservation",
     component: Booking,
+    MediaMetadata: {
+      title: "Reserva en linea",
+      description: "Reserva con nosotros rápido y facíl.",
+    },
+  },
+
+    {
+    path: "/online-reservation-multi",
+    component: MultiBookingWizard,
     MediaMetadata: {
       title: "Reserva en linea",
       description: "Reserva con nosotros rápido y facíl.",
