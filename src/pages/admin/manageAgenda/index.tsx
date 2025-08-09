@@ -38,7 +38,7 @@ import {
   startOfMonth,
 } from "date-fns";
 import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
-import { BiPlus, BiSearch, BiSort } from "react-icons/bi";
+import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
 import { FaCheck } from "react-icons/fa";
 import { IoAlertCircleOutline } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
@@ -213,24 +213,26 @@ const ScheduleView: React.FC = () => {
     }
   };
 
-const fetchAppointmentsForDay = async (date: Date): Promise<Appointment[]> => {
-  try {
-    const start = startOfDay(date).toISOString();
-    const end = endOfDay(date).toISOString();
-    const response = await getAppointmentsByOrganizationId(
-      organizationId as string,
-      start,
-      end
-    );
+  const fetchAppointmentsForDay = async (
+    date: Date
+  ): Promise<Appointment[]> => {
+    try {
+      const start = startOfDay(date).toISOString();
+      const end = endOfDay(date).toISOString();
+      const response = await getAppointmentsByOrganizationId(
+        organizationId as string,
+        start,
+        end
+      );
 
-    return hasPermission("appointments:view_all")
-      ? response
-      : response.filter((a) => a.employee._id === userId);
-  } catch {
-    console.error("Error al obtener citas del día");
-    return []; // <- Siempre retorna un array
-  }
-};
+      return hasPermission("appointments:view_all")
+        ? response
+        : response.filter((a) => a.employee._id === userId);
+    } catch {
+      console.error("Error al obtener citas del día");
+      return []; // <- Siempre retorna un array
+    }
+  };
 
   /**
    * MANEJO DE SERVICIO
@@ -610,15 +612,15 @@ const fetchAppointmentsForDay = async (date: Date): Promise<Appointment[]> => {
           >
             Buscar Citas
           </Button>
-          {/* <Button
+          <Button
             size="xs"
             variant="filled"
             color="blue"
             leftSection={<BiRefresh size={16} />}
-            onClick={fetchAppointmentsForMonth}
+            onClick={() => fetchAppointmentsForMonth(currentDate)}
           >
-            Actualizar
-          </Button> */}
+            Recargar agenda
+          </Button>
           {hasPermission("appointments:create") && (
             <Button
               size="xs"

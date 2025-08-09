@@ -1,10 +1,45 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// bookingUtilsMulti.ts
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrBefore);
 
 import { Appointment } from "../../services/appointmentService";
 
-// Retorna las horas disponibles en formato "HH:mm A"
+// ---------- Helpers genéricos ----------
+
+export const TIME_FORMATS = ["h:mm A", "HH:mm", "HH:mm:ss", "h:mm:ss A"] as const;
+
+/** Normaliza un id que puede venir como string u objeto con _id */
+export function getId(val: unknown): string | undefined {
+  if (!val) return undefined;
+  if (typeof val === "string") return val;
+  if (typeof val === "object" && (val as any)._id) return String((val as any)._id);
+  return undefined;
+}
+
+/** Parsea hora en múltiples formatos y devuelve un dayjs con la fecha dada */
+export function buildStartFrom(dateVal: Date, timeStr: string) {
+  const t = String(timeStr).replace(/\s+/g, " ").trim();
+  const tNorm = t.replace(/(a\.?m\.?|p\.?m\.?)/i, (m) =>
+    m.toUpperCase().replace(/\./g, "").replace("AM", "AM").replace("PM", "PM")
+  );
+  const parsed = dayjs(tNorm, TIME_FORMATS as unknown as string[], true);
+  if (!parsed.isValid()) {
+    throw new Error(`Hora inválida: "${timeStr}"`);
+  }
+  return dayjs(dateVal)
+    .hour(parsed.hour())
+    .minute(parsed.minute())
+    .second(parsed.second() || 0)
+    .millisecond(0);
+}
+
+// ---------- Disponibilidades por servicio (días distintos) ----------
+
+/** Retorna horas disponibles en formato "h:mm A" */
 export function generateAvailableTimes(
   date: Date,
   duration: number,
@@ -21,22 +56,21 @@ export function generateAvailableTimes(
       const slotStart = day.hour(hour).minute(minute).second(0).millisecond(0);
       const slotEnd = slotStart.add(duration, "minute");
 
-      // El slot debe estar dentro del rango de trabajo
-      if (slotEnd.hour() > endHour || slotEnd.isAfter(day.endOf("day")))
-        continue;
+      if (slotEnd.hour() > endHour || slotEnd.isAfter(day.endOf("day"))) continue;
 
       const overlaps = appointments.some(
-        (a) =>
-          dayjs(a.startDate).isBefore(slotEnd) &&
-          dayjs(a.endDate).isAfter(slotStart)
+        (a) => dayjs(a.startDate).isBefore(slotEnd) && dayjs(a.endDate).isAfter(slotStart)
       );
       if (!overlaps) {
         times.push(slotStart.format("h:mm A"));
       }
     }
   }
+
   return times;
 }
+
+// ---------- Bloques encadenados (mismo día) ----------
 
 export interface ChainService {
   serviceId: string;
@@ -54,9 +88,7 @@ export interface MultiServiceSlot {
 }
 
 /**
- * Calcula los bloques encadenados de horarios donde pueden agendarse los servicios uno tras otro,
- * respetando la disponibilidad de cada empleado y la duración de cada servicio.
- * - Todos los servicios van el mismo día, encadenados en el orden recibido.
+ * Calcula bloques encadenados (mismo día, en orden).
  */
 export function findAvailableMultiServiceSlots(
   day: Date,
@@ -68,58 +100,37 @@ export function findAvailableMultiServiceSlots(
 ): MultiServiceSlot[] {
   if (!day || !services.length) return [];
 
-  // Define los límites del día de trabajo
-  const dayStart = dayjs(day)
-    .hour(workStartHour)
-    .minute(0)
-    .second(0)
-    .millisecond(0);
-  const dayEnd = dayjs(day)
-    .hour(workEndHour)
-    .minute(0)
-    .second(0)
-    .millisecond(0);
+  const dayStart = dayjs(day).hour(workStartHour).minute(0).second(0).millisecond(0);
+  const dayEnd = dayjs(day).hour(workEndHour).minute(0).second(0).millisecond(0);
 
-  // Calcula la duración total encadenada
   const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
 
   const blocks: MultiServiceSlot[] = [];
 
-  // Recorre cada posible inicio de bloque
-  for (
-    let t = dayStart.clone();
-    t.clone().add(totalDuration, "minute").isSameOrBefore(dayEnd);
-    t = t.add(stepMinutes, "minute")
-  ) {
+  for (let t = dayStart.clone(); t.clone().add(totalDuration, "minute").isSameOrBefore(dayEnd); t = t.add(stepMinutes, "minute")) {
     let isAvailable = true;
-    const times: {
-      employeeId: string | null;
-      from: Date;
-      to: Date;
-    }[] = [];
+    const times: { employeeId: string | null; from: Date; to: Date }[] = [];
 
     let slotStart = t.clone();
 
     for (const svc of services) {
       const slotEnd = slotStart.clone().add(svc.duration, "minute");
-      // Si algún servicio se pasa del fin de la jornada, termina el loop
       if (slotEnd.isAfter(dayEnd)) {
         isAvailable = false;
         break;
       }
-      // Si tiene empleado asignado, revisa solapamiento
+
       if (svc.employeeId) {
         const appts = appointmentsByEmp[svc.employeeId] ?? [];
         const overlap = appts.some(
-          (appt) =>
-            dayjs(appt.startDate).isBefore(slotEnd) &&
-            dayjs(appt.endDate).isAfter(slotStart)
+          (appt) => dayjs(appt.startDate).isBefore(slotEnd) && dayjs(appt.endDate).isAfter(slotStart)
         );
         if (overlap) {
           isAvailable = false;
           break;
         }
       }
+
       times.push({
         employeeId: svc.employeeId,
         from: slotStart.toDate(),
@@ -129,10 +140,7 @@ export function findAvailableMultiServiceSlots(
     }
 
     if (isAvailable) {
-      blocks.push({
-        start: t.toDate(),
-        times,
-      });
+      blocks.push({ start: t.toDate(), times });
     }
   }
 

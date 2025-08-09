@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// MultiBookingWizard.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
@@ -16,7 +15,21 @@ import {
 } from "../../types/multiBooking";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
-import { Loader, Stack, Stepper, Button, Group, Text } from "@mantine/core";
+import {
+  Stack,
+  Stepper,
+  Button,
+  Group,
+  Text,
+  Card,
+  Paper,
+  LoadingOverlay,
+  Title,
+  Badge,
+  Divider,
+  Center,
+} from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
   createReservation,
   createMultipleReservations,
@@ -25,13 +38,15 @@ import {
   type CreateReservationPayload,
 } from "../../services/reservationService";
 import dayjs from "dayjs";
+import { buildStartFrom, getId } from "./bookingUtilsMulti";
+import CustomLoader from "../../components/customLoader/CustomLoader";
 
 export default function MultiBookingWizard() {
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Paso actual
+  // Paso actual (0..4) + finish (5)
   const [currentStep, setCurrentStep] = useState(0);
 
   // Paso 1: selección servicios/empleados
@@ -50,7 +65,21 @@ export default function MultiBookingWizard() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // Datos para la pantalla de éxito
+  const [finishInfo, setFinishInfo] = useState<{
+    count: number;
+    customer: string;
+    dateText: string;
+  } | null>(null);
+
+  // Bloquea navegación/reenvíos tras terminar
+  const [completed, setCompleted] = useState(false);
+
   const organization = useSelector((state: RootState) => state.organization.organization);
+
+  // === Responsive helpers ===
+  const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
+  const contentTopRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!organization?._id) return;
@@ -76,6 +105,11 @@ export default function MultiBookingWizard() {
     setTimes([]);
   }, [dates]);
 
+  // Scroll al top al cambiar de paso
+  useEffect(() => {
+    contentTopRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [currentStep]);
+
   const splitDates = useMemo(
     () => dates.some((d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()),
     [dates]
@@ -95,16 +129,16 @@ export default function MultiBookingWizard() {
     if (!times) return false;
     if (Array.isArray(times)) {
       if (times.length !== selected.length) return false;
-      return times.every((t) => !!t.time);
-    } else {
-      return !!times.startTime && Array.isArray(times.intervals) && times.intervals.length > 0;
+      return times.every((t) => typeof t.time === "string" && t.time.trim().length > 0);
     }
+    return !!(times as MultiServiceBlockSelection).startTime &&
+      Array.isArray((times as MultiServiceBlockSelection).intervals) &&
+      (times as MultiServiceBlockSelection).intervals.length > 0;
   }, [times, selected.length]);
 
   const hasCustomerData =
     customerDetails.name.trim().length > 0 && customerDetails.phone.trim().length >= 7;
 
-  // 🚧 Guard temprano: si no hay organización, no seguimos (evita string | undefined)
   if (!organization?._id) {
     return (
       <Stack align="center" justify="center" style={{ minHeight: 220 }}>
@@ -112,19 +146,15 @@ export default function MultiBookingWizard() {
       </Stack>
     );
   }
-  // Desde aquí, orgId es string garantizado
   const orgId: string = organization._id;
 
-  // Payloads para reservas
-
-  // 👉 Bloque único (mismo día encadenado): usa /multi
+  // Payloads
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
     const block = times as MultiServiceBlockSelection;
     return {
       services: block.intervals.map((iv) => ({
         serviceId: iv.serviceId,
         employeeId: iv.employeeId ?? null,
-        // duration opcional; el backend puede resolverla
       })),
       startDate: block.startTime ?? block.intervals[0].from,
       customerDetails,
@@ -132,24 +162,24 @@ export default function MultiBookingWizard() {
     } satisfies CreateMultipleReservationsPayload;
   };
 
-  // 👉 Split (fechas distintas): N llamadas a /reservations
   const buildSingles = (): CreateReservationPayload[] => {
     const arr = times as ServiceTimeSelection[];
-    return arr.map((t) => {
-      const d = dates.find((x) => x.serviceId === t.serviceId)!;
-      const svc = services.find((s) => s._id === t.serviceId)!;
 
-      const baseTime = dayjs(t.time!, "h:mm A");
-      const start = dayjs(d.date!)
-        .hour(baseTime.hour())
-        .minute(baseTime.minute())
-        .second(0)
-        .millisecond(0);
+    return arr.map((t) => {
+      const sid = getId(t.serviceId) ?? (t as any).serviceId; // id seguro
+      // Busca la fecha por id normalizado
+      const d = dates.find((x) => (getId(x.serviceId) ?? (x as any).serviceId) === sid);
+      const svc = services.find((s) => s._id === sid);
+
+      if (!d?.date) throw new Error(`Falta fecha para el servicio "${svc?.name ?? sid}"`);
+      if (!t.time) throw new Error(`Falta hora para el servicio "${svc?.name ?? sid}"`);
+
+      const start = buildStartFrom(d.date, t.time);
 
       return {
-        serviceId: svc._id,
+        serviceId: sid,
         employeeId: d.employeeId ?? null,
-        startDate: start.toDate(),
+        startDate: start.toISOString(), // ISO para evitar problemas de TZ/serialización
         customerDetails,
         organizationId: orgId,
         status: "pending",
@@ -158,67 +188,101 @@ export default function MultiBookingWizard() {
   };
 
   const handleSchedule = async () => {
+    if (completed || submitting) return; // evita doble envío post-finish
     try {
       setSubmitting(true);
 
       if (!hasCustomerData) {
-        // Obligar a completar datos
         setCurrentStep(3);
         return;
       }
 
+      let count = 0;
+      let firstDateText = "";
+
       if (!splitDates) {
         const payload = buildMultiplePayload();
         await createMultipleReservations(payload);
+        count = (times as MultiServiceBlockSelection).intervals.length;
+        const start =
+          (times as MultiServiceBlockSelection).startTime ??
+          (times as MultiServiceBlockSelection).intervals[0]?.from;
+        if (start) firstDateText = dayjs(start).format("DD/MM/YYYY HH:mm");
       } else {
         const singles = buildSingles();
         for (const p of singles) {
           await createReservation(p);
         }
+        count = singles.length;
+        firstDateText = dayjs(singles[0].startDate).format("DD/MM/YYYY HH:mm");
       }
 
-      // Reset tras éxito
-      setSelected([]);
-      setDates([]);
-      setTimes([]);
-      setCustomerDetails({ name: "", email: "", phone: "", birthDate: null });
-      setCurrentStep(0);
-      // Aquí puedes disparar tu notificación de éxito
+      setFinishInfo({
+        count,
+        customer: customerDetails.name || "Cliente",
+        dateText: firstDateText,
+      });
+
+      setCompleted(true);
+      setCurrentStep(5); // Paso “Finish”
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleNewBooking = () => {
+    setSelected([]);
+    setDates([]);
+    setTimes([]);
+    setCustomerDetails({ name: "", email: "", phone: "", birthDate: null });
+    setFinishInfo(null);
+    setCompleted(false);
+    setCurrentStep(0);
+  };
+
   if (loading) {
     return (
-      <Stack align="center" justify="center" style={{ minHeight: 220 }}>
-        <Loader size="lg" />
-      </Stack>
+      <CustomLoader loadingText="Cargando servicios y empleados"/>
     );
   }
 
-  return (
-    <Stack>
-      <Stepper active={currentStep} onStepClick={setCurrentStep}>
-        <Stepper.Step label="Servicios y Empleados">
+  const NextBtn = (props: any) => <Button fullWidth={isMobile} {...props} />;
+  const BackBtn = (props: any) => <Button variant="default" fullWidth={isMobile} {...props} />;
+
+  // ======= Header y contenido compactos en móvil =======
+  const steps = [
+    { key: 0, label: "Servicios y Empleados" },
+    { key: 1, label: "Fechas" },
+    { key: 2, label: "Horarios" },
+    { key: 3, label: "Tus datos" },
+    { key: 4, label: "Resumen" },
+    { key: 5, label: "Finish" },
+  ];
+  const totalSteps = 5; // 0..4 son pasos, el 5 es Completed
+  const progressValue = Math.min((currentStep / totalSteps) * 100, 100);
+
+  function renderStepContent(step: number) {
+    switch (step) {
+      case 0:
+        return (
           <StepMultiServiceEmployee
             services={services}
             employees={employees}
             value={selected}
             onChange={setSelected}
           />
-        </Stepper.Step>
-
-        <Stepper.Step label="Fechas">
+        );
+      case 1:
+        return (
           <StepMultiServiceDate
             selectedServices={selected}
             services={services}
             value={dates}
             onChange={setDates}
           />
-        </Stepper.Step>
-
-        <Stepper.Step label="Horarios">
+        );
+      case 2:
+        return (
           <StepMultiServiceTime
             organizationId={orgId}
             selectedServices={selected}
@@ -228,31 +292,22 @@ export default function MultiBookingWizard() {
             value={times}
             onChange={setTimes}
           />
-        </Stepper.Step>
-
-        {/* Paso de datos del cliente */}
-        <Stepper.Step label="Tus datos">
+        );
+      case 3:
+        return (
           <StepCustomerData
-            bookingData={{
-              customerDetails,
-              organizationId: orgId,
-            } as Partial<Reservation>}
+            bookingData={{ customerDetails, organizationId: orgId } as Partial<Reservation>}
             setBookingData={(updater) => {
-              const base: Partial<Reservation> = {
-                customerDetails,
-                organizationId: orgId,
-              };
-              const next =
-                typeof updater === "function" ? (updater as any)(base) : updater;
+              const base: Partial<Reservation> = { customerDetails, organizationId: orgId };
+              const next = typeof updater === "function" ? (updater as any)(base) : updater;
               if (next?.customerDetails) {
                 setCustomerDetails(next.customerDetails as typeof customerDetails);
               }
             }}
           />
-        </Stepper.Step>
-
-        {/* Resumen */}
-        <Stepper.Step label="Resumen">
+        );
+      case 4:
+        return (
           <StepMultiServiceSummary
             splitDates={splitDates}
             services={services}
@@ -260,46 +315,192 @@ export default function MultiBookingWizard() {
             dates={dates}
             times={times}
           />
-        </Stepper.Step>
-      </Stepper>
+        );
+      default:
+        return null;
+    }
+  }
 
-      <Group justify="flex-end">
-        {currentStep > 0 && (
-          <Button variant="default" onClick={() => setCurrentStep((s) => s - 1)}>
-            Atrás
-          </Button>
+  return (
+    <Card withBorder radius="md" p={isMobile ? "md" : "xl"} style={{ position: "relative" }}>
+      <LoadingOverlay visible={submitting} zIndex={1000} />
+      <div ref={contentTopRef} />
+
+      <Stack gap={isMobile ? "md" : "xl"}>
+        {/* ======= HEADER / STEPPER ======= */}
+        {!isMobile ? (
+          // Desktop: Stepper compacto (sin contenido dentro)
+          <Stepper
+            active={currentStep}
+            onStepClick={(i) => {
+              if (completed) return;
+              setCurrentStep(i);
+            }}
+            orientation="horizontal"
+            size="sm"
+            iconSize={26}
+            allowNextStepsSelect={false}
+          >
+            {steps.slice(0, 5).map((s) => (
+              <Stepper.Step key={s.key} label={s.label} />
+            ))}
+            <Stepper.Completed>Finish</Stepper.Completed>
+          </Stepper>
+        ) : (
+          // Mobile: Header compacto con barra de progreso
+          <Paper
+            withBorder
+            p="sm"
+            radius="md"
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 9,
+              background: "var(--mantine-color-body)",
+            }}
+          >
+            <Group justify="space-between" align="center">
+              <Text size="sm" fw={600}>
+                {currentStep < 5 ? steps[currentStep].label : "¡Completado!"}
+              </Text>
+              <Text size="xs" c="dimmed">
+                Paso {Math.min(currentStep + 1, 5)} de 5
+              </Text>
+            </Group>
+            <Divider my={6} />
+            <div
+              style={{
+                height: 6,
+                borderRadius: 9999,
+                overflow: "hidden",
+                background: "var(--mantine-color-gray-2)",
+              }}
+            >
+              <div
+                style={{
+                  width: `${progressValue}%`,
+                  height: "100%",
+                  background: "var(--mantine-color-green-6)",
+                  transition: "width 160ms ease",
+                }}
+              />
+            </div>
+          </Paper>
         )}
 
-        {currentStep === 0 && (
-          <Button disabled={!canGoNextFromStep0} onClick={() => setCurrentStep(1)}>
-            Siguiente
-          </Button>
+        {/* ======= STEP CONTENT ======= */}
+        {currentStep < 5 ? (
+          <Stack gap={isMobile ? "md" : "xl"}>{renderStepContent(currentStep)}</Stack>
+        ) : (
+          // Finish
+          <Stack>
+            <Center mb="sm">
+              <Badge color="green" size="lg" radius="md" variant="filled">
+                ¡Reservas creadas!
+              </Badge>
+            </Center>
+            <Title order={3} ta="center" mb="xs">
+              Todo listo, {finishInfo?.customer ?? "Cliente"} 🎉
+            </Title>
+            <Text ta="center" c="dimmed" mb="md">
+              {finishInfo?.count ?? 0} {finishInfo?.count === 1 ? "reserva" : "reservas"} programada
+              {finishInfo && finishInfo.count !== 1 ? "s" : ""} desde {finishInfo?.dateText ?? "—"}.
+            </Text>
+            <Divider my="md" />
+            <Group justify={isMobile ? "stretch" : "center"} gap="sm" wrap="wrap" mt="md">
+              <Button fullWidth={isMobile} onClick={handleNewBooking}>
+                Nueva reserva
+              </Button>
+            </Group>
+          </Stack>
         )}
 
-        {currentStep === 1 && (
-          <Button disabled={!canGoNextFromStep1} onClick={() => setCurrentStep(2)}>
-            Siguiente
-          </Button>
+        {/* Acciones desktop */}
+        {!isMobile && currentStep < 5 && !completed && (
+          <Group justify="flex-end" wrap="wrap" gap="sm">
+            {currentStep > 0 && <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>Atrás</BackBtn>}
+
+            {currentStep === 0 && (
+              <NextBtn disabled={!canGoNextFromStep0} onClick={() => setCurrentStep(1)}>
+                Siguiente
+              </NextBtn>
+            )}
+
+            {currentStep === 1 && (
+              <NextBtn disabled={!canGoNextFromStep1} onClick={() => setCurrentStep(2)}>
+                Siguiente
+              </NextBtn>
+            )}
+
+            {currentStep === 2 && (
+              <NextBtn disabled={!hasChosenTimes} onClick={() => setCurrentStep(3)}>
+                Continuar
+              </NextBtn>
+            )}
+
+            {currentStep === 3 && (
+              <NextBtn disabled={!hasCustomerData} onClick={() => setCurrentStep(4)}>
+                Continuar
+              </NextBtn>
+            )}
+
+            {currentStep === 4 && (
+              <Button loading={submitting} onClick={handleSchedule}>
+                Reservar
+              </Button>
+            )}
+          </Group>
         )}
 
-        {currentStep === 2 && (
-          <Button disabled={!hasChosenTimes} onClick={() => setCurrentStep(3)}>
-            Continuar
-          </Button>
-        )}
+        {/* Acciones mobile sticky */}
+        {isMobile && currentStep < 5 && !completed && (
+          <Paper
+            withBorder
+            radius="md"
+            p="sm"
+            style={{
+              position: "sticky",
+              bottom: 0,
+              zIndex: 10,
+              background: "var(--mantine-color-body)",
+            }}
+          >
+            <Stack gap="sm">
+              {currentStep > 0 && <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>Atrás</BackBtn>}
 
-        {currentStep === 3 && (
-          <Button disabled={!hasCustomerData} onClick={() => setCurrentStep(4)}>
-            Continuar
-          </Button>
-        )}
+              {currentStep === 0 && (
+                <NextBtn disabled={!canGoNextFromStep0} onClick={() => setCurrentStep(1)}>
+                  Siguiente
+                </NextBtn>
+              )}
 
-        {currentStep === 4 && (
-          <Button loading={submitting} onClick={handleSchedule}>
-            Agendar
-          </Button>
+              {currentStep === 1 && (
+                <NextBtn disabled={!canGoNextFromStep1} onClick={() => setCurrentStep(2)}>
+                  Siguiente
+                </NextBtn>
+              )}
+
+              {currentStep === 2 && (
+                <NextBtn disabled={!hasChosenTimes} onClick={() => setCurrentStep(3)}>
+                  Continuar
+                </NextBtn>
+              )}
+
+              {currentStep === 3 && (
+                <NextBtn disabled={!hasCustomerData} onClick={() => setCurrentStep(4)}>
+                  Continuar
+                </NextBtn>
+              )}
+
+              {currentStep === 4 && (
+                <Button fullWidth loading={submitting} onClick={handleSchedule}>
+                  Reservar
+                </Button>
+              )}
+            </Stack>
+          </Paper>
         )}
-      </Group>
-    </Stack>
+      </Stack>
+    </Card>
   );
 }

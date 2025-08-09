@@ -11,7 +11,7 @@ import AdminEmployees from "../pages/admin/manageEmployees";
 import OrganizationInfo from "../pages/account/OrganizationInfo";
 import EmployeeInfo from "../pages/account/EmployeeInfo";
 import DailyCashbox from "../pages/account/DailyCashbox";
-import Booking from "../pages/onlineReservation/Booking";
+// import Booking from "../pages/onlineReservation/Booking";
 import ReservationsList from "../pages/admin/manageReservation";
 import Home from "../pages/Home";
 import Location from "../pages/location/location";
@@ -52,17 +52,17 @@ const generalRoutes = [
       description: "Consulta nuestros servicios y precios en Galaxia Glamour.",
     },
   },
-  {
-    path: "/online-reservation",
-    component: Booking,
-    MediaMetadata: {
-      title: "Reserva en linea",
-      description: "Reserva con nosotros rápido y facíl.",
-    },
-  },
+  // {
+  //   path: "/online-reservation",
+  //   component: Booking,
+  //   MediaMetadata: {
+  //     title: "Reserva en linea",
+  //     description: "Reserva con nosotros rápido y facíl.",
+  //   },
+  // },
 
     {
-    path: "/online-reservation-multi",
+    path: "/online-reservation",
     component: MultiBookingWizard,
     MediaMetadata: {
       title: "Reserva en linea",
