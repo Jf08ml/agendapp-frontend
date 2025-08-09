@@ -166,6 +166,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
             placeholder="Selecciona una fecha"
             maxDate={new Date()}
             clearable
+            popoverProps={{ zIndex: 2000 }}
           />
         </Group>
 
