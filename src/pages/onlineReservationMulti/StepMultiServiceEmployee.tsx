@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { MultiSelect, Select, Stack, Group, Text, Paper } from "@mantine/core";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
@@ -5,7 +6,7 @@ import { SelectedService } from "../../types/multiBooking";
 
 interface StepMultiServiceEmployeeProps {
   services: Service[];
-  employees: Employee[];
+  employees: Employee[]; // Employee debe tener isActive: boolean
   value: SelectedService[];
   onChange: (selected: SelectedService[]) => void;
 }
@@ -16,9 +17,11 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
   value,
   onChange,
 }) => {
+  // Solo empleados activos
+  const activeEmployees = employees.filter((e) => e.isActive);
+
   // Selección de servicios
   const handleServicesChange = (serviceIds: string[]) => {
-    // Mantiene la selección de empleado si ya estaba elegida para ese servicio
     onChange(
       serviceIds.map((id) => {
         const prev = value.find((s) => s.serviceId === id);
@@ -30,9 +33,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
   // Selección de empleado
   const handleEmployeeChange = (serviceId: string, employeeId: string | null) => {
     onChange(
-      value.map((s) =>
-        s.serviceId === serviceId ? { ...s, employeeId } : s
-      )
+      value.map((s) => (s.serviceId === serviceId ? { ...s, employeeId } : s))
     );
   };
 
@@ -51,19 +52,25 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
 
       {value.map((sel) => {
         const service = services.find((s) => s._id === sel.serviceId);
-        const empleadosServicio = employees.filter((e) =>
-          (e.services || []).some((svc) => svc._id === sel.serviceId)
-        );
+
+        // Empleados activos que prestan este servicio
+        const empleadosServicio = activeEmployees.filter((e) => {
+          const svcIds = (e.services || []).map((svc: any) =>
+            typeof svc === "string" ? svc : svc._id
+          );
+          return svcIds.includes(sel.serviceId);
+        });
 
         return (
           <Paper key={sel.serviceId} p="md" radius="md" withBorder mt="sm">
             <Group justify="space-between" align="center">
               <Text fw={600}>
                 {service?.name}{" "}
-                <Text span color="dimmed" size="sm">
+                <Text span c="dimmed" size="sm">
                   ({service?.duration} min)
                 </Text>
               </Text>
+
               <Select
                 label="Empleado"
                 placeholder="Sin preferencia"
@@ -75,9 +82,12 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
                   })),
                 ]}
                 value={sel.employeeId || "none"}
-                onChange={(v) => handleEmployeeChange(sel.serviceId, v === "none" ? null : v)}
+                onChange={(v) =>
+                  handleEmployeeChange(sel.serviceId, v === "none" ? null : v)
+                }
                 searchable
-                style={{ width: 220 }}
+                style={{ width: 240 }}
+                nothingFoundMessage="Sin empleados activos para este servicio"
               />
             </Group>
           </Paper>
