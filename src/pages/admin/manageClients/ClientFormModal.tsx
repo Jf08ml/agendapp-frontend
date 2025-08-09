@@ -126,6 +126,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       title={client ? "Editar cliente" : "Crear cliente"}
       centered
       radius="md"
+      zIndex={999}
     >
       <Box>
         <Group grow align="flex-start">
