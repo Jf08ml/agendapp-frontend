@@ -11,6 +11,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import CustomLoader from "../components/customLoader/CustomLoader";
+import { IoAnalytics } from "react-icons/io5";
 
 interface NavbarLinksProps {
   closeNavbar: () => void;
@@ -227,6 +228,20 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
                 <FaWhatsapp size={20} color="white" />
                 <Text c="white" fw={600} my="md">
                   Gestionar Whatsapp
+                </Text>
+              </Flex>
+            </NavLink>
+          )}
+          {hasPermission("analytics:read") && (
+            <NavLink
+              to="/analytics-dashboard"
+              onClick={closeNavbar}
+              style={{ textDecoration: "none" }}
+            >
+              <Flex align="center" justify="center" gap="sm">
+                <IoAnalytics size={20} color="white" />
+                <Text c="white" fw={600} my="md">
+                  Analiticas del negocio
                 </Text>
               </Flex>
             </NavLink>

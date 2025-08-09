@@ -18,6 +18,7 @@ import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
+import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 
 const generalRoutes = [
   {
@@ -179,6 +180,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
+    },
+  },
+    {
+    path: "/analytics-dashboard",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <AdminAnalyticsDashboard {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Analiticas del negocio",
+      description: "Ve analiticas del negocio",
     },
   },
 
