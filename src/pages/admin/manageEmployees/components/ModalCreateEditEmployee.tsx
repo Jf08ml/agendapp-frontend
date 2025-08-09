@@ -19,7 +19,7 @@ import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
 
 import { ColorInput } from "@mantine/core"; // <--- Agrega esta importación
 
-import { uploadImage } from "../../../../services/imageService"; 
+import { uploadImage } from "../../../../services/imageService";
 import { Employee } from "../../../../services/employeeService";
 import { Service } from "../../../../services/serviceService";
 
@@ -57,8 +57,8 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     color: "", // <--- Aseguramos el campo color
   });
 
-  const [showPassword, setShowPassword] = useState(false); 
-  const [isUploading, setIsUploading] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (employee) {
@@ -92,7 +92,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
   };
 
   const handleDrop = async (files: File[]) => {
-    setIsUploading(true); 
+    setIsUploading(true);
     try {
       const imageUrl = await uploadImage(files[0]);
       setEditingEmployee({
@@ -102,7 +102,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     } catch (error) {
       console.error("Error al cargar la imagen:", error);
     } finally {
-      setIsUploading(false); 
+      setIsUploading(false);
     }
   };
 
@@ -136,6 +136,12 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     });
   };
 
+  const canSave =
+    editingEmployee.names.trim().length > 1 &&
+    editingEmployee.position.trim().length > 0 &&
+    editingEmployee.phoneNumber.trim().length > 5 &&
+    editingEmployee.email.trim().length > 3;
+
   return (
     <Modal
       opened={isOpen}
@@ -147,6 +153,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
       <Stack gap="xs">
         <TextInput
           label="Nombre completo"
+          withAsterisk
           value={editingEmployee.names}
           onChange={(e) =>
             setEditingEmployee({
@@ -158,6 +165,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
 
         <TextInput
           label="Posición"
+          withAsterisk
           value={editingEmployee.position}
           onChange={(e) =>
             setEditingEmployee({
@@ -169,6 +177,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
 
         <TextInput
           label="Número de teléfono"
+          withAsterisk
           value={editingEmployee.phoneNumber}
           onChange={(e) =>
             setEditingEmployee({
@@ -180,6 +189,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
 
         <MultiSelect
           label="Servicios"
+          withAsterisk
           placeholder="Selecciona los servicios"
           data={services.map((service) => ({
             value: service._id,
@@ -201,6 +211,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
 
         <TextInput
           label="Correo electrónico"
+          withAsterisk
           type="email"
           value={editingEmployee.email}
           onChange={(e) =>
@@ -213,6 +224,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
 
         <TextInput
           label="Contraseña"
+          withAsterisk
           type={showPassword ? "text" : "password"}
           value={editingEmployee.password}
           onChange={(e) =>
@@ -241,7 +253,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
               color: newColor,
             });
           }}
-          format="hex"    // Podrías usar 'rgba', 'hsl', etc.
+          format="hex" // Podrías usar 'rgba', 'hsl', etc.
           withPicker
           swatches={[
             "#FFB6C1",
@@ -311,7 +323,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         )}
 
         <Flex justify="end">
-          <Button onClick={handleSave} disabled={isUploading}>
+          <Button onClick={handleSave} disabled={isUploading || !canSave}>
             {employee ? "Guardar Cambios" : "Agregar Empleado"}
           </Button>
         </Flex>

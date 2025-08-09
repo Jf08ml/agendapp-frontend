@@ -1,25 +1,34 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Title,
   Card,
   Group,
-  Divider,
-  Flex,
   Button,
   Text,
   ActionIcon,
   Image,
   Grid,
   TextInput,
+  Badge,
+  Menu,
+  Tooltip,
+  SegmentedControl,
+  Select,
+  Skeleton,
+  AspectRatio,
+  rem,
+  Center,
+  Stack,
 } from "@mantine/core";
+import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import {
   BsTrash,
   BsPencil,
   BsSearch,
-  BsToggleOn,
-  BsToggleOff,
+  BsThreeDotsVertical,
 } from "react-icons/bs";
 import { showNotification } from "@mantine/notifications";
 import {
@@ -33,36 +42,33 @@ import ModalCreateEdit from "./components/ModalCreateEdit";
 import { uploadImage } from "../../../services/imageService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import CustomLoader from "../../../components/customLoader/CustomLoader";
+import { modals } from "@mantine/modals";
 
 const AdminServices: React.FC = () => {
+  const isMobile = useMediaQuery("(max-width: 48rem)");
   const [services, setServices] = useState<Service[]>([]);
-  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch] = useDebouncedValue(searchTerm, 250);
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"alpha" | "price" | "duration">("alpha");
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [isInitialLoadingExec, setIsInitialLoadingExec] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [, setLoading] = useState(false);
 
-  const organizationId = useSelector(
-    (state: RootState) => state.auth.organizationId
-  );
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
   useEffect(() => {
+    if (!organizationId) return;
     loadServices();
   }, [organizationId]);
 
-  useEffect(() => {
-    filterServices();
-  }, [searchTerm, services]);
-
   const loadServices = async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
-      if (!organizationId) {
-        throw new Error("Organization ID is required");
-      }
-      const servicesData = await getServicesByOrganizationId(organizationId);
+      const servicesData = await getServicesByOrganizationId(organizationId!);
       setServices(servicesData);
     } catch (error) {
       console.error(error);
@@ -70,83 +76,88 @@ const AdminServices: React.FC = () => {
         title: "Error",
         message: "Error al cargar los servicios",
         color: "red",
-        autoClose: 2000,
-        position: "top-right",
       });
     } finally {
-      setIsLoading(false);
-      setIsInitialLoadingExec(true);
+      setLoading(false);
+      setInitialLoaded(true);
     }
   };
 
-  const filterServices = () => {
-    const filtered = services.filter(
-      (service) =>
-        service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        service.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (service.description &&
-          service.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-    setFilteredServices(
-      filtered.sort((a, b) => Number(b.isActive) - Number(a.isActive))
-    );
-  };
+  // Options
+  const allTypes = useMemo(
+    () => Array.from(new Set(services.map((s) => s.type).filter(Boolean))).sort(),
+    [services]
+  );
+
+  // Compute filtered/sorted
+  const filtered = useMemo(() => {
+    let data = [...services];
+
+    // text
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
+      data = data.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.type.toLowerCase().includes(q) ||
+          (s.description?.toLowerCase() ?? "").includes(q)
+      );
+    }
+
+    // status
+    if (status !== "all") {
+      data = data.filter((s) => (status === "active" ? s.isActive : !s.isActive));
+    }
+
+    // type
+    if (typeFilter && typeFilter !== "__all__") {
+      data = data.filter((s) => s.type === typeFilter);
+    }
+
+    // sort
+    data.sort((a, b) => {
+      if (sortBy === "alpha") return a.name.localeCompare(b.name, "es");
+      if (sortBy === "price") return (b.price ?? 0) - (a.price ?? 0);
+      return (b.duration ?? 0) - (a.duration ?? 0);
+    });
+
+    return data;
+  }, [services, debouncedSearch, status, typeFilter, sortBy]);
 
   const handleSaveService = async (service: Service) => {
     try {
-      let updatedServices;
-
+      let updatedServices: (Service | undefined)[] = [];
       service.images = service.images || [];
 
-      const filesToUpload = service.images.filter((image) => image) as (
-        | File
-        | string
-      )[];
-
+      // Subir archivos nuevos (los File)
+      const filesToUpload = service.images.filter((img) => img && typeof img !== "string") as unknown as File[];
+      let uploadedUrls: (string | undefined)[] = [];
       if (filesToUpload.length > 0) {
-        const uploadPromises = filesToUpload.map((file) =>
-          uploadImage(file as File)
-        );
-        const uploadedUrls = await Promise.all(uploadPromises);
-
-        const validUploadedUrls = uploadedUrls.filter(
-          (url): url is string => url !== undefined
-        );
-
-        service.images = [
-          ...service.images.filter((image) => typeof image === "string"),
-          ...validUploadedUrls,
-        ];
+        uploadedUrls = await Promise.all(filesToUpload.map((f) => uploadImage(f)));
       }
+      const validUploaded = uploadedUrls.filter(Boolean) as string[];
+
+      const finalImages = [
+        ...service.images.filter((img): img is string => typeof img === "string"),
+        ...validUploaded,
+      ];
 
       if (service._id) {
-        const updatedService = await updateService(service._id, {
+        const updated = await updateService(service._id, {
           ...service,
-          images: service.images?.filter(
-            (image): image is string => typeof image === "string"
-          ),
+          images: finalImages,
         });
-        updatedServices = services.map((s) =>
-          s._id === service._id ? updatedService : s
-        );
+        updatedServices = services.map((s) => (s._id === service._id ? updated : s));
       } else {
-        const newService = {
+        const created = await createService({
           ...service,
-          images: service.images?.filter(
-            (image): image is string => typeof image === "string"
-          ),
-          organizationId: organizationId,
-        };
-        const createdService = await createService(newService);
-        updatedServices = [...services, createdService];
+          images: finalImages,
+          organizationId,
+        } as any);
+        updatedServices = [...services, created];
       }
 
-      setServices(
-        updatedServices.filter(
-          (service): service is Service => service !== undefined
-        )
-      );
-
+      setServices(updatedServices.filter(Boolean) as Service[]);
       setIsModalOpen(false);
       setEditingService(null);
 
@@ -154,8 +165,6 @@ const AdminServices: React.FC = () => {
         title: service._id ? "Servicio actualizado" : "Servicio agregado",
         message: "El servicio ha sido guardado correctamente",
         color: "green",
-        autoClose: 2000,
-        position: "top-right",
       });
     } catch (error) {
       console.error(error);
@@ -163,201 +172,230 @@ const AdminServices: React.FC = () => {
         title: "Error",
         message: "Error al guardar el servicio",
         color: "red",
-        autoClose: 2000,
-        position: "top-right",
       });
     }
+  };
+
+  const confirmDelete = (serviceId: string, index: number) => {
+    modals.openConfirmModal({
+      title: "Eliminar servicio",
+      children: <Text size="sm">¿Seguro que deseas eliminar este servicio? Esta acción no se puede deshacer.</Text>,
+      labels: { confirm: "Eliminar", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
+      onConfirm: () => handleDeleteService(serviceId, index),
+    });
   };
 
   const handleDeleteService = async (serviceId: string, index: number) => {
     try {
       await deleteService(serviceId);
-      const updatedServices = services.filter((_, i) => i !== index);
-      setServices(updatedServices);
-      showNotification({
-        title: "Servicio eliminado",
-        message: "El servicio ha sido eliminado correctamente",
-        color: "green",
-        autoClose: 2000,
-        position: "top-right",
-      });
+      setServices((prev) => prev.filter((_, i) => i !== index));
+      showNotification({ title: "Servicio eliminado", message: "Se eliminó correctamente", color: "green" });
     } catch (error) {
       console.error(error);
-      showNotification({
-        title: "Error",
-        message: "Error al eliminar el servicio",
-        color: "red",
-        autoClose: 2000,
-        position: "top-right",
-      });
+      showNotification({ title: "Error", message: "No se pudo eliminar el servicio", color: "red" });
     }
   };
 
-  const onCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingService(null);
-  };
-
-  const handleToggleServiceStatus = async (serviceId: string) => {
+  const toggleStatus = async (serviceId: string) => {
     try {
-      const service = services.find((s) => s._id === serviceId);
-      if (!service) {
-        throw new Error("Service not found");
-      }
-      await updateService(serviceId, {
-        ...service,
-        images: service.images?.filter(
-          (image): image is string => typeof image === "string"
-        ),
-        isActive: !service.isActive,
+      const current = services.find((s) => s._id === serviceId);
+      if (!current) return;
+      const updated = await updateService(serviceId, {
+        ...current,
+        images: current.images?.filter((img): img is string => typeof img === "string"),
+        isActive: !current.isActive,
       });
-      loadServices();
-      showNotification({
-        title: "Estado actualizado",
-        message: "El estado del servicio ha sido actualizado correctamente",
-        color: "green",
-        autoClose: 2000,
-        position: "top-right",
-      });
+      setServices((prev) => prev.map((s) => (s._id === serviceId ? (updated as Service) : s)));
+      showNotification({ title: "Estado actualizado", message: "Cambio aplicado", color: "green" });
     } catch (error) {
       console.error(error);
-      showNotification({
-        title: "Error",
-        message: "Error al actualizar el estado del servicio",
-        color: "red",
-        autoClose: 2000,
-        position: "top-right",
-      });
+      showNotification({ title: "Error", message: "No se pudo actualizar el estado", color: "red" });
     }
   };
 
-  const allTypes = Array.from(
-    new Set(services.map((s) => s.type).filter(Boolean))
-  );
+  const Toolbar = (
+    <Card withBorder radius="md" p="md" mb="md">
+      <Group justify="space-between" align="end" wrap="wrap" gap="sm">
+        <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
 
-  if (isLoading && !isInitialLoadingExec) {
-    return <CustomLoader />;
-  }
+        <Group wrap="wrap" gap="sm" align="end">
+          <TextInput
+            leftSection={<BsSearch />}
+            placeholder="Buscar por nombre, tipo o descripción…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.currentTarget.value)}
+            w={isMobile ? "100%" : 280}
+          />
+
+          <Select
+            label="Tipo"
+            data={[{ value: "__all__", label: "Todos" }, ...allTypes.map((t) => ({ value: t, label: t }))]}
+            value={typeFilter ?? "__all__"}
+            onChange={(v) => setTypeFilter(v ?? "__all__")}
+            clearable={false}
+            w={isMobile ? "48%" : 180}
+          />
+
+          <SegmentedControl
+            value={status}
+            onChange={(v: any) => setStatus(v)}
+            data={[
+              { label: "Todos", value: "all" },
+              { label: "Activos", value: "active" },
+              { label: "Inactivos", value: "inactive" },
+            ]}
+            size={isMobile ? "xs" : "sm"}
+          />
+
+          <Select
+            label="Ordenar por"
+            data={[
+              { value: "alpha", label: "Nombre (A–Z)" },
+              { value: "price", label: "Precio (desc)" },
+              { value: "duration", label: "Duración (desc)" },
+            ]}
+            value={sortBy}
+            onChange={(v) => setSortBy((v as any) ?? "alpha")}
+            w={isMobile ? "48%" : 180}
+          />
+
+          <Button onClick={() => { setIsModalOpen(true); setEditingService(null); }}>
+            Agregar servicio
+          </Button>
+        </Group>
+      </Group>
+    </Card>
+  );
 
   return (
     <Box>
-      <Group justify="space-between" mt="xl">
-        <Title order={1}>Administrar Servicios</Title>
-
-        <Button
-          onClick={() => {
-            setIsModalOpen(true);
-            setEditingService(null);
-          }}
-        >
-          Agregar Nuevo Servicio
-        </Button>
-      </Group>
-
-      <Divider my="md" />
-
-      <TextInput
-        leftSection={<BsSearch />}
-        placeholder="Buscar servicio..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.currentTarget.value)}
-        mb="md"
-      />
+      {Toolbar}
 
       <ModalCreateEdit
         isOpen={isModalOpen}
-        onClose={onCloseModal}
+        onClose={() => { setIsModalOpen(false); setEditingService(null); }}
         service={editingService}
         onSave={handleSaveService}
         allTypes={allTypes}
       />
 
-      <Grid>
-        {filteredServices.map((service, index) => (
-          <Grid.Col span={{ base: 12, xs: 6, md: 6, lg: 3 }} key={service._id}>
-            <Card
-              shadow="md"
-              radius="md"
-              withBorder
-              style={{
-                position: "relative",
-                opacity: service.isActive ? 1 : 0.5,
-              }}
-            >
-              {service.images &&
-                service.images.length > 0 &&
-                typeof service.images[0] === "string" && (
+      {/* Cargando inicial -> skeletons bonitos */}
+      {!initialLoaded ? (
+        <Grid>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Grid.Col key={i} span={{ base: 12, xs: 6, md: 4, lg: 3 }}>
+              <Card withBorder radius="md" p="xs">
+                <Skeleton height={140} mb="sm" />
+                <Skeleton height={12} width="60%" mb="xs" />
+                <Skeleton height={10} width="40%" mb="xs" />
+                <Skeleton height={10} width="30%" />
+              </Card>
+            </Grid.Col>
+          ))}
+        </Grid>
+      ) : filtered.length === 0 ? (
+        <Center mih={240}>
+          <Stack align="center" gap="xs">
+            <Text c="dimmed">No hay servicios para los filtros aplicados.</Text>
+            <Button variant="light" onClick={() => { setSearchTerm(""); setTypeFilter("__all__"); setStatus("all"); }}>
+              Limpiar filtros
+            </Button>
+          </Stack>
+        </Center>
+      ) : (
+        <Grid>
+          {filtered.map((service, index) => (
+            <Grid.Col span={{ base: 12, xs: 6, md: 4, lg: 3 }} key={service._id}>
+              <Card
+                shadow="sm"
+                radius="md"
+                withBorder
+                style={{ position: "relative" }}
+              >
+                {/* Imagen principal */}
+                {service.images?.length ? (
                   <Card.Section>
-                    <Image
-                      src={service.images[0] as string}
-                      height={160}
-                      alt={service.name}
-                      fit="cover"
-                    />
+                    <AspectRatio ratio={4 / 3}>
+                      <Image
+                        src={typeof service.images[0] === "string" ? (service.images[0] as string) : undefined}
+                        alt={service.name}
+                        fit="cover"
+                      />
+                    </AspectRatio>
+                  </Card.Section>
+                ) : (
+                  <Card.Section>
+                    <AspectRatio ratio={4 / 3}>
+                      <Center bg="gray.1">
+                        <Text c="dimmed" size="sm">Sin imagen</Text>
+                      </Center>
+                    </AspectRatio>
                   </Card.Section>
                 )}
 
-              {/* Botones en la esquina superior derecha */}
-              <Box
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  right: 8,
-                  display: "flex",
-                  gap: "8px",
-                }}
-              >
-                <ActionIcon
-                  variant="gradient"
-                  radius="lg"
-                  gradient={{ from: "blue", to: "cyan", deg: 90 }}
-                  onClick={() => {
-                    setIsModalOpen(true);
-                    setEditingService(service);
-                  }}
+                {/* Estado */}
+                <Badge
+                  variant={service.isActive ? "filled" : "light"}
+                  color={service.isActive ? "green" : "gray"}
+                  style={{ position: "absolute", top: rem(8), left: rem(8) }}
                 >
-                  <BsPencil />
-                </ActionIcon>
-                <ActionIcon
-                  variant="gradient"
-                  radius="lg"
-                  gradient={{ from: "red", to: "orange", deg: 90 }}
-                  onClick={() => handleDeleteService(service._id, index)}
-                >
-                  <BsTrash />
-                </ActionIcon>
-                <ActionIcon
-                  variant="gradient"
-                  radius="lg"
-                  gradient={
-                    service.isActive
-                      ? { from: "green", to: "lime", deg: 90 }
-                      : { from: "gray", to: "dark", deg: 90 }
-                  }
-                  onClick={() => handleToggleServiceStatus(service._id)}
-                >
-                  {service.isActive ? <BsToggleOn /> : <BsToggleOff />}
-                </ActionIcon>
-              </Box>
+                  {service.isActive ? "Activo" : "Inactivo"}
+                </Badge>
 
-              <Box p="xs" mt="md">
-                <Title order={4}>{service.name}</Title>
-                <Divider my="sm" />
-                <Text fw={500} c="dimmed">
-                  {service.type}
-                </Text>
-                <Text size="sm" c="dimmed" mt="xs">
-                  {service.description}
-                </Text>
-                <Flex justify="space-between">
-                  <Text fw={600}>${service.price.toLocaleString()}</Text>
-                  <Text>{service.duration} min</Text>
-                </Flex>
-              </Box>
-            </Card>
-          </Grid.Col>
-        ))}
-      </Grid>
+                {/* Menú de acciones */}
+                <Menu shadow="md" width={180} position="bottom-end">
+                  <Menu.Target>
+                    <ActionIcon
+                      variant="subtle"
+                      style={{ position: "absolute", top: rem(4), right: rem(4) }}
+                      aria-label="Acciones"
+                    >
+                      <BsThreeDotsVertical />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item leftSection={<BsPencil />} onClick={() => { setIsModalOpen(true); setEditingService(service); }}>
+                      Editar
+                    </Menu.Item>
+                    <Menu.Item onClick={() => toggleStatus(service._id)}>
+                      {service.isActive ? "Desactivar" : "Activar"}
+                    </Menu.Item>
+                    <Menu.Divider />
+                    <Menu.Item color="red" leftSection={<BsTrash />} onClick={() => confirmDelete(service._id, index)}>
+                      Eliminar
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+
+                {/* Contenido */}
+                <Card.Section p="md">
+                  <Group justify="space-between" mb={6}>
+                    <Text fw={700}>{service.name}</Text>
+                    <Tooltip label="Duración" withArrow>
+                      <Badge variant="light">{service.duration} min</Badge>
+                    </Tooltip>
+                  </Group>
+                  <Text size="sm" c="dimmed" mb={6}>{service.type}</Text>
+                  {service.description && (
+                    <Text size="sm" lineClamp={3} c="dimmed" mb="sm">
+                      {service.description}
+                    </Text>
+                  )}
+                  <Group justify="space-between">
+                    <Badge color="blue" variant="filled">
+                      ${service.price.toLocaleString()}
+                    </Badge>
+                    <Text size="sm" c="dimmed">
+                      ID: {service._id.slice(-4)}
+                    </Text>
+                  </Group>
+                </Card.Section>
+              </Card>
+            </Grid.Col>
+          ))}
+        </Grid>
+      )}
     </Box>
   );
 };

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import {
   Button,
   Modal,
@@ -6,6 +7,7 @@ import {
   Table,
   ActionIcon,
   Divider,
+  Text,
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 import {
@@ -51,6 +53,15 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
 
   const handleCreateOrUpdateAdvance = async () => {
     if (!employee) return;
+
+    if (advanceAmount <= 0) {
+      showNotification({
+        title: "Monto no válido",
+        message: "Ingresa un monto mayor a 0",
+        color: "yellow",
+      });
+      return;
+    }
 
     try {
       if (editingAdvance) {
@@ -200,6 +211,10 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
           )}
         </Table.Tbody>
       </Table>
+      <Divider my="sm" />
+      <Text fw={600} ta="right">
+        Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0))}
+      </Text>
     </Modal>
   );
 };

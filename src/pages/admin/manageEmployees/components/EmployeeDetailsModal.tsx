@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -299,7 +300,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
             {loadingAppointments ? (
               <Loader />
             ) : (
-              <Table>
+              <Table stickyHeader stickyHeaderOffset={0}>
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
@@ -313,7 +314,8 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                     <Table.Tr
                       key={appointment._id}
                       style={{
-                        backgroundColor: getStatusStyles(appointment.status).bg, color: getStatusStyles(appointment.status).color,
+                        backgroundColor: getStatusStyles(appointment.status).bg,
+                        color: getStatusStyles(appointment.status).color,
                       }}
                     >
                       <Table.Td>

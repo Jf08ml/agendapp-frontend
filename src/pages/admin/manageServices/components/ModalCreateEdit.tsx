@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import {
   Modal,
@@ -7,13 +8,15 @@ import {
   Textarea,
   Chip,
   Button,
-  Flex,
   Image,
   ActionIcon,
   Group,
   Text,
   Autocomplete,
+  SimpleGrid,
+  Paper,
   Box,
+  Badge,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
@@ -44,6 +47,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     images: [],
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (service) {
@@ -64,18 +68,28 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   }, [service]);
 
   const handleDrop = (files: File[]) => {
-    setImageFiles((prevFiles) => [...prevFiles, ...files]);
+    setImageFiles((prev) => [...prev, ...files]);
   };
 
   const handleRemoveImage = (index: number) => {
-    const newFiles = [...imageFiles];
-    newFiles.splice(index, 1);
-    setImageFiles(newFiles);
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    onSave({ ...editingService, images: imageFiles as string[] });
-    onClose();
+  const canSave =
+    editingService.name.trim().length > 1 &&
+    editingService.type.trim().length > 1 &&
+    (editingService.price ?? 0) > 0 &&
+    (editingService.duration ?? 0) > 0;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await onSave({ ...editingService, images: imageFiles as any });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -83,153 +97,135 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
       opened={isOpen}
       onClose={onClose}
       title={service ? "Editar Servicio" : "Agregar Servicio"}
-      size="md"
+      size="lg"
       centered
+      radius="md"
     >
-      <Stack gap="xs">
-        <TextInput
-          label="Nombre del servicio"
-          value={editingService.name}
-          onChange={(e) =>
-            setEditingService({
-              ...editingService,
-              name: e.currentTarget.value,
-            })
-          }
-          required
-        />
-        <Autocomplete
-          label="Tipo de servicio"
-          value={editingService.type}
-          onChange={(type) => setEditingService({ ...editingService, type })}
-          data={allTypes}
-          placeholder="Ejemplo: Uñas, Spa, Cejas..."
-          limit={10}
-          required
-        />
-        <Box>
-          <Text size="sm" fw={500} mb={4}>
-            Ícono
-          </Text>
-        </Box>
-        <NumberInput
-          label="Precio"
-          prefix="$ "
-          thousandSeparator=","
-          value={editingService.price}
-          onChange={(value) =>
-            setEditingService({
-              ...editingService,
-              price: typeof value === "number" ? value : 0,
-            })
-          }
-          required
-        />
-        <div>
-          <NumberInput
-            label="Duración (minutos)"
-            value={editingService.duration}
-            onChange={(value) =>
-              setEditingService({
-                ...editingService,
-                duration: typeof value === "number" ? value : 0,
-              })
-            }
-            required
-            min={1}
-          />
-          <Flex justify="center" mt={4}>
-            <Chip.Group>
-              {[15, 30, 60, 90].map((duration) => (
-                <Chip
-                  key={duration}
-                  size="xs"
-                  checked={editingService.duration === duration}
-                  onChange={() =>
-                    setEditingService({ ...editingService, duration })
-                  }
+      <Stack gap="md">
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Paper withBorder p="md" radius="md">
+            <Stack gap="sm">
+              <TextInput
+                label="Nombre del servicio"
+                value={editingService.name}
+                onChange={(e) => setEditingService({ ...editingService, name: e.currentTarget.value })}
+                required
+              />
+              <Autocomplete
+                label="Tipo de servicio"
+                value={editingService.type}
+                onChange={(type) => setEditingService({ ...editingService, type })}
+                data={allTypes}
+                placeholder="Ej: Uñas, Spa, Cejas…"
+                limit={10}
+                required
+              />
+              <NumberInput
+                label="Precio"
+                prefix="$ "
+                thousandSeparator="."
+                decimalSeparator=","
+                value={editingService.price}
+                onChange={(value) => setEditingService({ ...editingService, price: typeof value === "number" ? value : 0 })}
+                required
+                min={0}
+              />
+              <div>
+                <NumberInput
+                  label="Duración (minutos)"
+                  value={editingService.duration}
+                  onChange={(value) => setEditingService({ ...editingService, duration: typeof value === "number" ? value : 0 })}
+                  required
+                  min={1}
+                />
+                <Group gap="xs" mt={6} wrap="wrap">
+                  {[15, 30, 45, 60, 90].map((d) => (
+                    <Chip
+                      key={d}
+                      size="xs"
+                      checked={editingService.duration === d}
+                      onChange={() => setEditingService({ ...editingService, duration: d })}
+                    >
+                      {d} min
+                    </Chip>
+                  ))}
+                </Group>
+              </div>
+              <Textarea
+                label="Descripción"
+                value={editingService.description ?? ""}
+                onChange={(e) => setEditingService({ ...editingService, description: e.currentTarget.value })}
+                minRows={2}
+              />
+            </Stack>
+          </Paper>
+
+          <Paper withBorder p="md" radius="md">
+            <Stack gap="sm">
+              <Box>
+                <Text size="sm" fw={600} mb={6}>Imágenes</Text>
+                <Dropzone
+                  onDrop={handleDrop}
+                  accept={IMAGE_MIME_TYPE}
+                  multiple
+                  styles={{ inner: { paddingBlock: 18 } }}
                 >
-                  {duration} minutos
-                </Chip>
-              ))}
-            </Chip.Group>
-          </Flex>
-        </div>
-        <Textarea
-          label="Descripción"
-          value={editingService.description}
-          onChange={(e) =>
-            setEditingService({
-              ...editingService,
-              description: e.currentTarget.value,
-            })
-          }
-          minRows={2}
-        />
-        <Dropzone
-          onDrop={handleDrop}
-          accept={IMAGE_MIME_TYPE}
-          multiple
-          style={{
-            border: "2px dashed #ced4da",
-            borderRadius: "8px",
-            textAlign: "center",
-            cursor: "pointer",
-            transition: "border-color 0.3s",
-          }}
-          onDragEnter={(e) => (e.currentTarget.style.borderColor = "#228be6")}
-          onDragLeave={(e) => (e.currentTarget.style.borderColor = "#ced4da")}
-        >
-          <Group justify="center">
-            <BiImageAdd size={50} color="#228be6" />
-            <div>
-              <Text size="lg" inline>
-                Arrastra las imágenes aquí o haz clic para cargar
-              </Text>
-              <Text size="sm" color="dimmed" inline mt={7}>
-                Solo imágenes (jpeg, png, etc.)
-              </Text>
-            </div>
-          </Group>
-        </Dropzone>
-        <div>
-          {imageFiles.length > 0 && (
-            <Flex wrap="wrap" gap="sm" mt={4}>
-              {imageFiles.map((file, index) => (
-                <div key={index} style={{ position: "relative" }}>
-                  <Image
-                    src={
-                      typeof file === "string"
-                        ? file
-                        : URL.createObjectURL(file)
-                    }
-                    alt={`Imagen ${index + 1}`}
-                    width={80}
-                    height={80}
-                    radius="sm"
-                  />
-                  <ActionIcon
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                    }}
-                    variant="white"
-                    radius="lg"
-                    size="sm"
-                    color="red"
-                    onClick={() => handleRemoveImage(index)}
-                  >
-                    <BiSolidXCircle />
-                  </ActionIcon>
-                </div>
-              ))}
-            </Flex>
-          )}
-        </div>
-        <Button onClick={handleSave} fullWidth>
-          {service ? "Guardar Cambios" : "Agregar Servicio"}
-        </Button>
+                  <Group justify="center">
+                    <BiImageAdd size={48} />
+                    <div>
+                      <Text size="sm" fw={600}>Arrastra aquí o haz clic para subir</Text>
+                      <Text size="xs" c="dimmed">Formatos aceptados: jpeg, png, webp…</Text>
+                    </div>
+                  </Group>
+                </Dropzone>
+              </Box>
+
+              {imageFiles.length > 0 && (
+                <SimpleGrid cols={{ base: 3, md: 4 }} spacing="sm">
+                  {imageFiles.map((file, idx) => (
+                    <Box key={idx} pos="relative">
+                      <Image
+                        src={typeof file === "string" ? file : URL.createObjectURL(file)}
+                        alt={`Imagen ${idx + 1}`}
+                        radius="sm"
+                        h={90}
+                        w="100%"
+                        fit="cover"
+                      />
+                      <ActionIcon
+                        variant="filled"
+                        color="red"
+                        size="sm"
+                        radius="xl"
+                        style={{ position: "absolute", top: 6, right: 6 }}
+                        onClick={() => handleRemoveImage(idx)}
+                        aria-label="Eliminar imagen"
+                      >
+                        <BiSolidXCircle />
+                      </ActionIcon>
+                      {idx === 0 && (
+                        <Badge
+                          color="blue"
+                          variant="filled"
+                          style={{ position: "absolute", left: 6, top: 6 }}
+                        >
+                          Principal
+                        </Badge>
+                      )}
+                    </Box>
+                  ))}
+                </SimpleGrid>
+              )}
+            </Stack>
+          </Paper>
+        </SimpleGrid>
+
+        <Group justify="flex-end">
+          <Button variant="default" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} loading={saving} disabled={!canSave}>
+            {service ? "Guardar cambios" : "Agregar servicio"}
+          </Button>
+        </Group>
       </Stack>
     </Modal>
   );

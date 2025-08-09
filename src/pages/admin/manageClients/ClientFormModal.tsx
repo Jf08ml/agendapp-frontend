@@ -1,11 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, ChangeEvent } from "react";
-import { TextInput, Button, Box, Modal } from "@mantine/core";
-import {
-  createClient,
-  updateClient,
-  Client,
-} from "../../../services/clientService";
+import { TextInput, Button, Box, Modal, Group } from "@mantine/core";
+import { createClient, updateClient, Client } from "../../../services/clientService";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -30,24 +26,18 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [birthDate, setBirthDate] = useState<Date | null>(null);
-  const [loading, setLoading] = useState<boolean>(false); // Estado de carga
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const organizationId = useSelector(
-    (state: RootState) => state.auth.organizationId
-  );
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
-  // Función para restablecer los valores del formulario
   const resetForm = () => {
     setName("");
     setPhoneNumber("");
     setEmail("");
     setBirthDate(null);
-    if (setClient) {
-      setClient(null); // Restablecer el cliente
-    }
+    setClient?.(null);
   };
 
-  // Cargar datos del cliente cuando esté en modo edición
   useEffect(() => {
     if (client) {
       setName(client.name.trim());
@@ -57,26 +47,22 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     } else {
       resetForm();
     }
-  }, [client]);
+  }, [client, opened]);
 
   const handleSubmit = async (): Promise<void> => {
-    setLoading(true); // Activar el estado de carga
+    setLoading(true);
     try {
-      if (!organizationId) {
-        throw new Error("Organization ID is required");
-      }
+      if (!organizationId) throw new Error("Organization ID is required");
 
       const formattedPhoneNumber = phoneNumber.replace(/\s/g, "");
 
       if (client) {
-        // Modo edición: actualizar cliente
-        const updatedData = {
+        await updateClient(client._id, {
           name: name.trim(),
           phoneNumber: formattedPhoneNumber,
           email: email.trim(),
           birthDate: birthDate || null,
-        };
-        await updateClient(client._id, updatedData);
+        });
         showNotification({
           title: "Éxito",
           message: "Cliente actualizado con éxito",
@@ -85,15 +71,13 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
           position: "top-right",
         });
       } else {
-        // Modo creación: crear cliente nuevo
-        const newClient = {
+        await createClient({
           name: name.trim(),
           phoneNumber: formattedPhoneNumber,
           email: email.trim(),
           organizationId,
           birthDate: birthDate || null,
-        };
-        await createClient(newClient);
+        });
         showNotification({
           title: "Éxito",
           message: "Cliente creado con éxito",
@@ -103,7 +87,6 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         });
       }
 
-      // Refrescar la lista de clientes, restablecer el formulario y cerrar el modal
       fetchClients();
       resetForm();
       onClose();
@@ -111,84 +94,88 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       console.error(err);
       showNotification({
         title: "Error",
-        message: client
-          ? "Error al actualizar el cliente"
-          : "Error al crear el cliente",
+        message: client ? "Error al actualizar el cliente" : "Error al crear el cliente",
         color: "red",
         autoClose: 3000,
       });
     } finally {
-      setLoading(false); // Desactivar el estado de carga
+      setLoading(false);
     }
   };
 
   const handleInputChange =
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
-    (event: ChangeEvent<HTMLInputElement>): void => {
-      setter(event.target.value);
-    };
+    (event: ChangeEvent<HTMLInputElement>) => setter(event.target.value);
 
-  const formatPhoneNumber = (value: string): string => {
-    return value
-      .replace(/\D/g, "")
-      .replace(/(\d{3})(\d{3})(\d{4})/, "$1 $2 $3");
-  };
+  const formatPhoneNumber = (value: string) =>
+    value.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{0,4})/, (_m, a, b, c) =>
+      c ? `${a} ${b} ${c}` : `${a} ${b}`
+    );
 
   const handlePhoneNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value;
-    setPhoneNumber(formatPhoneNumber(rawValue)); // Actualiza con formato
+    setPhoneNumber(formatPhoneNumber(event.target.value));
   };
 
   return (
     <Modal
       opened={opened}
       onClose={() => {
-        resetForm(); // Restablecer valores al cerrar el modal
+        resetForm();
         onClose();
       }}
-      title={client ? "Editar Cliente" : "Crear Cliente"}
-      zIndex={1000}
+      title={client ? "Editar cliente" : "Crear cliente"}
+      centered
+      radius="md"
     >
       <Box>
-        <TextInput
-          mt="md"
-          label="Nombre"
-          value={name}
-          onChange={handleInputChange(setName)}
-          required
-        />
-        <TextInput
-          mt="md"
-          label="Número de Teléfono"
-          value={phoneNumber}
-          onChange={handlePhoneNumberChange}
-          required
-        />
-        <TextInput
-          mt="md"
-          label="Correo Electrónico"
-          value={email}
-          onChange={handleInputChange(setEmail)}
-        />
-        <DateInput
-          mt="md"
-          label="Fecha de Nacimiento"
-          value={birthDate}
-          locale="es"
-          valueFormat="DD/MM/YYYY"
-          onChange={(value) => setBirthDate(value || null)}
-          placeholder="Selecciona una fecha"
-          maxDate={new Date()}
-          clearable
-        />
-        <Button
-          mt="md"
-          color="blue"
-          onClick={handleSubmit}
-          loading={loading} // Indicador de carga en el botón
-        >
-          {client ? "Actualizar Cliente" : "Crear Cliente"}
-        </Button>
+        <Group grow align="flex-start">
+          <TextInput
+            mt="sm"
+            label="Nombre"
+            placeholder="Nombre completo"
+            value={name}
+            onChange={handleInputChange(setName)}
+            required
+          />
+          <TextInput
+            mt="sm"
+            label="Teléfono"
+            placeholder="300 000 0000"
+            value={phoneNumber}
+            onChange={handlePhoneNumberChange}
+            required
+          />
+        </Group>
+
+        <Group grow align="flex-start">
+          <TextInput
+            mt="sm"
+            label="Correo electrónico"
+            placeholder="correo@dominio.com"
+            value={email}
+            onChange={handleInputChange(setEmail)}
+          />
+          <DateInput
+            mt="sm"
+            label="Fecha de nacimiento"
+            value={birthDate}
+            locale="es"
+            valueFormat="DD/MM/YYYY"
+            onChange={(value) => setBirthDate(value || null)}
+            placeholder="Selecciona una fecha"
+            maxDate={new Date()}
+            clearable
+          />
+        </Group>
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => { resetForm(); onClose(); }}>
+            Cancelar
+          </Button>
+          <Button color="blue" onClick={handleSubmit} loading={loading}>
+            {client ? "Actualizar cliente" : "Crear cliente"}
+          </Button>
+        </Group>
       </Box>
     </Modal>
   );

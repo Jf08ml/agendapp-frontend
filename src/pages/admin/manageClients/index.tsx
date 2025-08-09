@@ -1,14 +1,17 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import {
   Box,
+  Card,
   Flex,
-  Divider,
   TextInput,
   Group,
   Title,
   Button,
+  Badge,
+  Tooltip,
+  Skeleton,
 } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ClientFormModal from "./ClientFormModal";
 import ClientTable from "./ClientTable";
 import { IoAddCircleOutline } from "react-icons/io5";
@@ -23,13 +26,13 @@ import {
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import CustomLoader from "../../../components/customLoader/CustomLoader";
+import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 
-const Dashboard = () => {
+const ClientsDashboard = () => {
   const [openModal, setOpenModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debounced] = useDebouncedValue(searchTerm, 250);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [editCLient, setEditClient] = useState<Client | null>(null);
@@ -37,25 +40,19 @@ const Dashboard = () => {
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
+  const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const handleOpenModal = (client: Client | null) => {
-    if (client) {
-      setEditClient(client);
-    }
+    setEditClient(client);
     setOpenModal(true);
   };
 
-  const handleCloseModal = () => {
-    setOpenModal(false);
-  };
+  const handleCloseModal = () => setOpenModal(false);
 
-  // Función para obtener clientes
   const fetchClients = async () => {
     setIsLoading(true);
     try {
-      if (!organizationId) {
-        throw new Error("Organization ID is required");
-      }
+      if (!organizationId) throw new Error("Organization ID is required");
       const response = await getClientsByOrganizationId(organizationId);
       setClients(response);
       setError(null);
@@ -64,8 +61,7 @@ const Dashboard = () => {
       setError("Error al obtener la lista de clientes");
       showNotification({
         title: "Error al obtener clientes",
-        message:
-          "No fue posible cargar la lista de clientes. Por favor, intenta de nuevo.",
+        message: "No fue posible cargar la lista de clientes. Intenta de nuevo.",
         color: "red",
         autoClose: 5000,
         position: "top-right",
@@ -76,23 +72,18 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (organizationId) {
-      fetchClients();
-    }
+    if (organizationId) void fetchClients();
   }, [organizationId]);
 
-  useEffect(() => {
-    filterClients();
-  }, [searchTerm, clients]);
-
-  const filterClients = () => {
-    const filtered = clients.filter(
-      (client) =>
-        client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredClients = useMemo(() => {
+    const q = debounced.trim().toLowerCase();
+    if (!q) return clients;
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phoneNumber.toLowerCase().includes(q)
     );
-    setFilteredClients(filtered);
-  };
+  }, [debounced, clients]);
 
   const handleRegisterService = async (clientId: string) => {
     try {
@@ -165,40 +156,73 @@ const Dashboard = () => {
     }
   };
 
-  if (!organizationId || isLoading) {
-    return <CustomLoader />;
-  }
-
   return (
     <Box>
-      <Flex
-        gap="md"
-        justify="space-between"
-        align="center"
-        direction="row"
-        wrap="wrap"
+      <Card
+        withBorder
+        radius="md"
+        p="md"
         mb="md"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 5,
+          background: "var(--mantine-color-body)",
+        }}
       >
-        <Title order={1}>Gestionar clientes</Title>
-        <Button
-          leftSection={<IoAddCircleOutline />}
-          onClick={() => handleOpenModal(null)}
+        <Flex
+          gap="sm"
+          justify="space-between"
+          align={isMobile ? "stretch" : "center"}
+          direction={isMobile ? "column" : "row"}
+          wrap="wrap"
         >
-          Crear cliente
-        </Button>
-      </Flex>
+          <Group gap="sm">
+            <Title order={2}>Clientes</Title>
+            <Badge variant="light" size="sm">
+              {filteredClients.length} de {clients.length}
+            </Badge>
+          </Group>
 
-      <Divider mb="md" />
+          <Group gap="sm" w={isMobile ? "100%" : "auto"}>
+            <TextInput
+              leftSection={<BsSearch />}
+              placeholder="Buscar por nombre o teléfono…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.currentTarget.value)}
+              w={isMobile ? "100%" : 320}
+              radius="md"
+            />
+            <Tooltip label="Crear nuevo cliente">
+              <Button
+                leftSection={<IoAddCircleOutline />}
+                onClick={() => handleOpenModal(null)}
+              >
+                Crear cliente
+              </Button>
+            </Tooltip>
+          </Group>
+        </Flex>
+      </Card>
 
-      <Group mb="md" justify="space-between">
-        <TextInput
-          leftSection={<BsSearch />}
-          placeholder="Buscar por nombre o teléfono..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.currentTarget.value)}
-          style={{ flexGrow: 1 }}
-        />
-      </Group>
+      {isLoading ? (
+        <Card withBorder radius="md" p="md">
+          <Skeleton height={36} mb="sm" />
+          <Skeleton height={36} mb="sm" />
+          <Skeleton height={36} />
+        </Card>
+      ) : (
+        <Card withBorder radius="md" p="md">
+          <ClientTable
+            clients={filteredClients}
+            handleDeleteClient={handleDeleteClient}
+            handleRegisterService={handleRegisterService}
+            handleReferral={handleReferral}
+            handleEditClient={handleOpenModal}
+            error={error}
+          />
+        </Card>
+      )}
 
       <ClientFormModal
         opened={openModal}
@@ -207,18 +231,8 @@ const Dashboard = () => {
         client={editCLient}
         setClient={setEditClient}
       />
-      <div>
-        <ClientTable
-          clients={filteredClients}
-          handleDeleteClient={handleDeleteClient}
-          handleRegisterService={handleRegisterService}
-          handleReferral={handleReferral}
-          handleEditClient={handleOpenModal}
-          error={error}
-        />
-      </div>
     </Box>
   );
 };
 
-export default Dashboard;
+export default ClientsDashboard;

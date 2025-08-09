@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Title,
   Group,
@@ -7,7 +9,15 @@ import {
   Grid,
   TextInput,
   Container,
+  Card,
+  Select,
+  SegmentedControl,
+  Skeleton,
+  Center,
+  Stack,
+  Text,
 } from "@mantine/core";
+import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { BsSearch } from "react-icons/bs";
 import { showNotification } from "@mantine/notifications";
 import {
@@ -15,13 +25,13 @@ import {
   updateEmployee,
   deleteEmployee,
   getEmployeesByOrganizationId,
+  type Employee,
 } from "../../../services/employeeService";
 import ModalCreateEdit from "./components/ModalCreateEditEmployee";
 import {
   getServicesByOrganizationId,
-  Service,
+  type Service,
 } from "../../../services/serviceService";
-import { Employee } from "../../../services/employeeService";
 import EmployeeCard from "./components/EmployeeCard";
 import EmployeeDetailsModal from "./components/EmployeeDetailsModal";
 import AdvanceModal from "./components/AdvanceModal";
@@ -31,91 +41,118 @@ import { RootState } from "../../../app/store";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
 
 const AdminEmployees: React.FC = () => {
+  const isMobile = useMediaQuery("(max-width: 48rem)");
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [services, setServices] = useState<Service[]>([]);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useDebouncedValue(search, 250);
+
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const [serviceFilter, setServiceFilter] = useState<string | null>("__all__");
+  const [sortBy, setSortBy] = useState<"alpha" | "position" | "recent">(
+    "alpha"
+  );
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
+
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
+
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
-  const [ isLoading, setIsLoading ] = useState(false);
+
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
 
   useEffect(() => {
-    loadEmployees();
-    fetchServices();
+    if (!organizationId) return;
+    void loadAll();
   }, [organizationId]);
 
-  useEffect(() => {
-    filterEmployees();
-  }, [searchTerm, employees]);
-
-  const loadEmployees = async () => {
-    setIsLoading(true);
+  const loadAll = async () => {
+    setLoading(true);
     try {
-      if (!organizationId) {
-        throw new Error("Organization ID is required");
-      }
-      const employeesData = await getEmployeesByOrganizationId(organizationId);
-      const sortedEmployees = employeesData.sort((_a, b) =>
-        b.isActive ? 1 : -1
+      const [emps, svcs] = await Promise.all([
+        getEmployeesByOrganizationId(organizationId!),
+        getServicesByOrganizationId(organizationId!),
+      ]);
+      // Activos arriba
+      const ordered = [...emps].sort(
+        (a, b) => Number(b.isActive) - Number(a.isActive)
       );
-      setEmployees(sortedEmployees);
+      setEmployees(ordered);
+      setServices(svcs);
     } catch (error) {
       console.error(error);
       showNotification({
         title: "Error",
-        message: "Error al cargar los empleados",
+        message: "No se pudo cargar empleados/servicios",
         color: "red",
-        autoClose: 2000,
-        position: "top-right",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
+      setInitialLoaded(true);
     }
   };
 
-  const fetchServices = async () => {
-    setIsLoading(true);
-    try {
-      if (!organizationId) {
-        throw new Error("Organization ID is required");
-      }
-      const servicesData = await getServicesByOrganizationId(organizationId);
-      setServices(servicesData);
-    } catch (error) {
-      console.error(error);
-      showNotification({
-        title: "Error",
-        message: "Error al cargar los servicios",
-        color: "red",
-        autoClose: 2000,
-        position: "top-right",
-      });
-    } finally {
-      setIsLoading(false);
+  // Filtros
+  const serviceOptions = useMemo(
+    () => [
+      { value: "__all__", label: "Todos" },
+      ...services.map((s) => ({ value: s._id, label: s.name })),
+    ],
+    [services]
+  );
+
+  const filtered = useMemo(() => {
+    let data = [...employees];
+
+    // Buscar
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
+      data = data.filter(
+        (e) =>
+          e.names.toLowerCase().includes(q) ||
+          e.position.toLowerCase().includes(q) ||
+          e.email.toLowerCase().includes(q) ||
+          e.phoneNumber.includes(q)
+      );
     }
-  };
 
-  // Funciones para empleado
-  const filterEmployees = () => {
-    const filtered = employees.filter(
-      (employee) =>
-        employee.names.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        employee.phoneNumber.includes(searchTerm)
-    );
-    setFilteredEmployees(filtered);
-  };
+    // Estado
+    if (status !== "all") {
+      data = data.filter((e) =>
+        status === "active" ? e.isActive : !e.isActive
+      );
+    }
 
+    // Servicio
+    if (serviceFilter && serviceFilter !== "__all__") {
+      data = data.filter((e) =>
+        (e.services || []).some((s) => (s as any)._id === serviceFilter)
+      );
+    }
+
+    // Orden
+    // Orden
+    if (sortBy === "alpha")
+      data.sort((a, b) => a.names.localeCompare(b.names, "es"));
+    if (sortBy === "position")
+      data.sort((a, b) => a.position.localeCompare(b.position, "es"));
+
+    // Activos primero siempre
+    data.sort((a, b) => Number(b.isActive) - Number(a.isActive));
+
+    return data;
+  }, [employees, debouncedSearch, status, serviceFilter, sortBy]);
+
+  // Acciones CRUD
   const handleSaveEmployee = async (employee: Employee) => {
     try {
       if (employee._id) {
@@ -124,124 +161,93 @@ const AdminEmployees: React.FC = () => {
         if (!organizationId) {
           showNotification({
             title: "Error",
-            message:
-              "No se ha podido agregar el empleado, la organización no está definida",
+            message: "Organización no definida",
             color: "red",
-            autoClose: 2000,
-            position: "top-right",
           });
           return;
         }
         await createEmployee({
           ...employee,
-          organizationId: organizationId,
+          organizationId,
           password: employee.password || "",
-        });
+        } as any);
       }
-
-      fetchServices();
-      loadEmployees();
-
+      await loadAll();
       setIsModalOpen(false);
       setEditingEmployee(null);
-
       showNotification({
         title: employee._id ? "Empleado actualizado" : "Empleado agregado",
-        message: "El empleado ha sido guardado correctamente",
+        message: "Guardado correctamente",
         color: "green",
-        autoClose: 2000,
-        position: "top-right",
       });
     } catch (error) {
       console.error(error);
       showNotification({
         title: "Error",
-        message: "Error al guardar el empleado",
+        message: "No se pudo guardar el empleado",
         color: "red",
-        autoClose: 2000,
-        position: "top-right",
       });
     }
   };
 
-  const handleDesactivateEmployee = async (employeeId: string) => {
+  const handleDeleteEmployee = async (employeeId: string) => {
     openConfirmModal({
-      title: "Confirmar desactivación",
-      children: (
-        <p>
-          Desactivar el usuario lo ocultará de la lista de empleados para
-          agendar citas, ¿Estas seguro de desactivarlo?
-        </p>
-      ),
+      title: "Eliminar empleado",
       centered: true,
-      labels: { confirm: "Confirmar", cancel: "Cancelar" },
-      confirmProps: { color: "green" },
+      children: <Text>¿Seguro que deseas eliminar este empleado?</Text>,
+      labels: { confirm: "Eliminar", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
       onConfirm: async () => {
         try {
-          await updateEmployee(employeeId, { isActive: false });
-          loadEmployees();
+          await deleteEmployee(employeeId);
+          await loadAll();
           showNotification({
-            title: "Empleado desactivado",
-            message: "El empleado ha sido desactivado correctamente",
+            title: "Eliminado",
+            message: "Empleado eliminado",
             color: "green",
-            autoClose: 2000,
-            position: "top-right",
           });
         } catch (error) {
           console.error(error);
+          // fallback a desactivar
           showNotification({
-            title: "Error",
-            message: "Error al desactivar el empleado",
-            color: "red",
-            autoClose: 2000,
-            position: "top-right",
+            title: "No se pudo eliminar",
+            message: "Se intentará desactivar el empleado.",
+            color: "yellow",
           });
+          await handleActiveEmployee(employeeId, false);
         }
       },
     });
   };
 
-  const handleDeleteEmployee = async (employeeId: string) => {
+  const handleActiveEmployee = async (employeeId: string, next = true) => {
     openConfirmModal({
-      title: "Confirmar eliminación",
-      children: <p>¿Estás seguro de que deseas eliminar este empleado?</p>,
+      title: next ? "Activar empleado" : "Desactivar empleado",
       centered: true,
+      children: (
+        <Text>
+          {next
+            ? "Se mostrará para agendar citas. ¿Confirmas?"
+            : "Se ocultará para agendar citas. ¿Confirmas?"}
+        </Text>
+      ),
       labels: { confirm: "Confirmar", cancel: "Cancelar" },
       confirmProps: { color: "green" },
       onConfirm: async () => {
         try {
-          await deleteEmployee(employeeId);
-          loadEmployees();
+          await updateEmployee(employeeId, { isActive: next } as any);
+          await loadAll();
           showNotification({
-            title: "Empleado eliminado",
-            message: "El empleado ha sido eliminado correctamente",
+            title: next ? "Empleado activado" : "Empleado desactivado",
+            message: "Cambio aplicado",
             color: "green",
-            autoClose: 2000,
-            position: "top-right",
           });
         } catch (error) {
           console.error(error);
-          if (
-            error instanceof Error &&
-            error.message ===
-              "No puedes eliminar un empleado con citas asignadas"
-          ) {
-            showNotification({
-              title: "Error",
-              message: "No puedes eliminar este usuario, tiene citas asignadas",
-              color: "red",
-              autoClose: 4000,
-              position: "top-right",
-            });
-            handleDesactivateEmployee(employeeId);
-            return;
-          }
           showNotification({
             title: "Error",
-            message: "Error al eliminar el empleado",
+            message: "No se pudo actualizar el estado",
             color: "red",
-            autoClose: 2000,
-            position: "top-right",
           });
         }
       },
@@ -249,57 +255,13 @@ const AdminEmployees: React.FC = () => {
   };
 
   const handleEditEmployee = (employee: Employee) => {
-    if (!employee.services) return;
-    const employeeWithServices = {
+    setEditingEmployee({
       ...employee,
-      services: employee.services.map(
-        (service) => services.find((s) => s._id === service._id) as Service
-      ),
-    };
-    setEditingEmployee(employeeWithServices);
-    setIsModalOpen(true);
-  };
-
-  const handleActiveEmployee = async (employeeId: string) => {
-    openConfirmModal({
-      title: "Confirmar activación",
-      children: (
-        <p>
-          Activar el usuario lo mostrará en la lista de empleados para agendar
-          citas, ¿Estas seguro de activarlo?
-        </p>
-      ),
-      centered: true,
-      labels: { confirm: "Confirmar", cancel: "Cancelar" },
-      confirmProps: { color: "green" },
-      onConfirm: async () => {
-        try {
-          await updateEmployee(employeeId, { isActive: true });
-          loadEmployees();
-          showNotification({
-            title: "Empleado activado",
-            message: "El empleado ha sido activado correctamente",
-            color: "green",
-            autoClose: 2000,
-            position: "top-right",
-          });
-        } catch (error) {
-          console.error(error);
-          showNotification({
-            title: "Error",
-            message: "Error al activar el empleado",
-            color: "red",
-            autoClose: 2000,
-            position: "top-right",
-          });
-        }
-      },
+      services: (employee.services || [])
+        .map((srv: any) => services.find((s) => s._id === srv._id)!)
+        .filter(Boolean),
     });
-  };
-
-  const onCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingEmployee(null);
+    setIsModalOpen(true);
   };
 
   const showEmployeeDetailsModal = (employee: Employee) => {
@@ -307,69 +269,123 @@ const AdminEmployees: React.FC = () => {
     setSelectedEmployee(employee);
   };
 
-  const onCloseModalEmployeeDetails = () => {
-    setShowEmployeeDetails(false);
-  };
-
   const handleShowAdvanceModal = (employee: Employee) => {
     setShowAdvanceModal(true);
     setSelectedEmployee(employee);
   };
 
-  const onCloseAdvanceModal = () => {
-    setShowAdvanceModal(false);
-  };
-
-  if( isLoading ) {
-    return (
-      <CustomLoader />
-    )
-  }
+  if (loading && !initialLoaded) return <CustomLoader />;
 
   return (
-    <Container>
-      <Group justify="space-between" mt="xl">
-        <Title order={1}>Administrar Empleados</Title>
-
-        <Button
-          onClick={() => {
-            setIsModalOpen(true);
-            setEditingEmployee(null);
-          }}
-        >
-          Agregar Nuevo Empleado
-        </Button>
-      </Group>
-
-      <Divider my="md" />
-
-      <TextInput
-        leftSection={<BsSearch />}
-        placeholder="Buscar empleado..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.currentTarget.value)}
-        mb="md"
-      />
-
-      <Grid>
-        {filteredEmployees.map((employee) => (
-          <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={employee._id}>
-            <EmployeeCard
-              key={employee._id}
-              employee={employee}
-              onEdit={handleEditEmployee}
-              onDelete={handleDeleteEmployee}
-              onActive={handleActiveEmployee}
-              onViewDetails={showEmployeeDetailsModal}
-              onShowAdvanceModal={handleShowAdvanceModal}
+    <Container fluid>
+      {/* Toolbar */}
+      <Card withBorder radius="md" p="md" mb="md">
+        <Group justify="space-between" align="end" wrap="wrap" gap="sm">
+          <Title order={isMobile ? 3 : 2}>Administrar Empleados</Title>
+          <Group wrap="wrap" gap="sm" align="end">
+            <TextInput
+              leftSection={<BsSearch />}
+              placeholder="Buscar por nombre, cargo, correo o teléfono…"
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              w={isMobile ? "100%" : 300}
             />
-          </Grid.Col>
-        ))}
-      </Grid>
+            <Select
+              label="Servicio"
+              data={serviceOptions}
+              value={serviceFilter}
+              onChange={(v) => setServiceFilter(v ?? "__all__")}
+              w={isMobile ? "48%" : 200}
+            />
+            <SegmentedControl
+              value={status}
+              onChange={(v: any) => setStatus(v)}
+              data={[
+                { label: "Todos", value: "all" },
+                { label: "Activos", value: "active" },
+                { label: "Inactivos", value: "inactive" },
+              ]}
+              size={isMobile ? "xs" : "sm"}
+            />
+            <Select
+              label="Ordenar por"
+              data={[
+                { value: "alpha", label: "Nombre (A–Z)" },
+                { value: "position", label: "Cargo (A–Z)" },
+                { value: "recent", label: "Más recientes" },
+              ]}
+              value={sortBy}
+              onChange={(v) => setSortBy((v as any) ?? "alpha")}
+              w={isMobile ? "48%" : 180}
+            />
+            <Button
+              onClick={() => {
+                setIsModalOpen(true);
+                setEditingEmployee(null);
+              }}
+            >
+              Agregar empleado
+            </Button>
+          </Group>
+        </Group>
+      </Card>
 
+      <Divider my="sm" />
+
+      {/* Grid */}
+      {!initialLoaded ? (
+        <Grid>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={i}>
+              <Card withBorder radius="md" p="md">
+                <Skeleton height={72} circle mb="sm" />
+                <Skeleton height={12} width="60%" mb="xs" />
+                <Skeleton height={10} width="40%" mb="xs" />
+                <Skeleton height={10} width="30%" />
+              </Card>
+            </Grid.Col>
+          ))}
+        </Grid>
+      ) : filtered.length === 0 ? (
+        <Center mih={240}>
+          <Stack align="center" gap="xs">
+            <Text c="dimmed">No hay empleados para los filtros aplicados.</Text>
+            <Button
+              variant="light"
+              onClick={() => {
+                setSearch("");
+                setServiceFilter("__all__");
+                setStatus("all");
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          </Stack>
+        </Center>
+      ) : (
+        <Grid>
+          {filtered.map((employee) => (
+            <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={employee._id}>
+              <EmployeeCard
+                employee={employee}
+                onEdit={handleEditEmployee}
+                onDelete={handleDeleteEmployee}
+                onActive={(id) => handleActiveEmployee(id, true)}
+                onViewDetails={showEmployeeDetailsModal}
+                onShowAdvanceModal={handleShowAdvanceModal}
+              />
+            </Grid.Col>
+          ))}
+        </Grid>
+      )}
+
+      {/* Modales */}
       <ModalCreateEdit
         isOpen={isModalOpen}
-        onClose={onCloseModal}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingEmployee(null);
+        }}
         employee={editingEmployee}
         services={services}
         onSave={handleSaveEmployee}
@@ -377,13 +393,13 @@ const AdminEmployees: React.FC = () => {
 
       <EmployeeDetailsModal
         isOpen={showEmployeeDetails}
-        onClose={onCloseModalEmployeeDetails}
+        onClose={() => setShowEmployeeDetails(false)}
         employee={selectedEmployee}
       />
 
       <AdvanceModal
         isOpen={showAdvanceModal}
-        onClose={onCloseAdvanceModal}
+        onClose={() => setShowAdvanceModal(false)}
         employee={selectedEmployee}
       />
     </Container>

@@ -3,7 +3,7 @@ import { Client } from "../../../services/clientService";
 import { ActionIcon, Badge, Menu, Table, Text } from "@mantine/core";
 import { BiTrash } from "react-icons/bi";
 import { CgAdd, CgOptions, CgUserAdd } from "react-icons/cg";
-import { MdEdit } from "react-icons/md";
+import { MdEdit, MdVisibility } from "react-icons/md";
 
 const ClientRow = React.memo(
   ({
@@ -49,11 +49,23 @@ const ClientRow = React.memo(
             setModalTitle(`Citas de ${client.name}`);
             fetchAppointments(client._id);
           }}
-          style={{ cursor: "pointer" }}
+          style={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+          }}
+          title="Ver citas recientes"
         >
-          {loadingClientId === client._id
-            ? "Cargando..."
-            : client.servicesTaken}
+          {loadingClientId === client._id ? (
+            "Cargando…"
+          ) : (
+            <>
+              {client.servicesTaken}
+              <MdVisibility size={16} />
+            </>
+          )}
         </Badge>
       </Table.Td>
       <Table.Td style={{ textAlign: "center" }}>
@@ -62,10 +74,10 @@ const ClientRow = React.memo(
         </Badge>
       </Table.Td>
       <Table.Td style={{ textAlign: "center" }}>
-        <Menu shadow="sm" width={200}>
+        <Menu shadow="sm" width={220} withinPortal>
           <Menu.Target>
-            <ActionIcon radius="xl">
-              <CgOptions size={20} />
+            <ActionIcon radius="xl" variant="default">
+              <CgOptions size={18} />
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>
@@ -76,12 +88,12 @@ const ClientRow = React.memo(
                 confirmAction(
                   () => handleRegisterService(client._id),
                   "Registrar Servicio",
-                  "¿Estás seguro de que deseas registrar un servicio para este cliente?",
+                  "¿Deseas registrar un servicio para este cliente?",
                   "register"
                 )
               }
             >
-              Registrar Servicio
+              Registrar servicio
             </Menu.Item>
             <Menu.Item
               leftSection={<CgUserAdd />}
@@ -89,18 +101,18 @@ const ClientRow = React.memo(
                 confirmAction(
                   () => handleReferral(client._id),
                   "Registrar Referido",
-                  "¿Estás seguro de que deseas registrar un referido para este cliente?",
+                  "¿Deseas registrar un referido para este cliente?",
                   "refer"
                 )
               }
             >
-              Registrar Referido
+              Registrar referido
             </Menu.Item>
             <Menu.Item
               leftSection={<MdEdit />}
               onClick={() => handleEditClient(client)}
             >
-              Editar Cliente
+              Editar cliente
             </Menu.Item>
             <Menu.Divider />
             <Menu.Item
@@ -110,12 +122,12 @@ const ClientRow = React.memo(
                 confirmAction(
                   () => handleDeleteClient(client._id),
                   "Eliminar Cliente",
-                  "¿Estás seguro de que deseas eliminar este cliente? Esta acción no se puede deshacer.",
+                  "¿Estás seguro? Esta acción no se puede deshacer.",
                   "delete"
                 )
               }
             >
-              Eliminar Cliente
+              Eliminar cliente
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
