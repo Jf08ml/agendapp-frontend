@@ -21,7 +21,7 @@ interface CustomCalendarProps {
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   fetchAppointmentsForMonth: (currentDate: Date) => void;
   loadingMonth: boolean;
-  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>
+  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -58,7 +58,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
 
   const getAppointmentsForDay = (day: Date) => {
     return appointments
-      .filter((event) => isSameDay(event.startDate, day))
+      .filter((event) => isSameDay(new Date(event.startDate), day))
       .sort(
         (a, b) =>
           new Date(a.startDate).getTime() - new Date(b.startDate).getTime()

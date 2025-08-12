@@ -102,11 +102,23 @@ const ScheduleView: React.FC = () => {
 
   const { hasPermission } = usePermissions();
 
+  const canViewAll = hasPermission("appointments:view_all");
+  const readyForScopedFetch =
+    Boolean(organizationId) && (canViewAll || Boolean(userId));
+
+  const normalizeAppointmentDates = (apts: Appointment[]): Appointment[] =>
+    apts.map((a) => ({
+      ...a,
+      startDate: new Date(a.startDate),
+      endDate: new Date(a.endDate),
+    }));
+
   useEffect(() => {
+    if (!readyForScopedFetch) return; // 👈 espera orgId y, si no hay view_all, también userId
     fetchClients();
     fetchEmployees();
     fetchAppointmentsForMonth(currentDate);
-  }, []);
+  }, [readyForScopedFetch]);
 
   useEffect(() => {
     if (!clientIdWhatsapp) return;
@@ -151,6 +163,7 @@ const ScheduleView: React.FC = () => {
    * OBTENER CLIENTES
    */
   const fetchClients = async () => {
+    if (!organizationId) return;
     setLoadingAgenda(true);
     try {
       const response = await getClientsByOrganizationId(
@@ -168,20 +181,19 @@ const ScheduleView: React.FC = () => {
    * OBTENER EMPLEADOS
    */
   const fetchEmployees = async () => {
+    if (!readyForScopedFetch) return; // 👈
     setLoadingAgenda(true);
     try {
       const response = await getEmployeesByOrganizationId(
         organizationId as string
       );
+      let activeEmployees = response.filter((e) => e.isActive);
 
-      // Filtrar por "isActive" para ocultar los inactivos
-      let activeEmployees = response.filter((employee) => employee.isActive);
-
-      // Si NO tiene permisos para ver todos, filtrar solo el suyo
-      if (!hasPermission("appointments:view_all")) {
+      if (!canViewAll) {
+        if (!userId) return; // 👈 evita setear [] prematuramente
         activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
       }
-
+      console.log(activeEmployees)
       setEmployees(activeEmployees);
     } catch (error) {
       console.error(error);
@@ -194,6 +206,7 @@ const ScheduleView: React.FC = () => {
    * OBTENER CITAS
    */
   const fetchAppointmentsForMonth = async (date: Date) => {
+    if (!readyForScopedFetch) return; // 👈
     setLoadingMonth(true);
     try {
       const start = startOfMonth(date).toISOString();
@@ -203,11 +216,14 @@ const ScheduleView: React.FC = () => {
         start,
         end
       );
-      setAppointments(
-        hasPermission("appointments:view_all")
-          ? response
-          : response.filter((a) => a.employee._id === userId)
-      );
+
+      const scoped = canViewAll
+        ? response
+        : userId
+        ? response.filter((a) => a.employee._id === userId)
+        : [];
+
+      setAppointments(normalizeAppointmentDates(scoped));
     } finally {
       setLoadingMonth(false);
     }
@@ -216,6 +232,7 @@ const ScheduleView: React.FC = () => {
   const fetchAppointmentsForDay = async (
     date: Date
   ): Promise<Appointment[]> => {
+    if (!readyForScopedFetch) return []; // 👈
     try {
       const start = startOfDay(date).toISOString();
       const end = endOfDay(date).toISOString();
@@ -225,12 +242,16 @@ const ScheduleView: React.FC = () => {
         end
       );
 
-      return hasPermission("appointments:view_all")
+      const scoped = canViewAll
         ? response
-        : response.filter((a) => a.employee._id === userId);
+        : userId
+        ? response.filter((a) => a.employee._id === userId)
+        : [];
+
+      return normalizeAppointmentDates(scoped);
     } catch {
       console.error("Error al obtener citas del día");
-      return []; // <- Siempre retorna un array
+      return [];
     }
   };
 
