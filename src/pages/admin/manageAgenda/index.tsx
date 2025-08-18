@@ -86,6 +86,7 @@ const ScheduleView: React.FC = () => {
   const dispatch = useDispatch();
 
   const BACKEND_URL = import.meta.env.VITE_API_URL_WHATSAPP;
+  const API_KEY = import.meta.env.VITE_API_KEY;
   // const [localWhatsappStatus, setLocalWhatsappStatus] = useState(""); // opcional, solo si quieres local también
   const socketRef = useRef<Socket | null>(null);
 
@@ -121,29 +122,53 @@ const ScheduleView: React.FC = () => {
   }, [readyForScopedFetch]);
 
   useEffect(() => {
-    if (!clientIdWhatsapp) return;
+    if (!clientIdWhatsapp || !BACKEND_URL || !API_KEY) return;
+
+    fetch(`${BACKEND_URL.replace(/\/$/, "")}/api/status/${clientIdWhatsapp}`, {
+      headers: { "x-api-key": API_KEY },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.code) dispatch(setWhatsappStatus(data.code));
+      })
+      .catch(() => {});
+  }, [clientIdWhatsapp, BACKEND_URL, API_KEY, dispatch]);
+
+  useEffect(() => {
+    if (!clientIdWhatsapp || !BACKEND_URL || !API_KEY) return;
 
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current = null;
     }
-    const socket: Socket = io(BACKEND_URL, { transports: ["websocket"] });
+
+    // Conéctate con auth de apiKey (el backend lo valida en io.use)
+    const socket: Socket = io(BACKEND_URL, {
+      transports: ["websocket"],
+      auth: { apiKey: API_KEY },
+    });
     socketRef.current = socket;
 
-    // Fuerza crear (o verificar) sesión en el backend WhatsApp
-    socket.emit("join", { clientId: clientIdWhatsapp });
-
-    // Recibe eventos de status
-    socket.on("status", (data: { status: string }) => {
-      // setLocalWhatsappStatus(data.status); // opcional
-      dispatch(setWhatsappStatus(data.status)); // ACTUALIZA REDUX
+    // Únete a la “sala” de la sesión
+    socket.on("connect", () => {
+      socket.emit("join", { clientId: clientIdWhatsapp });
     });
 
-    // Limpieza al desmontar
+    // Estado normalizado: { code, reason? }
+    socket.on("status", (data: { code: string; reason?: string }) => {
+      dispatch(setWhatsappStatus(data.code)); // 👈 guarda el "code" en Redux
+    });
+
+    socket.on("connect_error", (err) => {
+      // si quieres, refleja error como “error”
+      dispatch(setWhatsappStatus("error"));
+      console.error("socket error:", err.message);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [clientIdWhatsapp, BACKEND_URL, dispatch]);
+  }, [clientIdWhatsapp, BACKEND_URL, API_KEY, dispatch]);
 
   useEffect(() => {
     // Cada vez que cambie el empleado seleccionado, ajustamos servicios
@@ -193,7 +218,7 @@ const ScheduleView: React.FC = () => {
         if (!userId) return; // 👈 evita setear [] prematuramente
         activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
       }
-      console.log(activeEmployees)
+      console.log(activeEmployees);
       setEmployees(activeEmployees);
     } catch (error) {
       console.error(error);
@@ -677,11 +702,29 @@ const ScheduleView: React.FC = () => {
             </Group>
           )}
 
-          {whatsappStatus === "pending" && (
+          {whatsappStatus === "connecting" && (
             <Group gap="xs">
               <Loader size="xs" color="orange" />
               <Text size="sm" c="orange" fw={700}>
-                Pendiente
+                Conectando...
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {whatsappStatus === "waiting_qr" && (
+            <Group gap="xs">
+              <Loader size="xs" color="teal" />
+              <Text size="sm" c="teal" fw={700}>
+                Sesión sin autenticación
               </Text>
               <Button
                 size="xs"
@@ -699,7 +742,7 @@ const ScheduleView: React.FC = () => {
             <Group gap="xs">
               <Loader size="xs" color="blue" />
               <Text size="sm" c="blue" fw={700}>
-                Autenticando
+                Autenticando...
               </Text>
               <Button
                 size="xs"
@@ -717,7 +760,7 @@ const ScheduleView: React.FC = () => {
             <Group gap="xs">
               <IoAlertCircleOutline color="red" />
               <Text size="sm" c="red" fw={700}>
-                Error autenticación
+                Error de autenticación
               </Text>
               <Button
                 size="xs"
@@ -736,6 +779,33 @@ const ScheduleView: React.FC = () => {
               <IoAlertCircleOutline color="red" />
               <Text size="sm" c="red" fw={700}>
                 Desconectado
+              </Text>
+              <Button
+                size="xs"
+                variant="outline"
+                color="blue"
+                ml={8}
+                onClick={() => navigate("/gestionar-whatsapp")}
+              >
+                Configurar WhatsApp
+              </Button>
+            </Group>
+          )}
+
+          {whatsappStatus === "reconnecting" && (
+            <Group gap="xs">
+              <Loader size="xs" color="orange" />
+              <Text size="sm" c="orange" fw={700}>
+                Reconectando...
+              </Text>
+            </Group>
+          )}
+
+          {whatsappStatus === "error" && (
+            <Group gap="xs">
+              <IoAlertCircleOutline color="red" />
+              <Text size="sm" c="red" fw={700}>
+                Error de conexión
               </Text>
               <Button
                 size="xs"

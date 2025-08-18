@@ -131,7 +131,7 @@ export const createAppointment = async (
 ): Promise<Appointment | undefined> => {
   try {
     const response = await apiAppointment.post<Response<Appointment>>(
-      "/",
+      "",
       appointmentData
     );
     return response.data.data;
