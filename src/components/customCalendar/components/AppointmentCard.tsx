@@ -26,6 +26,7 @@ import {
   BiCheckCircle,
   BiCopy,
   BiPlus,
+  BiTimeFive,
 } from "react-icons/bi";
 import { format } from "date-fns";
 import {
@@ -779,6 +780,32 @@ ${clientServices}`;
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
+        <Tooltip
+          label={
+            appointment.reminderSent
+              ? "Recordatorio enviado"
+              : "Recordatorio pendiente"
+          }
+          withArrow
+        >
+          <ActionIcon
+            className="ignore-modal"
+            size="sm"
+            variant="transparent"
+            style={{
+              position: "absolute",
+              bottom: "-8px",
+              left: "-11px",
+              pointerEvents: "auto", // para que no abra modal
+            }}
+          >
+            {appointment.reminderSent ? (
+              <BiCheckCircle size={10} color="teal" />
+            ) : (
+              <BiTimeFive size={10} color="gray" />
+            )}
+          </ActionIcon>
+        </Tooltip>
       </Paper>
     </>
   );

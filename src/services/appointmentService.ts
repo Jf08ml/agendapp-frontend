@@ -23,6 +23,7 @@ export interface Appointment {
   customPrice?: number | null; // Precio personalizado definido por el usuario
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos
   totalPrice: number; // Precio total calculado para la cita
+  reminderSent?: boolean,
   createdAt: Date;
   updatedAt: Date;
 }
