@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Button, Group, Loader, Text, Title } from "@mantine/core";
+import { Box, Button, Group, Loader, Text, Title, Tooltip } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import io, { Socket } from "socket.io-client";
 import { setWhatsappStatus } from "../../../features/organization/sliceOrganization";
@@ -41,6 +41,9 @@ import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
 import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
 import { FaCheck } from "react-icons/fa";
 import { IoAlertCircleOutline } from "react-icons/io5";
+import { runDailyReminder } from "../../../services/cronService";
+import { IoNotificationsOutline } from "react-icons/io5";
+
 import { useNavigate } from "react-router-dom";
 
 export interface CreateAppointmentPayload {
@@ -80,6 +83,8 @@ const ScheduleView: React.FC = () => {
 
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  const [sendingReminders, setSendingReminders] = useState(false);
+
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
@@ -113,6 +118,8 @@ const ScheduleView: React.FC = () => {
       startDate: new Date(a.startDate),
       endDate: new Date(a.endDate),
     }));
+
+  const isWhatsAppReady = whatsappStatus === "ready";
 
   useEffect(() => {
     if (!readyForScopedFetch) return; // 👈 espera orgId y, si no hay view_all, también userId
@@ -183,6 +190,58 @@ const ScheduleView: React.FC = () => {
       setFilteredServices([]);
     }
   }, [newAppointment.employee, employees]);
+
+  /**ENVIAR RECORDATORIOS */
+  const handleSendDailyReminders = () => {
+    if (!isWhatsAppReady) {
+      showNotification({
+        title: "WhatsApp no conectado",
+        message:
+          "Conecta tu sesión de WhatsApp para poder enviar recordatorios.",
+        color: "orange",
+        autoClose: 3500,
+        position: "top-right",
+      });
+      return;
+    }
+
+    openConfirmModal({
+      title: "Enviar recordatorios de hoy",
+      centered: true,
+      children: (
+        <p>
+          Se enviarán mensajes a los <strong>clientes con citas de hoy</strong>{" "}
+          que <strong>aún no tienen recordatorio</strong>. ¿Deseas continuar?
+        </p>
+      ),
+      labels: { confirm: "Sí, enviar", cancel: "Cancelar" },
+      confirmProps: { color: "grape" },
+      onConfirm: async () => {
+        setSendingReminders(true);
+        try {
+          await runDailyReminder();
+          showNotification({
+            title: "Listo",
+            message: "Se ejecutó el envío de recordatorios.",
+            color: "green",
+            autoClose: 3500,
+            position: "top-right",
+          });
+        } catch (error) {
+          showNotification({
+            title: "Error",
+            message: "No se pudieron enviar los recordatorios.",
+            color: "red",
+            autoClose: 3500,
+            position: "top-right",
+          });
+          console.error(error);
+        } finally {
+          setSendingReminders(false);
+        }
+      },
+    });
+  };
 
   /**
    * OBTENER CLIENTES
@@ -882,6 +941,33 @@ const ScheduleView: React.FC = () => {
         onSave={handleSaveReorderedEmployees}
         onFetchEmployees={fetchEmployees}
       />
+      {hasPermission("appointments:send_reminders") && (
+        <Tooltip
+          label="Conecta WhatsApp para enviar recordatorios"
+          disabled={isWhatsAppReady}
+          withArrow
+        >
+          {/* Mantine: envolver el botón deshabilitado en un contenedor para que funcione el tooltip */}
+            <Button
+              size="xs"
+              variant="outline"
+              color="grape"
+              leftSection={
+                sendingReminders ? (
+                  <Loader size="xs" />
+                ) : (
+                  <IoNotificationsOutline size={16} />
+                )
+              }
+              onClick={handleSendDailyReminders}
+              disabled={sendingReminders || !isWhatsAppReady}
+              title="Enviar recordatorios de WhatsApp de las citas de hoy no enviadas"
+            >
+              Enviar recordatorios
+            </Button>
+          
+        </Tooltip>
+      )}
     </Box>
   );
 };
