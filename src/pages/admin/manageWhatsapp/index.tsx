@@ -30,14 +30,13 @@ import { BiInfoCircle } from "react-icons/bi";
 const BASE_URL = (import.meta as any).env.VITE_API_URL_WHATSAPP as string;
 const API_KEY = (import.meta as any).env.VITE_API_KEY as string;
 
-// Axios con x-api-key por defecto
 const api = axiosBase.create({
   baseURL: BASE_URL?.replace(/\/$/, "") ?? "",
   headers: { "x-api-key": API_KEY },
 });
 // ===================================================
 
-// ---- Mapeo de estados normalizados (code -> UI) ----
+// ---- Estados normalizados que envía el backend ----
 type Code =
   | "connecting"
   | "waiting_qr"
@@ -118,40 +117,78 @@ const WhatsappOrgSession: React.FC = () => {
     (state: RootState) => state.organization.organization
   );
 
-  // Formulario de envío
+  // Form envío
   const [phone, setPhone] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
 
-  // Estado de la sesión
+  // Estado sesión
   const [clientId, setClientId] = useState<string>("");
   const [qr, setQr] = useState<string>("");
-  const [code, setCode] = useState<string>("");
+  const [code, setCode] = useState<Code>("connecting");
   const [reason, setReason] = useState<string>("");
   const [error, setError] = useState<string>("");
 
-  // Ciclo para forzar reconexión
+  // Fuerza ciclo de reconexión
   const [sessionCycleKey, setSessionCycleKey] = useState<number>(0);
 
-  // TTL del QR (cuenta regresiva)
+  // TTL del QR
   const [qrTtl, setQrTtl] = useState<number>(0);
+
+  // Ventana de gracia tras 'authenticated'
+  const prevCodeRef = useRef<Code>("connecting");
+  const [authGraceUntil, setAuthGraceUntil] = useState<number>(0);
 
   const socketRef = useRef<Socket | null>(null);
   const connected = code === "ready";
+
+  // Helper: manejar transiciones de estado con ventana de gracia y filtros
+  function handleIncomingStatus(next: Code, reasonStr: string) {
+    const prev = prevCodeRef.current;
+    prevCodeRef.current = next;
+
+    if (next === "authenticated") {
+      setAuthGraceUntil(Date.now() + 8000); // 8s de gracia
+    }
+
+    if (next === "disconnected") {
+      const inGrace = Date.now() < authGraceUntil;
+      const linkingPhase = prev === "waiting_qr" || prev === "authenticated";
+      if (inGrace || linkingPhase) {
+        setCode("reconnecting");
+        setReason(reasonStr || "");
+        return;
+      }
+    }
+
+    setCode(next);
+    setReason(reasonStr || "");
+
+    if (next === "ready") {
+      setQr("");
+    } else if (next === "auth_failure") {
+      setError("Error de autenticación, intenta de nuevo");
+      limpiarClientIdEnOrganizacion(
+        "Error de autenticación. Vuelve a escanear el QR para conectar."
+      );
+    } else if (next === "disconnected") {
+      setError("Sesión desconectada. Puedes reconectar o reiniciar.");
+    }
+  }
 
   // Detecta cambios en la organización y define clientId base
   useEffect(() => {
     if (!organization) return;
     const id = (organization as any).clientIdWhatsapp || organization._id || "";
     setClientId(id);
-    setCode("");
+    setCode("connecting");
     setReason("");
     setQr("");
     setError("");
-    setSessionCycleKey((prev) => prev + 1); // nuevo ciclo
+    setSessionCycleKey((prev) => prev + 1);
   }, [organization?.clientIdWhatsapp, organization?._id]);
 
-  // Socket.IO (autenticado con apiKey) + creación/reuso de sesión
+  // Socket.IO: unirse primero a la sala y luego crear/reusar sesión (evita perder el primer QR)
   useEffect(() => {
     if (!clientId || !BASE_URL || !API_KEY) return;
 
@@ -171,13 +208,13 @@ const WhatsappOrgSession: React.FC = () => {
     });
     socketRef.current = socket;
 
-    // Crea/reusa sesión en backend
-    api.post(`/api/session`, { clientId }).catch(() => {
-      setError("Error conectando con la API de WhatsApp");
-    });
-
     socket.on("connect", () => {
+      // 1) Únete a la sala
       socket.emit("join", { clientId });
+      // 2) Crea/reusa sesión (idempotente)
+      api.post(`/api/session`, { clientId }).catch(() => {
+        setError("Error conectando con la API de WhatsApp");
+      });
     });
 
     socket.on("qr", (data: { qr: string }) => {
@@ -187,21 +224,14 @@ const WhatsappOrgSession: React.FC = () => {
     });
 
     socket.on("status", (data: { code: Code; reason?: string }) => {
-      setCode(data.code);
-      setReason(data.reason || "");
-      if (data.code === "ready") setQr("");
-      if (data.code === "auth_failure") {
-        setError("Error de autenticación, intenta de nuevo");
-        limpiarClientIdEnOrganizacion(
-          "Error de autenticación. Vuelve a escanear el QR para conectar."
-        );
-      }
-      if (data.code === "disconnected") {
-        setError("Sesión desconectada o expirada.");
-        limpiarClientIdEnOrganizacion(
-          "Tu sesión de WhatsApp ha expirado o se cerró desde el teléfono."
-        );
-      }
+      handleIncomingStatus(data.code, data.reason || "");
+    });
+
+    socket.on("session_cleaned", () => {
+      setQr("");
+      setCode("waiting_qr");
+      setReason("");
+      limpiarClientIdEnOrganizacion("Sesión cerrada en el servidor.");
     });
 
     socket.on("connect_error", (err) => {
@@ -220,7 +250,7 @@ const WhatsappOrgSession: React.FC = () => {
       .get(`/api/status/${clientId}`)
       .then(({ data }) => {
         if (data?.code) {
-          setCode(data.code);
+          setCode(data.code as Code);
           setReason(data.reason || "");
           if (data.code === "ready") setQr("");
         }
@@ -228,39 +258,33 @@ const WhatsappOrgSession: React.FC = () => {
       .catch(() => {});
   }, [clientId]);
 
-  // Guarda clientId en la organización cuando está "ready"
+  // Micropoll cuando está "authenticated" para detectar salto a "ready"
   useEffect(() => {
-    const guardarClientId = async () => {
-      if (
-        code === "ready" &&
-        organization &&
-        (organization as any).clientIdWhatsapp !== clientId &&
-        clientId
-      ) {
-        try {
-          const updated = await updateOrganization(organization._id!, {
-            clientIdWhatsapp: clientId,
-          });
-          dispatch(updateOrganizationState(updated!));
-          showNotification({
-            color: "green",
-            icon: <FaCheck size={18} />,
-            title: "¡Sesión conectada!",
-            message:
-              "La sesión de WhatsApp ha sido autenticada y guardada para esta organización.",
-          });
-        } catch (err: any) {
-          showNotification({
-            color: "red",
-            icon: <IoAlertCircleOutline size={18} />,
-            title: "Error al actualizar la organización",
-            message: err?.message || "No se pudo guardar el clientIdWhatsapp.",
-          });
+    if (code !== "authenticated" || !clientId) return;
+
+    let alive = true;
+    const started = Date.now();
+
+    const tick = async () => {
+      if (!alive) return;
+      try {
+        const { data } = await api.get(`/api/status/${clientId}`);
+        if (data?.code === "ready") {
+          setCode("ready");
+          setQr("");
+          return;
         }
+      } catch { /* empty */ }
+      if (Date.now() - started < 10000) {
+        setTimeout(tick, 1500);
       }
     };
-    guardarClientId();
-  }, [code, clientId, organization, dispatch]);
+
+    tick();
+    return () => {
+      alive = false;
+    };
+  }, [code, clientId]);
 
   // TTL del QR: 60s cada vez que llega QR o el code pasa a waiting_qr
   useEffect(() => {
@@ -273,7 +297,7 @@ const WhatsappOrgSession: React.FC = () => {
     return () => clearInterval(t);
   }, [qrTtl]);
 
-  // Limpia el clientIdWhatsapp en DB cuando expira/desconecta/autenticación falla
+  // Limpiar clientIdWhatsapp en DB cuando es terminal (auth_failure / session_cleaned / logout)
   const limpiarClientIdEnOrganizacion = async (razon: string) => {
     if (!organization || !(organization as any).clientIdWhatsapp) return;
     try {
@@ -281,7 +305,6 @@ const WhatsappOrgSession: React.FC = () => {
         clientIdWhatsapp: null,
       });
       dispatch(updateOrganizationState(updated!));
-      // Forzar ciclo para volver a usar el _id y mostrar QR
       setSessionCycleKey((prev) => prev + 1);
       showNotification({
         color: "orange",
@@ -301,7 +324,8 @@ const WhatsappOrgSession: React.FC = () => {
 
   // Enviar mensaje
   const handleSendMessage = async () => {
-    if (!phone || !message) {
+    const phoneClean = (phone || "").replace(/\s+/g, "");
+    if (!phoneClean || !message) {
       showNotification({
         color: "red",
         icon: <IoAlertCircleOutline size={18} />,
@@ -314,7 +338,7 @@ const WhatsappOrgSession: React.FC = () => {
     try {
       const res = await api.post(`/api/send`, {
         clientId,
-        phone,
+        phone: phoneClean,
         message,
       });
       showNotification({
@@ -345,6 +369,7 @@ const WhatsappOrgSession: React.FC = () => {
   const handleRestart = async () => {
     if (!clientId) return;
     try {
+      setCode("reconnecting");
       await api.post(`/api/restart`, { clientId });
       showNotification({
         color: "blue",
@@ -353,6 +378,7 @@ const WhatsappOrgSession: React.FC = () => {
       });
       setSessionCycleKey((p) => p + 1);
     } catch (err: any) {
+      setCode("error");
       showNotification({
         color: "red",
         title: "No se pudo reiniciar",
@@ -392,7 +418,7 @@ const WhatsappOrgSession: React.FC = () => {
     );
   }
 
-  const ui = UI_STATUS[(code as Code) || "connecting"];
+  const ui = UI_STATUS[code || "connecting"];
 
   return (
     <Container size="xs" mt={40}>
@@ -428,6 +454,16 @@ const WhatsappOrgSession: React.FC = () => {
             Estado: {ui.title}
           </Text>
 
+          {/* Esperando generación del QR */}
+          {code === "waiting_qr" && !qr && (
+            <Stack align="center" gap="sm">
+              <Loader size="sm" />
+              <Text size="sm" c="dimmed">
+                Generando código QR… espera unos segundos
+              </Text>
+            </Stack>
+          )}
+
           {/* QR cuando corresponde */}
           {ui.showQR && qr && (
             <>
@@ -451,10 +487,10 @@ const WhatsappOrgSession: React.FC = () => {
                   </b>
                 </Text>
                 <Text size="xs" c="dimmed" mt={8}>
-                  <b>Importante:</b> Mantén tu teléfono con conexión a internet
-                  para no perder la sesión.
+                  <b>Importante:</b> Mantén tu teléfono con conexión a internet para no perder la sesión.
                 </Text>
               </Alert>
+
               <Stack align="center" gap={0}>
                 <QRCodeCanvas value={qr} size={220} style={{ margin: "auto" }} />
                 <Text size="xs" c="gray" mt={4}>
@@ -463,7 +499,10 @@ const WhatsappOrgSession: React.FC = () => {
                 <Button
                   mt="xs"
                   variant="light"
-                  onClick={() => api.post(`/api/session`, { clientId })}
+                  onClick={() => {
+                    api.post(`/api/session`, { clientId });
+                    socketRef.current?.emit("join", { clientId });
+                  }}
                 >
                   Regenerar QR
                 </Button>
