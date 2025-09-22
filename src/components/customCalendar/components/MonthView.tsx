@@ -1,5 +1,5 @@
 import React from "react";
-import { Grid, Box, Paper, Text } from "@mantine/core";
+import { Grid, Box, Paper, Text, Tooltip, Badge } from "@mantine/core";
 import {
   eachDayOfInterval,
   startOfMonth,
@@ -15,6 +15,7 @@ import {
 import { es } from "date-fns/locale";
 import { Appointment } from "../../../services/appointmentService";
 import CustomLoader from "../../customLoader/CustomLoader";
+import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
 
 interface MonthViewProps {
   currentDate: Date;
@@ -22,6 +23,7 @@ interface MonthViewProps {
   handleDayClick: (day: Date) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
   loadingMonth: boolean;
+  holidayConfig?: HolidayConfig; // <— nuevo
 }
 
 const MonthView: React.FC<MonthViewProps> = ({
@@ -30,6 +32,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   handleDayClick,
   getAppointmentsForDay,
   loadingMonth,
+  holidayConfig = { country: "CO", language: "es" }, // por defecto Colombia en español
 }) => {
   const daysOfWeek = [
     "Domingo",
@@ -47,6 +50,8 @@ const MonthView: React.FC<MonthViewProps> = ({
     end: endOfCalendarWeek(endMonth),
   });
 
+  const { isHoliday, holidayNames } = useHolidays(currentDate, holidayConfig);
+
   return (
     <Box style={{ position: "relative" }}>
       <Paper withBorder>
@@ -61,6 +66,7 @@ const MonthView: React.FC<MonthViewProps> = ({
           {formatDate(currentDate, "MMMM", { locale: es })}
         </Text>
       </Paper>
+
       <Paper withBorder my="xs">
         <Grid>
           {daysOfWeek.map((day, index) => (
@@ -76,62 +82,99 @@ const MonthView: React.FC<MonthViewProps> = ({
           ))}
         </Grid>
       </Paper>
-      {/* Calendario SIEMPRE visible */}
+
       <Grid gutter="xs">
-        {daysInMonth.map((day) => (
-          <Grid.Col span={1.7} key={day.toISOString()}>
-            <Paper
-              shadow="sm"
-              radius="md"
-              p="xs"
-              withBorder
-              onClick={() => handleDayClick(day)}
-              style={{
-                cursor: "pointer",
-                position: "relative",
-                height: "100%",
-                backgroundColor: isSameDay(day, currentDate)
-                  ? "#f0f8ff"
-                  : "white",
-                borderColor: isSameDay(day, currentDate)
-                  ? "#007bff"
-                  : undefined,
-                borderWidth: isSameDay(day, currentDate) ? 2 : 1,
-                transition: "background 0.2s, border-color 0.2s",
-                opacity: loadingMonth ? 0.7 : 1, // Suaviza el fondo en loading
-                filter: loadingMonth ? "blur(0.5px)" : "none",
-              }}
-            >
-              <Text
-                size={isMobile ? "xs" : "sm"}
-                c="dimmed"
-                mb="xs"
-                ta="center"
-                fw={800}
+        {daysInMonth.map((day) => {
+          const selected = isSameDay(day, currentDate);
+          const holiday = isHoliday(day);
+          const holidayLabel = holidayNames(day).join(" · ");
+
+          return (
+            <Grid.Col span={1.7} key={day.toISOString()}>
+              <Tooltip
+                disabled={!holiday}
+                label={holidayLabel}
+                position="top"
+                withArrow
+                withinPortal
               >
-                {format(day, "d", { locale: es })}
-              </Text>
-              {getAppointmentsForDay(day).length > 0 && (
-                <Text
-                  ta="center"
-                  c="dimmed"
+                <Paper
+                  shadow="sm"
+                  radius="md"
+                  p="xs"
+                  withBorder
+                  onClick={() => handleDayClick(day)}
                   style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "100%",
-                    fontSize: isMobile ? 10 : 12,
+                    cursor: "pointer",
+                    position: "relative",
+                    height: "100%",
+                    backgroundColor: selected
+                      ? "#f0f8ff"
+                      : holiday
+                      ? "rgba(255, 99, 71, 0.08)" // leve tinte (tipo 'tomato' muy suave)
+                      : "white",
+                    borderColor: selected
+                      ? "#007bff"
+                      : holiday
+                      ? "rgba(255, 99, 71, 0.6)"
+                      : undefined,
+                    borderWidth: selected ? 2 : holiday ? 2 : 1,
+                    transition: "background 0.2s, border-color 0.2s",
+                    opacity: loadingMonth ? 0.7 : 1,
+                    filter: loadingMonth ? "blur(0.5px)" : "none",
                   }}
                 >
-                  {getAppointmentsForDay(day).length} citas
-                </Text>
-              )}
-            </Paper>
-          </Grid.Col>
-        ))}
+                  <Box
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      size={isMobile ? "xs" : "sm"}
+                      c={holiday ? "red" : "dimmed"}
+                      mb="xs"
+                      ta="center"
+                      fw={800}
+                    >
+                      {format(day, "d", { locale: es })}
+                    </Text>
+                  </Box>
+
+                  {/* insignia festivo en esquina */}
+                  {holiday && (
+                    <Badge
+                      variant="light"
+                      size="xs"
+                      style={{ position: "absolute", top: 0, right: 0 }}
+                    >
+                      Festivo
+                    </Badge>
+                  )}
+
+                  {getAppointmentsForDay(day).length > 0 && (
+                    <Text
+                      ta="center"
+                      c="dimmed"
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        width: "100%",
+                        fontSize: isMobile ? 10 : 12,
+                      }}
+                    >
+                      {getAppointmentsForDay(day).length} citas
+                    </Text>
+                  )}
+                </Paper>
+              </Tooltip>
+            </Grid.Col>
+          );
+        })}
       </Grid>
 
-      {/* Overlay sólo cuando loadingMonth */}
       {loadingMonth && (
         <Box
           style={{
