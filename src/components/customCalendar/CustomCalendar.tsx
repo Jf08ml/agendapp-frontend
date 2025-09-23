@@ -73,6 +73,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         handleDayClick={handleDayClick}
         getAppointmentsForDay={getAppointmentsForDay}
         loadingMonth={loadingMonth}
+        holidayConfig={{ country: "CO", language: "es" }}
       />
 
       <Group justify="center" my="md">

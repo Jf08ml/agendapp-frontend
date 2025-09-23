@@ -1,13 +1,21 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Button, Group, Loader, Text, Title, Tooltip } from "@mantine/core";
+import {
+  Box,
+  Button,
+  Group,
+  Loader,
+  Text,
+  Title,
+  Tooltip,
+} from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import io, { Socket } from "socket.io-client";
 import { setWhatsappStatus } from "../../../features/organization/sliceOrganization";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
-  createAppointment,
+  createAppointmentsBatch,
   deleteAppointment,
   getAppointmentsByOrganizationId,
   updateAppointment,
@@ -31,7 +39,6 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
 import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
 import {
-  addMinutes,
   endOfDay,
   endOfMonth,
   startOfDay,
@@ -611,31 +618,20 @@ const ScheduleView: React.FC = () => {
           });
         } else {
           // MODO CREACIÓN
-          let currentStart = startDate; // Hora de inicio de la PRIMER cita
+          const payload = {
+            services: services.map((s) => s._id ?? s), // aseguramos que sean IDs
+            employee,
+            client,
+            employeeRequestedByClient: employeeRequestedByClient ?? false,
+            startDate, // inicio de la primera cita
+            organizationId: organizationId as string,
+            advancePayment,
+            // si manejas precios personalizados o adicionales, aquí también:
+            // customPrices: { [serviceId]: number },
+            // additionalItemsByService: { [serviceId]: [{ name, price, quantity }] }
+          };
 
-          for (const service of services) {
-            // Calculamos la hora de fin para este servicio
-            // usando su duración (en minutos).
-            const serviceEnd = addMinutes(currentStart, service.duration || 0);
-
-            // Construimos el payload para ESTA cita
-            const payload = {
-              service,
-              employee,
-              client,
-              employeeRequestedByClient: employeeRequestedByClient ?? false,
-              startDate: currentStart, // Empieza donde terminó el anterior
-              endDate: serviceEnd, // Termina después de su duración
-              status: status || "pending",
-              organizationId: organizationId as string,
-              advancePayment,
-            };
-
-            await createAppointment(payload);
-
-            // El próximo servicio empieza donde terminó éste
-            currentStart = serviceEnd;
-          }
+          await createAppointmentsBatch(payload);
 
           showNotification({
             title: "Éxito",
@@ -645,6 +641,10 @@ const ScheduleView: React.FC = () => {
             autoClose: 3000,
             position: "top-right",
           });
+
+          setCreatingAppointment(false);
+          closeModal(); // cierra el modal
+          fetchAppointmentsForMonth(currentDate); // refresca la agenda
         }
         setCreatingAppointment(false);
         closeModal(); // cierra el modal
@@ -948,24 +948,23 @@ const ScheduleView: React.FC = () => {
           withArrow
         >
           {/* Mantine: envolver el botón deshabilitado en un contenedor para que funcione el tooltip */}
-            <Button
-              size="xs"
-              variant="outline"
-              color="grape"
-              leftSection={
-                sendingReminders ? (
-                  <Loader size="xs" />
-                ) : (
-                  <IoNotificationsOutline size={16} />
-                )
-              }
-              onClick={handleSendDailyReminders}
-              disabled={sendingReminders || !isWhatsAppReady}
-              title="Enviar recordatorios de WhatsApp de las citas de hoy no enviadas"
-            >
-              Enviar recordatorios
-            </Button>
-          
+          <Button
+            size="xs"
+            variant="outline"
+            color="grape"
+            leftSection={
+              sendingReminders ? (
+                <Loader size="xs" />
+              ) : (
+                <IoNotificationsOutline size={16} />
+              )
+            }
+            onClick={handleSendDailyReminders}
+            disabled={sendingReminders || !isWhatsAppReady}
+            title="Enviar recordatorios de WhatsApp de las citas de hoy no enviadas"
+          >
+            Enviar recordatorios
+          </Button>
         </Tooltip>
       )}
     </Box>

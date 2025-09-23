@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiAppointment } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
@@ -23,7 +24,7 @@ export interface Appointment {
   customPrice?: number | null; // Precio personalizado definido por el usuario
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos
   totalPrice: number; // Precio total calculado para la cita
-  reminderSent?: boolean,
+  reminderSent?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,12 +42,32 @@ export interface CreateAppointmentPayload {
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos (opcional)
 }
 
+/** Payload para el endpoint BATCH RECOMENDADO */
+export interface CreateAppointmentsBatchPayload {
+  services: Array<Service | string>; // ids
+  employee: Employee | string;
+  client: Client | string;
+  startDate: Date | string; // inicio de la primera cita
+  organizationId: string;
+  advancePayment?: number;
+  employeeRequestedByClient?: boolean;
+  /** { [serviceId]: price } */
+  customPrices?: Record<string, number>;
+  /** { [serviceId]: AdditionalItem[] } */
+  additionalItemsByService?: Record<string, AdditionalItem[]>;
+}
+
 interface Response<T> {
   code: number;
   status: string;
   data: T;
   message: string;
 }
+
+/** ---- Helpers ---- */
+const asId = (x: any) => (typeof x === "string" ? x : x?._id ?? x?.id ?? x);
+const asISO = (d: Date | string) =>
+  typeof d === "string" ? new Date(d).toISOString() : d.toISOString();
 
 // Obtener todas las citas
 export const getAppointments = async (): Promise<Appointment[]> => {
@@ -138,6 +159,36 @@ export const createAppointment = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al crear la cita");
+  }
+};
+
+// Crear múltiples citas (batch)
+/**
+ * Crear múltiples citas en lote (endpoint recomendado /appointments/batch)
+ * -> El backend espera UN payload con arreglo de servicios, no { appointments: [...] }
+ */
+export const createAppointmentsBatch = async (
+  data: CreateAppointmentsBatchPayload
+): Promise<Appointment[] | undefined> => {
+  try {
+    const payload = {
+      services: data.services.map(asId),
+      employee: asId(data.employee),
+      client: asId(data.client),
+      startDate: asISO(data.startDate),
+      organizationId: data.organizationId,
+      advancePayment: data.advancePayment,
+      employeeRequestedByClient: data.employeeRequestedByClient ?? false,
+      customPrices: data.customPrices,
+      additionalItemsByService: data.additionalItemsByService,
+    };
+    const res = await apiAppointment.post<Response<Appointment[]>>(
+      "/batch",
+      payload
+    );
+    return res.data.data;
+  } catch (err) {
+    handleAxiosError(err, "Error al crear las citas en lote");
   }
 };
 
