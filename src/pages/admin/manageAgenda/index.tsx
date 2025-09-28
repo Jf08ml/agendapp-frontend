@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Group,
@@ -38,12 +39,7 @@ import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
 import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
-import {
-  endOfDay,
-  endOfMonth,
-  startOfDay,
-  startOfMonth,
-} from "date-fns";
+import { endOfDay, endOfMonth, startOfDay, startOfMonth } from "date-fns";
 import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
 import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
 import { FaCheck } from "react-icons/fa";
@@ -866,7 +862,7 @@ const ScheduleView: React.FC = () => {
               <Text size="sm" c="red" fw={700}>
                 Error de conexión
               </Text>
-              <Button
+              {/* <Button
                 size="xs"
                 variant="outline"
                 color="blue"
@@ -874,7 +870,10 @@ const ScheduleView: React.FC = () => {
                 onClick={() => navigate("/gestionar-whatsapp")}
               >
                 Configurar WhatsApp
-              </Button>
+              </Button> */}
+              <Text size="sm" c="red" fw={700}>
+                - Inhabilitado temporalemente
+              </Text>
             </Group>
           )}
 
@@ -947,7 +946,6 @@ const ScheduleView: React.FC = () => {
           disabled={isWhatsAppReady}
           withArrow
         >
-          {/* Mantine: envolver el botón deshabilitado en un contenedor para que funcione el tooltip */}
           <Button
             size="xs"
             variant="outline"
@@ -960,7 +958,8 @@ const ScheduleView: React.FC = () => {
               )
             }
             onClick={handleSendDailyReminders}
-            disabled={sendingReminders || !isWhatsAppReady}
+            // disabled={sendingReminders || !isWhatsAppReady}
+            disabled={true}
             title="Enviar recordatorios de WhatsApp de las citas de hoy no enviadas"
           >
             Enviar recordatorios
