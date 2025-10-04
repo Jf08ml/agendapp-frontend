@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -11,7 +12,6 @@ import {
 } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import io, { Socket } from "socket.io-client";
-import { setWhatsappStatus } from "../../../features/organization/sliceOrganization";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
@@ -43,10 +43,16 @@ import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
 import { BiPlus, BiRefresh, BiSearch, BiSort } from "react-icons/bi";
 import { FaCheck } from "react-icons/fa";
 import { IoAlertCircleOutline } from "react-icons/io5";
-import { runDailyReminder } from "../../../services/cronService";
 import { IoNotificationsOutline } from "react-icons/io5";
-
 import { useNavigate } from "react-router-dom";
+
+import { sendOrgReminders } from "../../../services/reminderService";
+import {
+  getWaStatus,
+  connectWaSession,
+  WaCode,
+} from "../../../services/waService";
+import { setWhatsappMeta } from "../../../features/organization/sliceOrganization";
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -91,10 +97,6 @@ const ScheduleView: React.FC = () => {
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
   const dispatch = useDispatch();
-
-  const BACKEND_URL = import.meta.env.VITE_API_URL_WHATSAPP;
-  const API_KEY = import.meta.env.VITE_API_KEY;
-  // const [localWhatsappStatus, setLocalWhatsappStatus] = useState(""); // opcional, solo si quieres local también
   const socketRef = useRef<Socket | null>(null);
 
   // Datos de la organización
@@ -104,12 +106,15 @@ const ScheduleView: React.FC = () => {
   const organizationId = organization?._id;
   const clientIdWhatsapp =
     organization?.clientIdWhatsapp || organization?._id || "";
+
   const whatsappStatus = useSelector(
     (state: RootState) => state.organization.whatsappStatus
+  ) as WaCode | "";
+  const whatsappReason = useSelector(
+    (s: RootState) => s.organization.whatsappReason
   );
 
   const { hasPermission } = usePermissions();
-
   const canViewAll = hasPermission("appointments:view_all");
   const readyForScopedFetch =
     Boolean(organizationId) && (canViewAll || Boolean(userId));
@@ -121,66 +126,109 @@ const ScheduleView: React.FC = () => {
       endDate: new Date(a.endDate),
     }));
 
-  const isWhatsAppReady = whatsappStatus === "ready";
-
+  // ---------- DATA FETCH ----------
   useEffect(() => {
-    if (!readyForScopedFetch) return; // 👈 espera orgId y, si no hay view_all, también userId
+    if (!readyForScopedFetch) return; // espera orgId y, si no hay view_all, también userId
     fetchClients();
     fetchEmployees();
     fetchAppointmentsForMonth(currentDate);
   }, [readyForScopedFetch]);
 
+  // ---------- WA STATUS: Reset suave al cambiar org/sesión ----------
   useEffect(() => {
-    if (!clientIdWhatsapp || !BACKEND_URL || !API_KEY) return;
+    if (organizationId && clientIdWhatsapp) {
+      dispatch(setWhatsappMeta({ code: "connecting", reason: null }));
+    } else {
+      dispatch(setWhatsappMeta({ code: "", reason: null }));
+    }
+  }, [organizationId, clientIdWhatsapp, dispatch]);
 
-    fetch(`${BACKEND_URL.replace(/\/$/, "")}/api/status/${clientIdWhatsapp}`, {
-      headers: { "x-api-key": API_KEY },
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.code) dispatch(setWhatsappStatus(data.code));
+  // ---------- WA STATUS: precarga por REST (agenda-backend) ----------
+  useEffect(() => {
+    if (!organizationId) return;
+    getWaStatus(organizationId)
+      .then((s) => {
+        if (s?.code) {
+          dispatch(
+            setWhatsappMeta({
+              code: s.code as WaCode,
+              reason: s.reason ?? null,
+              readySince: s.readySince ?? null,
+              me: s.me ?? null,
+            })
+          );
+        }
       })
       .catch(() => {});
-  }, [clientIdWhatsapp, BACKEND_URL, API_KEY, dispatch]);
+  }, [organizationId, dispatch]);
 
+  // ---------- SOCKET: conectar con ws.url + token efímero ----------
   useEffect(() => {
-    if (!clientIdWhatsapp || !BACKEND_URL || !API_KEY) return;
+    if (!organizationId || !clientIdWhatsapp) return;
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
+    let mounted = true;
 
-    // Conéctate con auth de apiKey (el backend lo valida en io.use)
-    const socket: Socket = io(BACKEND_URL, {
-      transports: ["websocket"],
-      auth: { apiKey: API_KEY },
-    });
-    socketRef.current = socket;
+    connectWaSession(organizationId, clientIdWhatsapp)
+      .then((resp) => {
+        if (!mounted) return;
 
-    // Únete a la “sala” de la sesión
-    socket.on("connect", () => {
-      socket.emit("join", { clientId: clientIdWhatsapp });
-    });
+        const ws = resp?.ws;
+        if (!ws?.url || !ws?.token) {
+          dispatch(
+            setWhatsappMeta({ code: "error", reason: "WS no disponible" })
+          );
+          return;
+        }
 
-    // Estado normalizado: { code, reason? }
-    socket.on("status", (data: { code: string; reason?: string }) => {
-      dispatch(setWhatsappStatus(data.code)); // 👈 guarda el "code" en Redux
-    });
+        // Limpieza previa si existía
+        if (socketRef.current) {
+          socketRef.current.off("status");
+          socketRef.current.off("connect");
+          socketRef.current.off("connect_error");
+          socketRef.current.disconnect();
+          socketRef.current = null;
+        }
 
-    socket.on("connect_error", (err) => {
-      // si quieres, refleja error como “error”
-      dispatch(setWhatsappStatus("error"));
-      console.error("socket error:", err.message);
-    });
+        const socket: Socket = io(ws.url, {
+          transports: ["websocket"],
+          auth: { token: ws.token }, // JWT efímero
+        });
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+          socket.emit("join", { clientId: clientIdWhatsapp });
+        });
+
+        socket.on("status", (data: { code: string; reason?: string }) => {
+          console.log("wa status:", data);
+          dispatch(
+            setWhatsappMeta({ code: data.code as WaCode, reason: data.reason })
+          );
+        });
+
+        socket.on("connect_error", (err) => {
+          dispatch(setWhatsappMeta({ code: "error", reason: err.message }));
+          console.error("socket error:", err.message);
+        });
+      })
+      .catch((e) => {
+        dispatch(setWhatsappMeta({ code: "error", reason: e?.message }));
+      });
 
     return () => {
-      socket.disconnect();
+      mounted = false;
+      if (socketRef.current) {
+        socketRef.current.off("status");
+        socketRef.current.off("connect");
+        socketRef.current.off("connect_error");
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
-  }, [clientIdWhatsapp, BACKEND_URL, API_KEY, dispatch]);
+  }, [organizationId, clientIdWhatsapp, dispatch]);
 
+  // ---------- Ajuste de servicios según empleado ----------
   useEffect(() => {
-    // Cada vez que cambie el empleado seleccionado, ajustamos servicios
     if (newAppointment.employee) {
       const selectedEmployee = employees.find(
         (employee) => employee._id === newAppointment.employee?._id
@@ -193,19 +241,36 @@ const ScheduleView: React.FC = () => {
     }
   }, [newAppointment.employee, employees]);
 
-  /**ENVIAR RECORDATORIOS */
-  const handleSendDailyReminders = () => {
-    if (!isWhatsAppReady) {
-      showNotification({
-        title: "WhatsApp no conectado",
-        message:
-          "Conecta tu sesión de WhatsApp para poder enviar recordatorios.",
-        color: "orange",
-        autoClose: 3500,
-        position: "top-right",
-      });
-      return;
+  const isWhatsAppReady = whatsappStatus === "ready";
+
+  const [refreshingWa, setRefreshingWa] = useState(false);
+
+  const recheckWaStatus = async () => {
+    if (!organizationId) return;
+    setRefreshingWa(true);
+    try {
+      const s = await getWaStatus(organizationId as string);
+      dispatch(
+        setWhatsappMeta({
+          code: (s?.code as WaCode) || "",
+          reason: s?.reason ?? null,
+          readySince: s?.readySince ?? null,
+          me: s?.me ?? null,
+        })
+      );
+    } catch (e) {
+      dispatch(
+        setWhatsappMeta({ code: "error", reason: (e as Error)?.message })
+      );
+      console.error(e);
+    } finally {
+      setRefreshingWa(false);
     }
+  };
+
+  // ---------- Envío de recordatorios (campaña bulk) ----------
+  const handleSendDailyReminders = () => {
+    if (sendingReminders) return; // locker básico
 
     openConfirmModal({
       title: "Enviar recordatorios de hoy",
@@ -219,12 +284,44 @@ const ScheduleView: React.FC = () => {
       labels: { confirm: "Sí, enviar", cancel: "Cancelar" },
       confirmProps: { color: "grape" },
       onConfirm: async () => {
+        if (sendingReminders) return;
         setSendingReminders(true);
         try {
-          await runDailyReminder();
+          // Pre-flight: valida estado actualizado
+          const s = await getWaStatus(organizationId as string);
+          if (s?.code !== "ready") {
+            dispatch(
+              setWhatsappMeta({
+                code: (s?.code as WaCode) || "error",
+                reason: s?.reason,
+              })
+            );
+            showNotification({
+              title: "WhatsApp no está listo",
+              message: s?.reason || "La sesión no está en estado 'ready'.",
+              color: "orange",
+              autoClose: 3500,
+              position: "top-right",
+            });
+            return;
+          }
+
+          // Enviar campaña
+          const r = await sendOrgReminders(organizationId as string, {
+            dryRun: false,
+          });
+
+          // Soporta ambos casos: que el servicio devuelva data ya “desenvuelta” o el AxiosResponse
+          const results = r?.results ?? r?.data?.results ?? [];
+          // Si pudiera haber varias orgs en el array, suma todo:
+          const prepared = results.reduce(
+            (sum: number, it: { prepared: any; }) => sum + Number(it?.prepared ?? 0),
+            0
+          );
+
           showNotification({
-            title: "Listo",
-            message: "Se ejecutó el envío de recordatorios.",
+            title: "Campaña creada",
+            message: `Se prepararon ${prepared} mensajes para enviar.`,
             color: "green",
             autoClose: 3500,
             position: "top-right",
@@ -245,9 +342,7 @@ const ScheduleView: React.FC = () => {
     });
   };
 
-  /**
-   * OBTENER CLIENTES
-   */
+  // ---------- DATA: Clientes/Empleados/Citas ----------
   const fetchClients = async () => {
     if (!organizationId) return;
     setLoadingAgenda(true);
@@ -263,11 +358,8 @@ const ScheduleView: React.FC = () => {
     }
   };
 
-  /**
-   * OBTENER EMPLEADOS
-   */
   const fetchEmployees = async () => {
-    if (!readyForScopedFetch) return; // 👈
+    if (!readyForScopedFetch) return;
     setLoadingAgenda(true);
     try {
       const response = await getEmployeesByOrganizationId(
@@ -276,10 +368,9 @@ const ScheduleView: React.FC = () => {
       let activeEmployees = response.filter((e) => e.isActive);
 
       if (!canViewAll) {
-        if (!userId) return; // 👈 evita setear [] prematuramente
+        if (!userId) return;
         activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
       }
-      console.log(activeEmployees);
       setEmployees(activeEmployees);
     } catch (error) {
       console.error(error);
@@ -288,11 +379,8 @@ const ScheduleView: React.FC = () => {
     }
   };
 
-  /**
-   * OBTENER CITAS
-   */
   const fetchAppointmentsForMonth = async (date: Date) => {
-    if (!readyForScopedFetch) return; // 👈
+    if (!readyForScopedFetch) return;
     setLoadingMonth(true);
     try {
       const start = startOfMonth(date).toISOString();
@@ -318,7 +406,7 @@ const ScheduleView: React.FC = () => {
   const fetchAppointmentsForDay = async (
     date: Date
   ): Promise<Appointment[]> => {
-    if (!readyForScopedFetch) return []; // 👈
+    if (!readyForScopedFetch) return [];
     try {
       const start = startOfDay(date).toISOString();
       const end = endOfDay(date).toISOString();
@@ -340,7 +428,6 @@ const ScheduleView: React.FC = () => {
       return [];
     }
   };
-
   /**
    * MANEJO DE SERVICIO
    */
@@ -381,13 +468,11 @@ const ScheduleView: React.FC = () => {
     dateHour: Date
   ): Date | null => {
     if (!dateDay) return null;
-
     const combinedDate = new Date(dateDay);
     combinedDate.setHours(dateHour.getHours());
     combinedDate.setMinutes(dateHour.getMinutes());
     combinedDate.setSeconds(dateHour.getSeconds());
     combinedDate.setMilliseconds(dateHour.getMilliseconds());
-
     return combinedDate;
   };
 
@@ -693,6 +778,18 @@ const ScheduleView: React.FC = () => {
     }
   };
 
+  const RecheckBtn = (
+    <Button
+      size="xs"
+      variant="outline"
+      leftSection={<BiRefresh size={14} />}
+      loading={refreshingWa}
+      onClick={recheckWaStatus}
+    >
+      Reconsultar
+    </Button>
+  );
+
   // Muestra un loader si estamos cargando
   if (loadingAgenda) {
     return <CustomLoader overlay />;
@@ -741,6 +838,7 @@ const ScheduleView: React.FC = () => {
           </Button>
         </Group>
       </Group>
+
       {hasPermission("whatsapp:read") && (
         <Group align="center" gap="xs" mt={-10}>
           <Text size="sm" fw={500}>
@@ -753,6 +851,7 @@ const ScheduleView: React.FC = () => {
               <Text size="sm" c="green" fw={700}>
                 Conectado
               </Text>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -771,6 +870,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -789,6 +889,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -807,6 +908,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -825,6 +927,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -843,6 +946,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -852,6 +956,7 @@ const ScheduleView: React.FC = () => {
               <Text size="sm" c="orange" fw={700}>
                 Reconectando...
               </Text>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -861,18 +966,10 @@ const ScheduleView: React.FC = () => {
               <Text size="sm" c="red" fw={700}>
                 Error de conexión
               </Text>
-              {/* <Button
-                size="xs"
-                variant="outline"
-                color="blue"
-                ml={8}
-                onClick={() => navigate("/gestionar-whatsapp")}
-              >
-                Configurar WhatsApp
-              </Button> */}
               <Text size="sm" c="red" fw={700}>
                 - Inhabilitado temporalemente
               </Text>
+              {RecheckBtn}
             </Group>
           )}
 
@@ -891,6 +988,7 @@ const ScheduleView: React.FC = () => {
               >
                 Configurar WhatsApp
               </Button>
+              {RecheckBtn}
             </Group>
           )}
         </Group>
@@ -939,9 +1037,14 @@ const ScheduleView: React.FC = () => {
         onSave={handleSaveReorderedEmployees}
         onFetchEmployees={fetchEmployees}
       />
+
       {hasPermission("appointments:send_reminders") && (
         <Tooltip
-          label="Conecta WhatsApp para enviar recordatorios"
+          label={
+            isWhatsAppReady
+              ? ""
+              : whatsappReason || "Conecta tu sesión de WhatsApp"
+          }
           disabled={isWhatsAppReady}
           withArrow
         >
@@ -957,8 +1060,7 @@ const ScheduleView: React.FC = () => {
               )
             }
             onClick={handleSendDailyReminders}
-            // disabled={sendingReminders || !isWhatsAppReady}
-            disabled={true}
+            disabled={sendingReminders || !isWhatsAppReady}
             title="Enviar recordatorios de WhatsApp de las citas de hoy no enviadas"
           >
             Enviar recordatorios

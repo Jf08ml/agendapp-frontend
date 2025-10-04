@@ -1,580 +1,611 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Container,
-  Title,
+  Anchor,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Center,
+  CheckIcon,
+  CopyButton,
+  Divider,
+  Group,
+  Kbd,
+  Loader,
   Paper,
+  Progress,
   Stack,
   Text,
-  Group,
-  Loader,
-  Button,
   TextInput,
-  Notification,
-  Alert,
+  ThemeIcon,
+  Title,
+  Tooltip,
 } from "@mantine/core";
-import { showNotification } from "@mantine/notifications";
-import io, { Socket } from "socket.io-client";
-import axiosBase from "axios";
 import { QRCodeCanvas } from "qrcode.react";
-import { useSelector, useDispatch } from "react-redux";
+import { io, Socket } from "socket.io-client";
+import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import { updateOrganization } from "../../../services/organizationService";
-import { updateOrganizationState } from "../../../features/organization/sliceOrganization";
-import { FaCheck } from "react-icons/fa";
-import { IoAlertCircleOutline } from "react-icons/io5";
-import { BiInfoCircle } from "react-icons/bi";
+import {
+  connectWaSession,
+  getWaStatus,
+  restartWa,
+  logoutWa,
+  sendWa,
+  WaCode,
+} from "../../../services/waService";
+import { BiCopy, BiInfoCircle, BiRefresh, BiX } from "react-icons/bi";
 
-// ===================== CONFIG =====================
-const BASE_URL = (import.meta as any).env.VITE_API_URL_WHATSAPP as string;
-const API_KEY = (import.meta as any).env.VITE_API_KEY as string;
-
-const api = axiosBase.create({
-  baseURL: BASE_URL?.replace(/\/$/, "") ?? "",
-  headers: { "x-api-key": API_KEY },
-});
-// ===================================================
-
-// ---- Estados normalizados que envía el backend ----
-type Code =
-  | "connecting"
-  | "waiting_qr"
-  | "authenticated"
-  | "ready"
-  | "disconnected"
-  | "auth_failure"
-  | "reconnecting"
-  | "error";
-
+// -----------------------------
+// 1) Mapeo UI por estado
+// -----------------------------
 const UI_STATUS: Record<
-  Code,
+  WaCode,
   {
     title: string;
     color: "blue" | "teal" | "green" | "orange" | "red" | "gray";
-    description?: string;
     showQR?: boolean;
-    canSend?: boolean;
-    showReconnect?: boolean;
-    showRestart?: boolean;
+    desc?: string;
   }
 > = {
   connecting: {
     title: "Conectando…",
     color: "blue",
-    description: "Estableciendo sesión.",
+    desc: "Creando o reanudando la sesión.",
   },
   waiting_qr: {
-    title: "Sesión sin autenticación",
+    title: "Escanea el QR",
     color: "teal",
-    description: "Escanea el QR para vincular.",
     showQR: true,
-    showReconnect: true,
+    desc: "Abre WhatsApp → Dispositivos vinculados → Vincular un dispositivo.",
   },
   authenticated: {
     title: "Autenticado",
     color: "blue",
-    description: "Finalizando inicio…",
+    desc: "Listando chats y finalizando inicio…",
   },
   ready: {
     title: "Conectado",
     color: "green",
-    description: "Todo listo para enviar.",
-    canSend: true,
-    showRestart: true,
+    desc: "Sesión lista para enviar mensajes.",
   },
   disconnected: {
-    title: "Sesión desconectada",
+    title: "Desconectado",
     color: "orange",
-    description: "Se perdió la conexión. Puedes reconectar.",
-    showReconnect: true,
-    showRestart: true,
+    desc: "La sesión no está activa en este momento.",
   },
   auth_failure: {
     title: "Error de autenticación",
     color: "red",
-    description: "Vuelve a escanear el QR.",
     showQR: true,
-    showReconnect: true,
+    desc: "Tus credenciales caducaron o se invalidaron. Vuelve a escanear el QR.",
   },
   reconnecting: {
     title: "Reconectando…",
     color: "blue",
-    description: "Intentando recuperar la sesión.",
+    desc: "Recuperando la sesión tras una caída.",
   },
   error: {
     title: "Error",
     color: "red",
-    description: "Algo salió mal. Intenta de nuevo.",
-    showReconnect: true,
-    showRestart: true,
+    desc: "Ocurrió un problema. Intenta de nuevo.",
   },
 };
 
+// -----------------------------
+// 2) Tipos auxiliares
+// -----------------------------
+
+type WsQrPayload = {
+  qr: string;
+  issuedAt: number;
+  expiresAt: number;
+  ttlMs: number;
+  seq: number;
+  replacesPrevious: boolean;
+  qrId: string;
+};
+
+type ReadyAccount = { id?: string; name?: string } | null;
+
+// -----------------------------
+// 3) Componente principal
+// -----------------------------
+
 const WhatsappOrgSession: React.FC = () => {
-  const dispatch = useDispatch();
+  // Organización y prefill del clientId
   const organization = useSelector(
-    (state: RootState) => state.organization.organization
+    (s: RootState) => s.organization.organization
   );
 
-  // Form envío
-  const [phone, setPhone] = useState<string>("");
-  const [message, setMessage] = useState<string>("");
-  const [sending, setSending] = useState<boolean>(false);
-
-  // Estado sesión
   const [clientId, setClientId] = useState<string>("");
-  const [qr, setQr] = useState<string>("");
-  const [code, setCode] = useState<Code>("connecting");
+  const [code, setCode] = useState<WaCode>("connecting");
   const [reason, setReason] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [me, setMe] = useState<ReadyAccount>(null);
 
-  // Fuerza ciclo de reconexión
-  const [sessionCycleKey, setSessionCycleKey] = useState<number>(0);
-
-  // TTL del QR
+  // QR y metadatos
+  const [qr, setQr] = useState<string>("");
+  const [qrMeta, setQrMeta] = useState<{
+    expiresAt: number;
+    seq: number;
+    replacesPrevious: boolean;
+  } | null>(null);
   const [qrTtl, setQrTtl] = useState<number>(0);
 
-  // Ventana de gracia tras 'authenticated'
-  const prevCodeRef = useRef<Code>("connecting");
-  const [authGraceUntil, setAuthGraceUntil] = useState<number>(0);
+  // Cargas de acciones
+  const [loadingPrimary, setLoadingPrimary] = useState(false);
+  const [loadingRestart, setLoadingRestart] = useState(false);
+  const [loadingLogout, setLoadingLogout] = useState(false);
+  const [loadingSend, setLoadingSend] = useState(false);
 
+  // Control de socket y temporizadores
   const socketRef = useRef<Socket | null>(null);
-  const connected = code === "ready";
+  const connectingSinceRef = useRef<number | null>(null);
 
-  // Helper: manejar transiciones de estado con ventana de gracia y filtros
-  function handleIncomingStatus(next: Code, reasonStr: string) {
-    const prev = prevCodeRef.current;
-    prevCodeRef.current = next;
+  // Estado derivado para mostrar un "hint" cuando connecting dura demasiado
+  const connectingAges = useMemo(() => {
+    const started = connectingSinceRef.current;
+    return started ? Math.round((Date.now() - started) / 1000) : 0;
+  }, [code]);
 
-    if (next === "authenticated") {
-      setAuthGraceUntil(Date.now() + 8000); // 8s de gracia
-    }
-
-    if (next === "disconnected") {
-      const inGrace = Date.now() < authGraceUntil;
-      const linkingPhase = prev === "waiting_qr" || prev === "authenticated";
-      if (inGrace || linkingPhase) {
-        setCode("reconnecting");
-        setReason(reasonStr || "");
-        return;
-      }
-    }
-
-    setCode(next);
-    setReason(reasonStr || "");
-
-    if (next === "ready") {
-      setQr("");
-    } else if (next === "auth_failure") {
-      setError("Error de autenticación, intenta de nuevo");
-      limpiarClientIdEnOrganizacion(
-        "Error de autenticación. Vuelve a escanear el QR para conectar."
-      );
-    } else if (next === "disconnected") {
-      setError("Sesión desconectada. Puedes reconectar o reiniciar.");
-    }
-  }
-
-  // Detecta cambios en la organización y define clientId base
+  // Prefill del clientId al cambiar de organización
   useEffect(() => {
     if (!organization) return;
-    const id = (organization as any).clientIdWhatsapp || organization._id || "";
-    setClientId(id);
+    const pre =
+      (organization as any).clientIdWhatsapp || organization._id || "";
+    setClientId(pre);
+    // reset UI
     setCode("connecting");
     setReason("");
     setQr("");
-    setError("");
-    setSessionCycleKey((prev) => prev + 1);
-  }, [organization?.clientIdWhatsapp, organization?._id]);
+    setQrMeta(null);
+    setQrTtl(0);
+    setMe(null);
+    connectingSinceRef.current = Date.now();
+  }, [organization?._id, (organization as any)?.clientIdWhatsapp]);
 
-  // Socket.IO: unirse primero a la sala y luego crear/reusar sesión (evita perder el primer QR)
+  // Precarga de estado del backend administrativo (idempotente)
   useEffect(() => {
-    if (!clientId || !BASE_URL || !API_KEY) return;
+    if (!organization?._id) return;
+    (async () => {
+      try {
+        const s = await getWaStatus(organization._id!);
+        if (s?.code) {
+          setCode(s.code as WaCode);
+          setReason(s.reason || "");
+          if (s.code === "ready") {
+            setQr("");
+            setQrMeta(null);
+            setQrTtl(0);
+            if (s.me) setMe(s.me);
+          }
+        } else {
+          setCode("disconnected");
+          setReason("not_found");
+        }
+      } catch (e) {
+        setCode("error");
+        setReason("status_fetch_failed");
+        console.error(e);
+      }
+    })();
+  }, [organization?._id]);
 
-    setCode("connecting");
-    setReason("");
-    setQr("");
-    setError("");
+  // Countdown del QR según expiresAt del backend (no confiamos en timers locales)
+  useEffect(() => {
+    if (!qrMeta) return;
+    const compute = () =>
+      Math.max(0, Math.floor((qrMeta.expiresAt - Date.now()) / 1000));
+    setQrTtl(compute());
+    const id = setInterval(() => setQrTtl(compute()), 1000);
+    return () => clearInterval(id);
+  }, [qrMeta?.expiresAt]);
 
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
+  // -----------------------------
+  // 3.1) Conectar sesión y abrir WS
+  // -----------------------------
+  const openSocketAndHandlers = (
+    url: string,
+    token: string,
+    joinedClientId: string
+  ) => {
+    // Cerrar previo si existiera
+    socketRef.current?.disconnect();
+    socketRef.current = null;
 
-    const socket: Socket = io(BASE_URL, {
-      transports: ["websocket"],
-      auth: { apiKey: API_KEY },
-    });
+    const socket = io(url, { transports: ["websocket"], auth: { token } });
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      // 1) Únete a la sala
-      socket.emit("join", { clientId });
-      // 2) Crea/reusa sesión (idempotente)
-      api.post(`/api/session`, { clientId }).catch(() => {
-        setError("Error conectando con la API de WhatsApp");
-      });
+      // Si el backend no auto-join con el token, haz join manual
+      socket.emit("join", { clientId: joinedClientId });
     });
 
-    socket.on("qr", (data: { qr: string }) => {
-      setQr(data.qr);
+    socket.on(
+      "status",
+      (s: {
+        code: WaCode;
+        reason?: string;
+        me?: { id?: string; name?: string };
+      }) => {
+        setCode(s.code);
+        setReason(s.reason || "");
+        if (s.me) setMe(s.me);
+        if (s.code === "ready") {
+          setQr("");
+          setQrMeta(null);
+          setQrTtl(0);
+        }
+        if (s.code === "connecting") connectingSinceRef.current = Date.now();
+      }
+    );
+
+    socket.on("qr", (payload: WsQrPayload) => {
+      setQr(payload.qr);
       setCode("waiting_qr");
       setReason("");
-    });
-
-    socket.on("status", (data: { code: Code; reason?: string }) => {
-      handleIncomingStatus(data.code, data.reason || "");
+      setQrMeta({
+        expiresAt: payload.expiresAt,
+        seq: payload.seq,
+        replacesPrevious: payload.replacesPrevious,
+      });
     });
 
     socket.on("session_cleaned", () => {
+      setCode("disconnected");
       setQr("");
-      setCode("waiting_qr");
-      setReason("");
-      limpiarClientIdEnOrganizacion("Sesión cerrada en el servidor.");
+      setQrMeta(null);
+      setQrTtl(0);
+      setMe(null);
     });
 
     socket.on("connect_error", (err) => {
-      setError(`Error de socket: ${err.message}`);
+      setCode("error");
+      setReason(`socket_error:${err?.message ?? "unknown"}`);
     });
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [clientId, sessionCycleKey, BASE_URL, API_KEY]);
-
-  // Sincronizar estado al montar/cambiar clientId (por si el socket tarda)
-  useEffect(() => {
-    if (!clientId) return;
-    api
-      .get(`/api/status/${clientId}`)
-      .then(({ data }) => {
-        if (data?.code) {
-          setCode(data.code as Code);
-          setReason(data.reason || "");
-          if (data.code === "ready") setQr("");
-        }
-      })
-      .catch(() => {});
-  }, [clientId]);
-
-  // Micropoll cuando está "authenticated" para detectar salto a "ready"
-  useEffect(() => {
-    if (code !== "authenticated" || !clientId) return;
-
-    let alive = true;
-    const started = Date.now();
-
-    const tick = async () => {
-      if (!alive) return;
+    // Renovar token en reintentos de reconexión
+    socket.io.on("reconnect_attempt", async () => {
       try {
-        const { data } = await api.get(`/api/status/${clientId}`);
-        if (data?.code === "ready") {
-          setCode("ready");
-          setQr("");
-          return;
-        }
-      } catch { /* empty */ }
-      if (Date.now() - started < 10000) {
-        setTimeout(tick, 1500);
+        const r2 = await connectWaSession(organization!._id!, joinedClientId);
+        if (r2?.ws?.token) socket.auth = { token: r2.ws.token };
+      } catch {
+        /* ignore */
       }
-    };
-
-    tick();
-    return () => {
-      alive = false;
-    };
-  }, [code, clientId]);
-
-  // TTL del QR: 60s cada vez que llega QR o el code pasa a waiting_qr
-  useEffect(() => {
-    if (qr || code === "waiting_qr") setQrTtl(60);
-  }, [qr, code]);
-
-  useEffect(() => {
-    if (!qrTtl) return;
-    const t = setInterval(() => setQrTtl((s) => (s > 0 ? s - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [qrTtl]);
-
-  // Limpiar clientIdWhatsapp en DB cuando es terminal (auth_failure / session_cleaned / logout)
-  const limpiarClientIdEnOrganizacion = async (razon: string) => {
-    if (!organization || !(organization as any).clientIdWhatsapp) return;
-    try {
-      const updated = await updateOrganization(organization._id!, {
-        clientIdWhatsapp: null,
-      });
-      dispatch(updateOrganizationState(updated!));
-      setSessionCycleKey((prev) => prev + 1);
-      showNotification({
-        color: "orange",
-        icon: <IoAlertCircleOutline size={18} />,
-        title: "Sesión cerrada",
-        message: razon,
-      });
-    } catch (err: any) {
-      showNotification({
-        color: "red",
-        icon: <IoAlertCircleOutline size={18} />,
-        title: "Error al actualizar la organización",
-        message: err?.message || "No se pudo limpiar el clientIdWhatsapp.",
-      });
-    }
+    });
   };
 
-  // Enviar mensaje
-  const handleSendMessage = async () => {
-    const phoneClean = (phone || "").replace(/\s+/g, "");
-    if (!phoneClean || !message) {
-      showNotification({
-        color: "red",
-        icon: <IoAlertCircleOutline size={18} />,
-        title: "Faltan datos",
-        message: "Debes ingresar el número y el mensaje",
-      });
-      return;
-    }
-    setSending(true);
+  const connectSession = async (forceFresh = false) => {
+    if (!organization?._id || !clientId) return;
+    setLoadingPrimary(true);
+    setQr("");
+    setQrMeta(null);
+    setQrTtl(0);
+    setMe(null);
     try {
-      const res = await api.post(`/api/send`, {
-        clientId,
-        phone: phoneClean,
-        message,
-      });
-      showNotification({
-        color: "green",
-        icon: <FaCheck size={18} />,
-        title: "Mensaje enviado",
-        message: `ID: ${res.data?.id || "ok"} (intento ${res.data?.attempt || 1})`,
-      });
-      setMessage("");
-    } catch (err: any) {
-      showNotification({
-        color: "red",
-        icon: <IoAlertCircleOutline size={18} />,
-        title: "Error al enviar",
-        message: err?.response?.data?.error || err.message,
-      });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // Reconectar (fuerza nuevo ciclo)
-  const handleReconnect = () => {
-    setSessionCycleKey((prev) => prev + 1);
-  };
-
-  // Reiniciar sesión (suave, sin perder login)
-  const handleRestart = async () => {
-    if (!clientId) return;
-    try {
-      setCode("reconnecting");
-      await api.post(`/api/restart`, { clientId });
-      showNotification({
-        color: "blue",
-        title: "Reinicio solicitado",
-        message: "Intentando recuperar la sesión…",
-      });
-      setSessionCycleKey((p) => p + 1);
-    } catch (err: any) {
+      // Si el usuario pide "empezar de cero", limpiamos primero
+      if (forceFresh) {
+        await logoutWa(organization._id!, clientId).catch(() => {});
+      }
+      const res = await connectWaSession(organization._id!, clientId);
+      if (!res?.ws?.url || !res?.ws?.token) {
+        setCode("error");
+        setReason("no_ws_credentials");
+        return;
+      }
+      setCode("connecting");
+      connectingSinceRef.current = Date.now();
+      openSocketAndHandlers(res.ws.url, res.ws.token, res.clientId || clientId);
+    } catch (e: any) {
       setCode("error");
-      showNotification({
-        color: "red",
-        title: "No se pudo reiniciar",
-        message: err?.response?.data?.error || err.message,
-      });
+      setReason(e?.message || "connect_failed");
+    } finally {
+      setLoadingPrimary(false);
     }
   };
 
-  // Logout manual (borra credenciales: requerirá QR)
-  const handleLogoutManual = async () => {
-    if (!clientId) return;
+  // -----------------------------
+  // 3.2) Acciones rápidas
+  // -----------------------------
+  const handleRestart = async () => {
+    if (!organization?._id || !clientId) return;
+    setLoadingRestart(true);
     try {
-      await api.post(`/api/logout`, { clientId });
-      limpiarClientIdEnOrganizacion("Sesión cerrada manualmente.");
-    } catch (err: any) {
-      showNotification({
-        color: "red",
-        icon: <IoAlertCircleOutline size={18} />,
-        title: "Error cerrando sesión",
-        message: err?.message || "No se pudo cerrar la sesión correctamente.",
-      });
+      await restartWa(organization._id!, clientId);
+      await connectSession();
+    } finally {
+      setLoadingRestart(false);
     }
   };
 
-  if (!organization) {
-    return (
-      <Container size="xs" mt={40}>
-        <Paper shadow="md" radius="md" p="xl" withBorder>
-          <Stack gap="md" align="center">
-            <Title order={3}>No hay organización seleccionada</Title>
-            <Text size="sm" c="gray">
-              Debes cargar una organización para conectar WhatsApp.
-            </Text>
-          </Stack>
-        </Paper>
-      </Container>
-    );
-  }
+  const handleLogout = async () => {
+    if (!organization?._id || !clientId) return;
+    setLoadingLogout(true);
+    try {
+      await logoutWa(organization._id!, clientId);
+      setCode("disconnected");
+      setQr("");
+      setQrMeta(null);
+      setQrTtl(0);
+      setMe(null);
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    } finally {
+      setLoadingLogout(false);
+    }
+  };
 
-  const ui = UI_STATUS[code || "connecting"];
+  const handleSendTest = async () => {
+    if (!organization?._id || !clientId) return;
+    const phone = prompt("Número E.164 (ej: 57300XXXXXXX):")?.trim();
+    if (!phone) return;
+    setLoadingSend(true);
+    try {
+      await sendWa(organization._id!, {
+        clientId,
+        phone,
+        message: "✅ Prueba desde el panel (ignora este mensaje).",
+      });
+      alert("Mensaje enviado (requiere estado READY). ");
+    } catch (e: any) {
+      alert(`Error enviando: ${e?.message || e}`);
+    } finally {
+      setLoadingSend(false);
+    }
+  };
+
+  // -----------------------------
+  // 3.3) CTA principal dinámico según estado
+  // -----------------------------
+  const primaryCta = useMemo(() => {
+    // Reglas:
+    // - disconnected/not_found/auth_failure → Mostrar "Conectar y mostrar QR"
+    // - connecting > 20s → Mostrar "Forzar nueva sesión" (limpia y reconecta)
+    // - waiting_qr → Mostrar "Regenerar QR"
+    // - error → "Reintentar"
+    // - ready → no CTA principal (las acciones están abajo)
+    const longConnecting =
+      code === "connecting" &&
+      connectingSinceRef.current &&
+      Date.now() - connectingSinceRef.current > 20_000;
+
+    if (code === "ready") return null;
+
+    if (code === "waiting_qr") {
+      return {
+        label: qrTtl === 0 ? "Regenerar QR" : "Mostrar QR (activo)",
+        onClick: () => connectSession(false),
+      } as const;
+    }
+
+    if (
+      code === "disconnected" ||
+      reason === "not_found" ||
+      code === "auth_failure"
+    ) {
+      return {
+        label: "Conectar y mostrar QR",
+        onClick: () => connectSession(code === "auth_failure"),
+      } as const;
+    }
+
+    if (code === "error") {
+      return {
+        label: "Reintentar",
+        onClick: () => connectSession(false),
+      } as const;
+    }
+
+    if (longConnecting) {
+      return {
+        label: "Forzar nueva sesión",
+        onClick: () => connectSession(true),
+      } as const;
+    }
+
+    return {
+      label: "Conectar / Mostrar QR",
+      onClick: () => connectSession(false),
+    } as const;
+  }, [code, reason, qrTtl, clientId]);
+
+  const ui = UI_STATUS[code];
 
   return (
-    <Container size="xs" mt={40}>
-      <Paper shadow="md" radius="md" p="xl" withBorder>
-        <Stack gap="md" align="center">
-          <Title order={3}>
-            WhatsApp para la organización{" "}
-            <Text span c="blue">
-              {organization.name}
-            </Text>
-          </Title>
-
-          <Alert
-            icon={<BiInfoCircle size={18} />}
-            color={ui.color}
-            title={ui.title}
-            mb="md"
-          >
-            <Text size="sm">{ui.description}</Text>
-            {reason && (
-              <Text size="xs" c="dimmed" mt={6}>
-                Detalle: {reason}
+    <Paper shadow="md" radius="md" p="xl" withBorder>
+      <Stack gap="md">
+        {/* HEADER */}
+        <Group justify="space-between" align="center">
+          <div>
+            <Title order={3}>
+              WhatsApp de{" "}
+              <Text span c="blue">
+                {organization?.name ?? "Organización"}
               </Text>
-            )}
-            <Text size="sm" c="dimmed" mt={8}>
-              <b>¡Debes mantener la sesión conectada!</b> Si la cierras o
-              expira, deja de funcionar el envío automático.
+            </Title>
+            <Text size="sm" c="dimmed">
+              Administra la sesión vinculada a tu línea.
             </Text>
-          </Alert>
+          </div>
+          <Badge color={ui.color} size="lg" radius="sm">
+            {ui.title}
+          </Badge>
+        </Group>
 
-          {/* Estado visible */}
-          <Text size="sm" c={code === "ready" ? "green" : "gray"}>
-            Estado: {ui.title}
-          </Text>
-
-          {/* Esperando generación del QR */}
-          {code === "waiting_qr" && !qr && (
-            <Stack align="center" gap="sm">
-              <Loader size="sm" />
-              <Text size="sm" c="dimmed">
-                Generando código QR… espera unos segundos
-              </Text>
-            </Stack>
-          )}
-
-          {/* QR cuando corresponde */}
-          {ui.showQR && qr && (
-            <>
-              <Alert
-                color="teal"
-                title="Escanea este código QR con tu WhatsApp"
-                mb="md"
-                style={{ maxWidth: 400, width: "100%" }}
-              >
-                <Text size="sm">
-                  <b>1. Abre WhatsApp</b> en tu teléfono.
-                  <br />
-                  <b>
-                    2. Ve a <u>Menú</u> <span style={{ fontWeight: 700 }}>⋮</span> {">"}{" "}
-                    <u>Dispositivos vinculados</u> (Android) o{" "}
-                    <u>Configuración {">"} Dispositivos vinculados</u> (iPhone).
-                  </b>
-                  <br />
-                  <b>
-                    3. Pulsa <u>Vincular un dispositivo</u> y escanea el QR de esta pantalla.
-                  </b>
-                </Text>
-                <Text size="xs" c="dimmed" mt={8}>
-                  <b>Importante:</b> Mantén tu teléfono con conexión a internet para no perder la sesión.
-                </Text>
-              </Alert>
-
-              <Stack align="center" gap={0}>
-                <QRCodeCanvas value={qr} size={220} style={{ margin: "auto" }} />
-                <Text size="xs" c="gray" mt={4}>
-                  El código expira en {qrTtl}s
-                </Text>
+        {/* CLIENT ID */}
+        <Group align="end">
+          <TextInput
+            label="ID de sesión (clientId)"
+            description="Suele ser el ID de la organización; puedes personalizarlo."
+            value={clientId}
+            onChange={(e) => setClientId(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <CopyButton value={clientId} timeout={1500}>
+            {({ copied, copy }) => (
+              <Tooltip label={copied ? "Copiado" : "Copiar"}>
                 <Button
-                  mt="xs"
                   variant="light"
-                  onClick={() => {
-                    api.post(`/api/session`, { clientId });
-                    socketRef.current?.emit("join", { clientId });
-                  }}
+                  onClick={copy}
+                  leftSection={
+                    copied ? <CheckIcon size={16} /> : <BiCopy size={16} />
+                  }
+                >
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </Tooltip>
+            )}
+          </CopyButton>
+        </Group>
+
+        {/* STATUS CARD */}
+        <Card withBorder padding="md" radius="md">
+          <Group align="flex-start" wrap="nowrap">
+            <ThemeIcon color={ui.color} variant="light" radius="xl">
+              <BiInfoCircle size={18} />
+            </ThemeIcon>
+            <Box style={{ flex: 1 }}>
+              <Text fw={600}>{ui.title}</Text>
+              <Text size="sm" c="dimmed">
+                {ui.desc}
+              </Text>
+              {reason && (
+                <Text size="xs" c="dimmed" mt={6}>
+                  Detalle técnico: <Kbd>{reason}</Kbd>
+                </Text>
+              )}
+              {code === "ready" && me && (
+                <Text size="xs" c="dimmed" mt={6}>
+                  Cuenta: {me.name ?? "—"} {me.id ? `· ${me.id}` : ""}
+                </Text>
+              )}
+
+              {code === "connecting" && (
+                <Box mt="sm">
+                  <Progress
+                    value={Math.min(100, (connectingAges / 20) * 100)}
+                    striped
+                    animated
+                  />
+                  <Text size="xs" c="dimmed" mt={4}>
+                    Conectando
+                    {connectingAges > 0 ? `… (${connectingAges}s)` : "…"}
+                  </Text>
+                </Box>
+              )}
+            </Box>
+
+            {/* CTA primaria dinámica (si aplica) */}
+            {primaryCta && (
+              <Button
+                loading={loadingPrimary}
+                color={ui.color}
+                onClick={async () => {
+                  setLoadingPrimary(true);
+                  try {
+                    await primaryCta.onClick();
+                  } finally {
+                    setLoadingPrimary(false);
+                  }
+                }}
+              >
+                {primaryCta.label}
+              </Button>
+            )}
+          </Group>
+        </Card>
+
+        {/* BLOQUE QR */}
+        {UI_STATUS[code].showQR && qr && (
+          <Center>
+            <Stack align="center" gap={6}>
+              <QRCodeCanvas value={qr} size={240} includeMargin />
+              <Text size="xs" c="gray">
+                {qrMeta?.seq ? `QR #${qrMeta.seq} · ` : null}
+                Expira en {qrTtl}s
+                {qrMeta?.replacesPrevious ? " · reemplaza al anterior" : null}
+              </Text>
+              {qrTtl === 0 && (
+                <Button
+                  variant="light"
+                  leftSection={<BiRefresh size={16} />}
+                  onClick={() => connectSession(false)}
                 >
                   Regenerar QR
                 </Button>
-              </Stack>
-            </>
-          )}
+              )}
+            </Stack>
+          </Center>
+        )}
 
-          {/* Espera mientras no hay QR ni ready */}
-          {!ui.showQR && !qr && code !== "ready" && <Loader size="md" />}
+        {/* INTERMEDIOS SIN QR */}
+        {code !== "ready" && !UI_STATUS[code].showQR && !qr && (
+          <Center>
+            <Loader />
+          </Center>
+        )}
 
-          {/* Formulario de envío cuando está listo */}
-          {ui.canSend && (
-            <Paper shadow="xs" radius="md" p="md" withBorder mt="md" style={{ width: "100%" }}>
-              <Stack gap="sm">
-                <TextInput
-                  label="Número de teléfono (incluye país, ej: 57300xxxxxxx)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-                <TextInput
-                  label="Mensaje"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && message) handleSendMessage();
-                  }}
-                />
-                <Button
-                  fullWidth
-                  color="blue"
-                  onClick={handleSendMessage}
-                  loading={sending}
-                  disabled={!phone || !message}
-                >
-                  Enviar mensaje
-                </Button>
-              </Stack>
-            </Paper>
-          )}
-
-          {/* Acciones contextuales */}
-          {ui.showRestart && (
-            <Button fullWidth color="yellow" variant="outline" mt="md" onClick={handleRestart}>
-              Reiniciar sesión (suave)
+        {/* ACCIONES cuando está READY */}
+        {code === "ready" && (
+          <Group justify="center" mt="sm">
+            <Button
+              variant="default"
+              onClick={handleRestart}
+              loading={loadingRestart}
+            >
+              Reiniciar
             </Button>
-          )}
-
-          {ui.showReconnect && (
-            <Button fullWidth color="gray" variant="outline" mt="md" onClick={handleReconnect}>
-              Reconectar
+            <Button
+              variant="default"
+              onClick={handleSendTest}
+              loading={loadingSend}
+            >
+              Probar envío
             </Button>
-          )}
-
-          {connected && (
-            <Button fullWidth color="red" variant="outline" mt="md" onClick={handleLogoutManual}>
-              Cerrar sesión manualmente
+            <Button
+              color="red"
+              onClick={handleLogout}
+              leftSection={<BiX size={16} />}
+              loading={loadingLogout}
+            >
+              Cerrar sesión
             </Button>
-          )}
+          </Group>
+        )}
 
-          {error && (
-            <Notification color="red" mt="sm">
-              {error}
-            </Notification>
-          )}
+        <Divider my="xs" />
+
+        {/* AYUDA RÁPIDA / TROUBLESHOOTING */}
+        <Stack gap={4}>
+          <Text fw={600}>¿No aparece el QR o se queda en “Conectando…”?</Text>
+          <Text size="sm">
+            1. Pulsa <Kbd>Forzar nueva sesión</Kbd> para borrar credenciales
+            caducadas y generar un QR nuevo.
+          </Text>
+          <Text size="sm">
+            2. Si cambiaste de celular, simplemente vuelve a escanear el QR
+            desde tu WhatsApp.
+          </Text>
+          <Text size="sm">
+            3. Si persiste, revisa tu conexión a Internet y que el servidor de
+            WhatsApp esté en línea.
+          </Text>
+          <Text size="xs" c="dimmed">
+            Tip: puedes volver aquí en cualquier momento; la sesión permanecerá
+            conectada mientras no cierres desde tu WhatsApp.
+          </Text>
         </Stack>
 
-        <Group gap="xs" mt="sm" justify="center">
-          <Text fw={500}>ID sesión:</Text>
-          <Text c="blue">{clientId}</Text>
-        </Group>
-      </Paper>
-    </Container>
+        {/* FOOTER */}
+        <Text size="xs" c="dimmed">
+          Necesitas ayuda? Escríbenos o revisa la guía de instalación.{" "}
+          <Anchor size="xs" href="#" onClick={(e) => e.preventDefault()}>
+            Ver guía
+          </Anchor>
+        </Text>
+      </Stack>
+    </Paper>
   );
 };
 
