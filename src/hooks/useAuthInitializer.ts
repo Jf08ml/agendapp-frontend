@@ -25,7 +25,9 @@ const useAuthInitializer = () => {
             if (organization._id) {
               dispatch(setOrganizationId(organization._id));
             }
-            dispatch(setPermissions(organization.role.permissions));
+            if (typeof organization.role !== "string") {
+              dispatch(setPermissions(organization.role.permissions ?? []));
+            }
           } else if (role === "employee" && userId) {
             const employeeData = await getEmployeeById(userId);
             if (employeeData) {

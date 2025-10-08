@@ -168,7 +168,7 @@ export default function SuperadminOrganizations() {
         phoneNumber: newOrg.phoneNumber!.trim(),
         address: newOrg.address?.trim(),
         password: newOrg.password, // el backend debe hashearla
-        role: ROLE_ADMIN_ID, // 👈 ObjectId de rol admin
+        role: ROLE_ADMIN_ID, 
         isActive: newOrg.isActive ?? true,
         location: {
           lat: Number(newOrg.location?.lat ?? 0),
