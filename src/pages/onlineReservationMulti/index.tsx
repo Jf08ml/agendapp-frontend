@@ -5,8 +5,14 @@ import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
 import StepMultiServiceSummary from "./StepMultiServiceSummary";
 import StepCustomerData from "./StepCustomerData";
-import { Service, getServicesByOrganizationId } from "../../services/serviceService";
-import { Employee, getEmployeesByOrganizationId } from "../../services/employeeService";
+import {
+  Service,
+  getServicesByOrganizationId,
+} from "../../services/serviceService";
+import {
+  Employee,
+  getEmployeesByOrganizationId,
+} from "../../services/employeeService";
 import {
   SelectedService,
   ServiceWithDate,
@@ -54,7 +60,9 @@ export default function MultiBookingWizard() {
   // Paso 2: fechas
   const [dates, setDates] = useState<ServiceWithDate[]>([]);
   // Paso 3: horarios
-  const [times, setTimes] = useState<MultiServiceBlockSelection | ServiceTimeSelection[]>([]);
+  const [times, setTimes] = useState<
+    MultiServiceBlockSelection | ServiceTimeSelection[]
+  >([]);
   // Paso 4: datos cliente
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
@@ -75,7 +83,9 @@ export default function MultiBookingWizard() {
   // Bloquea navegación/reenvíos tras terminar
   const [completed, setCompleted] = useState(false);
 
-  const organization = useSelector((state: RootState) => state.organization.organization);
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
 
   // === Responsive helpers ===
   const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
@@ -107,11 +117,17 @@ export default function MultiBookingWizard() {
 
   // Scroll al top al cambiar de paso
   useEffect(() => {
-    contentTopRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    contentTopRef.current?.scrollIntoView({
+      block: "start",
+      behavior: "smooth",
+    });
   }, [currentStep]);
 
   const splitDates = useMemo(
-    () => dates.some((d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()),
+    () =>
+      dates.some(
+        (d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()
+      ),
     [dates]
   );
 
@@ -129,20 +145,27 @@ export default function MultiBookingWizard() {
     if (!times) return false;
     if (Array.isArray(times)) {
       if (times.length !== selected.length) return false;
-      return times.every((t) => typeof t.time === "string" && t.time.trim().length > 0);
+      return times.every(
+        (t) => typeof t.time === "string" && t.time.trim().length > 0
+      );
     }
-    return !!(times as MultiServiceBlockSelection).startTime &&
+    return (
+      !!(times as MultiServiceBlockSelection).startTime &&
       Array.isArray((times as MultiServiceBlockSelection).intervals) &&
-      (times as MultiServiceBlockSelection).intervals.length > 0;
+      (times as MultiServiceBlockSelection).intervals.length > 0
+    );
   }, [times, selected.length]);
 
   const hasCustomerData =
-    customerDetails.name.trim().length > 0 && customerDetails.phone.trim().length >= 7;
+    customerDetails.name.trim().length > 0 &&
+    customerDetails.phone.trim().length >= 7;
 
   if (!organization?._id) {
     return (
       <Stack align="center" justify="center" style={{ minHeight: 220 }}>
-        <Text c="dimmed">No hay organización seleccionada. Intenta recargar o selecciona una.</Text>
+        <Text c="dimmed">
+          No hay organización seleccionada. Intenta recargar o selecciona una.
+        </Text>
       </Stack>
     );
   }
@@ -168,11 +191,15 @@ export default function MultiBookingWizard() {
     return arr.map((t) => {
       const sid = getId(t.serviceId) ?? (t as any).serviceId; // id seguro
       // Busca la fecha por id normalizado
-      const d = dates.find((x) => (getId(x.serviceId) ?? (x as any).serviceId) === sid);
+      const d = dates.find(
+        (x) => (getId(x.serviceId) ?? (x as any).serviceId) === sid
+      );
       const svc = services.find((s) => s._id === sid);
 
-      if (!d?.date) throw new Error(`Falta fecha para el servicio "${svc?.name ?? sid}"`);
-      if (!t.time) throw new Error(`Falta hora para el servicio "${svc?.name ?? sid}"`);
+      if (!d?.date)
+        throw new Error(`Falta fecha para el servicio "${svc?.name ?? sid}"`);
+      if (!t.time)
+        throw new Error(`Falta hora para el servicio "${svc?.name ?? sid}"`);
 
       const start = buildStartFrom(d.date, t.time);
 
@@ -241,13 +268,13 @@ export default function MultiBookingWizard() {
   };
 
   if (loading) {
-    return (
-      <CustomLoader loadingText="Cargando servicios y empleados"/>
-    );
+    return <CustomLoader loadingText="Cargando servicios y empleados" />;
   }
 
   const NextBtn = (props: any) => <Button fullWidth={isMobile} {...props} />;
-  const BackBtn = (props: any) => <Button variant="default" fullWidth={isMobile} {...props} />;
+  const BackBtn = (props: any) => (
+    <Button variant="default" fullWidth={isMobile} {...props} />
+  );
 
   // ======= Header y contenido compactos en móvil =======
   const steps = [
@@ -270,6 +297,9 @@ export default function MultiBookingWizard() {
             employees={employees}
             value={selected}
             onChange={setSelected}
+            employeeRequired={
+              organization?.reservationPolicy === "auto_if_available"
+            }
           />
         );
       case 1:
@@ -296,12 +326,22 @@ export default function MultiBookingWizard() {
       case 3:
         return (
           <StepCustomerData
-            bookingData={{ customerDetails, organizationId: orgId } as Partial<Reservation>}
+            bookingData={
+              { customerDetails, organizationId: orgId } as Partial<Reservation>
+            }
             setBookingData={(updater) => {
-              const base: Partial<Reservation> = { customerDetails, organizationId: orgId };
-              const next = typeof updater === "function" ? (updater as any)(base) : updater;
+              const base: Partial<Reservation> = {
+                customerDetails,
+                organizationId: orgId,
+              };
+              const next =
+                typeof updater === "function"
+                  ? (updater as any)(base)
+                  : updater;
               if (next?.customerDetails) {
-                setCustomerDetails(next.customerDetails as typeof customerDetails);
+                setCustomerDetails(
+                  next.customerDetails as typeof customerDetails
+                );
               }
             }}
           />
@@ -322,7 +362,12 @@ export default function MultiBookingWizard() {
   }
 
   return (
-    <Card withBorder radius="md" p={isMobile ? "md" : "xl"} style={{ position: "relative" }}>
+    <Card
+      withBorder
+      radius="md"
+      p={isMobile ? "md" : "xl"}
+      style={{ position: "relative" }}
+    >
       <LoadingOverlay visible={submitting} zIndex={1000} />
       <div ref={contentTopRef} />
 
@@ -390,7 +435,9 @@ export default function MultiBookingWizard() {
 
         {/* ======= STEP CONTENT ======= */}
         {currentStep < 5 ? (
-          <Stack gap={isMobile ? "md" : "xl"}>{renderStepContent(currentStep)}</Stack>
+          <Stack gap={isMobile ? "md" : "xl"}>
+            {renderStepContent(currentStep)}
+          </Stack>
         ) : (
           // Finish
           <Stack>
@@ -403,11 +450,18 @@ export default function MultiBookingWizard() {
               Todo listo, {finishInfo?.customer ?? "Cliente"} 🎉
             </Title>
             <Text ta="center" c="dimmed" mb="md">
-              {finishInfo?.count ?? 0} {finishInfo?.count === 1 ? "reserva" : "reservas"} programada
-              {finishInfo && finishInfo.count !== 1 ? "s" : ""} desde {finishInfo?.dateText ?? "—"}.
+              {finishInfo?.count ?? 0}{" "}
+              {finishInfo?.count === 1 ? "reserva" : "reservas"} programada
+              {finishInfo && finishInfo.count !== 1 ? "s" : ""} desde{" "}
+              {finishInfo?.dateText ?? "—"}.
             </Text>
             <Divider my="md" />
-            <Group justify={isMobile ? "stretch" : "center"} gap="sm" wrap="wrap" mt="md">
+            <Group
+              justify={isMobile ? "stretch" : "center"}
+              gap="sm"
+              wrap="wrap"
+              mt="md"
+            >
               <Button fullWidth={isMobile} onClick={handleNewBooking}>
                 Nueva reserva
               </Button>
@@ -418,28 +472,44 @@ export default function MultiBookingWizard() {
         {/* Acciones desktop */}
         {!isMobile && currentStep < 5 && !completed && (
           <Group justify="flex-end" wrap="wrap" gap="sm">
-            {currentStep > 0 && <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>Atrás</BackBtn>}
+            {currentStep > 0 && (
+              <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>
+                Atrás
+              </BackBtn>
+            )}
 
             {currentStep === 0 && (
-              <NextBtn disabled={!canGoNextFromStep0} onClick={() => setCurrentStep(1)}>
+              <NextBtn
+                disabled={!canGoNextFromStep0}
+                onClick={() => setCurrentStep(1)}
+              >
                 Siguiente
               </NextBtn>
             )}
 
             {currentStep === 1 && (
-              <NextBtn disabled={!canGoNextFromStep1} onClick={() => setCurrentStep(2)}>
+              <NextBtn
+                disabled={!canGoNextFromStep1}
+                onClick={() => setCurrentStep(2)}
+              >
                 Siguiente
               </NextBtn>
             )}
 
             {currentStep === 2 && (
-              <NextBtn disabled={!hasChosenTimes} onClick={() => setCurrentStep(3)}>
+              <NextBtn
+                disabled={!hasChosenTimes}
+                onClick={() => setCurrentStep(3)}
+              >
                 Continuar
               </NextBtn>
             )}
 
             {currentStep === 3 && (
-              <NextBtn disabled={!hasCustomerData} onClick={() => setCurrentStep(4)}>
+              <NextBtn
+                disabled={!hasCustomerData}
+                onClick={() => setCurrentStep(4)}
+              >
                 Continuar
               </NextBtn>
             )}
@@ -466,28 +536,44 @@ export default function MultiBookingWizard() {
             }}
           >
             <Stack gap="sm">
-              {currentStep > 0 && <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>Atrás</BackBtn>}
+              {currentStep > 0 && (
+                <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>
+                  Atrás
+                </BackBtn>
+              )}
 
               {currentStep === 0 && (
-                <NextBtn disabled={!canGoNextFromStep0} onClick={() => setCurrentStep(1)}>
+                <NextBtn
+                  disabled={!canGoNextFromStep0}
+                  onClick={() => setCurrentStep(1)}
+                >
                   Siguiente
                 </NextBtn>
               )}
 
               {currentStep === 1 && (
-                <NextBtn disabled={!canGoNextFromStep1} onClick={() => setCurrentStep(2)}>
+                <NextBtn
+                  disabled={!canGoNextFromStep1}
+                  onClick={() => setCurrentStep(2)}
+                >
                   Siguiente
                 </NextBtn>
               )}
 
               {currentStep === 2 && (
-                <NextBtn disabled={!hasChosenTimes} onClick={() => setCurrentStep(3)}>
+                <NextBtn
+                  disabled={!hasChosenTimes}
+                  onClick={() => setCurrentStep(3)}
+                >
                   Continuar
                 </NextBtn>
               )}
 
               {currentStep === 3 && (
-                <NextBtn disabled={!hasCustomerData} onClick={() => setCurrentStep(4)}>
+                <NextBtn
+                  disabled={!hasCustomerData}
+                  onClick={() => setCurrentStep(4)}
+                >
                   Continuar
                 </NextBtn>
               )}
