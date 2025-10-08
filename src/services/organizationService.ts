@@ -5,6 +5,8 @@ export interface Role {
   permissions: string[];
 }
 
+export type ReservationPolicy = "manual" | "auto_if_available";
+
 export interface Branding {
   primaryColor?: string;
   secondaryColor?: string;
@@ -34,7 +36,7 @@ export interface Organization {
   instagramUrl?: string;
   whatsappUrl?: string;
   tiktokUrl?: string;
-  role: Role;
+  role: Role | string;
   isActive?: boolean;
   referredCount?: number;
   referredReward?: string;
@@ -47,6 +49,7 @@ export interface Organization {
   clientIdWhatsapp?: string | null;
   branding?: Branding;
   domains?: string[];
+  reservationPolicy?: ReservationPolicy;
 }
 
 // Crear una nueva organización

@@ -7,8 +7,10 @@ import {
 } from "@reduxjs/toolkit";
 import {
   Organization,
+  ReservationPolicy,
   getOrganizationById,
   getOrganizationConfig,
+  updateOrganization,
 } from "../../services/organizationService";
 
 // === Tipos opcionales para WA ===
@@ -38,6 +40,7 @@ interface OrganizationState {
   whatsappReason: string | null; // explicación (quiet hours, not_ready, rate limit, etc.)
   whatsappReadySince?: number | null; // epoch ms cuando pasó a ready (si lo envías)
   whatsappMe?: WaMe | null; // info de la cuenta, si la envías
+  savingPolicy?: boolean; // para el updateReservationPolicy thunk
 }
 
 const initialState: OrganizationState = {
@@ -49,6 +52,8 @@ const initialState: OrganizationState = {
   whatsappReason: null,
   whatsappReadySince: null,
   whatsappMe: null,
+
+  savingPolicy: false,
 };
 
 // ---- THUNKS ----
@@ -59,6 +64,7 @@ export const fetchOrganization = createAsyncThunk(
   async (organizationId: string, { rejectWithValue }) => {
     try {
       const organization = await getOrganizationById(organizationId);
+      console.log("Fetched organization by ID:", organization);
       return organization;
     } catch (error) {
       console.log("Error fetching organization:", error);
@@ -79,6 +85,29 @@ export const fetchOrganizationConfig = createAsyncThunk(
     } catch (error) {
       console.log("Error fetching organization by domain:", error);
       return rejectWithValue("Error al cargar la organización por dominio");
+    }
+  }
+);
+
+export const updateReservationPolicy = createAsyncThunk(
+  "organization/updateReservationPolicy",
+  async (
+    {
+      organizationId,
+      policy,
+    }: { organizationId: string; policy: ReservationPolicy },
+    { rejectWithValue }
+  ) => {
+    try {
+      const updated = await updateOrganization(organizationId, {
+        reservationPolicy: policy,
+      });
+      return updated; // Organization
+    } catch (error) {
+      console.error("Error updating reservation policy:", error);
+      return rejectWithValue(
+        "No se pudo actualizar la política de agendamiento"
+      );
     }
   }
 );
@@ -162,6 +191,25 @@ const organizationSlice = createSlice({
         state.whatsappReadySince = payload.readySince;
       if (payload.me !== undefined) state.whatsappMe = payload.me;
     });
+
+    builder
+      .addCase(updateReservationPolicy.pending, (state) => {
+        state.savingPolicy = true;
+      })
+      .addCase(
+        updateReservationPolicy.fulfilled,
+        (state, action: PayloadAction<Organization | null>) => {
+          state.savingPolicy = false;
+          if (action.payload) {
+            state.organization = action.payload; // ya trae reservationPolicy actualizada
+          }
+        }
+      )
+      .addCase(updateReservationPolicy.rejected, (state, action) => {
+        state.savingPolicy = false;
+        state.error =
+          (action.payload as string) ?? "Error al guardar la política";
+      });
   },
 });
 
@@ -184,3 +232,10 @@ export const selectWaReason = (s: { organization: OrganizationState }) =>
   s.organization.whatsappReason;
 export const selectWaIsReady = (s: { organization: OrganizationState }) =>
   s.organization.whatsappStatus === "ready";
+
+export const selectReservationPolicy = (s: {
+  organization: OrganizationState;
+}) => s.organization.organization?.reservationPolicy ?? "manual";
+
+export const selectSavingPolicy = (s: { organization: OrganizationState }) =>
+  Boolean(s.organization.savingPolicy);
