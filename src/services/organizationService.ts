@@ -36,7 +36,7 @@ export interface Organization {
   instagramUrl?: string;
   whatsappUrl?: string;
   tiktokUrl?: string;
-  role: Role | string;
+  role: Role;
   isActive?: boolean;
   referredCount?: number;
   referredReward?: string;
