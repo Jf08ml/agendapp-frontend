@@ -38,7 +38,7 @@ export const CustomLoader = forwardRef<HTMLImageElement, CustomLoaderProps>(
             className={classes.imageLoader}
             ref={ref}
           />
-          <Text size="xl" fw={700} c="dark">
+          <Text size="xl" fw={700} c="dark" className={classes.textLoader}>
             {loadingText}
           </Text>
         </Stack>

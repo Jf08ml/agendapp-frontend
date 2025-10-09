@@ -88,10 +88,35 @@ export default function AppWithBranding() {
   const primaryColor = isHex ? "custom" : "blue";
 
   // Crea el theme dinámico
+  // Crea el theme dinámico
   const theme = createTheme({
-    fontFamily: "Playfair Display, serif",
-    fontFamilyMonospace: "Monaco, Courier, monospace",
-    headings: { fontFamily: "Playfair Display, serif" },
+    // Base UI: Inter
+    fontFamily:
+      '"Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, sans-serif',
+
+    // Monospace (para logs / código)
+    fontFamilyMonospace:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+
+    // Títulos / Headings: Poppins
+    headings: {
+      fontFamily:
+        '"Poppins", "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      sizes: {
+        h1: {
+          fontSize: "clamp(2rem, 2.8vw, 3rem)",
+          fontWeight: "700",
+          lineHeight: "1.1",
+        },
+        h2: {
+          fontSize: "clamp(1.5rem, 2.2vw, 2.25rem)",
+          fontWeight: "700",
+          lineHeight: "1.15",
+        },
+      },
+    },
+
+    // Tamaños opcionales (conserva si te sirven)
     fontSizes: {
       xxs: "10px",
       xs: "12px",
@@ -101,6 +126,8 @@ export default function AppWithBranding() {
       xl: "20px",
       xxl: "24px",
     },
+
+    // Branding de color que ya tenías
     colors,
     primaryColor,
   });

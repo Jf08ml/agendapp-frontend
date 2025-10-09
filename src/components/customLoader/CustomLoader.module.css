@@ -25,3 +25,16 @@
   overflow: hidden;
 }
 
+
+@keyframes text-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.textLoader {
+  animation: text-blink 1.5s ease-in-out infinite;
+}

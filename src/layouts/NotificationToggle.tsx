@@ -89,18 +89,18 @@ const NotificationToggle = ({ userId }: NotificationToggleProps) => {
   };
 
   return (
-    <Flex direction="column" gap="sm">
+    <Flex direction="column">
       <Flex align="center" gap="md">
         <Switch
           checked={isEnabled}
           onChange={handleToggle}
           disabled={isLoading}
-          size="md"
+          size="xs"
         />
-        <Text>
+        <Text size="xs">
           {isEnabled
-            ? "Notificaciones activadas"
-            : "Notificaciones desactivadas"}
+            ? "Noti. activadas"
+            : "Noti. desactivadas"}
         </Text>
         {isLoading && <Loader size="sm" />}
       </Flex>

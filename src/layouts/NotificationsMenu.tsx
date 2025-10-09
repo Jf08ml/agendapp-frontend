@@ -1,5 +1,6 @@
+// src/layouts/NotificationsMenu.tsx
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode, useMemo } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState } from "../app/store";
@@ -24,15 +25,29 @@ import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt } from "react-icons/fa";
 import NotificationToggle from "./NotificationToggle";
 
-const NotificationsMenu = () => {
+type NotificationsMenuProps = {
+  /** Si se pasa, esto será el botón/trigger del menú.
+   * Se envolverá automáticamente con Indicator (badge) y Menu.Target. */
+  target?: ReactNode;
+  /** Por defecto true: pinta el badge sobre el target */
+  showBadgeOnTarget?: boolean;
+  /** Ancho del dropdown */
+  dropdownWidth?: number;
+};
+
+export default function NotificationsMenu({
+  target,
+  showBadgeOnTarget = true,
+  dropdownWidth = 450,
+}: NotificationsMenuProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const auth = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
 
-  // Fetch notifications
+  const type = auth.role === "admin" ? "organization" : "employee";
+
   const fetchNotifications = async () => {
     try {
-      const type = auth.role === "admin" ? "organization" : "employee";
       if (!auth.userId) return;
       const response = await getNotificationsByUserOrOrganization(
         auth.userId,
@@ -47,38 +62,21 @@ const NotificationsMenu = () => {
   useEffect(() => {
     fetchNotifications();
 
-    // Listen for push notifications from the service worker
-    const handleServiceWorkerMessage = async (event: MessageEvent) => {
+    // SW listener con cleanup correcto
+    const onSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "NEW_NOTIFICATION") {
-        const { title, message } = event.data.payload;
-
-        // Show a visual notification in the app
-        showNotification({
-          title,
-          message,
-          color: "blue",
-        });
-
-        // Refresh notifications
+        const { title, message } = event.data.payload || {};
+        showNotification({ title, message, color: "blue" });
         fetchNotifications();
       }
     };
 
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      console.log("Mensaje recibido del Service Worker:", event.data);
-      handleServiceWorkerMessage(event);
-    });
-
-    // Cleanup the event listener on unmount
+    navigator.serviceWorker.addEventListener("message", onSwMessage);
     return () => {
-      navigator.serviceWorker.removeEventListener(
-        "message",
-        handleServiceWorkerMessage
-      );
+      navigator.serviceWorker.removeEventListener("message", onSwMessage);
     };
   }, []);
 
-  // Handle single notification click
   const handleNotificationClick = async (notification: Notification) => {
     try {
       if (notification.status === "unread") {
@@ -89,30 +87,27 @@ const NotificationsMenu = () => {
           )
         );
       }
-      if (notification.frontendRoute) {
-        navigate(notification.frontendRoute);
-      }
+      if (notification.frontendRoute) navigate(notification.frontendRoute);
     } catch (error) {
       console.error("Error al marcar notificación como leída:", error);
     }
   };
 
-  // Handle marking all notifications as read
   const handleMarkAllAsRead = async () => {
     try {
       if (!auth.userId) return;
-      const type = auth.role === "admin" ? "organization" : "employee";
       await markAllNotificationsAsRead(auth.userId, type);
       setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
     } catch (error) {
-      console.error(
-        "Error al marcar todas las notificaciones como leídas:",
-        error
-      );
+      console.error("Error al marcar todas como leídas:", error);
     }
   };
 
-  // Get notification icon based on type
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => n.status === "unread").length,
+    [notifications]
+  );
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "reservation":
@@ -122,28 +117,47 @@ const NotificationsMenu = () => {
     }
   };
 
-  // Filter unread notifications for the badge count
-  const unreadCount = notifications.filter((n) => n.status === "unread").length;
-
   return (
-    <Menu shadow="md" width={400}>
+    <Menu shadow="md" width={dropdownWidth} position="bottom-end">
       <Menu.Target>
-        <Indicator
-          inline
-          size={16}
-          offset={4}
-          label={unreadCount}
-          color="red"
-          disabled={unreadCount === 0}
-        >
-          <ActionIcon radius="xl" size="md" variant="filled" color="yellow">
-            <FaBell />
-          </ActionIcon>
-        </Indicator>
+        {target ? (
+          showBadgeOnTarget ? (
+            <Indicator
+              inline
+              size={16}
+              offset={4}
+              label={unreadCount > 99 ? "99+" : String(unreadCount)}
+              color="red"
+              disabled={unreadCount === 0}
+              withBorder
+              processing={unreadCount > 0}
+            >
+              {target}
+            </Indicator>
+          ) : (
+            <>{target}</>
+          )
+        ) : (
+          // Fallback: campana
+          <Indicator
+            inline
+            size={16}
+            offset={4}
+            label={unreadCount}
+            color="red"
+            disabled={unreadCount === 0}
+          >
+            <ActionIcon radius="xl" size="md" variant="filled" color="yellow">
+              <FaBell />
+            </ActionIcon>
+          </Indicator>
+        )}
       </Menu.Target>
+
       <Menu.Dropdown>
-        <Flex justify="space-between" align="center" px="sm">
-          <NotificationToggle userId={auth.userId ? auth.userId : ""} />
+        <Flex justify="space-between" align="center">
+          {/* Si usas un toggle de permisos/push, déjalo */}
+          <NotificationToggle userId={auth.userId ?? ""} />
           <Button
             variant="subtle"
             size="xs"
@@ -153,6 +167,7 @@ const NotificationsMenu = () => {
             Marcar todas como leídas
           </Button>
         </Flex>
+
         <Divider my="xs" />
         <Box style={{ maxHeight: 320, overflowY: "auto" }}>
           {[...notifications]
@@ -168,7 +183,7 @@ const NotificationsMenu = () => {
                 style={{
                   position: "relative",
                   backgroundColor:
-                    notification.status === "unread" ? "#f9f9f9" : "white",
+                    notification.status === "unread" ? "#f7faf9" : "white",
                   borderLeft:
                     notification.status === "unread"
                       ? "4px solid #00b894"
@@ -198,6 +213,7 @@ const NotificationsMenu = () => {
               </Menu.Item>
             ))}
         </Box>
+
         {notifications.length === 0 && (
           <Menu.Item>
             <Text size="sm" c="dimmed" ta="center">
@@ -208,6 +224,4 @@ const NotificationsMenu = () => {
       </Menu.Dropdown>
     </Menu>
   );
-};
-
-export default NotificationsMenu;
+}

@@ -1,32 +1,42 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
-import { Box, Text, Flex, Divider, ScrollArea } from "@mantine/core";
+import { Link, useLocation } from "react-router-dom";
+import {
+  Box,
+  ScrollArea,
+  Stack,
+  NavLink as MantineNavLink,
+  Divider,
+  Text,
+  rem,
+} from "@mantine/core";
 import { MdOutlineLoyalty } from "react-icons/md";
-// import { RiReservedLine } from "react-icons/ri";
 import { GrUserSettings } from "react-icons/gr";
 import { BiCalendar, BiCalendarCheck } from "react-icons/bi";
 import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
 import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
+import { IoAnalytics } from "react-icons/io5";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import CustomLoader from "../components/customLoader/CustomLoader";
-import { IoAnalytics } from "react-icons/io5";
 
 interface NavbarLinksProps {
   closeNavbar: () => void;
 }
 
-const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
+type LinkItem = {
+  label: string;
+  to: string;
+  icon: React.ReactNode;
+  canShow: boolean;
+};
+
+export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
   const { hasPermission } = usePermissions();
-
-  // const isAuthenticated = useSelector(
-  //   (state: RootState) => state.auth.isAuthenticated
-  // );
-
   const { organization, loading } = useSelector(
-    (state: RootState) => state.organization
+    (s: RootState) => s.organization
   );
+  const location = useLocation();
 
   if (loading || !organization) {
     return (
@@ -37,219 +47,204 @@ const NavbarLinks: React.FC<NavbarLinksProps> = ({ closeNavbar }) => {
     );
   }
 
+  // Permisos (centralizado)
+  const can = {
+    businessInfo: hasPermission("businessInformation:read"),
+    employeeInfo: hasPermission("employeeInformation:read"),
+    clientsRead: hasPermission("clients:read"),
+    servicesRead: hasPermission("services:read"),
+    employeesRead: hasPermission("employees:read"),
+    apptsAll: hasPermission("appointments:view_all"),
+    apptsOwn: hasPermission("appointments:view_own"),
+    onlineRes: hasPermission("reservationOnline:read"),
+    cashRead: hasPermission("cashManagement:read"), // <-- fix typo
+    whatsappRead: hasPermission("whatsapp:read"),
+    analyticsRead: hasPermission("analytics:read"),
+  };
+
+  // Estilos consistentes sobre navbar de color
+  const textColor = "white";
+  const activeBg = "rgba(255,255,255,0.18)";
+  const hoverBg = "rgba(255,255,255,0.12)";
+
+  // SECCIONES EN ORDEN FIJO
+  const sections: { title?: string; items: LinkItem[] }[] = [
+    {
+      title: "Explora",
+      items: [
+        {
+          label: "Precios y servicios",
+          to: "/servicios-precios",
+          icon: <GiPriceTag size={18} />,
+          canShow: true,
+        },
+        {
+          label: "Plan de fidelidad",
+          to: "/search-client",
+          icon: <FaIdeal size={18} />,
+          canShow: true,
+        },
+        {
+          label: "Reserva en línea",
+          to: "/online-reservation",
+          icon: <BiCalendar size={18} />,
+          canShow: true,
+        },
+      ],
+    },
+    {
+      title:
+        can.businessInfo || can.apptsAll || can.apptsOwn
+          ? "Gestión de cuenta"
+          : undefined,
+      items: [
+        {
+          label: "Gestión de caja",
+          to: "/gestion-caja",
+          icon: <FaCashRegister size={18} />,
+          canShow: can.cashRead,
+        },
+        {
+          label: "Gestionar agenda",
+          to: "/gestionar-agenda",
+          icon: <BiCalendarCheck size={18} />,
+          canShow: can.apptsAll || can.apptsOwn,
+        },
+        {
+          label: "Gestionar reservas online",
+          to: "/gestionar-reservas-online",
+          icon: <FaUsers size={18} />,
+          canShow: can.onlineRes,
+        },
+        {
+          label: "Información del negocio",
+          to: "/informacion-negocio",
+          icon: <MdOutlineLoyalty size={18} />,
+          canShow: can.businessInfo,
+        },
+        {
+          label: "Información del empleado",
+          to: "/informacion-empleado",
+          icon: <MdOutlineLoyalty size={18} />,
+          canShow: can.employeeInfo,
+        },
+      ],
+    },
+    {
+      title:
+        can.clientsRead || can.servicesRead || can.employeesRead
+          ? "Sección administrativa"
+          : undefined,
+      items: [
+        {
+          label: "Gestionar clientes",
+          to: "/gestionar-clientes",
+          icon: <GrUserSettings size={18} />,
+          canShow: can.clientsRead,
+        },
+        {
+          label: "Gestionar servicios",
+          to: "/gestionar-servicios",
+          icon: <GiClawSlashes size={18} />,
+          canShow: can.servicesRead,
+        },
+        {
+          label: "Gestionar empleados",
+          to: "/gestionar-empleados",
+          icon: <FaUsers size={18} />,
+          canShow: can.employeesRead,
+        },
+        {
+          label: "Gestionar WhatsApp",
+          to: "/gestionar-whatsapp",
+          icon: <FaWhatsapp size={18} />,
+          canShow: can.whatsappRead,
+        },
+        {
+          label: "Analíticas del negocio",
+          to: "/analytics-dashboard",
+          icon: <IoAnalytics size={18} />,
+          canShow: can.analyticsRead,
+        },
+      ],
+    },
+  ];
+
+  const linkStyles = {
+    root: {
+      color: textColor,
+      padding: `${rem(8)} ${rem(10)}`,
+      borderRadius: rem(10),
+      "&:hover": { backgroundColor: hoverBg },
+    },
+    label: { fontWeight: 600 },
+  } as const;
+
+  const renderLink = (item: LinkItem) => {
+    if (!item.canShow) return null;
+    const active =
+      location.pathname === item.to ||
+      (item.to !== "/" && location.pathname.startsWith(item.to));
+
+    return (
+      <MantineNavLink
+        key={item.to}
+        component={Link}
+        to={item.to}
+        leftSection={item.icon}
+        label={item.label}
+        onClick={closeNavbar}
+        active={active}
+        styles={{
+          ...linkStyles,
+          root: {
+            ...linkStyles.root,
+            backgroundColor: active ? activeBg : "transparent",
+            borderLeft: active ? `${rem(3)} solid ${textColor}` : "transparent",
+          },
+        }}
+      />
+    );
+  };
+
   return (
-    <ScrollArea>
-      <Box>
-        <Flex direction="column" align="center" justify="center">
-          <NavLink
-            to="/servicios-precios"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <GiPriceTag size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Precios y servicios
-              </Text>
-            </Flex>
-          </NavLink>
+    <ScrollArea type="auto" scrollbars="y" style={{ paddingTop: rem(4) }}>
+      <Stack gap="xs">
+        {sections.map(({ title, items }, idx) => {
+          // Filtra items visibles según permisos
+          const visible = items.filter((it) => it.canShow);
+          if (visible.length === 0) return null;
 
-          <NavLink
-            to="/search-client"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <FaIdeal size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Plan de fidelidad
-              </Text>
-            </Flex>
-          </NavLink>
-
-          <NavLink
-            to="/online-reservation"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <BiCalendar size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Reserva en linea
-              </Text>
-            </Flex>
-          </NavLink>
-        </Flex>
-        {(hasPermission("businessInformation:read") ||
-          hasPermission("appointments:view_own") ||
-          hasPermission("appointments:view_all")) && (
-          <Divider my="xs" label="Gestión de cuenta" labelPosition="center" />
-        )}
-
-        {hasPermission("cashManagement:red") && (
-          <NavLink
-            to="/gestion-caja"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <FaCashRegister size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Gestión de caja
-              </Text>
-            </Flex>
-          </NavLink>
-        )}
-
-        {(hasPermission("appointments:view_all") ||
-          hasPermission("appointments:view_own")) && (
-          <NavLink
-            to="/gestionar-agenda"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <BiCalendarCheck size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Gestionar agenda
-              </Text>
-            </Flex>
-          </NavLink>
-        )}
-
-        {hasPermission("reservationOnline:read") && (
-          <NavLink
-            to="/gestionar-reservas-online"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <FaUsers size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Gestionar reservas online
-              </Text>
-            </Flex>
-          </NavLink>
-        )}
-
-        {hasPermission("businessInformation:read") && (
-          <NavLink
-            to="/informacion-negocio"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <MdOutlineLoyalty size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Información del negocio
-              </Text>
-            </Flex>
-          </NavLink>
-        )}
-
-        {hasPermission("employeeInformation:read") && (
-          <NavLink
-            to="/informacion-empleado"
-            onClick={closeNavbar}
-            style={{ textDecoration: "none" }}
-          >
-            <Flex align="center" justify="center" gap="sm">
-              <MdOutlineLoyalty size={20} color="white" />
-              <Text c="white" fw={600} my="md">
-                Información del empleado
-              </Text>
-            </Flex>
-          </NavLink>
-        )}
-
-        {(hasPermission("clients:read") ||
-          hasPermission("services:read") ||
-          hasPermission("employees:read")) && (
-          <Divider
-            my="xs"
-            label="Sección administrativa"
-            labelPosition="center"
-          />
-        )}
-
-        <Flex direction="column" align="center" justify="center">
-          {hasPermission("clients:read") && (
-            <NavLink
-              to="/gestionar-clientes"
-              onClick={closeNavbar}
-              style={{ textDecoration: "none" }}
-            >
-              <Flex align="center" justify="center" gap="sm">
-                <GrUserSettings size={20} color="white" />
-                <Text c="white" fw={600} my="md">
-                  Gestionar clientes
-                </Text>
-              </Flex>
-            </NavLink>
-          )}
-
-          {hasPermission("services:read") && (
-            <NavLink
-              to="/gestionar-servicios"
-              onClick={closeNavbar}
-              style={{ textDecoration: "none" }}
-            >
-              <Flex align="center" justify="center" gap="sm">
-                <GiClawSlashes size={20} color="white" />
-                <Text c="white" fw={600} my="md">
-                  Gestionar servicios
-                </Text>
-              </Flex>
-            </NavLink>
-          )}
-
-          {hasPermission("employees:read") && (
-            <NavLink
-              to="/gestionar-empleados"
-              onClick={closeNavbar}
-              style={{ textDecoration: "none" }}
-            >
-              <Flex align="center" justify="center" gap="sm">
-                <FaUsers size={20} color="white" />
-                <Text c="white" fw={600} my="md">
-                  Gestionar empleados
-                </Text>
-              </Flex>
-            </NavLink>
-          )}
-
-          {hasPermission("whatsapp:read") && (
-            <NavLink
-              to="/gestionar-whatsapp"
-              onClick={closeNavbar}
-              style={{ textDecoration: "none" }}
-            >
-              <Flex align="center" justify="center" gap="sm">
-                <FaWhatsapp size={20} color="white" />
-                <Text c="white" fw={600} my="md">
-                  Gestionar Whatsapp
-                </Text>
-              </Flex>
-            </NavLink>
-          )}
-          {hasPermission("analytics:read") && (
-            <NavLink
-              to="/analytics-dashboard"
-              onClick={closeNavbar}
-              style={{ textDecoration: "none" }}
-            >
-              <Flex align="center" justify="center" gap="sm">
-                <IoAnalytics size={20} color="white" />
-                <Text c="white" fw={600} my="md">
-                  Analiticas del negocio
-                </Text>
-              </Flex>
-            </NavLink>
-          )}
-        </Flex>
-      </Box>
+          return (
+            <Box key={idx}>
+              {title && (
+                <Divider
+                  my="xs"
+                  label={
+                    <Text
+                      size="xs"
+                      fw={700}
+                      c={textColor}
+                      style={{ letterSpacing: ".02em" }}
+                    >
+                      {title}
+                    </Text>
+                  }
+                  labelPosition="center"
+                  color={textColor}
+                  styles={{
+                    label: { opacity: 0.9 },
+                    root: { borderColor: "rgba(255,255,255,.35)" },
+                  }}
+                />
+              )}
+              <Stack gap={4} px="xs" py={4}>
+                {visible.map(renderLink)}
+              </Stack>
+            </Box>
+          );
+        })}
+      </Stack>
     </ScrollArea>
   );
-};
-
-export default NavbarLinks;
+}

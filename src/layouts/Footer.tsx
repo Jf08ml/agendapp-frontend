@@ -1,5 +1,16 @@
+// src/layouts/Footer.tsx
 import { useEffect, useState } from "react";
-import { Text, Box, Center, ActionIcon, Button, Group, Image } from "@mantine/core";
+import {
+  Text,
+  Group,
+  ActionIcon,
+  Button,
+  Tooltip,
+  Box,
+  useMantineTheme,
+  rem,
+  Avatar,
+} from "@mantine/core";
 import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
 import { MdInstallMobile } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
@@ -12,127 +23,130 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-export const Footer = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+export default function Footer() {
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+
+  const theme = useMantineTheme();
   const navigate = useNavigate();
-  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const dispatch = useDispatch();
 
-  const organization = useSelector((state: RootState) => state.organization.organization);
+  const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
+  const organization = useSelector(
+    (s: RootState) => s.organization.organization
+  );
+
   const { name, branding } = organization || {};
-  const footerColor = branding?.primaryColor || branding?.themeColor || "#DE739E";
+  const footerColor =
+    branding?.primaryColor || branding?.themeColor || "#DE739E";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
 
+  // Captura del evento PWA
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
-
-    window.addEventListener(
-      "beforeinstallprompt",
-      handleBeforeInstallPrompt as EventListener
-    );
-
-    return () => {
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return () =>
       window.removeEventListener(
         "beforeinstallprompt",
-        handleBeforeInstallPrompt as EventListener
+        handleBeforeInstallPrompt
       );
-    };
   }, []);
 
-  const handleInstallClick = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(
-        (choiceResult: { outcome: "accepted" | "dismissed" }) => {
-          if (choiceResult.outcome === "accepted") {
-            console.log("User accepted the install prompt");
-          } else {
-            console.log("User dismissed the install prompt");
-          }
-          setDeferredPrompt(null);
-        }
-      );
-    }
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice; // opcional: puedes revisar outcome aquí
+    setDeferredPrompt(null);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate("/");
+  const handleAuthAction = () => {
+    if (isAuthenticated) {
+      dispatch(logout());
+      navigate("/");
+    } else {
+      navigate("/login-admin");
+    }
   };
 
   return (
     <Box
       component="footer"
-      bg={footerColor}
-      p="0.1rem 0"
+      // Fondo sólido con un leve overlay para profundidad
       style={{
-        width: "100%",
-        boxShadow: "0 -2px 10px rgba(0, 0, 0, 0.2)",
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        zIndex: 1000,
+        background: `linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06)), ${footerColor}`,
+        color: textColor,
       }}
     >
-      {deferredPrompt && (
-        <Button
-          leftSection={<MdInstallMobile />}
-          variant="transparent"
-          style={{
-            position: "absolute",
-            left: "0px",
-            bottom: "-8px",
-          }}
-          onClick={handleInstallClick}
-        >
-          Instalar app
-        </Button>
-      )}
-
-      <Center>
-        <Group gap="xs" style={{ paddingTop: 4, paddingBottom: 2 }}>
-          {/* Logo */}
+      <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+        {/* IZQUIERDA: marca */}
+        <Group gap="xs" wrap="nowrap" pl="xs">
           {logoUrl && (
-            <Image
+            <Avatar
               src={logoUrl}
-              alt={name}
-              width={22}
-              height={22}
-              fit="contain"
-              style={{ borderRadius: 8, background: "#fff" }}
+              alt={name || "Logo"}
+              size={22}
+              radius="md"
+              styles={{
+                root: {
+                  background: "#fff",
+                  borderRadius: 6,
+                },
+                image: {
+                  objectFit: "contain",
+                },
+              }}
             />
           )}
-          <Text
-            size="xs"
-            style={{
-              color: textColor,
-              fontWeight: 500,
-              letterSpacing: 1,
-            }}
-          >
-            © {name || "Organización"}.
+          <Text size="xs" fw={600} style={{ color: textColor }}>
+            © {name || "Organización"}
           </Text>
         </Group>
-      </Center>
 
-      <ActionIcon
-        style={{
-          position: "absolute",
-          right: "5px",
-          bottom: "5px",
-          color: textColor,
-        }}
-        radius="lg"
-        onClick={isAuthenticated ? handleLogout : () => navigate("/login-admin")}
-      >
-        {isAuthenticated ? <FaSignOutAlt size="1.5rem" /> : <FaUserShield size="1.5rem" />}
-      </ActionIcon>
+        {/* CENTRO: CTA PWA (sólo si hay prompt) */}
+        {deferredPrompt ? (
+          <Button
+            size="xs"
+            variant="white"
+            leftSection={<MdInstallMobile size={14} />}
+            onClick={handleInstallClick}
+            styles={{
+              root: {
+                color: theme.colors.dark[7],
+                height: rem(28),
+                paddingInline: rem(10),
+              },
+            }}
+          >
+            Instalar app
+          </Button>
+        ) : (
+          <span /> // Mantiene el layout en 3 columnas aunque no haya CTA
+        )}
+
+        {/* DERECHA: acción auth */}
+        <Tooltip
+          label={isAuthenticated ? "Cerrar sesión" : "Entrar al panel"}
+          withArrow
+        >
+          <ActionIcon
+            variant="subtle"
+            aria-label={isAuthenticated ? "Cerrar sesión" : "Entrar"}
+            onClick={handleAuthAction}
+            radius="xl"
+            style={{ color: textColor }}
+          >
+            {isAuthenticated ? (
+              <FaSignOutAlt size={18} />
+            ) : (
+              <FaUserShield size={18} />
+            )}
+          </ActionIcon>
+        </Tooltip>
+      </Group>
     </Box>
   );
-};
-
-export default Footer;
+}

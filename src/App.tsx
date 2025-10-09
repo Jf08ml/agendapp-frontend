@@ -1,5 +1,5 @@
 // src/App.tsx
-import { AppShell, Burger, Flex } from "@mantine/core";
+import { AppShell, Avatar, Burger, Flex, UnstyledButton } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -14,6 +14,7 @@ import { RootState } from "./app/store";
 import { useEffect } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
+import NotificationsMenu from "./layouts/NotificationsMenu";
 
 function App() {
   const { userId, isAuthenticated } = useSelector(
@@ -22,9 +23,7 @@ function App() {
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
-  const loading = useSelector(
-    (state: RootState) => state.organization.loading
-  );
+  const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
 
   // Branding dinámico
@@ -114,16 +113,24 @@ function App() {
               color="white"
               onMouseEnter={() => opened || toggle()}
             />
-            {/* Logo de la organización */}
-            <img
-              src={logoUrl}
-              alt={organization?.name}
-              style={{
-                height: 36,
-                width: 36,
-                objectFit: "cover",
-                borderRadius: "50%",
-              }}
+            {/* Logo + badge + menú de notificaciones */}
+            <NotificationsMenu
+              target={
+                <UnstyledButton
+                  aria-label="Abrir notificaciones"
+                  style={{ lineHeight: 0 }}
+                >
+                  <Avatar
+                    src={logoUrl}
+                    alt={organization?.name}
+                    size={36}
+                    radius="xl"
+                    styles={{ image: { objectFit: "cover" } }}
+                  />
+                </UnstyledButton>
+              }
+              showBadgeOnTarget
+              dropdownWidth={400}
             />
             {/* Nombre dinámico y contenido extra del Header */}
             <Header organization={organization} />
@@ -148,7 +155,9 @@ function App() {
           </Routes>
         </AppShell.Main>
 
-        <Footer />
+        <AppShell.Footer>
+          <Footer />
+        </AppShell.Footer>
       </AppShell>
     </Router>
   );

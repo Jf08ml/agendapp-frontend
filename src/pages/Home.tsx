@@ -1,90 +1,134 @@
-import { Container, Title, Grid, Group, Text, Paper, useMantineTheme, Box } from "@mantine/core";
+import { Link } from "react-router-dom";
+import {
+  Container,
+  Title,
+  Text,
+  Card,
+  Group,
+  Box,
+  SimpleGrid,
+  useMantineTheme,
+  rem,
+} from "@mantine/core";
 import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
-import { Link } from "react-router-dom";
 
-const Home = () => {
+function FeatureCard({
+  to,
+  title,
+  icon,
+}: {
+  to: string;
+  title: string;
+  icon: React.ReactNode;
+}) {
   const theme = useMantineTheme();
+  const primary = theme.colors[theme.primaryColor][6];
+
+  return (
+    <Card
+      component={Link}
+      to={to}
+      withBorder
+      radius="xl"
+      p="md"
+      aria-label={title}
+      tabIndex={0}
+      shadow="sm"
+      style={{
+        transition:
+          "transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = theme.shadows.md)}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = theme.shadows.sm)}
+      // Accesibilidad teclado
+      onFocus={(e) => (e.currentTarget.style.boxShadow = theme.shadows.md)}
+      onBlur={(e) => (e.currentTarget.style.boxShadow = theme.shadows.sm)}
+      // Reduce motion: evita scale si el usuario lo pide
+      className="feature-card"
+    >
+      <Group align="center" gap="md" wrap="nowrap">
+        <Box
+          aria-hidden
+          style={{
+            borderRadius: 999,
+            padding: rem(12),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: rem(56),
+            minHeight: rem(56),
+          }}
+        >
+          {icon}
+        </Box>
+
+        <Text size="lg" fw={700} c={primary} style={{ letterSpacing: 0.2 }}>
+          {title}
+        </Text>
+      </Group>
+    </Card>
+  );
+}
+
+export default function Home() {
+  const theme = useMantineTheme();
+  const primary = theme.colors[theme.primaryColor][6];
 
   const features = [
     {
-      title: "Reserva en Línea",
-      icon: <BiCalendar size={32} color={theme.colors[theme.primaryColor][6]} />,
+      title: "Reserva en línea",
+      icon: <BiCalendar size={28} color={primary} />,
       link: "/online-reservation",
     },
     {
-      title: "Servicios y Precios",
-      icon: <GiPriceTag size={32} color={theme.colors[theme.primaryColor][6]} />,
+      title: "Servicios y precios",
+      icon: <GiPriceTag size={28} color={primary} />,
       link: "/servicios-precios",
     },
     {
-      title: "Plan de Fidelidad",
-      icon: <FaIdeal size={32} color={theme.colors[theme.primaryColor][6]} />,
+      title: "Plan de fidelidad",
+      icon: <FaIdeal size={28} color={primary} />,
       link: "/search-client",
     },
     {
       title: "Ubicación",
-      icon: <GrLocation size={32} color={theme.colors[theme.primaryColor][6]} />,
+      icon: <GrLocation size={28} color={primary} />,
       link: "/location",
     },
   ];
 
   return (
-    <Container size="sm" py="lg">
-      <Title ta="center" fw={900} mb="sm" style={{ color: theme.colors[theme.primaryColor][6] }}>
-        ¡Holaaa! Bienvenido
+    <Container size="sm" py="xl">
+      <Title ta="center" fw={900} mb="xs" c={primary}>
+        ¡Hola! Bienvenido
       </Title>
-      <Text ta="center" c="dimmed" mb="xl">
-        Estamos felices de tenerte aquí. Tus uñas y pestañas merecen lo mejor, ¡y aquí lo encontrarás! ✨
+      <Text ta="center" c="dimmed" mb="lg">
+        Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo
+        encontrarás! ✨
       </Text>
 
-      <Grid gutter="md">
-        {features.map((feature, index) => (
-          <Grid.Col key={index} span={{sm: 6}}>
-            <Paper
-              withBorder
-              radius="xl"
-              p="md"
-              style={{
-                background: theme.colors.gray[0],
-                boxShadow: theme.shadows.md,
-                transition: "transform 0.15s, box-shadow 0.15s",
-                cursor: "pointer",
-                minHeight: 120,
-              }}
-              component={Link}
-              to={feature.link}
-              tabIndex={0}
-              aria-label={feature.title}
-              onMouseOver={e => (e.currentTarget.style.boxShadow = theme.shadows.lg)}
-              onMouseOut={e => (e.currentTarget.style.boxShadow = theme.shadows.md)}
-            >
-              <Group align="center" p="md">
-                <Box
-                  style={{
-                    borderRadius: "50%",
-                    padding: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 56,
-                    minHeight: 56,
-                  }}
-                >
-                  {feature.icon}
-                </Box>
-                <Text size="lg" fw={700} color={theme.colors[theme.primaryColor][7]}>
-                  {feature.title}
-                </Text>
-              </Group>
-            </Paper>
-          </Grid.Col>
+      <SimpleGrid
+        cols={{ base: 1, sm: 2 }}
+        spacing="md"
+        // un poco más de espacio en vertical en mobile
+        verticalSpacing="lg"
+      >
+        {features.map((f) => (
+          <FeatureCard key={f.link} to={f.link} title={f.title} icon={f.icon} />
         ))}
-      </Grid>
+      </SimpleGrid>
+
+      <style>
+        {`
+          @media (prefers-reduced-motion: no-preference) {
+            .feature-card:hover { transform: translateY(-2px) scale(1.01); }
+            .feature-card:focus-visible { transform: translateY(-2px) scale(1.01); outline: none; }
+          }
+        `}
+      </style>
     </Container>
   );
-};
-
-export default Home;
+}

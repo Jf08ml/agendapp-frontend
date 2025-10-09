@@ -4,200 +4,173 @@ import {
   Group,
   ActionIcon,
   Menu,
-  Flex,
   SimpleGrid,
+  Anchor,
+  Tooltip,
+  Skeleton,
+  rem,
 } from "@mantine/core";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
-import { useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { RootState } from "../app/store";
+// import { useSelector } from "react-redux";
+// import { RootState } from "../app/store";
 import { useMediaQuery } from "@mantine/hooks";
-import NotificationsMenu from "./NotificationsMenu";
+// import NotificationsMenu from "./NotificationsMenu";
 import { Organization } from "../services/organizationService";
 
-const Header = ({ organization }: { organization: Organization | null }) => {
-  const isVerySmallScreen = useMediaQuery("(max-width: 428px)");
-  const [menuOpened] = useState(false);
+type Props = { organization: Organization | null };
 
-  // const organization = useSelector(
-  //   (state: RootState) => state.organization.organization
-  // );
-  const auth = useSelector((state: RootState) => state.auth);
+export default function Header({ organization }: Props) {
+  const isXS = useMediaQuery("(max-width: 428px)");
+  // const auth = useSelector((state: RootState) => state.auth);
 
   const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl } =
     organization || {};
 
+  // Links del centro (solo desktop). Agrega/edita a tu gusto:
+  const navLinks = useMemo(
+    () => [
+      { label: "Precios y servicios", to: "/servicios-precios" },
+      { label: "Plan de fidelidad", to: "/" },
+    ],
+    []
+  );
+
+  // Redes (se renderizan dinámicamente según existan URLs)
+  const socials = useMemo(
+    () =>
+      [
+        {
+          key: "facebook",
+          url: facebookUrl,
+          Icon: FaFacebook,
+          label: "Facebook",
+        },
+        {
+          key: "instagram",
+          url: instagramUrl,
+          Icon: FaInstagram,
+          label: "Instagram",
+        },
+        {
+          key: "whatsapp",
+          url: whatsappUrl,
+          Icon: FaWhatsapp,
+          label: "WhatsApp",
+        },
+        { key: "tiktok", url: tiktokUrl, Icon: FaTiktok, label: "TikTok" },
+      ].filter((s) => !!s.url),
+    [facebookUrl, instagramUrl, whatsappUrl, tiktokUrl]
+  );
+
   return (
-    <Box
-      component="header"
-      px="xs"
-      style={{
-        width: "100%",
-      }}
-    >
-      <Group justify="space-between" style={{ flexWrap: "wrap" }}>
-        <Flex gap="xs">
+    <Box component="header" px="xs" w="100%">
+      <Group justify="space-between" wrap="nowrap" gap="md">
+        {/* Izquierda: Branding + notificaciones (si autenticado) */}
+        <Group gap="sm" wrap="nowrap">
           <Text
             size="xl"
             fw={900}
-            style={{
-              textShadow: "2px 2px 4px rgba(0, 0, 0, 0.5)",
-            }}
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,.35)" }}
           >
-            <Link to="/" style={{ textDecoration: "none", color: "white" }}>
-              {name}
-            </Link>
-          </Text>
-          {auth.isAuthenticated && <NotificationsMenu />}
-        </Flex>
-
-        <Group
-          gap="xl"
-          className="menu-links"
-          style={{
-            display: menuOpened ? "flex" : "none",
-            alignItems: "center",
-          }}
-        >
-          <Text c="white" fw={600}>
-            <Link
-              to="/servicios-precios"
-              style={{ textDecoration: "none", color: "white" }}
+            <Anchor
+              component={Link}
+              to="/"
+              underline="never"
+              c="white"
+              style={{ display: "inline-block", maxWidth: rem(240) }}
             >
-              Precios y servicios
-            </Link>
+              {/* Truncado elegante del nombre */}
+              {name ? (
+                <Text inherit >
+                  {name}
+                </Text>
+              ) : (
+                <Skeleton width={160} height={20} radius="sm" />
+              )}
+            </Anchor>
           </Text>
-          <Text c="white" fw={600}>
-            <Link to="/" style={{ textDecoration: "none", color: "white" }}>
-              Plan de fidelidad
-            </Link>
-          </Text>
+
+          {/* {auth.isAuthenticated && <NotificationsMenu />} */}
         </Group>
 
-        {/* Redes Sociales */}
-        {isVerySmallScreen ? (
-          // Mostrar menú en pantallas muy pequeñas
-          <Menu shadow="md" width={200}>
+        {/* Centro: Links (solo ≥ sm). Oculte en mobile porque ya tienes el Burger en AppShell */}
+        <Group gap="lg" visibleFrom="sm">
+          {navLinks.map((l) => (
+            <Anchor
+              key={l.to}
+              component={Link}
+              to={l.to}
+              c="white"
+              fw={600}
+              underline="never"
+              style={{ textShadow: "0 1px 2px rgba(0,0,0,.25)" }}
+            >
+              {l.label}
+            </Anchor>
+          ))}
+        </Group>
+
+        {/* Derecha: Redes sociales (menu compacto en XS) */}
+        {isXS ? (
+          <Menu shadow="md" width={200} position="bottom-end" withArrow>
             <Menu.Target>
-              <Box
-                style={{
-                  boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                  padding: "0.5rem",
-                  borderRadius: "8px",
-                }}
-              >
+              <Box>
                 <SimpleGrid
                   cols={2}
                   spacing={4}
                   style={{ width: 36, height: 36 }}
                 >
-                  {facebookUrl && <FaFacebook color="#1877f3" size={18} />}
-                  {instagramUrl && <FaInstagram color="#e1306c" size={18} />}
-                  {whatsappUrl && <FaWhatsapp color="#25D366" size={18} />}
-                  {tiktokUrl && <FaTiktok color="#000" size={18} />}
+                  {socials.slice(0, 4).map(({ key, Icon }) => (
+                    <Icon key={key} size={18} color="#fff" />
+                  ))}
                 </SimpleGrid>
               </Box>
             </Menu.Target>
             <Menu.Dropdown>
-              {facebookUrl && (
+              {socials.map(({ key, url, Icon, label }) => (
                 <Menu.Item
-                  leftSection={<FaFacebook />}
+                  key={key}
+                  leftSection={<Icon size={16} />}
                   component="a"
-                  href={facebookUrl}
+                  href={url!}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Facebook
+                  {label}
                 </Menu.Item>
-              )}
-              {instagramUrl && (
-                <Menu.Item
-                  leftSection={<FaInstagram />}
-                  component="a"
-                  href={instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Instagram
-                </Menu.Item>
-              )}
-              {whatsappUrl && (
-                <Menu.Item
-                  leftSection={<FaWhatsapp />}
-                  component="a"
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  WhatsApp
-                </Menu.Item>
-              )}
-              {tiktokUrl && (
-                <Menu.Item
-                  leftSection={<FaTiktok />}
-                  component="a"
-                  href={tiktokUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  TikTok
-                </Menu.Item>
-              )}
+              ))}
             </Menu.Dropdown>
           </Menu>
         ) : (
-          // Mostrar íconos normalmente en pantallas más grandes
-          <Group
-            gap="xs"
-            className="social-icons"
-            style={{
-              justifyContent: "center",
-            }}
-          >
-            {facebookUrl && (
-              <a href={facebookUrl} target="_blank" rel="noopener noreferrer">
-                <ActionIcon radius="xl" size="md" variant="filled" color="blue">
-                  <FaFacebook />
-                </ActionIcon>
-              </a>
-            )}
-            {instagramUrl && (
-              <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
-                <ActionIcon radius="xl" size="md" variant="filled" color="pink">
-                  <FaInstagram />
-                </ActionIcon>
-              </a>
-            )}
-            {whatsappUrl && (
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+          <Group gap="xs" wrap="nowrap">
+            {socials.map(({ key, url, Icon, label }) => (
+              <Tooltip key={key} label={label} withArrow>
                 <ActionIcon
+                  component="a"
+                  href={url!}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   radius="xl"
                   size="md"
-                  variant="filled"
-                  color="green"
+                  variant="subtle"
+                  // Monocromo para verse pro sobre el header de color
+                  styles={{
+                    root: {
+                      color: "white",
+                      background: "transparent",
+                    },
+                  }}
+                  aria-label={label}
                 >
-                  <FaWhatsapp />
+                  <Icon size={18} />
                 </ActionIcon>
-              </a>
-            )}
-            {tiktokUrl && (
-              <a href={tiktokUrl} target="_blank" rel="noopener noreferrer">
-                <ActionIcon
-                  radius="xl"
-                  size="md"
-                  variant="filled"
-                  color="black"
-                >
-                  <FaTiktok />
-                </ActionIcon>
-              </a>
-            )}
+              </Tooltip>
+            ))}
           </Group>
         )}
       </Group>
     </Box>
   );
-};
-
-export default Header;
+}
