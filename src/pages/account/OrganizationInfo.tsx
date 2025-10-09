@@ -177,7 +177,7 @@ export default function OrganizationInfo() {
   }, [organizationId]);
 
   // Track dirty
-  const isDirty = useMemo(() => form.isDirty(), [form.values]);
+  const isDirty = useMemo(() => form.isDirty(), [form]);
   useEffect(() => {
     isBlockingRef.current = isEditing && isDirty;
   }, [isEditing, isDirty]);
