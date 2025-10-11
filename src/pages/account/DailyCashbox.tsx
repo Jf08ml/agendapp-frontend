@@ -12,9 +12,10 @@ import {
   Container,
   ActionIcon,
   Badge,
-  CheckIcon,
   Accordion,
   Stack,
+  Group,
+  Tooltip,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
@@ -31,6 +32,7 @@ import dayjs from "dayjs";
 import localeData from "dayjs/plugin/localeData";
 import "dayjs/locale/es";
 import { registerService } from "../../services/clientService";
+import { CheckIcon } from "@mantine/core";
 
 dayjs.extend(localeData);
 dayjs.locale("es");
@@ -38,11 +40,15 @@ dayjs.locale("es");
 const DailyCashbox: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Intervalo y fechas
   const [interval, setInterval] = useState<string>("daily");
+  const [selectedDay, setSelectedDay] = useState<Date | null>(new Date()); // <= NUEVO
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [totalIncome, setTotalIncome] = useState<number>(0);
 
+  // Totales y filtros
+  const [totalIncome, setTotalIncome] = useState<number>(0);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [servicesSummary, setServicesSummary] = useState<
     Record<string, { count: number; total: number }>
@@ -52,53 +58,77 @@ const DailyCashbox: React.FC = () => {
     (state: RootState) => state.auth.organizationId
   );
 
+  // Recalcula rangos cuando cambia el intervalo
   useEffect(() => {
-    calculateDates(interval);
+    calculateDates(interval, selectedDay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interval]);
 
+  // Recalcula rangos si cambias el día (solo aplica a "daily")
+  useEffect(() => {
+    if (interval === "daily") {
+      calculateDates("daily", selectedDay);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay]);
+
+  // Trae citas cuando tengamos org y rango
   useEffect(() => {
     if (organizationId && startDate && endDate) {
       fetchAppointments();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, startDate, endDate]);
 
-  const calculateDates = (interval: string) => {
+  const calculateDates = (intervalValue: string, day?: Date | null) => {
     const now = new Date();
     let start: Date | null = null;
     let end: Date | null = null;
 
-    switch (interval) {
-      case "daily":
-        start = dayjs(now).startOf("day").toDate();
-        end = dayjs(now).endOf("day").toDate();
+    switch (intervalValue) {
+      case "daily": {
+        const base = day ?? now;
+        start = dayjs(base).startOf("day").toDate();
+        end = dayjs(base).endOf("day").toDate();
         break;
-      case "weekly":
+      }
+      case "weekly": {
         start = startOfWeek(now, { weekStartsOn: 1 });
         end = addDays(start, 6);
+        // normalizamos a inicio/fin de día
+        start = dayjs(start).startOf("day").toDate();
+        end = dayjs(end).endOf("day").toDate();
         break;
+      }
       case "biweekly": {
-        const day = now.getDate();
+        const d = now.getDate();
         start =
-          day <= 15
+          d <= 15
             ? new Date(now.getFullYear(), now.getMonth(), 1)
             : new Date(now.getFullYear(), now.getMonth(), 16);
         end =
-          day <= 15
+          d <= 15
             ? new Date(now.getFullYear(), now.getMonth(), 15)
             : endOfMonth(now);
+        start = dayjs(start).startOf("day").toDate();
+        end = dayjs(end).endOf("day").toDate();
         break;
       }
-      case "monthly":
+      case "monthly": {
         start = startOfMonth(now);
         end = endOfMonth(now);
+        start = dayjs(start).startOf("day").toDate();
+        end = dayjs(end).endOf("day").toDate();
         break;
+      }
       case "custom":
+        // Se manejará con los DatePicker manuales
         break;
       default:
         break;
     }
 
-    if (interval !== "custom") {
+    if (intervalValue !== "custom") {
       setStartDate(start);
       setEndDate(end);
     }
@@ -122,6 +152,7 @@ const DailyCashbox: React.FC = () => {
 
       setAppointments(sortedAppointments);
 
+      // Total general
       const total = sortedAppointments.reduce((sum, appointment) => {
         const additionalTotal =
           appointment.additionalItems?.reduce(
@@ -138,31 +169,24 @@ const DailyCashbox: React.FC = () => {
         return sum + usedPrice + additionalTotal;
       }, 0);
 
-      // Agrupar servicios
+      // Resumen por servicio
       const summary: Record<string, { count: number; total: number }> = {};
 
       sortedAppointments.forEach((appt) => {
         const serviceName = appt.service?.name || "Otro";
-
         const additional =
-          appt.additionalItems?.reduce(
-            (sum, item) => sum + (item.price || 0),
-            0
-          ) || 0;
-
+          appt.additionalItems?.reduce((s, item) => s + (item.price || 0), 0) ||
+          0;
         const price =
           appt.customPrice || appt.totalPrice || appt.service?.price || 0;
 
-        if (!summary[serviceName]) {
+        if (!summary[serviceName])
           summary[serviceName] = { count: 0, total: 0 };
-        }
-
         summary[serviceName].count += 1;
         summary[serviceName].total += price + additional;
       });
 
       setServicesSummary(summary);
-
       setTotalIncome(total);
     } catch (error) {
       console.error("Error al obtener citas:", error);
@@ -224,7 +248,17 @@ const DailyCashbox: React.FC = () => {
     new Intl.NumberFormat("es-CO", {
       style: "currency",
       currency: "COP",
+      maximumFractionDigits: 0,
     }).format(value);
+
+  const formattedRangeLabel =
+    startDate && endDate
+      ? interval === "daily"
+        ? dayjs(startDate).format("DD/MM/YYYY")
+        : `${dayjs(startDate).format("DD/MM/YYYY")} – ${dayjs(endDate).format(
+            "DD/MM/YYYY"
+          )}`
+      : "";
 
   return (
     <Container>
@@ -235,7 +269,6 @@ const DailyCashbox: React.FC = () => {
       <Card shadow="lg" radius="md" withBorder>
         <Stack
           p="md"
-          // Por defecto stackea en columna (mobile), pero en pantallas grandes usa fila
           styles={{
             root: {
               [`@media (min-width: 768px)`]: {
@@ -243,6 +276,7 @@ const DailyCashbox: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                gap: "1rem",
               },
             },
           }}
@@ -258,9 +292,27 @@ const DailyCashbox: React.FC = () => {
               { value: "custom", label: "Personalizado" },
             ]}
             value={interval}
-            onChange={(value) => setInterval(value || "daily")}
+            onChange={(value) => {
+              const v = value || "daily";
+              setInterval(v);
+              // si pasa a daily y no hay fecha elegida, usa hoy
+              if (v === "daily" && !selectedDay) {
+                setSelectedDay(new Date());
+              }
+            }}
             w="100%"
           />
+
+          {interval === "daily" && (
+            <DatePickerInput
+              label="Día específico"
+              locale="es"
+              value={selectedDay}
+              onChange={(d) => setSelectedDay(d)}
+              clearable={false}
+              w="100%"
+            />
+          )}
 
           <MultiSelect
             label="Filtrar por servicio"
@@ -276,12 +328,17 @@ const DailyCashbox: React.FC = () => {
             w="100%"
           />
 
-          <Text size="lg" fw={800} ta="right" w="100%">
-            Total Ingresos:{" "}
-            <Badge variant="light" size="xl">
-              {formatCurrency(totalIncome)}
-            </Badge>
-          </Text>
+          <div style={{ width: "100%", textAlign: "right" }}>
+            <Text size="sm" c="dimmed">
+              {formattedRangeLabel}
+            </Text>
+            <Text size="lg" fw={800}>
+              Total Ingresos:{" "}
+              <Badge variant="light" size="xl">
+                {formatCurrency(totalIncome)}
+              </Badge>
+            </Text>
+          </div>
         </Stack>
 
         {interval === "custom" && (
@@ -290,13 +347,17 @@ const DailyCashbox: React.FC = () => {
               label="Inicio"
               locale="es"
               value={startDate}
-              onChange={setStartDate}
+              onChange={(d) =>
+                setStartDate(d ? dayjs(d).startOf("day").toDate() : null)
+              }
             />
             <DatePickerInput
               label="Fin"
               locale="es"
               value={endDate}
-              onChange={setEndDate}
+              onChange={(d) =>
+                setEndDate(d ? dayjs(d).endOf("day").toDate() : null)
+              }
             />
           </Flex>
         )}
@@ -319,7 +380,7 @@ const DailyCashbox: React.FC = () => {
                   </Flex>
                 ))
               ) : (
-                <Text color="dimmed" ta="center">
+                <Text c="dimmed" ta="center">
                   No hay servicios en este intervalo.
                 </Text>
               )}
@@ -332,6 +393,7 @@ const DailyCashbox: React.FC = () => {
         <Title order={3} mb="sm">
           Citas Registradas
         </Title>
+
         <ScrollArea style={{ height: "auto" }} scrollbarSize={10}>
           {loading ? (
             <Flex justify="center" align="center" direction="column">
@@ -349,6 +411,7 @@ const DailyCashbox: React.FC = () => {
                   <Table.Th>Acciones</Table.Th>
                 </Table.Tr>
               </Table.Thead>
+
               <Table.Tbody>
                 {appointments.length > 0 ? (
                   appointments
@@ -358,19 +421,28 @@ const DailyCashbox: React.FC = () => {
                       return selectedServices.includes(name);
                     })
                     .map((appointment) => {
+                      // ---- CÁLCULO UNA SOLA VEZ POR FILA ----
+                      const basePrice = appointment.service?.price || 0;
+
                       const additionalTotal =
                         appointment.additionalItems?.reduce(
-                          (sum, item) => sum + (item.price || 0),
+                          (sum, item) => sum + (item?.price || 0),
                           0
                         ) || 0;
 
                       const usedPrice =
-                        appointment.customPrice ||
-                        appointment.totalPrice ||
-                        appointment.service?.price ||
-                        0;
+                        typeof appointment.customPrice === "number"
+                          ? appointment.customPrice
+                          : typeof appointment.totalPrice === "number"
+                          ? appointment.totalPrice
+                          : basePrice;
 
                       const total = usedPrice + additionalTotal;
+
+                      const isCustom =
+                        typeof appointment.customPrice === "number" &&
+                        appointment.customPrice !== basePrice;
+                      // ----------------------------------------
 
                       return (
                         <Table.Tr
@@ -382,9 +454,79 @@ const DailyCashbox: React.FC = () => {
                               appointment.startDate
                             ).toLocaleDateString()}
                           </Table.Td>
-                          <Table.Td>{appointment.client?.name}</Table.Td>
-                          <Table.Td>{appointment.service?.name}</Table.Td>
-                          <Table.Td>{formatCurrency(total)}</Table.Td>
+
+                          <Table.Td>{appointment.client?.name || "—"}</Table.Td>
+
+                          <Table.Td>
+                            {appointment.service?.name || "—"}
+                          </Table.Td>
+
+                          <Table.Td>
+                            <Group gap="xs" wrap="nowrap">
+                              <Text>{formatCurrency(total)}</Text>
+
+                              {isCustom && (
+                                <Tooltip
+                                  label={
+                                    <>
+                                      <div>
+                                        Base: {formatCurrency(basePrice)}
+                                      </div>
+                                      <div>
+                                        Custom:{" "}
+                                        {formatCurrency(
+                                          appointment.customPrice!
+                                        )}
+                                      </div>
+                                      {additionalTotal > 0 && (
+                                        <div>
+                                          Adicionales:{" "}
+                                          {formatCurrency(additionalTotal)}
+                                        </div>
+                                      )}
+                                      <div
+                                        style={{
+                                          marginTop: 4,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        Total: {formatCurrency(total)}
+                                      </div>
+                                    </>
+                                  }
+                                  withArrow
+                                  position="top"
+                                >
+                                  <Badge
+                                    size="sm"
+                                    color="grape"
+                                    variant="light"
+                                  >
+                                    Custom
+                                  </Badge>
+                                </Tooltip>
+                              )}
+                            </Group>
+
+                            {isCustom && (
+                              <Text size="xs" c="dimmed">
+                                Base:{" "}
+                                <Text span td="line-through">
+                                  {formatCurrency(basePrice)}
+                                </Text>{" "}
+                                →{" "}
+                                <Text span fw={600}>
+                                  {formatCurrency(appointment.customPrice!)}
+                                </Text>
+                                {additionalTotal > 0 && (
+                                  <>
+                                    {" "}
+                                    + Adic.: {formatCurrency(additionalTotal)}
+                                  </>
+                                )}
+                              </Text>
+                            )}
+                          </Table.Td>
 
                           <Table.Td align="center">
                             {appointment.status !== "confirmed" && (
@@ -393,7 +535,7 @@ const DailyCashbox: React.FC = () => {
                                 onClick={() =>
                                   handleConfirmAppointment(
                                     appointment._id,
-                                    appointment.client._id
+                                    appointment.client?._id || ""
                                   )
                                 }
                               >

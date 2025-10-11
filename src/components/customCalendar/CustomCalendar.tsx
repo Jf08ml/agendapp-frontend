@@ -1,7 +1,5 @@
 import React, { useState } from "react";
-import { Container, Button, Group } from "@mantine/core";
-import { BiArrowBack } from "react-icons/bi";
-import { BsArrowRight } from "react-icons/bs";
+import { Container } from "@mantine/core";
 import { Appointment } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
 import DayModal from "./components/DayModal";
@@ -67,16 +65,23 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
 
   return (
     <Container size="lg" mt="xl">
-      <MonthView
+     <MonthView
         currentDate={currentDate}
         isMobile={isMobile}
         handleDayClick={handleDayClick}
         getAppointmentsForDay={getAppointmentsForDay}
         loadingMonth={loadingMonth}
         holidayConfig={{ country: "CO", language: "es" }}
+        onPrevMonth={() => handleNavigation("prev")}
+        onNextMonth={() => handleNavigation("next")}
+        onToday={() => {
+          const today = new Date();
+          setCurrentDate(today);
+          fetchAppointmentsForMonth(today);
+        }}
       />
 
-      <Group justify="center" my="md">
+      {/* <Group justify="center" my="md">
         <Button
           variant="light"
           leftSection={<BiArrowBack />}
@@ -91,7 +96,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         >
           Mes Siguiente
         </Button>
-      </Group>
+      </Group> */}
 
       <DayModal
         key={selectedDay?.toISOString()}

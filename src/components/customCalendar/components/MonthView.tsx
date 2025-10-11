@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback } from "react";
-import { Grid, Box, Paper, Text, Group } from "@mantine/core";
+import React, { useMemo, useCallback, useState } from "react";
+import { Grid, Box, Paper, Text, Group, Tooltip, Button } from "@mantine/core";
 import {
   eachDayOfInterval,
   startOfMonth,
@@ -17,6 +17,7 @@ import { es } from "date-fns/locale";
 import { Appointment } from "../../../services/appointmentService";
 import CustomLoader from "../../customLoader/CustomLoader";
 import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
+import { BsChevronCompactLeft, BsChevronCompactRight } from "react-icons/bs";
 
 interface MonthViewProps {
   currentDate: Date;
@@ -25,11 +26,14 @@ interface MonthViewProps {
   getAppointmentsForDay: (day: Date) => Appointment[];
   loadingMonth: boolean;
   holidayConfig?: HolidayConfig;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+  onToday?: () => void; // opcional
 }
 
 const COLOR = {
-  today: "#6366f1", // indigo-500
-  holiday: "#ef4444", // red-500
+  today: "#6366f1",
+  holiday: "#ef4444",
   weekend: "rgba(0,0,0,0.03)",
 };
 
@@ -39,12 +43,7 @@ const LegendDot: React.FC<{ color: string; label: string }> = ({
 }) => (
   <Group gap={8} align="center">
     <Box
-      style={{
-        width: 10,
-        height: 10,
-        borderRadius: 999,
-        background: color,
-      }}
+      style={{ width: 10, height: 10, borderRadius: 999, background: color }}
     />
     <Text size="xs" c="dimmed">
       {label}
@@ -59,6 +58,8 @@ const MonthView: React.FC<MonthViewProps> = ({
   getAppointmentsForDay,
   loadingMonth,
   holidayConfig = { country: "CO", language: "es" },
+  onPrevMonth,
+  onNextMonth,
 }) => {
   const daysOfWeek = [
     "Domingo",
@@ -84,7 +85,6 @@ const MonthView: React.FC<MonthViewProps> = ({
 
   const { isHoliday } = useHolidays(currentDate, holidayConfig);
 
-  // Conteo memoizado por día
   const apptCountByKey = useMemo(() => {
     const map = new Map<string, number>();
     for (const d of daysInMonth) {
@@ -104,30 +104,74 @@ const MonthView: React.FC<MonthViewProps> = ({
     [handleDayClick]
   );
 
-  return (
-    <Box style={{ position: "relative" }}>
-      {/* Título del mes */}
-      <Paper withBorder>
-        <Text
-          ta="center"
-          style={{
-            fontSize: isMobile ? 16 : 24,
-            marginBottom: 2,
-            textTransform: "uppercase",
-          }}
-        >
-          {format(currentDate, "MMMM", { locale: es })}
-        </Text>
-      </Paper>
+  // Navegación con teclado: ← / →
+  const onContainerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowLeft") onPrevMonth();
+    if (e.key === "ArrowRight") onNextMonth();
+  };
 
-      {/* Leyenda compacta */}
+  // Estado visual de flechas (hover / touch)
+  const [leftActive, setLeftActive] = useState(false);
+  const [rightActive, setRightActive] = useState(false);
+
+  // Dimensiones y posición (desktop vs mobile)
+  const SIDE_ARROW_HEIGHT = 88; // más altas en desktop
+  const SIDE_ARROW_WIDTH = 40;
+  const DESKTOP_OFFSET_LEFT = -45; // ligeramente fuera
+  const DESKTOP_OFFSET_RIGHT = -35;
+
+  const baseArrowStyle: React.CSSProperties = {
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    zIndex: 5,
+    height: SIDE_ARROW_HEIGHT,
+    width: SIDE_ARROW_WIDTH,
+    borderRadius: 999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "transparent",
+    transition:
+      "opacity 0.15s ease, background 0.15s ease, box-shadow 0.15s ease",
+    cursor: "pointer",
+    userSelect: "none",
+    WebkitTapHighlightColor: "transparent",
+  };
+
+  // Opacidad por estado
+  const idleOpacity = 0.35;
+  const activeOpacity = 0.9;
+
+  return (
+    <Box
+      style={{ position: "relative" }}
+      onKeyDown={onContainerKeyDown}
+      tabIndex={0}
+    >
+      {/* Header: sólo mes/año centrado */}
+      <Group justify="center" align="center" mb="xs">
+        <Paper
+          withBorder
+          px="md"
+          py={6}
+          radius="md"
+          style={{ textTransform: "uppercase" }}
+        >
+          <Text ta="center" fw={700} style={{ fontSize: isMobile ? 14 : 18 }}>
+            {format(currentDate, "MMMM yyyy", { locale: es })}
+          </Text>
+        </Paper>
+      </Group>
+
+      {/* Leyenda */}
       <Group justify="center" gap="xl" my={8}>
         <LegendDot color={COLOR.today} label="Hoy" />
         <LegendDot color={COLOR.holiday} label="Festivo" />
         <LegendDot color="#9ca3af" label="Fin de semana" />
       </Group>
 
-      {/* Encabezado días de la semana (misma proporción) */}
+      {/* Encabezado días de la semana */}
       <Paper withBorder my="xs">
         <Grid>
           {daysOfWeek.map((day, index) => (
@@ -144,7 +188,50 @@ const MonthView: React.FC<MonthViewProps> = ({
         </Grid>
       </Paper>
 
-      {/* Celdas del calendario (misma proporción) */}
+      {/* FLECHAS LATERALES (sólo DESKTOP) */}
+      {!isMobile && (
+        <>
+          <Tooltip label="Mes anterior" openDelay={200}>
+            <Box
+              aria-label="Mes anterior"
+              role="button"
+              onClick={onPrevMonth}
+              onMouseEnter={() => setLeftActive(true)}
+              onMouseLeave={() => setLeftActive(false)}
+              style={{
+                ...baseArrowStyle,
+                left: DESKTOP_OFFSET_LEFT,
+                opacity: leftActive ? activeOpacity : idleOpacity,
+                background: leftActive ? "rgba(0,0,0,0.06)" : "transparent",
+                boxShadow: leftActive ? "0 6px 16px rgba(0,0,0,0.12)" : "none",
+              }}
+            >
+              <BsChevronCompactLeft size={50} />
+            </Box>
+          </Tooltip>
+
+          <Tooltip label="Mes siguiente" openDelay={200}>
+            <Box
+              aria-label="Mes siguiente"
+              role="button"
+              onClick={onNextMonth}
+              onMouseEnter={() => setRightActive(true)}
+              onMouseLeave={() => setRightActive(false)}
+              style={{
+                ...baseArrowStyle,
+                right: DESKTOP_OFFSET_RIGHT,
+                opacity: rightActive ? activeOpacity : idleOpacity,
+                background: rightActive ? "rgba(0,0,0,0.06)" : "transparent",
+                boxShadow: rightActive ? "0 6px 16px rgba(0,0,0,0.12)" : "none",
+              }}
+            >
+              <BsChevronCompactRight size={50} />
+            </Box>
+          </Tooltip>
+        </>
+      )}
+
+      {/* GRID del calendario */}
       <Grid gutter="xs">
         {daysInMonth.map((day) => {
           const key = day.toISOString().slice(0, 10);
@@ -159,7 +246,7 @@ const MonthView: React.FC<MonthViewProps> = ({
           const bgColor = selected
             ? "#f0f8ff"
             : holiday
-            ? "rgba(255, 99, 71, 0.08)" // festivo sutil
+            ? "rgba(255, 99, 71, 0.08)"
             : weekend
             ? COLOR.weekend
             : "white";
@@ -196,7 +283,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                   outlineOffset: today ? -2 : 0,
                 }}
               >
-                {/* Encabezado celda: número del día */}
+                {/* Número del día */}
                 <Box
                   style={{
                     display: "flex",
@@ -216,7 +303,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                   </Text>
                 </Box>
 
-                {/* Contador de citas (abajo centrado) */}
+                {/* Contador de citas */}
                 {count > 0 && (
                   <Text
                     ta="center"
@@ -237,6 +324,28 @@ const MonthView: React.FC<MonthViewProps> = ({
           );
         })}
       </Grid>
+
+      {/* BARRA DE NAVEGACIÓN (sólo MOBILE) */}
+      {isMobile && (
+        <Group mt="sm" grow>
+          <Button
+            variant="light"
+            leftSection={<BsChevronCompactLeft />}
+            onClick={onPrevMonth}
+            aria-label="Mes anterior"
+          >
+            Anterior
+          </Button>
+          <Button
+            variant="light"
+            rightSection={<BsChevronCompactRight />}
+            onClick={onNextMonth}
+            aria-label="Mes siguiente"
+          >
+            Siguiente
+          </Button>
+        </Group>
+      )}
 
       {loadingMonth && (
         <Box

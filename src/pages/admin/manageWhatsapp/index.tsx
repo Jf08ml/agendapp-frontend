@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Anchor,
   Badge,
@@ -24,18 +24,12 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { QRCodeCanvas } from "qrcode.react";
-import { io, Socket } from "socket.io-client";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import {
-  connectWaSession,
-  getWaStatus,
-  restartWa,
-  logoutWa,
-  sendWa,
-  WaCode,
-} from "../../../services/waService";
 import { BiCopy, BiInfoCircle, BiRefresh, BiX } from "react-icons/bi";
+import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
+import type { WaCode } from "../../../utils/waRealtime";
+import { computePrimaryCta } from "../../../utils/waUi";
 
 // -----------------------------
 // 1) Mapeo UI por estado
@@ -94,321 +88,62 @@ const UI_STATUS: Record<
 };
 
 // -----------------------------
-// 2) Tipos auxiliares
+// 2) Componente principal
 // -----------------------------
-
-type WsQrPayload = {
-  qr: string;
-  issuedAt: number;
-  expiresAt: number;
-  ttlMs: number;
-  seq: number;
-  replacesPrevious: boolean;
-  qrId: string;
-};
-
-type ReadyAccount = { id?: string; name?: string } | null;
-
-// -----------------------------
-// 3) Componente principal
-// -----------------------------
-
 const WhatsappOrgSession: React.FC = () => {
   // Organización y prefill del clientId
   const organization = useSelector(
     (s: RootState) => s.organization.organization
   );
 
-  const [clientId, setClientId] = useState<string>("");
-  const [code, setCode] = useState<WaCode>("connecting");
-  const [reason, setReason] = useState<string>("");
-  const [me, setMe] = useState<ReadyAccount>(null);
+  const initialClientId =
+    (organization as any)?.clientIdWhatsapp || organization?._id || "";
 
-  // QR y metadatos
-  const [qr, setQr] = useState<string>("");
-  const [qrMeta, setQrMeta] = useState<{
-    expiresAt: number;
-    seq: number;
-    replacesPrevious: boolean;
-  } | null>(null);
-  const [qrTtl, setQrTtl] = useState<number>(0);
+  // Hook centralizado
+  const {
+    // estado
+    code,
+    reason,
+    me,
 
-  // Cargas de acciones
-  const [loadingPrimary, setLoadingPrimary] = useState(false);
-  const [loadingRestart, setLoadingRestart] = useState(false);
-  const [loadingLogout, setLoadingLogout] = useState(false);
-  const [loadingSend, setLoadingSend] = useState(false);
+    // clientId controlado
+    clientId,
+    setClientId,
 
-  // Control de socket y temporizadores
-  const socketRef = useRef<Socket | null>(null);
-  const connectingSinceRef = useRef<number | null>(null);
+    // QR
+    qr,
+    qrMeta,
+    qrTtl,
 
-  // Estado derivado para mostrar un "hint" cuando connecting dura demasiado
-  const connectingAges = useMemo(() => {
-    const started = connectingSinceRef.current;
-    return started ? Math.round((Date.now() - started) / 1000) : 0;
+    // loaders
+    loadingPrimary,
+    loadingRestart,
+    loadingLogout,
+    loadingSend,
+
+    // helpers
+    longConnecting,
+
+    // acciones
+    connect,
+    restart,
+    logout,
+    sendTest,
+  } = useWhatsappStatus(organization?._id, initialClientId);
+
+  // Para la barra de progreso en "connecting"
+  const connectingAges = React.useMemo(() => {
+    // longConnecting ya te dice si pasaste de 20s;
+    // aquí solo hacemos un contador simple para la UI (0..20s)
+    // Nota: si quieres el contador exacto, podrías levantarlo dentro del hook.
+    return 0; // mantenemos la UI existente sin cronómetro “real”; puedes retirarlo si prefieres
   }, [code]);
 
-  // Prefill del clientId al cambiar de organización
-  useEffect(() => {
-    if (!organization) return;
-    const pre =
-      (organization as any).clientIdWhatsapp || organization._id || "";
-    setClientId(pre);
-    // reset UI
-    setCode("connecting");
-    setReason("");
-    setQr("");
-    setQrMeta(null);
-    setQrTtl(0);
-    setMe(null);
-    connectingSinceRef.current = Date.now();
-  }, [organization?._id, (organization as any)?.clientIdWhatsapp]);
-
-  // Precarga de estado del backend administrativo (idempotente)
-  useEffect(() => {
-    if (!organization?._id) return;
-    (async () => {
-      try {
-        const s = await getWaStatus(organization._id!);
-        if (s?.code) {
-          setCode(s.code as WaCode);
-          setReason(s.reason || "");
-          if (s.code === "ready") {
-            setQr("");
-            setQrMeta(null);
-            setQrTtl(0);
-            if (s.me) setMe(s.me);
-          }
-        } else {
-          setCode("disconnected");
-          setReason("not_found");
-        }
-      } catch (e) {
-        setCode("error");
-        setReason("status_fetch_failed");
-        console.error(e);
-      }
-    })();
-  }, [organization?._id]);
-
-  // Countdown del QR según expiresAt del backend (no confiamos en timers locales)
-  useEffect(() => {
-    if (!qrMeta) return;
-    const compute = () =>
-      Math.max(0, Math.floor((qrMeta.expiresAt - Date.now()) / 1000));
-    setQrTtl(compute());
-    const id = setInterval(() => setQrTtl(compute()), 1000);
-    return () => clearInterval(id);
-  }, [qrMeta?.expiresAt]);
-
-  // -----------------------------
-  // 3.1) Conectar sesión y abrir WS
-  // -----------------------------
-  const openSocketAndHandlers = (
-    url: string,
-    token: string,
-    joinedClientId: string
-  ) => {
-    // Cerrar previo si existiera
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-
-    const socket = io(url, { transports: ["websocket"], auth: { token } });
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      // Si el backend no auto-join con el token, haz join manual
-      socket.emit("join", { clientId: joinedClientId });
-    });
-
-    socket.on(
-      "status",
-      (s: {
-        code: WaCode;
-        reason?: string;
-        me?: { id?: string; name?: string };
-      }) => {
-        setCode(s.code);
-        setReason(s.reason || "");
-        if (s.me) setMe(s.me);
-        if (s.code === "ready") {
-          setQr("");
-          setQrMeta(null);
-          setQrTtl(0);
-        }
-        if (s.code === "connecting") connectingSinceRef.current = Date.now();
-      }
-    );
-
-    socket.on("qr", (payload: WsQrPayload) => {
-      setQr(payload.qr);
-      setCode("waiting_qr");
-      setReason("");
-      setQrMeta({
-        expiresAt: payload.expiresAt,
-        seq: payload.seq,
-        replacesPrevious: payload.replacesPrevious,
-      });
-    });
-
-    socket.on("session_cleaned", () => {
-      setCode("disconnected");
-      setQr("");
-      setQrMeta(null);
-      setQrTtl(0);
-      setMe(null);
-    });
-
-    socket.on("connect_error", (err) => {
-      setCode("error");
-      setReason(`socket_error:${err?.message ?? "unknown"}`);
-    });
-
-    // Renovar token en reintentos de reconexión
-    socket.io.on("reconnect_attempt", async () => {
-      try {
-        const r2 = await connectWaSession(organization!._id!, joinedClientId);
-        if (r2?.ws?.token) socket.auth = { token: r2.ws.token };
-      } catch {
-        /* ignore */
-      }
-    });
-  };
-
-  const connectSession = async (forceFresh = false) => {
-    if (!organization?._id || !clientId) return;
-    setLoadingPrimary(true);
-    setQr("");
-    setQrMeta(null);
-    setQrTtl(0);
-    setMe(null);
-    try {
-      // Si el usuario pide "empezar de cero", limpiamos primero
-      if (forceFresh) {
-        await logoutWa(organization._id!, clientId).catch(() => {});
-      }
-      const res = await connectWaSession(organization._id!, clientId);
-      if (!res?.ws?.url || !res?.ws?.token) {
-        setCode("error");
-        setReason("no_ws_credentials");
-        return;
-      }
-      setCode("connecting");
-      connectingSinceRef.current = Date.now();
-      openSocketAndHandlers(res.ws.url, res.ws.token, res.clientId || clientId);
-    } catch (e: any) {
-      setCode("error");
-      setReason(e?.message || "connect_failed");
-    } finally {
-      setLoadingPrimary(false);
-    }
-  };
-
-  // -----------------------------
-  // 3.2) Acciones rápidas
-  // -----------------------------
-  const handleRestart = async () => {
-    if (!organization?._id || !clientId) return;
-    setLoadingRestart(true);
-    try {
-      await restartWa(organization._id!, clientId);
-      await connectSession();
-    } finally {
-      setLoadingRestart(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    if (!organization?._id || !clientId) return;
-    setLoadingLogout(true);
-    try {
-      await logoutWa(organization._id!, clientId);
-      setCode("disconnected");
-      setQr("");
-      setQrMeta(null);
-      setQrTtl(0);
-      setMe(null);
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    } finally {
-      setLoadingLogout(false);
-    }
-  };
-
-  const handleSendTest = async () => {
-    if (!organization?._id || !clientId) return;
-    const phone = prompt("Número E.164 (ej: 57300XXXXXXX):")?.trim();
-    if (!phone) return;
-    setLoadingSend(true);
-    try {
-      await sendWa(organization._id!, {
-        clientId,
-        phone,
-        message: "✅ Prueba desde el panel (ignora este mensaje).",
-      });
-      alert("Mensaje enviado (requiere estado READY). ");
-    } catch (e: any) {
-      alert(`Error enviando: ${e?.message || e}`);
-    } finally {
-      setLoadingSend(false);
-    }
-  };
-
-  // -----------------------------
-  // 3.3) CTA principal dinámico según estado
-  // -----------------------------
-  const primaryCta = useMemo(() => {
-    // Reglas:
-    // - disconnected/not_found/auth_failure → Mostrar "Conectar y mostrar QR"
-    // - connecting > 20s → Mostrar "Forzar nueva sesión" (limpia y reconecta)
-    // - waiting_qr → Mostrar "Regenerar QR"
-    // - error → "Reintentar"
-    // - ready → no CTA principal (las acciones están abajo)
-    const longConnecting =
-      code === "connecting" &&
-      connectingSinceRef.current &&
-      Date.now() - connectingSinceRef.current > 20_000;
-
-    if (code === "ready") return null;
-
-    if (code === "waiting_qr") {
-      return {
-        label: qrTtl === 0 ? "Regenerar QR" : "Mostrar QR (activo)",
-        onClick: () => connectSession(false),
-      } as const;
-    }
-
-    if (
-      code === "disconnected" ||
-      reason === "not_found" ||
-      code === "auth_failure"
-    ) {
-      return {
-        label: "Conectar y mostrar QR",
-        onClick: () => connectSession(code === "auth_failure"),
-      } as const;
-    }
-
-    if (code === "error") {
-      return {
-        label: "Reintentar",
-        onClick: () => connectSession(false),
-      } as const;
-    }
-
-    if (longConnecting) {
-      return {
-        label: "Forzar nueva sesión",
-        onClick: () => connectSession(true),
-      } as const;
-    }
-
-    return {
-      label: "Conectar / Mostrar QR",
-      onClick: () => connectSession(false),
-    } as const;
-  }, [code, reason, qrTtl, clientId]);
+  // CTA dinámica
+  const primaryCta = useMemo(
+    () => computePrimaryCta(code, reason, qrTtl, longConnecting, connect),
+    [code, reason, qrTtl, longConnecting, connect]
+  );
 
   const ui = UI_STATUS[code];
 
@@ -489,8 +224,7 @@ const WhatsappOrgSession: React.FC = () => {
                     animated
                   />
                   <Text size="xs" c="dimmed" mt={4}>
-                    Conectando
-                    {connectingAges > 0 ? `… (${connectingAges}s)` : "…"}
+                    Conectando…
                   </Text>
                 </Box>
               )}
@@ -501,14 +235,7 @@ const WhatsappOrgSession: React.FC = () => {
               <Button
                 loading={loadingPrimary}
                 color={ui.color}
-                onClick={async () => {
-                  setLoadingPrimary(true);
-                  try {
-                    await primaryCta.onClick();
-                  } finally {
-                    setLoadingPrimary(false);
-                  }
-                }}
+                onClick={primaryCta.onClick}
               >
                 {primaryCta.label}
               </Button>
@@ -530,7 +257,7 @@ const WhatsappOrgSession: React.FC = () => {
                 <Button
                   variant="light"
                   leftSection={<BiRefresh size={16} />}
-                  onClick={() => connectSession(false)}
+                  onClick={() => connect()}
                 >
                   Regenerar QR
                 </Button>
@@ -551,21 +278,26 @@ const WhatsappOrgSession: React.FC = () => {
           <Group justify="center" mt="sm">
             <Button
               variant="default"
-              onClick={handleRestart}
+              onClick={restart}
               loading={loadingRestart}
             >
               Reiniciar
             </Button>
             <Button
               variant="default"
-              onClick={handleSendTest}
+              onClick={async () => {
+                const phone = prompt(
+                  "Número E.164 (ej: 57300XXXXXXX):"
+                )?.trim();
+                if (phone) await sendTest(phone);
+              }}
               loading={loadingSend}
             >
               Probar envío
             </Button>
             <Button
               color="red"
-              onClick={handleLogout}
+              onClick={logout}
               leftSection={<BiX size={16} />}
               loading={loadingLogout}
             >
@@ -599,7 +331,7 @@ const WhatsappOrgSession: React.FC = () => {
 
         {/* FOOTER */}
         <Text size="xs" c="dimmed">
-          Necesitas ayuda? Escríbenos o revisa la guía de instalación.{" "}
+          ¿Necesitas ayuda? Escríbenos o revisa la guía de instalación.{" "}
           <Anchor size="xs" href="#" onClick={(e) => e.preventDefault()}>
             Ver guía
           </Anchor>
