@@ -14,6 +14,8 @@ import { Service } from "../../services/serviceService";
 import { SelectedService, ServiceWithDate } from "../../types/multiBooking";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 dayjs.locale("es");
 
 interface StepMultiServiceDateProps {
@@ -34,6 +36,15 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   // UI:  "one" = un solo día para todos, "split" = fechas por servicio
   const [mode, setMode] = useState<"one" | "split">("one");
 
+  const organization = useSelector(
+    (s: RootState) => s.organization.organization
+  );
+  const businessDays = organization?.openingHours?.businessDays ?? [
+    1, 2, 3, 4, 5,
+  ];
+
+  const isDisabledDay = (d: Date) => !businessDays.includes(dayjs(d).day());
+
   // Mantener value sincronizado con servicios seleccionados
   useEffect(() => {
     if (mode === "split") {
@@ -47,7 +58,10 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
         );
       }
     } else {
-      if (selectedServices.length > 0 && value.length !== selectedServices.length) {
+      if (
+        selectedServices.length > 0 &&
+        value.length !== selectedServices.length
+      ) {
         onChange(
           selectedServices.map((s) => ({
             serviceId: s.serviceId,
@@ -125,6 +139,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
               size={isMobile ? "sm" : "md"}
               style={{ width: "100%" }}
               locale="es"
+              getDayProps={(date) => ({ disabled: isDisabledDay(date) })}
             />
           </Paper>
         </Stack>
@@ -140,7 +155,12 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
               const service = services.find((s) => s._id === sel.serviceId);
 
               return (
-                <Paper key={sel.serviceId} withBorder radius="md" p={isMobile ? "sm" : "md"}>
+                <Paper
+                  key={sel.serviceId}
+                  withBorder
+                  radius="md"
+                  p={isMobile ? "sm" : "md"}
+                >
                   <Stack gap="xs">
                     <Text fw={600} lh="sm">
                       {service?.name}{" "}
@@ -154,13 +174,16 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
                       placeholder="Selecciona una fecha"
                       minDate={new Date()}
                       value={item?.date ?? null}
-                      onChange={(date) => handleSplitDateChange(sel.serviceId, date)}
+                      onChange={(date) =>
+                        handleSplitDateChange(sel.serviceId, date)
+                      }
                       size={isMobile ? "sm" : "md"}
                       clearable
                       style={{ width: "100%" }}
                       popoverProps={{ withinPortal: true, trapFocus: false }}
                       locale="es"
                       valueFormat="DD/MM/YYYY"
+                      getDayProps={(date) => ({ disabled: isDisabledDay(date) })}
                     />
                   </Stack>
                 </Paper>

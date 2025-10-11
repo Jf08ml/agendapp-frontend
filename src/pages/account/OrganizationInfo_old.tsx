@@ -108,7 +108,7 @@ function sectionCard(
   );
 }
 
-export default function OrganizationInfo() {
+export default function OrganizationInfo_old() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);

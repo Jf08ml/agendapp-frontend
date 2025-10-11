@@ -7,6 +7,13 @@ export interface Role {
 
 export type ReservationPolicy = "manual" | "auto_if_available";
 
+export interface OpeningHours {
+  start?: string;
+  end?: string;
+  businessDays?: number[]; // 0..6
+  breaks?: { day: number; start: string; end: string; note?: string }[];
+}
+
 export interface Branding {
   primaryColor?: string;
   secondaryColor?: string;
@@ -42,10 +49,7 @@ export interface Organization {
   referredReward?: string;
   serviceCount?: number;
   serviceReward?: string;
-  openingHours?: {
-    start: string;
-    end: string;
-  };
+  openingHours?: OpeningHours;
   clientIdWhatsapp?: string | null;
   branding?: Branding;
   domains?: string[];

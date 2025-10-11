@@ -8,16 +8,90 @@ dayjs.extend(isSameOrBefore);
 
 import { Appointment } from "../../services/appointmentService";
 
-// ---------- Helpers genéricos ----------
+export const TIME_FORMATS = [
+  "h:mm A",
+  "HH:mm",
+  "HH:mm:ss",
+  "h:mm:ss A",
+] as const;
 
-export const TIME_FORMATS = ["h:mm A", "HH:mm", "HH:mm:ss", "h:mm:ss A"] as const;
+/** --- NUEVO: Tipos que vienen del schema del org --- */
+export type OpeningBreak = {
+  day: number; // 0..6 (Dom..Sáb)
+  start: string; // "HH:mm"
+  end: string; // "HH:mm"
+  note?: string;
+};
+export type OpeningConstraints = {
+  start?: string; // "HH:mm" o ""
+  end?: string; // "HH:mm" o ""
+  businessDays?: number[]; // ej. [1,2,3,4,5]
+  breaks?: OpeningBreak[]; // array por día
+  stepMinutes?: number; // override del step si quieres
+};
+
+// ---------- Helpers genéricos ----------
 
 /** Normaliza un id que puede venir como string u objeto con _id */
 export function getId(val: unknown): string | undefined {
   if (!val) return undefined;
   if (typeof val === "string") return val;
-  if (typeof val === "object" && (val as any)._id) return String((val as any)._id);
+  if (typeof val === "object" && (val as any)._id)
+    return String((val as any)._id);
   return undefined;
+}
+
+/** Convierte "HH:mm" -> minutos desde 00:00 */
+function hhmmToMinutes(hhmm?: string | null): number | null {
+  if (!hhmm) return null;
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/** Devuelve la ventana de trabajo del día (dayjs start/end) según openingHours (con fallback si faltan) */
+function getWorkWindow(
+  day: Date,
+  opening: OpeningConstraints,
+  fallback = { start: 8 * 60, end: 18 * 60 }
+) {
+  const minutesStart = hhmmToMinutes(opening.start) ?? fallback.start;
+  const minutesEnd = hhmmToMinutes(opening.end) ?? fallback.end;
+
+  const base = dayjs(day).startOf("day");
+  const winStart = base.add(minutesStart, "minute");
+  const winEnd = base.add(minutesEnd, "minute");
+  return { winStart, winEnd };
+}
+
+function isBusinessDay(day: Date, businessDays?: number[]) {
+  if (!businessDays || businessDays.length === 0) return true; // si no config, no limitar
+  const dow = dayjs(day).day(); // 0..6 (Dom..Sáb)
+  return businessDays.includes(dow);
+}
+
+/** ¿El rango [from, to) cae dentro de algún break del mismo día? */
+function isInBreak(
+  from: dayjs.Dayjs,
+  to: dayjs.Dayjs,
+  breaks?: OpeningBreak[]
+) {
+  if (!breaks || breaks.length === 0) return false;
+  const dow = from.day();
+  const dayBreaks = breaks.filter((b) => b.day === dow);
+  if (dayBreaks.length === 0) return false;
+
+  return dayBreaks.some((b) => {
+    const bStartMin = hhmmToMinutes(b.start);
+    const bEndMin = hhmmToMinutes(b.end);
+    if (bStartMin == null || bEndMin == null) return false;
+
+    const base = from.startOf("day");
+    const brStart = base.add(bStartMin, "minute");
+    const brEnd = base.add(bEndMin, "minute");
+    // solapa si brStart < to && from < brEnd
+    return brStart.isBefore(to) && from.isBefore(brEnd);
+  });
 }
 
 /** Parsea hora en múltiples formatos y devuelve un dayjs con la fecha dada */
@@ -39,31 +113,39 @@ export function buildStartFrom(dateVal: Date, timeStr: string) {
 
 // ---------- Disponibilidades por servicio (días distintos) ----------
 
-/** Retorna horas disponibles en formato "h:mm A" */
+/** Retorna horas disponibles en formato "h:mm A", aplicando openingHours y breaks */
 export function generateAvailableTimes(
   date: Date,
   duration: number,
   appointments: Appointment[],
-  startHour = 8,
-  endHour = 18,
-  stepMinutes = 15
+  opening?: OpeningConstraints
 ): string[] {
+  const stepMinutes = opening?.stepMinutes ?? 15;
+
+  // si no es día laboral, retorna []
+  if (!isBusinessDay(date, opening?.businessDays)) return [];
+
+  const { winStart, winEnd } = getWorkWindow(date, opening ?? {});
   const times: string[] = [];
-  const day = dayjs(date);
 
-  for (let hour = startHour; hour < endHour; hour++) {
-    for (let minute = 0; minute < 60; minute += stepMinutes) {
-      const slotStart = day.hour(hour).minute(minute).second(0).millisecond(0);
-      const slotEnd = slotStart.add(duration, "minute");
+  for (
+    let slotStart = winStart.clone();
+    slotStart.add(duration, "minute").isSameOrBefore(winEnd);
+    slotStart = slotStart.add(stepMinutes, "minute")
+  ) {
+    const slotEnd = slotStart.add(duration, "minute");
 
-      if (slotEnd.hour() > endHour || slotEnd.isAfter(day.endOf("day"))) continue;
+    // salta si cae en un break
+    if (isInBreak(slotStart, slotEnd, opening?.breaks)) continue;
 
-      const overlaps = appointments.some(
-        (a) => dayjs(a.startDate).isBefore(slotEnd) && dayjs(a.endDate).isAfter(slotStart)
-      );
-      if (!overlaps) {
-        times.push(slotStart.format("h:mm A"));
-      }
+    // evita solapes con citas
+    const overlaps = appointments.some(
+      (a) =>
+        dayjs(a.startDate).isBefore(slotEnd) &&
+        dayjs(a.endDate).isAfter(slotStart)
+    );
+    if (!overlaps) {
+      times.push(slotStart.format("h:mm A"));
     }
   }
 
@@ -80,34 +162,30 @@ export interface ChainService {
 
 export interface MultiServiceSlot {
   start: Date;
-  times: {
-    employeeId: string | null;
-    from: Date;
-    to: Date;
-  }[];
+  times: { employeeId: string | null; from: Date; to: Date }[];
 }
 
-/**
- * Calcula bloques encadenados (mismo día, en orden).
- */
+/** Calcula bloques encadenados (mismo día, en orden) respetando horario/breaks */
 export function findAvailableMultiServiceSlots(
   day: Date,
   services: ChainService[],
   appointmentsByEmp: Record<string, Appointment[]>,
-  workStartHour = 8,
-  workEndHour = 18,
-  stepMinutes = 15
+  opening?: OpeningConstraints
 ): MultiServiceSlot[] {
   if (!day || !services.length) return [];
+  if (!isBusinessDay(day, opening?.businessDays)) return [];
 
-  const dayStart = dayjs(day).hour(workStartHour).minute(0).second(0).millisecond(0);
-  const dayEnd = dayjs(day).hour(workEndHour).minute(0).second(0).millisecond(0);
-
+  const stepMinutes = opening?.stepMinutes ?? 15;
+  const { winStart, winEnd } = getWorkWindow(day, opening ?? {});
   const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
 
   const blocks: MultiServiceSlot[] = [];
 
-  for (let t = dayStart.clone(); t.clone().add(totalDuration, "minute").isSameOrBefore(dayEnd); t = t.add(stepMinutes, "minute")) {
+  for (
+    let t = winStart.clone();
+    t.clone().add(totalDuration, "minute").isSameOrBefore(winEnd);
+    t = t.add(stepMinutes, "minute")
+  ) {
     let isAvailable = true;
     const times: { employeeId: string | null; from: Date; to: Date }[] = [];
 
@@ -115,15 +193,24 @@ export function findAvailableMultiServiceSlots(
 
     for (const svc of services) {
       const slotEnd = slotStart.clone().add(svc.duration, "minute");
-      if (slotEnd.isAfter(dayEnd)) {
+      if (slotEnd.isAfter(winEnd)) {
         isAvailable = false;
         break;
       }
 
+      // respeta breaks
+      if (isInBreak(slotStart, slotEnd, opening?.breaks)) {
+        isAvailable = false;
+        break;
+      }
+
+      // respeta citas del empleado (si aplica)
       if (svc.employeeId) {
         const appts = appointmentsByEmp[svc.employeeId] ?? [];
         const overlap = appts.some(
-          (appt) => dayjs(appt.startDate).isBefore(slotEnd) && dayjs(appt.endDate).isAfter(slotStart)
+          (appt) =>
+            dayjs(appt.startDate).isBefore(slotEnd) &&
+            dayjs(appt.endDate).isAfter(slotStart)
         );
         if (overlap) {
           isAvailable = false;

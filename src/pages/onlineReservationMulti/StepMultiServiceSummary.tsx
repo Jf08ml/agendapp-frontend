@@ -32,6 +32,24 @@ interface Props {
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+// --- Helpers de precio ---
+function toNumber(v: unknown): number {
+  if (v == null) return 0;
+  const n = typeof v === "string" ? Number(v) : (v as number);
+  return Number.isFinite(n) ? n : 0;
+}
+function fmtMoney(v: number, currency = "COP", locale = "es-CO") {
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+    }).format(v);
+  } catch {
+    // fallback simple
+    return `${v.toFixed(0)}`;
+  }
+}
+
 export default function StepMultiServiceSummary({
   splitDates,
   services,
@@ -41,9 +59,12 @@ export default function StepMultiServiceSummary({
 }: Props) {
   if (!times) return null;
 
-  // Lookup rápidos
+  // Lookups
   const svcMap = Object.fromEntries(services.map((s) => [s._id, s]));
   const empMap = Object.fromEntries(employees.map((e) => [e._id, e]));
+
+  // === Totales ===
+  let grandTotal = 0;
 
   return (
     <Stack>
@@ -98,6 +119,13 @@ export default function StepMultiServiceSummary({
               ? dayjs(block.intervals[0].from).format("h:mm A")
               : "—";
 
+            // total del bloque
+            const blockTotal = block.intervals.reduce((acc, iv) => {
+              const svc = svcMap[iv.serviceId];
+              return acc + toNumber(svc?.price);
+            }, 0);
+            grandTotal = blockTotal;
+
             return (
               <Paper withBorder p="md" radius="md">
                 <Stack gap="xs">
@@ -118,6 +146,7 @@ export default function StepMultiServiceSummary({
                       const emp = iv.employeeId
                         ? empMap[iv.employeeId]
                         : undefined;
+                      const price = toNumber(svc?.price);
 
                       return (
                         <Group
@@ -144,9 +173,14 @@ export default function StepMultiServiceSummary({
                           </Box>
 
                           <Stack gap={2} style={{ flex: 1 }}>
-                            <Text fw={600} size="sm">
-                              {svc?.name ?? "Servicio"}
-                            </Text>
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text fw={600} size="sm">
+                                {svc?.name ?? "Servicio"}
+                              </Text>
+                              <Text fw={600} size="sm">
+                                {fmtMoney(price)}
+                              </Text>
+                            </Group>
                             <Text c="dimmed" size="sm">
                               {dayjs(iv.from).format("h:mm A")} –{" "}
                               {dayjs(iv.to).format("h:mm A")}
@@ -164,61 +198,98 @@ export default function StepMultiServiceSummary({
         : // ===== FECHAS SEPARADAS =====
           (() => {
             const arr = times as ServiceTimeSelection[];
-            // Grid responsive: 1 col en móvil, 2–3 en desktop según cantidad
             const cols = arr.length >= 3 ? 3 : 2;
 
+            // total en modo split
+            grandTotal = arr.reduce((acc, t) => {
+              const svc = svcMap[t.serviceId];
+              return acc + toNumber(svc?.price);
+            }, 0);
+
             return (
-              <SimpleGrid
-                cols={{ base: 1, sm: 2, md: cols }}
-                spacing={{ base: "sm", md: "md" }}
-              >
-                {arr.map((t) => {
-                  const svc = svcMap[t.serviceId];
-                  const d = dates.find((x) => x.serviceId === t.serviceId);
-                  const emp = d?.employeeId ? empMap[d.employeeId] : undefined;
-                  const displayDate = d?.date
-                    ? capitalize(dayjs(d.date).format("dddd, D MMM YYYY"))
-                    : "—";
+              <>
+                <SimpleGrid
+                  cols={{ base: 1, sm: 2, md: cols }}
+                  spacing={{ base: "sm", md: "md" }}
+                >
+                  {arr.map((t) => {
+                    const svc = svcMap[t.serviceId];
+                    const d = dates.find((x) => x.serviceId === t.serviceId);
+                    const emp = d?.employeeId
+                      ? empMap[d.employeeId]
+                      : undefined;
+                    const displayDate = d?.date
+                      ? capitalize(dayjs(d.date).format("dddd, D MMM YYYY"))
+                      : "—";
+                    const price = toNumber(svc?.price);
 
-                  return (
-                    <Paper key={t.serviceId} withBorder p="md" radius="md">
-                      <Group align="flex-start" gap="md" wrap="nowrap">
-                        <Avatar
-                          radius="xl"
-                          size={48}
-                          src={emp?.profileImage || undefined}
-                        >
-                          {!emp?.profileImage && emp?.names
-                            ? emp.names.charAt(0)
-                            : null}
-                        </Avatar>
+                    return (
+                      <Paper key={t.serviceId} withBorder p="md" radius="md">
+                        <Group align="flex-start" gap="md" wrap="nowrap">
+                          <Avatar
+                            radius="xl"
+                            size={48}
+                            src={emp?.profileImage || undefined}
+                          >
+                            {!emp?.profileImage && emp?.names
+                              ? emp.names.charAt(0)
+                              : null}
+                          </Avatar>
 
-                        <Stack gap={4} style={{ flex: 1 }}>
-                          <Text fw={700} size="sm">
-                            {svc?.name ?? "Servicio"}
-                          </Text>
-                          <Text size="sm" c="dimmed">
-                            {displayDate} · {t.time ?? "—"}
-                          </Text>
-                          <Text size="sm">
-                            {emp ? (
-                              emp.names
-                            ) : (
-                              <span
-                                style={{ color: "var(--mantine-color-dimmed)" }}
-                              >
-                                Sin preferencia
-                              </span>
-                            )}
-                          </Text>
-                        </Stack>
-                      </Group>
-                    </Paper>
-                  );
-                })}
-              </SimpleGrid>
+                          <Stack gap={4} style={{ flex: 1 }}>
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text fw={700} size="sm">
+                                {svc?.name ?? "Servicio"}
+                              </Text>
+                              <Text fw={700} size="sm">
+                                {fmtMoney(price)}
+                              </Text>
+                            </Group>
+                            <Text size="sm" c="dimmed">
+                              {displayDate} · {t.time ?? "—"}
+                            </Text>
+                            <Text size="sm">
+                              {emp ? (
+                                emp.names
+                              ) : (
+                                <span
+                                  style={{
+                                    color: "var(--mantine-color-dimmed)",
+                                  }}
+                                >
+                                  Sin preferencia
+                                </span>
+                              )}
+                            </Text>
+                          </Stack>
+                        </Group>
+                      </Paper>
+                    );
+                  })}
+                </SimpleGrid>
+
+                <Group justify="flex-end" mt="sm">
+                  <Badge size="lg" color="green" variant="filled">
+                    Total: {fmtMoney(grandTotal)}
+                  </Badge>
+                </Group>
+              </>
             );
           })()}
+
+      {/* Total también visible al final en modo bloque, por consistencia */}
+      {!splitDates && (
+        <Paper p="md" shadow="sm" radius="md" withBorder>
+          <Group justify="space-between">
+            <Text fw={700} size="md">
+              Total a pagar
+            </Text>
+            <Text fw={800} size="lg" c="green">
+              {fmtMoney(grandTotal)}
+            </Text>
+          </Group>
+        </Paper>
+      )}
     </Stack>
   );
 }

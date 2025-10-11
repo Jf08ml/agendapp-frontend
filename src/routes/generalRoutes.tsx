@@ -8,7 +8,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { JSX } from "react/jsx-runtime";
 import AdminServices from "../pages/admin/manageServices";
 import AdminEmployees from "../pages/admin/manageEmployees";
-import OrganizationInfo from "../pages/account/OrganizationInfo";
+import OrganizationInfo from "../pages/admin/OrganizationInfo/index";
 import EmployeeInfo from "../pages/account/EmployeeInfo";
 import DailyCashbox from "../pages/account/DailyCashbox";
 // import Booking from "../pages/onlineReservation/Booking";

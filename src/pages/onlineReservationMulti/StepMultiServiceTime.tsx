@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -29,7 +30,10 @@ import {
 import {
   generateAvailableTimes,
   findAvailableMultiServiceSlots,
+  OpeningConstraints,
 } from "./bookingUtilsMulti";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 
 interface StepMultiServiceTimeProps {
   organizationId: string;
@@ -73,11 +77,24 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
   // Detecta si hay fechas distintas
   const splitDates = useMemo(
-    () => dates.some((d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()),
+    () =>
+      dates.some(
+        (d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()
+      ),
     [dates]
   );
 
   const dateMissing = dates.length === 0 || !dates[0]?.date;
+
+  const org = useSelector((s: RootState) => s.organization.organization);
+
+  const opening: OpeningConstraints = {
+    start: org?.openingHours?.start || "", // si "" => fallback en utils
+    end: org?.openingHours?.end || "",
+    businessDays: org?.openingHours?.businessDays || [1, 2, 3, 4, 5],
+    breaks: org?.openingHours?.breaks || [],
+    // stepMinutes: 15, // opcional
+  };
 
   // 🔹 Seed inicial en modo split: copiar employeeId y date desde "dates"
   useEffect(() => {
@@ -85,7 +102,9 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     const val = Array.isArray(value) ? (value as ServiceTimeSelection[]) : [];
     const needsInit =
       val.length !== selectedServices.length ||
-      selectedServices.some((s) => !val.find((v) => v.serviceId === s.serviceId));
+      selectedServices.some(
+        (s) => !val.find((v) => v.serviceId === s.serviceId)
+      );
 
     if (needsInit) {
       const seeded: ServiceTimeSelection[] = selectedServices.map((s) => {
@@ -99,7 +118,6 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       });
       onChange(seeded);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [splitDates, selectedServices, dates]);
 
   useEffect(() => {
@@ -150,7 +168,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
           const bloques = findAvailableMultiServiceSlots(
             dates[0].date!,
             chainServices,
-            appointmentsByEmp
+            appointmentsByEmp,
+            opening
           );
 
           setBlockOptions(
@@ -194,9 +213,13 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
             const availableTimes = generateAvailableTimes(
               d.date,
               service.duration,
-              appts
+              appts,
+              opening 
             );
-            perService.push({ serviceId: d.serviceId, options: availableTimes });
+            perService.push({
+              serviceId: d.serviceId,
+              options: availableTimes,
+            });
           }
 
           setServiceTimes(perService);
@@ -208,7 +231,14 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
     // Evita llamadas sin fecha
     if (!dateMissing) void load();
-  }, [dates, selectedServices, services, organizationId, splitDates, dateMissing]);
+  }, [
+    dates,
+    selectedServices,
+    services,
+    organizationId,
+    splitDates,
+    dateMissing,
+  ]);
 
   // Handler para bloque único (todos el mismo día)
   const handleBlockSelect = (start: Date, intervals: any[]) => {
@@ -220,7 +250,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
   // Handler para selección de hora individual (días distintos)
   const handleTimeSelect = (serviceId: string, time: string) => {
-    const current = (Array.isArray(value) ? (value as ServiceTimeSelection[]) : []) || [];
+    const current =
+      (Array.isArray(value) ? (value as ServiceTimeSelection[]) : []) || [];
 
     const fromDates = dates.find((d) => d.serviceId === serviceId);
     const prev = current.find((v) => v.serviceId === serviceId);
@@ -269,7 +300,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
         <>
           {blockOptions.length === 0 ? (
             <Notification color="red" title="Sin bloques disponibles">
-              No hay bloques disponibles para la combinación seleccionada (verifica empleados y duración).
+              No hay bloques disponibles para la combinación seleccionada
+              (verifica empleados y duración).
             </Notification>
           ) : (
             <Grid gutter="sm">
@@ -277,24 +309,37 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                 const isSelected =
                   !Array.isArray(value) &&
                   (value as MultiServiceBlockSelection)?.startTime &&
-                  dayjs((value as MultiServiceBlockSelection).startTime as Date).valueOf() ===
-                    dayjs(block.start).valueOf();
+                  dayjs(
+                    (value as MultiServiceBlockSelection).startTime as Date
+                  ).valueOf() === dayjs(block.start).valueOf();
 
                 return (
-                  <Grid.Col key={block.time} span={{ base: 12, sm: 6, md: 4, lg: 3 }}>
+                  <Grid.Col
+                    key={block.time}
+                    span={{ base: 12, sm: 6, md: 4, lg: 3 }}
+                  >
                     <Paper
                       withBorder
                       p="md"
-                      onClick={() => handleBlockSelect(block.start, block.intervals)}
+                      onClick={() =>
+                        handleBlockSelect(block.start, block.intervals)
+                      }
                       style={{
                         cursor: "pointer",
-                        background: isSelected ? "var(--mantine-color-green-light)" : undefined,
-                        borderColor: isSelected ? "var(--mantine-color-green-filled)" : undefined,
+                        background: isSelected
+                          ? "var(--mantine-color-green-light)"
+                          : undefined,
+                        borderColor: isSelected
+                          ? "var(--mantine-color-green-filled)"
+                          : undefined,
                         transition: "background 120ms ease",
                       }}
                     >
                       <Group align="center" mb={6} wrap="nowrap">
-                        <Badge color="green" variant={isSelected ? "filled" : "light"}>
+                        <Badge
+                          color="green"
+                          variant={isSelected ? "filled" : "light"}
+                        >
                           {block.time}
                         </Badge>
                         <Text size="sm" fw={600}>
@@ -304,11 +349,17 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                       <Text size="sm" c="dimmed">
                         {block.intervals
                           .map((i) => {
-                            const service = services.find((s) => s._id === i.serviceId);
-                            const emp = employees.find((e) => e._id === i.employeeId);
-                            return `${service?.name}: ${dayjs(i.from).format("h:mm A")} - ${dayjs(
-                              i.to
-                            ).format("h:mm A")} (${emp?.names ?? "Sin preferencia"})`;
+                            const service = services.find(
+                              (s) => s._id === i.serviceId
+                            );
+                            const emp = employees.find(
+                              (e) => e._id === i.employeeId
+                            );
+                            return `${service?.name}: ${dayjs(i.from).format(
+                              "h:mm A"
+                            )} - ${dayjs(i.to).format("h:mm A")} (${
+                              emp?.names ?? "Sin preferencia"
+                            })`;
                           })
                           .join(" | ")}
                       </Text>
@@ -324,13 +375,16 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       {/* Servicios en días diferentes */}
       {splitDates &&
         serviceTimes.map((s) => {
-          const arr = Array.isArray(value) ? (value as ServiceTimeSelection[]) : [];
+          const arr = Array.isArray(value)
+            ? (value as ServiceTimeSelection[])
+            : [];
           const sel = arr.find((v) => v.serviceId === s.serviceId);
 
           const service = services.find((sv) => sv._id === s.serviceId);
 
           // Fallback: si el value no trae employeeId, uso el de "dates"
-          const fallbackEmpId = dates.find((x) => x.serviceId === s.serviceId)?.employeeId ?? null;
+          const fallbackEmpId =
+            dates.find((x) => x.serviceId === s.serviceId)?.employeeId ?? null;
           const effectiveEmpId = sel?.employeeId ?? fallbackEmpId;
           const emp = employees.find((e) => e._id === effectiveEmpId);
 
@@ -343,8 +397,10 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
             <Paper key={s.serviceId} withBorder p="md" mt="sm">
               <Text fw={600} mb={6}>
                 {service?.name ?? "Servicio"} —{" "}
-                {dateForService ? dayjs(dateForService).format("DD/MM/YYYY") : "—"} — (
-                {emp?.names ?? "Sin preferencia"})
+                {dateForService
+                  ? dayjs(dateForService).format("DD/MM/YYYY")
+                  : "—"}{" "}
+                — ({emp?.names ?? "Sin preferencia"})
               </Text>
 
               {s.options.length === 0 ? (
@@ -357,7 +413,9 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                   placeholder="Selecciona una hora"
                   data={s.options.map((h) => ({ value: h, label: h }))}
                   value={sel?.time || null}
-                  onChange={(time) => time && handleTimeSelect(s.serviceId, time)}
+                  onChange={(time) =>
+                    time && handleTimeSelect(s.serviceId, time)
+                  }
                   searchable
                   nothingFoundMessage="Sin horarios"
                 />
