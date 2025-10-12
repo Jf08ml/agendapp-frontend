@@ -123,7 +123,9 @@ const ReservationsList: React.FC = () => {
   };
 
   // ------- HELPERS UI -------
-  const translateStatus = (status: "pending" | "approved" | "rejected") => {
+  const translateStatus = (
+    status: "pending" | "approved" | "rejected" | "auto_approved"
+  ) => {
     switch (status) {
       case "pending":
         return "Pendiente";
@@ -131,13 +133,15 @@ const ReservationsList: React.FC = () => {
         return "Aprobada";
       case "rejected":
         return "Rechazada";
+      case "auto_approved":
+        return "Auto-Aprobada";
       default:
         return "Desconocido";
     }
   };
 
   const getBadgeColor = (
-    status: "pending" | "approved" | "rejected"
+    status: "pending" | "approved" | "rejected" | "auto_approved"
   ): string => {
     switch (status) {
       case "pending":
@@ -146,6 +150,8 @@ const ReservationsList: React.FC = () => {
         return "green";
       case "rejected":
         return "red";
+      case "auto_approved":
+        return "teal";
       default:
         return "gray";
     }
