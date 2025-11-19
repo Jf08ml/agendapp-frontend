@@ -7,6 +7,10 @@
     {
       "source": "/favicon.ico",
       "destination": "https://agendapp-backend.vercel.app/api/favicon.ico"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
