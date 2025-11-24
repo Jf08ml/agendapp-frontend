@@ -74,6 +74,8 @@ const ScheduleView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sendingReminders, setSendingReminders] = useState(false);
 
+  const [reminderDate, setReminderDate] = useState<Date | null>(null);
+
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
@@ -138,13 +140,33 @@ const ScheduleView: React.FC = () => {
   const handleSendDailyReminders = () => {
     if (sendingReminders) return;
 
+    if (!reminderDate) {
+      showNotification({
+        title: "Selecciona una fecha",
+        message:
+          "Debes elegir el día para el que quieres enviar los recordatorios.",
+        color: "orange",
+        autoClose: 3000,
+        position: "top-right",
+      });
+      return;
+    }
+
+    const dateLabel = reminderDate.toLocaleDateString("es-CO", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     openConfirmModal({
-      title: "Enviar recordatorios de hoy",
+      title: "Enviar recordatorios",
       centered: true,
       children: (
         <p>
-          Se enviarán mensajes a los <strong>clientes con citas de hoy</strong>{" "}
-          que <strong>aún no tienen recordatorio</strong>. ¿Deseas continuar?
+          Se enviarán mensajes a los{" "}
+          <strong>clientes con citas el día {dateLabel}</strong> que{" "}
+          <strong>aún no tienen recordatorio</strong>. ¿Deseas continuar?
         </p>
       ),
       labels: { confirm: "Sí, enviar", cancel: "Cancelar" },
@@ -166,6 +188,7 @@ const ScheduleView: React.FC = () => {
 
           const r = await sendOrgReminders(organizationId as string, {
             dryRun: false,
+            targetDate: reminderDate.toISOString(), // o .toISOString().slice(0, 10)
           });
 
           const results = r?.results ?? r?.data?.results ?? [];
@@ -187,7 +210,7 @@ const ScheduleView: React.FC = () => {
             title: "Error",
             message: "No se pudieron enviar los recordatorios.",
             color: "red",
-            autoClose: 3500,
+            autoClose: 3000,
             position: "top-right",
           });
           console.error(error);
@@ -631,7 +654,8 @@ const ScheduleView: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box pos="relative">
+      {sendingReminders && <CustomLoader loadingText="Enviando recordatorios.." overlay />}
       <Group justify="space-between" align="center">
         {/* Lado izquierdo: estado WhatsApp */}
         <WhatsappStatusIcon
@@ -664,6 +688,8 @@ const ScheduleView: React.FC = () => {
             canCreate={hasPermission("appointments:create")}
             canSendReminders={hasPermission("appointments:send_reminders")}
             canReorderEmployees={hasPermission("appointments:reorderemployees")}
+            reminderDate={reminderDate}
+            onChangeReminderDate={setReminderDate}
           />
         </Group>
       </Group>
