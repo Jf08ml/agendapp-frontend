@@ -146,7 +146,7 @@ function App() {
             <Text size="xs" ta="center" c="white" style={{ opacity: 0.8 }}>
               Powered by{" "}
               <Anchor
-                href="https://www.agenditapp.com"
+                href="https://www.agenditapp.com?utm_source=app-dashboard&utm_medium=referral&utm_campaign=powered-by"
                 target="_blank"
                 rel="noopener noreferrer"
                 c="white"

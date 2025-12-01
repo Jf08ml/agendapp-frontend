@@ -126,7 +126,7 @@ export default function Home() {
       <Box mt={50} mb="xl">
         <Center>
           <Anchor
-            href="https://www.agenditapp.com"
+            href="https://www.agenditapp.com?utm_source=app-dashboard&utm_medium=referral&utm_campaign=powered-by"
             target="_blank"
             c="dimmed" 
             size="xs" 
