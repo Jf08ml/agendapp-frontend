@@ -11,6 +11,7 @@ import {
   type ReadyAccount,
   type WaSocketHandle,
   type WaStatusPayload,
+  type WsPairingPayload,
 } from "../utils/waRealtime";
 import {
   getWaStatus,
@@ -35,6 +36,8 @@ export function useWhatsappStatus(
   const [qrMeta, setQrMeta] = useState<QrMeta | null>(null);
   const [qrTtl, setQrTtl] = useState<number>(0);
 
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+
   const [loadingPrimary, setLoadingPrimary] = useState(false);
   const [loadingRestart, setLoadingRestart] = useState(false);
   const [loadingLogout, setLoadingLogout] = useState(false);
@@ -55,19 +58,25 @@ export function useWhatsappStatus(
   }, [qrMeta?.expiresAt]);
 
   // Precarga del estado por REST
+  // Precarga del estado por REST
   useEffect(() => {
     if (!organizationId) return;
     (async () => {
       try {
         const s = await getWaStatus(organizationId);
-        if (s?.code) {
-          setCode(s.code as WaCode);
-          setReason(s.reason || "");
-          if (s.code === "ready") {
+        if (s?.waStatus?.code || s?.code) {
+          // Ajuste dependiendo de cómo devuelva tu endpoint getStatus (waStatus anidado o plano)
+          const finalCode = s.waStatus?.code || s.code;
+          const finalReason = s.waStatus?.reason || s.reason;
+          const finalMe = s.waStatus?.me || s.me;
+
+          setCode(finalCode as WaCode);
+          setReason(finalReason || "");
+          if (finalCode === "ready") {
             setQr("");
             setQrMeta(null);
-            setQrTtl(0);
-            if (s.me) setMe(s.me);
+            setPairingCode(null); // Limpiar pairing
+            if (finalMe) setMe(finalMe);
           }
         } else {
           setCode("disconnected");
@@ -98,6 +107,7 @@ export function useWhatsappStatus(
       },
       onQr: (payload: WsQrPayload) => {
         setQr(payload.qr);
+        setPairingCode(null);
         setCode("waiting_qr");
         setReason("");
         setQrMeta({
@@ -105,6 +115,16 @@ export function useWhatsappStatus(
           seq: payload.seq,
           replacesPrevious: payload.replacesPrevious,
         });
+      },
+      onPairingCode: (payload: WsPairingPayload) => {
+        setPairingCode(payload.code);
+        // Limpiamos QR si llega pairing code
+        setQr("");
+        setQrMeta(null);
+      },
+      onPairingError: (err) => {
+        setReason(`pairing_error: ${err?.error || err}`);
+        // Opcional: setCode("error") si quieres bloquear la UI
       },
       onSessionCleaned: () => {
         setCode("disconnected");
@@ -128,11 +148,12 @@ export function useWhatsappStatus(
   );
 
   const connect = useCallback(
-    async (opts?: { forceFresh?: boolean }) => {
+    async (opts?: { forceFresh?: boolean; pairingPhone?: string }) => {
       if (!organizationId || !clientId) return;
       setLoadingPrimary(true);
       setQr("");
       setQrMeta(null);
+      setPairingCode(null)
       setQrTtl(0);
       setMe(null);
       try {
@@ -142,7 +163,8 @@ export function useWhatsappStatus(
         const { handle, effectiveClientId } = await ensureWaSocket(
           organizationId,
           clientId,
-          attachHandlers()
+          attachHandlers(),
+          opts?.pairingPhone
         );
         handleRef.current?.disconnect();
         handleRef.current = handle;
@@ -178,6 +200,7 @@ export function useWhatsappStatus(
       setCode("disconnected");
       setQr("");
       setQrMeta(null);
+      setPairingCode(null);
       setQrTtl(0);
       setMe(null);
       handleRef.current?.disconnect();
@@ -241,6 +264,7 @@ export function useWhatsappStatus(
     qr,
     qrMeta,
     qrTtl,
+    pairingCode,
 
     // loaders
     loadingPrimary,

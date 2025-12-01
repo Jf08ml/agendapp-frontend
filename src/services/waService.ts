@@ -24,6 +24,7 @@ export interface WaConnectResponse {
 }
 
 export interface WaStatus {
+  waStatus: any;
   code: WaCode;
   reason?: string;
   me?: { id?: string; name?: string };
@@ -39,10 +40,14 @@ export interface WaStatus {
  */
 export async function connectWaSession(
   orgId: string,
-  clientId: string
+  clientId: string,
+  pairingPhone?: string
 ): Promise<WaConnectResponse> {
   const { data }: AxiosResponse<{ data: WaConnectResponse }> =
-    await apiOrganization.post(`/${orgId}/wa/connect`, { clientId });
+    await apiOrganization.post(`/${orgId}/wa/connect`, {
+      clientId,
+      pairingPhone,
+    });
   return data.data;
 }
 
@@ -60,6 +65,7 @@ export async function getWaStatus(orgId: string): Promise<WaStatus | null> {
     const s = data?.data?.waStatus ?? (data?.data?.code ? data.data : null);
     if (!s) return null;
     return {
+      waStatus: s.waStatus ?? s, // include waStatus, fallback to s if not present
       code: s.code as WaCode,
       reason: s.reason,
       me: s.me,

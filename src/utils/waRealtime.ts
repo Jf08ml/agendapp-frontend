@@ -25,6 +25,12 @@ export type WsQrPayload = {
   qrId: string;
 };
 
+export type WsPairingPayload = {
+  code: string;
+  raw: string;
+  phone: string;
+};
+
 export type WaStatusPayload = {
   code: WaCode;
   reason?: string;
@@ -35,6 +41,10 @@ export type WaWsHandlers = {
   onConnect?: (socket: Socket) => void;
   onStatus?: (s: WaStatusPayload) => void;
   onQr?: (payload: WsQrPayload) => void;
+
+  onPairingCode?: (payload: WsPairingPayload) => void;
+  onPairingError?: (error: any) => void;
+
   onSessionCleaned?: () => void;
   onConnectError?: (err: Error) => void;
   /**
@@ -70,6 +80,12 @@ export function openWaSocket(
 
   socket.on("status", (s: WaStatusPayload) => handlers.onStatus?.(s));
   socket.on("qr", (payload: WsQrPayload) => handlers.onQr?.(payload));
+
+  socket.on("pairing_code", (payload: WsPairingPayload) =>
+    handlers.onPairingCode?.(payload)
+  );
+  socket.on("pairing_error", (err: any) => handlers.onPairingError?.(err));
+
   socket.on("session_cleaned", () => handlers.onSessionCleaned?.());
 
   socket.on("connect_error", (err: any) => {
@@ -92,6 +108,8 @@ export function openWaSocket(
   const disconnect = () => {
     socket.off("status");
     socket.off("qr");
+    socket.off("pairing_code");
+    socket.off("pairing_error");
     socket.off("session_cleaned");
     socket.off("connect_error");
     socket.disconnect();
@@ -107,9 +125,12 @@ export function openWaSocket(
 export async function ensureWaSocket(
   organizationId: string,
   clientId: string,
-  handlers: WaWsHandlers
+  handlers: WaWsHandlers,
+  pairingPhone?: string
 ): Promise<{ handle: WaSocketHandle; effectiveClientId: string }> {
-  const resp = await connectWaSession(organizationId, clientId);
+  
+  const resp = await connectWaSession(organizationId, clientId, pairingPhone);
+
   const wsUrl = resp?.ws?.url;
   const wsToken = resp?.ws?.token;
   const effectiveClientId = resp?.clientId || clientId;

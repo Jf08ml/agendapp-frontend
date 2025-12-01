@@ -1,6 +1,5 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useMemo } from "react";
+import React, {  useState } from "react";
 import {
   Anchor,
   Badge,
@@ -13,9 +12,9 @@ import {
   Divider,
   Group,
   Kbd,
-  Loader,
   Paper,
   Progress,
+  SegmentedControl,
   Stack,
   Text,
   TextInput,
@@ -26,10 +25,17 @@ import {
 import { QRCodeCanvas } from "qrcode.react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import { BiCopy, BiInfoCircle, BiRefresh, BiX } from "react-icons/bi";
+import {
+  BiCopy,
+  BiInfoCircle,
+  BiRefresh,
+  BiX,
+  BiQrScan,
+  BiMobile,
+} from "react-icons/bi";
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import type { WaCode } from "../../../utils/waRealtime";
-import { computePrimaryCta } from "../../../utils/waUi";
+// import { computePrimaryCta } from "../../../utils/waUi";
 
 // -----------------------------
 // 1) Mapeo UI por estado
@@ -49,10 +55,10 @@ const UI_STATUS: Record<
     desc: "Creando o reanudando la sesión.",
   },
   waiting_qr: {
-    title: "Escanea el QR",
+    title: "Esperando vinculación",
     color: "teal",
-    showQR: true,
-    desc: "Abre WhatsApp → Dispositivos vinculados → Vincular un dispositivo.",
+    showQR: true, // Nota: controlamos la visualización manualmente abajo según el modo
+    desc: "Escanea el QR o ingresa el código en tu celular.",
   },
   authenticated: {
     title: "Autenticado",
@@ -73,7 +79,7 @@ const UI_STATUS: Record<
     title: "Error de autenticación",
     color: "red",
     showQR: true,
-    desc: "Tus credenciales caducaron o se invalidaron. Vuelve a escanear el QR.",
+    desc: "Tus credenciales caducaron. Vuelve a vincular.",
   },
   reconnecting: {
     title: "Reconectando…",
@@ -110,10 +116,11 @@ const WhatsappOrgSession: React.FC = () => {
     clientId,
     setClientId,
 
-    // QR
+    // QR & Pairing
     qr,
     qrMeta,
     qrTtl,
+    pairingCode, // <--- Importante: viene del hook actualizado
 
     // loaders
     loadingPrimary,
@@ -122,7 +129,7 @@ const WhatsappOrgSession: React.FC = () => {
     loadingSend,
 
     // helpers
-    longConnecting,
+    // longConnecting,
 
     // acciones
     connect,
@@ -131,21 +138,32 @@ const WhatsappOrgSession: React.FC = () => {
     sendTest,
   } = useWhatsappStatus(organization?._id, initialClientId);
 
-  // Para la barra de progreso en "connecting"
-  const connectingAges = React.useMemo(() => {
-    // longConnecting ya te dice si pasaste de 20s;
-    // aquí solo hacemos un contador simple para la UI (0..20s)
-    // Nota: si quieres el contador exacto, podrías levantarlo dentro del hook.
-    return 0; // mantenemos la UI existente sin cronómetro “real”; puedes retirarlo si prefieres
-  }, [code]);
-
-  // CTA dinámica
-  const primaryCta = useMemo(
-    () => computePrimaryCta(code, reason, qrTtl, longConnecting, connect),
-    [code, reason, qrTtl, longConnecting, connect]
-  );
+  // Estado local para UI de conexión
+  const [connectMode, setConnectMode] = useState<"qr" | "pairing">("qr");
+  const [pairingPhone, setPairingPhone] = useState("");
 
   const ui = UI_STATUS[code];
+
+  // CTA dinámica (principalmente para reconexiones automáticas)
+  // const primaryCta = useMemo(
+  //   () => computePrimaryCta(code, reason, qrTtl, longConnecting, connect),
+  //   [code, reason, qrTtl, longConnecting, connect]
+  // );
+
+  // Handler manual para el botón de conectar
+  const handleConnect = () => {
+    if (connectMode === "pairing") {
+      if (!pairingPhone || pairingPhone.length < 7) {
+        alert("Por favor ingresa un número válido (ej: 57300...)");
+        return;
+      }
+      // Forzamos nueva sesión enviando el teléfono
+      connect({ forceFresh: true, pairingPhone });
+    } else {
+      // Modo QR normal
+      connect({ forceFresh: true });
+    }
+  };
 
   return (
     <Paper shadow="md" radius="md" p="xl" withBorder>
@@ -172,10 +190,11 @@ const WhatsappOrgSession: React.FC = () => {
         <Group align="end">
           <TextInput
             label="ID de sesión (clientId)"
-            description="Suele ser el ID de la organización; puedes personalizarlo."
+            description="Identificador interno para esta conexión."
             value={clientId}
             onChange={(e) => setClientId(e.currentTarget.value)}
             style={{ flex: 1 }}
+            disabled={code === "ready" || code === "connecting"}
           />
           <CopyButton value={clientId} timeout={1500}>
             {({ copied, copy }) => (
@@ -218,59 +237,167 @@ const WhatsappOrgSession: React.FC = () => {
 
               {code === "connecting" && (
                 <Box mt="sm">
-                  <Progress
-                    value={Math.min(100, (connectingAges / 20) * 100)}
-                    striped
-                    animated
-                  />
+                  <Progress value={100} striped animated />
                   <Text size="xs" c="dimmed" mt={4}>
-                    Conectando…
+                    Conectando con WhatsApp...
                   </Text>
                 </Box>
               )}
             </Box>
-
-            {/* CTA primaria dinámica (si aplica) */}
-            {primaryCta && (
-              <Button
-                loading={loadingPrimary}
-                color={ui.color}
-                onClick={primaryCta.onClick}
-              >
-                {primaryCta.label}
-              </Button>
-            )}
           </Group>
         </Card>
 
-        {/* BLOQUE QR */}
-        {UI_STATUS[code].showQR && qr && (
-          <Center>
-            <Stack align="center" gap={6}>
-              <QRCodeCanvas value={qr} size={240} includeMargin />
-              <Text size="xs" c="gray">
-                {qrMeta?.seq ? `QR #${qrMeta.seq} · ` : null}
-                Expira en {qrTtl}s
-                {qrMeta?.replacesPrevious ? " · reemplaza al anterior" : null}
-              </Text>
-              {qrTtl === 0 && (
-                <Button
-                  variant="light"
-                  leftSection={<BiRefresh size={16} />}
-                  onClick={() => connect()}
-                >
-                  Regenerar QR
-                </Button>
-              )}
-            </Stack>
-          </Center>
-        )}
+        <Divider />
 
-        {/* INTERMEDIOS SIN QR */}
-        {code !== "ready" && !UI_STATUS[code].showQR && !qr && (
-          <Center>
-            <Loader />
-          </Center>
+        {/* ========================================================= */}
+        {/* ZONA DE CONEXIÓN (Solo visible si NO estamos listos)      */}
+        {/* ========================================================= */}
+        {code !== "ready" && (
+          <Box>
+            <Text fw={600} mb="xs">
+              Método de vinculación
+            </Text>
+
+            {/* Selector de Modo */}
+            <SegmentedControl
+              value={connectMode}
+              onChange={(val: any) => setConnectMode(val)}
+              data={[
+                {
+                  label: (
+                    <Center>
+                      <BiQrScan style={{ marginRight: 6 }} /> Código QR
+                    </Center>
+                  ),
+                  value: "qr",
+                },
+                {
+                  label: (
+                    <Center>
+                      <BiMobile style={{ marginRight: 6 }} /> Pairing Code
+                    </Center>
+                  ),
+                  value: "pairing",
+                },
+              ]}
+              fullWidth
+              mb="md"
+              disabled={code === "connecting"}
+            />
+
+            {/* --- CASO 1: MODO PAIRING --- */}
+            {connectMode === "pairing" && (
+              <Stack>
+                {!pairingCode ? (
+                  /* Paso 1: Pedir teléfono */
+                  <>
+                    <TextInput
+                      label="Número de teléfono"
+                      placeholder="573001234567"
+                      description="Ingresa el número internacional sin '+' (Ej: 57...)"
+                      value={pairingPhone}
+                      onChange={(e) => setPairingPhone(e.currentTarget.value)}
+                      disabled={code === "connecting"}
+                    />
+                    <Button
+                      onClick={handleConnect}
+                      loading={loadingPrimary}
+                      disabled={!pairingPhone || code === "connecting"}
+                      fullWidth
+                    >
+                      Obtener Código de Vinculación
+                    </Button>
+                  </>
+                ) : (
+                  /* Paso 2: Mostrar Código */
+                  <Paper withBorder p="lg" bg="gray.0" radius="md">
+                    <Stack align="center" gap="xs">
+                      <Text size="sm" c="dimmed" fw={500}>
+                        CÓDIGO DE VINCULACIÓN
+                      </Text>
+                      <Title
+                        order={1}
+                        style={{
+                          letterSpacing: "0.2em",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {pairingCode}
+                      </Title>
+                      <Text size="xs" c="dimmed" ta="center" maw={300}>
+                        En tu celular ve a: <b>Dispositivos vinculados</b> {">"}{" "}
+                        <b>Vincular dispositivo</b> {">"}{" "}
+                        <b>Vincular con número de teléfono</b>.
+                      </Text>
+                      <CopyButton value={pairingCode}>
+                        {({ copied, copy }) => (
+                          <Button
+                            size="xs"
+                            variant="subtle"
+                            onClick={copy}
+                            color={copied ? "teal" : "blue"}
+                            leftSection={
+                              copied ? (
+                                <CheckIcon size={14} />
+                              ) : (
+                                <BiCopy size={14} />
+                              )
+                            }
+                          >
+                            {copied ? "Copiado" : "Copiar Código"}
+                          </Button>
+                        )}
+                      </CopyButton>
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        color="red"
+                        onClick={() => connect({ forceFresh: true })}
+                        mt="xs"
+                      >
+                        Cancelar / Reintentar
+                      </Button>
+                    </Stack>
+                  </Paper>
+                )}
+              </Stack>
+            )}
+
+            {/* --- CASO 2: MODO QR --- */}
+            {connectMode === "qr" && (
+              <Stack align="center">
+                {!qr ? (
+                  <Button
+                    onClick={() => connect({ forceFresh: true })}
+                    loading={loadingPrimary}
+                    disabled={code === "connecting"}
+                    fullWidth
+                    variant="light"
+                  >
+                    Generar Código QR
+                  </Button>
+                ) : (
+                  <Stack align="center" gap={6}>
+                    <QRCodeCanvas value={qr} size={240} includeMargin />
+                    <Text size="xs" c="gray">
+                      {qrMeta?.seq ? `QR #${qrMeta.seq} · ` : null}
+                      Expira en {qrTtl}s
+                    </Text>
+                    {qrTtl === 0 && (
+                      <Button
+                        variant="light"
+                        leftSection={<BiRefresh size={16} />}
+                        onClick={() => connect()}
+                        size="xs"
+                      >
+                        Regenerar QR
+                      </Button>
+                    )}
+                  </Stack>
+                )}
+              </Stack>
+            )}
+          </Box>
         )}
 
         {/* ACCIONES cuando está READY */}
@@ -281,7 +408,7 @@ const WhatsappOrgSession: React.FC = () => {
               onClick={restart}
               loading={loadingRestart}
             >
-              Reiniciar
+              Reiniciar Cliente
             </Button>
             <Button
               variant="default"
@@ -307,27 +434,6 @@ const WhatsappOrgSession: React.FC = () => {
         )}
 
         <Divider my="xs" />
-
-        {/* AYUDA RÁPIDA / TROUBLESHOOTING */}
-        <Stack gap={4}>
-          <Text fw={600}>¿No aparece el QR o se queda en “Conectando…”?</Text>
-          <Text size="sm">
-            1. Pulsa <Kbd>Forzar nueva sesión</Kbd> para borrar credenciales
-            caducadas y generar un QR nuevo.
-          </Text>
-          <Text size="sm">
-            2. Si cambiaste de celular, simplemente vuelve a escanear el QR
-            desde tu WhatsApp.
-          </Text>
-          <Text size="sm">
-            3. Si persiste, revisa tu conexión a Internet y que el servidor de
-            WhatsApp esté en línea.
-          </Text>
-          <Text size="xs" c="dimmed">
-            Tip: puedes volver aquí en cualquier momento; la sesión permanecerá
-            conectada mientras no cierres desde tu WhatsApp.
-          </Text>
-        </Stack>
 
         {/* FOOTER */}
         <Text size="xs" c="dimmed">
