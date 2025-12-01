@@ -517,7 +517,7 @@ const ServicesAndPrices: React.FC = () => {
   const [order, setOrder] = useState<"price-asc" | "price-desc" | "name-asc">(
     "price-asc"
   );
-  const [view, setView] = useState<"lista" | "tarjetas">("lista");
+  const [view, setView] = useState<"lista" | "tarjetas">("tarjetas");
 
   const [modalService, setModalService] = useState<Service | null>(null);
 

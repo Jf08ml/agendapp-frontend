@@ -1,5 +1,5 @@
 // src/App.tsx
-import { AppShell, Avatar, Burger, Flex, UnstyledButton } from "@mantine/core";
+import { AppShell, Avatar, Burger, Flex, UnstyledButton, Text, Anchor } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -142,6 +142,21 @@ function App() {
           onMouseLeave={() => opened && close()}
         >
           <NavbarLinks closeNavbar={close} />
+          <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
+            <Text size="xs" ta="center" c="white" style={{ opacity: 0.8 }}>
+              Powered by{" "}
+              <Anchor
+                href="https://www.agenditapp.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                c="white"
+                fw={700}
+                style={{ textDecoration: "underline" }}
+              >
+                AgenditApp
+              </Anchor>
+            </Text>
+          </div>
         </AppShell.Navbar>
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
           <Routes>

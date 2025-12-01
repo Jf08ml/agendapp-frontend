@@ -9,6 +9,8 @@ import {
   SimpleGrid,
   useMantineTheme,
   rem,
+  Center,
+  Anchor,
 } from "@mantine/core";
 import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
@@ -120,6 +122,27 @@ export default function Home() {
           <FeatureCard key={f.link} to={f.link} title={f.title} icon={f.icon} />
         ))}
       </SimpleGrid>
+
+      <Box mt={50} mb="xl">
+        <Center>
+          <Anchor
+            href="https://www.agenditapp.com"
+            target="_blank"
+            c="dimmed" 
+            size="xs" 
+            underline="hover" 
+          >
+            Plataforma impulsada por{" "}
+            <Text
+              span
+              fw={800} 
+              c={primary} 
+            >
+              AgenditApp
+            </Text>
+          </Anchor>
+        </Center>
+      </Box>
 
       <style>
         {`
