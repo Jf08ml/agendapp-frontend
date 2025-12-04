@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useMemo, useState } from "react";
-import { Box, Group, Text } from "@mantine/core";
+import React, { useEffect, useMemo, useState, useCallback, Suspense, lazy } from "react";
+import { Badge, Box, Group, Paper, Text } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -11,7 +11,6 @@ import {
   getAppointmentsByOrganizationId,
   updateAppointment,
 } from "../../../services/appointmentService";
-import AppointmentModal from "./components/AppointmentModal";
 import {
   Employee,
   getEmployeesByOrganizationId,
@@ -28,15 +27,18 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
-import SearchAppointmentsModal from "./components/SearchAppointmentsModal";
 import { endOfDay, endOfMonth, startOfDay, startOfMonth } from "date-fns";
-import ReorderEmployeesModal from "./components/ReorderEmployeesModal";
 import { useNavigate } from "react-router-dom";
 import { sendOrgReminders } from "../../../services/reminderService";
 
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import WhatsappStatusIcon from "./components/WhatsappStatusIcon";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
+
+// 🚀 Lazy loading de modales para mejorar carga inicial
+const AppointmentModal = lazy(() => import("./components/AppointmentModal"));
+const SearchAppointmentsModal = lazy(() => import("./components/SearchAppointmentsModal"));
+const ReorderEmployeesModal = lazy(() => import("./components/ReorderEmployeesModal"));
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -222,7 +224,7 @@ const ScheduleView: React.FC = () => {
   };
 
   // ---------- DATA: Clientes/Empleados/Citas ----------
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     if (!organizationId) return;
     setLoadingAgenda(true);
     try {
@@ -235,9 +237,9 @@ const ScheduleView: React.FC = () => {
     } finally {
       setLoadingAgenda(false);
     }
-  };
+  }, [organizationId]);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     if (!readyForScopedFetch) return;
     setLoadingAgenda(true);
     try {
@@ -256,9 +258,9 @@ const ScheduleView: React.FC = () => {
     } finally {
       setLoadingAgenda(false);
     }
-  };
+  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
 
-  const fetchAppointmentsForMonth = async (date: Date) => {
+  const fetchAppointmentsForMonth = useCallback(async (date: Date) => {
     if (!readyForScopedFetch) return;
     setLoadingMonth(true);
     try {
@@ -280,9 +282,9 @@ const ScheduleView: React.FC = () => {
     } finally {
       setLoadingMonth(false);
     }
-  };
+  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
 
-  const fetchAppointmentsForDay = async (
+  const fetchAppointmentsForDay = useCallback(async (
     date: Date
   ): Promise<Appointment[]> => {
     if (!readyForScopedFetch) return [];
@@ -306,7 +308,7 @@ const ScheduleView: React.FC = () => {
       console.error("Error al obtener citas del día");
       return [];
     }
-  };
+  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
   /**
    * MANEJO DE SERVICIO
    */
@@ -320,29 +322,29 @@ const ScheduleView: React.FC = () => {
   /**
    * MANEJO DE EMPLEADO
    */
-  const handleEmployeeChange = (value: string | null) => {
+  const handleEmployeeChange = useCallback((value: string | null) => {
     const selectedEmployee = employees.find((emp) => emp._id === value);
     if (selectedEmployee) {
-      setNewAppointment({ ...newAppointment, employee: selectedEmployee });
+      setNewAppointment((prev) => ({ ...prev, employee: selectedEmployee }));
       setFilteredServices(selectedEmployee.services as unknown as Service[]);
     } else {
-      setNewAppointment({ ...newAppointment, employee: undefined });
+      setNewAppointment((prev) => ({ ...prev, employee: undefined }));
       setFilteredServices([]);
     }
-  };
+  }, [employees]);
 
   /**
    * MANEJO DE CLIENTE
    */
-  const handleClientChange = (clientId: string | null) => {
+  const handleClientChange = useCallback((clientId: string | null) => {
     const selectedClient = clients.find((client) => client._id === clientId);
-    setNewAppointment({ ...newAppointment, client: selectedClient });
-  };
+    setNewAppointment((prev) => ({ ...prev, client: selectedClient }));
+  }, [clients]);
 
   /**
    * COMBINAR FECHA + HORA
    */
-  const combineDateAndTime = (
+  const combineDateAndTime = useCallback((
     dateDay: Date | null,
     dateHour: Date
   ): Date | null => {
@@ -353,12 +355,12 @@ const ScheduleView: React.FC = () => {
     combinedDate.setSeconds(dateHour.getSeconds());
     combinedDate.setMilliseconds(dateHour.getMilliseconds());
     return combinedDate;
-  };
+  }, []);
 
   /**
    * ABRIR MODAL NUEVA CITA
    */
-  const openModal = (
+  const openModal = useCallback((
     selectedDay: Date | null,
     interval?: Date,
     employeeId?: string
@@ -385,38 +387,41 @@ const ScheduleView: React.FC = () => {
         position: "top-right",
       });
     }
-  };
+  }, [employees, combineDateAndTime]);
 
   /**
    * CERRAR MODAL
    */
-  const closeModal = () => {
-    setNewAppointment({});
+  const closeModal = useCallback(() => {
+    setNewAppointment({ services: [] });
     setModalOpenedAppointment(false);
     setSelectedAppointment(null);
     setFilteredServices([]);
-  };
+  }, []);
 
   /**
    * EDITAR CITA
    */
-  const handleEditAppointment = (appointment: Appointment) => {
+  const handleEditAppointment = useCallback((appointment: Appointment) => {
     setSelectedAppointment(appointment);
     setNewAppointment({
       service: appointment.service,
+      services: appointment.service ? [appointment.service] : [],
       client: appointment.client,
       employee: appointment.employee,
+      employeeRequestedByClient: appointment.employeeRequestedByClient,
       startDate: new Date(appointment.startDate),
       endDate: new Date(appointment.endDate),
       status: appointment.status,
+      advancePayment: appointment.advancePayment,
     });
     setModalOpenedAppointment(true);
-  };
+  }, []);
 
   /**
    * CANCELAR CITA
    */
-  const handleCancelAppointment = (appointmentId: string) => {
+  const handleCancelAppointment = useCallback((appointmentId: string) => {
     openConfirmModal({
       title: "Cancelar cita",
       children: (
@@ -451,12 +456,12 @@ const ScheduleView: React.FC = () => {
         }
       },
     });
-  };
+  }, [currentDate, fetchAppointmentsForMonth]);
 
   /**
    * CONFIRMAR CITA
    */
-  const handleConfirmAppointment = (appointmentId: string) => {
+  const handleConfirmAppointment = useCallback((appointmentId: string) => {
     const appointment = appointments.find((a) => a._id === appointmentId);
     if (!appointment) {
       showNotification({
@@ -519,7 +524,7 @@ const ScheduleView: React.FC = () => {
         }
       },
     });
-  };
+  }, [appointments, fetchAppointmentsForMonth, currentDate]);
 
   /**
    * CREAR O ACTUALIZAR CITA
@@ -617,7 +622,7 @@ const ScheduleView: React.FC = () => {
   /**
    * ACTUALIZAR ORDEN DE EMPLEADOS
    */
-  const handleSaveReorderedEmployees = async (updatedEmployees: Employee[]) => {
+  const handleSaveReorderedEmployees = useCallback(async (updatedEmployees: Employee[]) => {
     try {
       const updates = updatedEmployees.map((employee, index) => ({
         ...employee,
@@ -646,7 +651,7 @@ const ScheduleView: React.FC = () => {
         position: "top-right",
       });
     }
-  };
+  }, []);
 
   // Loader inicial
   if (loadingAgenda) {
@@ -654,10 +659,25 @@ const ScheduleView: React.FC = () => {
   }
 
   return (
-    <Box pos="relative">
-      {sendingReminders && <CustomLoader loadingText="Enviando recordatorios.." overlay />}
-      <Group justify="space-between" align="center">
-        {/* Lado izquierdo: estado WhatsApp */}
+   <Box pos="relative">
+    {sendingReminders && (
+      <CustomLoader loadingText="Enviando recordatorios.." overlay />
+    )}
+
+    {/* Barra superior tipo toolbar */}
+    <Paper
+      withBorder
+      radius="md"
+      p="xs"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+      }}
+    >
+      {/* Izquierda: estado WhatsApp */}
+      <Group gap={8}>
         <WhatsappStatusIcon
           code={code}
           reason={reason}
@@ -667,76 +687,101 @@ const ScheduleView: React.FC = () => {
           size="xs"
         />
 
-        {/* Lado derecho: contador + menú de acciones */}
-        <Group gap="sm" align="center">
-          <Text size="sm">
-            <strong>Citas este mes:</strong> {appointments.length}
+        <Text size="xs" c="dimmed">
+          Agenda de{" "}
+          <Text component="span" fw={600}>
+            {organization?.name ?? "tu negocio"}
           </Text>
-
-          <SchedulerQuickActionsMenu
-            onOpenSearch={() => setShowSearchModal(true)}
-            onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
-            onAddAppointment={() => openModal(new Date(), new Date())}
-            onReorderEmployees={() => setReorderModalOpened(true)}
-            onSendReminders={handleSendDailyReminders}
-            isWhatsappReady={isWhatsAppReady}
-            sendingReminders={sendingReminders}
-            reasonForDisabled={reason}
-            canSearchAppointments={hasPermission(
-              "appointments:search_schedule"
-            )}
-            canCreate={hasPermission("appointments:create")}
-            canSendReminders={hasPermission("appointments:send_reminders")}
-            canReorderEmployees={hasPermission("appointments:reorderemployees")}
-            reminderDate={reminderDate}
-            onChangeReminderDate={setReminderDate}
-          />
-        </Group>
+        </Text>
       </Group>
 
-      <CustomCalendar
-        employees={employees}
-        appointments={appointments}
-        currentDate={currentDate}
-        setCurrentDate={setCurrentDate}
-        setAppointments={setAppointments}
-        onOpenModal={openModal}
-        onEditAppointment={handleEditAppointment}
-        onCancelAppointment={handleCancelAppointment}
-        onConfirmAppointment={handleConfirmAppointment}
-        fetchAppointmentsForMonth={fetchAppointmentsForMonth}
-        loadingMonth={loadingMonth}
-        fetchAppointmentsForDay={fetchAppointmentsForDay}
-      />
+      {/* Derecha: contador + quick actions */}
+      <Group gap="sm" align="center">
+        <Badge size="sm" radius="xl" variant="light">
+          Citas este mes: {appointments.length}
+        </Badge>
 
-      <AppointmentModal
-        opened={modalOpenedAppointment}
-        onClose={closeModal}
-        appointment={selectedAppointment}
-        newAppointment={newAppointment}
-        setNewAppointment={setNewAppointment}
-        services={filteredServices}
-        employees={employees}
-        clients={clients}
-        // onServiceChange={handleServiceChange}
-        onEmployeeChange={handleEmployeeChange}
-        onClientChange={handleClientChange}
-        onSave={addOrUpdateAppointment}
-        fetchClients={fetchClients}
-        creatingAppointment={creatingAppointment}
-      />
-      <SearchAppointmentsModal
-        opened={showSearchModal}
-        onClose={() => setShowSearchModal(false)}
-        appointments={appointments}
-      />
-      <ReorderEmployeesModal
-        opened={reorderModalOpened}
-        onClose={() => setReorderModalOpened(false)}
-        employees={employees}
-        onSave={handleSaveReorderedEmployees}
-        onFetchEmployees={fetchEmployees}
-      />
+        <SchedulerQuickActionsMenu
+          onOpenSearch={() => setShowSearchModal(true)}
+          onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
+          onAddAppointment={() => openModal(new Date(), new Date())}
+          onReorderEmployees={() => setReorderModalOpened(true)}
+          onSendReminders={handleSendDailyReminders}
+          isWhatsappReady={isWhatsAppReady}
+          sendingReminders={sendingReminders}
+          reasonForDisabled={reason}
+          canSearchAppointments={hasPermission(
+            "appointments:search_schedule"
+          )}
+          canCreate={hasPermission("appointments:create")}
+          canSendReminders={hasPermission("appointments:send_reminders")}
+          canReorderEmployees={hasPermission(
+            "appointments:reorderemployees"
+          )}
+          reminderDate={reminderDate}
+          onChangeReminderDate={setReminderDate}
+        />
+      </Group>
+    </Paper>
+
+    {/* Calendario principal */}
+    <CustomCalendar
+      employees={employees}
+      appointments={appointments}
+      currentDate={currentDate}
+      setCurrentDate={setCurrentDate}
+      setAppointments={setAppointments}
+      onOpenModal={openModal}
+      onEditAppointment={handleEditAppointment}
+      onCancelAppointment={handleCancelAppointment}
+      onConfirmAppointment={handleConfirmAppointment}
+      fetchAppointmentsForMonth={fetchAppointmentsForMonth}
+      loadingMonth={loadingMonth}
+      fetchAppointmentsForDay={fetchAppointmentsForDay}
+    />
+      
+      {/* 🚀 Modales con Suspense para lazy loading */}
+      <Suspense fallback={<CustomLoader overlay />}>
+        {modalOpenedAppointment && (
+          <AppointmentModal
+            opened={modalOpenedAppointment}
+            onClose={closeModal}
+            appointment={selectedAppointment}
+            newAppointment={newAppointment}
+            setNewAppointment={setNewAppointment}
+            services={filteredServices}
+            employees={employees}
+            clients={clients}
+            onEmployeeChange={handleEmployeeChange}
+            onClientChange={handleClientChange}
+            onSave={addOrUpdateAppointment}
+            fetchClients={fetchClients}
+            creatingAppointment={creatingAppointment}
+          />
+        )}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {showSearchModal && (
+          <SearchAppointmentsModal
+            opened={showSearchModal}
+            onClose={() => setShowSearchModal(false)}
+            appointments={appointments}
+          />
+        )}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {reorderModalOpened && (
+          <ReorderEmployeesModal
+            opened={reorderModalOpened}
+            onClose={() => setReorderModalOpened(false)}
+            employees={employees}
+            onSave={handleSaveReorderedEmployees}
+            onFetchEmployees={fetchEmployees}
+          />
+        )}
+      </Suspense>
     </Box>
   );
 };

@@ -10,10 +10,9 @@ import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 
 interface EmployeeColumnProps {
   employee: Employee;
-  appoinments: Appointment[]; // todas las citas (no solo de este empleado)
+  appoinments: Appointment[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   appointmentsByEmployee: Record<string, Appointment[]>;
-  // timeIntervals: Date[];
   startHour: number;
   endHour: number;
   selectedDay: Date;
@@ -33,11 +32,6 @@ interface DraggedItem {
 }
 
 const isTouchDevice = () => navigator.maxTouchPoints > 0;
-
-/**
- * Función para ajustar los minutos al bloque de 15 min más cercano
- * ej: 10:07 → 10:00, 10:08 → 10:15
- */
 function snapToQuarter(minutes: number) {
   return Math.round(minutes / 15) * 15;
 }
@@ -47,7 +41,6 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   appoinments,
   setAppointments,
   appointmentsByEmployee,
-  // timeIntervals,
   startHour,
   endHour,
   selectedDay,
@@ -61,42 +54,31 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
 }) => {
   const columnRef = useRef<HTMLDivElement | null>(null);
 
-  // Obtenemos todas las citas en un solo array para buscar la original al hacer drop
   const allAppointments = useMemo(
     () => Object.values(appointmentsByEmployee).flat(),
     [appointmentsByEmployee]
   );
 
-  /**
-   * Función que maneja la lógica cuando se suelta (drop) una cita.
-   */
   const handleDrop = useCallback(
     (item: DraggedItem, monitor: DropTargetMonitor) => {
       if (!columnRef.current) return;
-
       const boundingRect = columnRef.current.getBoundingClientRect();
       const mousePos = monitor.getClientOffset();
       if (!mousePos) return;
 
-      // Ajustar posición para dispositivos táctiles
       const devicePixelRatio = isTouchDevice() ? window.devicePixelRatio : 1;
-
-      // Ajustamos la posición (y) de donde se suelta
       const scrollOffset = columnRef.current.scrollTop || 0;
       const correctedY = (mousePos.y - boundingRect.top) / devicePixelRatio;
       const yTop = correctedY - item.offsetY + scrollOffset;
 
-      // Convertir posición vertical a “minutos desde el inicio de la jornada”
       const totalMinutes = Math.round((yTop / HOUR_HEIGHT) * 60);
-      const snappedMinutes = snapToQuarter(totalMinutes); // redondea a 15 min
+      const snappedMinutes = snapToQuarter(totalMinutes);
       const hourOffset = Math.floor(snappedMinutes / 60);
       const minuteOffset = snappedMinutes % 60;
 
-      // Generar nueva fecha de inicio usando startHour
       const newStartDate = new Date(selectedDay);
-      newStartDate.setHours(startHour + hourOffset, minuteOffset, 0, 0);      
+      newStartDate.setHours(startHour + hourOffset, minuteOffset, 0, 0);
 
-      // Buscar la cita original y calcular su duración
       const originalAppointment = allAppointments.find(
         (app) => app._id === item.appointmentId
       );
@@ -106,10 +88,8 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         new Date(originalAppointment.endDate).getTime() -
         new Date(originalAppointment.startDate).getTime();
 
-      // Generar nueva fecha de fin
       const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
-      // Crear la cita actualizada
       const updatedAppointment: Appointment = {
         ...originalAppointment,
         employee,
@@ -117,78 +97,53 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         endDate: newEndDate,
       };
 
-      // Llamamos a la función que abre tu lógica de edición
       onEditAppointment(updatedAppointment);
     },
-    [
-      columnRef,
-      allAppointments,
-      employee,
-      onEditAppointment,
-      selectedDay,
-      startHour,
-    ]
+    [columnRef, allAppointments, employee, onEditAppointment, selectedDay, startHour]
   );
 
-  // Configuración de la zona drop (columna)
   const [{ isOver }, dropRef] = useDrop(() => ({
     accept: ItemTypes.APPOINTMENT,
     drop: handleDrop,
     collect: (monitor) => ({ isOver: !!monitor.isOver() }),
   }));
-  
 
-  /**
-   * Cuando hacemos click en la columna vacía,
-   * calculamos el horario y abrimos el modal de creación.
-   */
   const handleColumnClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const clickedElement = event.target as HTMLElement;
-    // Evita abrir modal si hizo click en una cita
-    if (clickedElement.closest(".appointment-card")) {
-      return;
-    }
-  
+    if (clickedElement.closest(".appointment-card")) return;
+
     const boundingRect = columnRef.current?.getBoundingClientRect();
     if (!boundingRect) return;
-  
+
     const clickedY = event.clientY - boundingRect.top;
-  
-    // Calcula el tiempo basado en la posición vertical del clic
     const totalMinutes = (clickedY / HOUR_HEIGHT) * 60;
-    const snappedMinutes = snapToQuarter(totalMinutes); // Redondea al bloque de 15 minutos más cercano
+    const snappedMinutes = snapToQuarter(totalMinutes);
     const hourOffset = Math.floor(snappedMinutes / 60);
     const minuteOffset = snappedMinutes % 60;
-  
-    // Genera la hora de inicio ajustada
+
     const clickedInterval = new Date(selectedDay);
     clickedInterval.setHours(startHour + hourOffset, minuteOffset, 0, 0);
-  
+
     if (hasPermission("appointments:create") && clickedInterval) {
       onOpenModal(selectedDay, clickedInterval, employee._id);
     }
   };
-  
 
-  /**
-   * Pintamos las citas del empleado (absolutas en el contenedor).
-   */
   const renderAppointments = () => {
     return appointmentsByEmployee[employee._id]?.map((appointment) => {
-      // Calcula posición y altura en píxeles
       const { top, height } = calculateAppointmentPosition(
         appointment,
         startHour,
         selectedDay,
         MINUTE_HEIGHT
       );
-  
       return (
         <Box
           key={appointment._id}
           style={{
             position: "absolute",
             top: `${top}px`,
+            left: 0,
             width: "100%",
             height: isExpanded(appointment) ? "auto" : `${height}px`,
             zIndex: isExpanded(appointment) ? 1 : 0,
@@ -210,7 +165,57 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       );
     });
   };
-  
+
+// 🕓 Renderiza las líneas guía dentro de la columna (exactas a TimeGrid)
+const renderGuides = () => {
+  const hours = endHour - startHour + 1;
+  const marks = [0, 15, 30, 45];
+
+  return (
+    <>
+      {/* Línea vertical de columna */}
+      <Box
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,              // o right: 0 si la quieres al borde derecho
+          borderLeft: "1px solid #e0e0e0",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Líneas horizontales (horas y cuartos) */}
+      {Array.from({ length: hours }).map((_, hourIndex) =>
+        marks.map((minutes, markIndex) => {
+          const isMain = minutes === 0;
+          const top =
+            hourIndex * HOUR_HEIGHT +
+            (HOUR_HEIGHT / marks.length) * markIndex;
+
+          return (
+            <Box
+              key={`${hourIndex}-${minutes}`}
+              style={{
+                position: "absolute",
+                top,
+                left: 0,
+                right: 0,
+                borderTop: isMain
+                  ? "2px solid #e0e0e0"
+                  : "1px dashed rgb(171, 171, 173)",
+                pointerEvents: "none",
+              }}
+            />
+          );
+        })
+      )}
+    </>
+  );
+};
+
+
+  const canCreate = hasPermission("appointments:create");
 
   return (
     <div
@@ -223,14 +228,34 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         marginLeft: 2,
         borderRight: "1px solid #e0e0e0",
         position: "relative",
-        border: isOver ? "2px dashed #4caf50" : "1px solid #e0e0e0",
+        background: isOver ? "rgba(76, 175, 80, 0.04)" : "#fff",
+        outline: isOver ? "2px dashed #4caf50" : "none",
+        outlineOffset: -2,
+        transition: "background 120ms ease, outline-color 120ms ease",
+        cursor: canCreate ? "crosshair" : "default",
       }}
       onClick={handleColumnClick}
     >
+      {/* Fondo con guías */}
+      <Box
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 0,
+        }}
+      >
+        {renderGuides()}
+      </Box>
+
+      {/* Contenedor de citas */}
       <Box
         style={{
           position: "relative",
           minHeight: `${(endHour - startHour + 1) * HOUR_HEIGHT}px`,
+          zIndex: 1,
         }}
       >
         {renderAppointments()}

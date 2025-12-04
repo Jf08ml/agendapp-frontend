@@ -19,7 +19,6 @@ import {
   Tabs,
 } from "@mantine/core";
 import {
-  BiDotsVertical,
   BiEdit,
   BiTrash,
   BiCheck,
@@ -27,6 +26,7 @@ import {
   BiCopy,
   BiPlus,
   BiTimeFive,
+  BiExpand,
 } from "react-icons/bi";
 import { format } from "date-fns";
 import {
@@ -41,6 +41,7 @@ import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { showNotification } from "@mantine/notifications";
+import { IoSettings } from "react-icons/io5";
 
 dayjs.extend(localizedFormat);
 dayjs.locale("es");
@@ -52,6 +53,8 @@ interface AppointmentCardProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  isExpanded?: (appointment: Appointment) => boolean;
+  handleToggleExpand?: (appointmentId: string) => void;
 }
 
 // Función para calcular el contraste del color
@@ -64,18 +67,18 @@ const getTextColor = (backgroundColor: string): string => {
   return brightness > 128 ? "#000000" : "#FFFFFF";
 };
 
-const getStatusStyles = (status: string) => {
-  switch (status) {
-    case "confirmed":
-      return { backgroundColor: "#d4edda", borderColor: "#28a745" };
-    case "pending":
-      return { backgroundColor: "#fff3cd", borderColor: "#ffc107" };
-    case "cancelled":
-      return { backgroundColor: "#f8d7da", borderColor: "#dc3545" };
-    default:
-      return { backgroundColor: "#f0f4f8", borderColor: "#007bff" };
-  }
-};
+// const getStatusStyles = (status: string) => {
+//   switch (status) {
+//     case "confirmed":
+//       return { backgroundColor: "#d4edda", borderColor: "#2f9e44" };
+//     case "pending":
+//       return { backgroundColor: "#fff3cd", borderColor: "#f08c00" };
+//     case "cancelled":
+//       return { backgroundColor: "#f8d7da", borderColor: "#e03131" };
+//     default:
+//       return { backgroundColor: "#edf2ff", borderColor: "#4c6ef5" };
+//   }
+// };
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
@@ -84,13 +87,18 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  isExpanded,
+  handleToggleExpand,
 }) => {
-  const { borderColor } = getStatusStyles(appointment.status);
+  // const { borderColor } = getStatusStyles(appointment.status);
   const { hasPermission } = usePermissions();
-  const textColor = getTextColor(appointment.employee.color || "#ffffff");
+
+  const employeeColor = appointment.employee.color || "#ffffff";
+  const textColor = getTextColor(employeeColor);
 
   const [modalOpened, setModalOpened] = useState(false);
 
+  // 👇 esto debe seguir funcionando: citas pasadas cambian color
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
 
   const { role } = useSelector((state: RootState) => state.auth);
@@ -118,14 +126,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   const handleSaveChanges = async () => {
     try {
-      // Crea una copia del appointment con los nuevos valores
       const updatedAppointmentData = {
         ...appointment,
         customPrice,
         additionalItems,
       };
 
-      // Llama a la API para actualizar el appointment
       const response = await updateAppointment(
         updatedAppointmentData._id,
         updatedAppointmentData
@@ -140,17 +146,13 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           position: "top-right",
         });
 
-        // Si necesitas actualizar la lista de appointments en la UI:
         const updatedAppointments = appoinments.map((appt) =>
           appt._id === updatedAppointmentData._id
             ? updatedAppointmentData
             : appt
         );
 
-        // Aquí puedes llamar a una función de actualización en el componente padre o en el estado global
-        // Por ejemplo: setAppointments(updatedAppointments);
         setAppointments(updatedAppointments);
-
         setModalOpened(false);
       }
     } catch (error) {
@@ -169,12 +171,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     birthDate: string | number | dayjs.Dayjs | Date | null | undefined
   ): boolean => {
     if (!birthDate) return false;
-
     const today = dayjs();
     const birthDateClient = dayjs(birthDate);
-
     if (!birthDateClient.isValid()) return false;
-
     return (
       birthDateClient.month() === today.month() &&
       birthDateClient.date() === today.date()
@@ -192,7 +191,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           ? `⭐ *Servicio:* ${appt.service.name}\n👤 *Empleado:* ${appt.employee.names}`
           : `⭐ *Servicio:* [Eliminado]\n👤 *Empleado:* ${appt.employee.names}`
       )
-      .join("\n\n"); // Salto de línea adicional entre servicios
+      .join("\n\n");
 
     return `*DETALLES DE LA CITA*
 👩‍🦰 *Cliente:* ${appointment.client.name}
@@ -205,48 +204,41 @@ ${clientServices}`;
   };
 
   const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
+  const isBirthday = getIsBirthday(appointment.client.birthDate);
 
   return (
     <>
-      {/* Modal para mostrar detalles de la cita */}
+      {/* MODAL */}
       <Modal
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
         withCloseButton={false}
         size="lg"
-        title={null}
         centered
+        radius="md"
+        onClick={(e) => e.stopPropagation()}
       >
-        <Flex
-          direction="column"
-          gap="md"
-          // Evita que se cierre el modal si hacen clic en estos hijos
-          onClick={(event) => event.stopPropagation()}
-        >
-          {/* Contenedor principal */}
-          <Tabs defaultValue="details">
-            <Tabs.List>
-              <Tabs.Tab value="details">Detalle de la Cita</Tabs.Tab>
-              <Tabs.Tab value="modify">Modificar Precio y Adicionales</Tabs.Tab>
+        <Flex direction="column" gap="md" onClick={(e) => e.stopPropagation()}>
+          <Tabs defaultValue="details" keepMounted={false}>
+            <Tabs.List mb="sm">
+              <Tabs.Tab value="details">Detalle</Tabs.Tab>
+              <Tabs.Tab value="modify">Precio y adicionales</Tabs.Tab>
               <Tabs.Tab value="invoice">Facturar</Tabs.Tab>
             </Tabs.List>
 
-            {/* Detalle de la cita */}
+            {/* -------- PANEL: Detalle -------- */}
             <Tabs.Panel value="details">
-              <Flex
-                direction="column"
-                gap="md"
-                // Evita que se cierre el modal si hacen clic en estos hijos
-                onClick={(event) => event.stopPropagation()}
-              >
-                {/* Lista de citas del cliente */}
-                <Box mt="lg">
+              <Flex direction="column" gap="md">
+                <Box mt="xs">
+                  <Text fw={600} size="sm" mb={4}>
+                    Historial de citas del cliente
+                  </Text>
                   {appoinments
                     .filter(
                       (appt) => appt.client._id === appointment.client._id
                     )
                     .map((appt, index) => {
-                      const isCurrentAppointment = appt._id === appointment._id; // Resaltar la cita actual
+                      const isCurrentAppointment = appt._id === appointment._id;
                       return (
                         <Flex
                           key={index}
@@ -254,26 +246,27 @@ ${clientServices}`;
                           gap="xs"
                           align="center"
                           py={5}
+                          px={8}
                           style={{
-                            borderBottom: "1px solid #e0e0e0",
-                            backgroundColor: isCurrentAppointment
-                              ? "#d4f5ff"
-                              : "transparent",
-                            padding: isCurrentAppointment ? "5px" : "2px",
-                            borderRadius: isCurrentAppointment ? "4px" : "0",
+                            borderRadius: 6,
                             border: isCurrentAppointment
-                              ? "2px solid #007bff"
-                              : "none",
+                              ? "1px solid #1971c2"
+                              : "1px solid #e0e0e0",
+                            backgroundColor: isCurrentAppointment
+                              ? "#e7f5ff"
+                              : "#f8f9fa",
                           }}
                         >
-                          {appt.service ? (
-                            appt.service.name
-                          ) : (
-                            <Text c="red" fw={700} size="sm">
-                              Sin Servicio
-                            </Text>
-                          )}
-                          <Text size="sm" c="dimmed">
+                          <Text size="sm" fw={500}>
+                            {appt.service ? (
+                              appt.service.name
+                            ) : (
+                              <Text component="span" c="red" fw={700} size="sm">
+                                Sin Servicio
+                              </Text>
+                            )}
+                          </Text>
+                          <Text size="xs" c="dimmed">
                             (Empleado:{" "}
                             {appt.employeeRequestedByClient ? (
                               <strong style={{ color: "purple" }}>
@@ -289,9 +282,11 @@ ${clientServices}`;
                     })}
                 </Box>
 
-                {/* Sección de Horario y detalles */}
                 <Box>
-                  <Flex direction="column" gap="xs">
+                  <Text fw={600} size="sm" mb={4}>
+                    Resumen
+                  </Text>
+                  <Flex direction="column" gap={4}>
                     <Text size="sm">
                       <strong>Horario:</strong>{" "}
                       {dayjs(appointment.startDate).format(
@@ -310,16 +305,12 @@ ${clientServices}`;
                       }).format(appointment.advancePayment)}
                     </Text>
 
-                    {/* <Text size="sm">
-                      <strong>Estado:</strong> {appointment.status}
-                    </Text> */}
-
                     <Text size="sm">
                       <strong>Cliente: </strong> {appointment.client.name}
                     </Text>
 
                     {role === "admin" && (
-                      <Flex align="center">
+                      <Flex align="center" gap={4}>
                         <Text size="sm">
                           <strong>Teléfono:</strong>{" "}
                           {appointment.client.phoneNumber}
@@ -336,13 +327,13 @@ ${clientServices}`;
                               <ActionIcon
                                 color={copied ? "green" : "blue"}
                                 onClick={copy}
-                                size="md"
+                                size="sm"
                                 variant="subtle"
                               >
                                 {copied ? (
-                                  <BiCheckCircle size={16} />
+                                  <BiCheckCircle size={14} />
                                 ) : (
-                                  <BiCopy size={16} />
+                                  <BiCopy size={14} />
                                 )}
                               </ActionIcon>
                             </Tooltip>
@@ -351,7 +342,7 @@ ${clientServices}`;
                       </Flex>
                     )}
 
-                    {getIsBirthday(appointment.client.birthDate) && (
+                    {isBirthday && (
                       <Text size="sm" c="orange">
                         🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
                       </Text>
@@ -361,59 +352,54 @@ ${clientServices}`;
 
                 <Divider />
 
-                <Flex gap="md" align="center">
-                  {/* Botón para copiar texto */}
-                  <Flex direction="column" align="center">
-                    <ActionIcon
-                      color="blue"
-                      size="lg"
-                      variant="filled"
-                      onClick={() =>
-                        navigator.clipboard.writeText(
-                          generateAppointmentDetails(appointment, appoinments)
-                        )
-                      }
-                      style={{
-                        backgroundColor: "#007bff",
-                        color: "#fff",
-                      }}
-                    >
-                      <BiCopy size={16} />
-                    </ActionIcon>
-                    <Text size="xs" mt={4}>
-                      Copiar detalle para WhatsApp
-                    </Text>
-                  </Flex>
-
-                  {/* Botón para enviar por WhatsApp */}
-                  {role === "admin" && (
-                    <Flex direction="column" align="center">
+                <Group gap="lg">
+                  <Flex direction="column" align="center" gap={4}>
+                    <Tooltip label="Copiar detalle de la cita" withArrow>
                       <ActionIcon
-                        color="green"
+                        color="blue"
                         size="lg"
                         variant="filled"
-                        onClick={() => {
-                          window.open(whatsappURL, "_blank");
-                        }}
-                        style={{ backgroundColor: "#25D366", color: "#fff" }}
+                        onClick={() =>
+                          navigator.clipboard.writeText(
+                            generateAppointmentDetails(
+                              appointment,
+                              appoinments
+                            )
+                          )
+                        }
                       >
-                        <FaWhatsapp size={16} />
+                        <BiCopy size={18} />
                       </ActionIcon>
-                      <Text size="xs" mt={4}>
-                        Enviar WhatsApp
-                      </Text>
+                    </Tooltip>
+                    <Text size="xs">Copiar detalle</Text>
+                  </Flex>
+
+                  {role === "admin" && (
+                    <Flex direction="column" align="center" gap={4}>
+                      <Tooltip label="Abrir chat de WhatsApp" withArrow>
+                        <ActionIcon
+                          color="green"
+                          size="lg"
+                          variant="filled"
+                          onClick={() => {
+                            window.open(whatsappURL, "_blank");
+                          }}
+                        >
+                          <FaWhatsapp size={18} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Text size="xs">Enviar WhatsApp</Text>
                     </Flex>
                   )}
-                </Flex>
+                </Group>
 
                 <Divider />
               </Flex>
             </Tabs.Panel>
 
-            {/* Pestaña 2: Modificar precio y adicionales */}
+            {/* -------- PANEL: Modificar precio -------- */}
             <Tabs.Panel value="modify">
-              {/* Precio personalizado */}
-              <Flex direction="column" gap="xs" mt="sm">
+              <Flex direction="column" gap="sm" mt="sm">
                 <NumberInput
                   label="Cambiar precio del servicio"
                   prefix="$ "
@@ -423,17 +409,18 @@ ${clientServices}`;
                 />
               </Flex>
 
-              <Divider />
+              <Divider my="sm" />
 
-              <Flex direction="column" mt="md" gap="xs">
-                <Text>Añadir adicionales</Text>
-                <Flex align="center" gap="xs">
+              <Flex direction="column" gap="xs">
+                <Text fw={500}>Añadir adicionales</Text>
+                <Flex align="flex-end" gap="xs">
                   <TextInput
                     label="Nombre"
                     value={newItem.name}
                     onChange={(e) =>
                       setNewItem({ ...newItem, name: e.target.value })
                     }
+                    style={{ flex: 2 }}
                   />
                   <NumberInput
                     label="Precio"
@@ -446,14 +433,19 @@ ${clientServices}`;
                         price: (value as number) || 0,
                       })
                     }
+                    style={{ flex: 1 }}
                   />
-                  <ActionIcon color="green" onClick={handleAddItem} mt="lg">
-                    <BiPlus size={24} />
+                  <ActionIcon
+                    color="green"
+                    onClick={handleAddItem}
+                    mt="lg"
+                    variant="filled"
+                  >
+                    <BiPlus size={18} />
                   </ActionIcon>
                 </Flex>
               </Flex>
 
-              {/* Elementos adicionales */}
               <Box mt="md">
                 <Text fw={700} mb="sm">
                   Elementos adicionales
@@ -463,6 +455,7 @@ ${clientServices}`;
                   highlightOnHover
                   withTableBorder
                   withColumnBorders
+                  verticalSpacing="xs"
                 >
                   <Table.Thead>
                     <Table.Tr>
@@ -483,11 +476,11 @@ ${clientServices}`;
                             maximumFractionDigits: 0,
                           }).format(item.price)}
                         </Table.Td>
-
                         <Table.Td>
                           <ActionIcon
                             color="red"
                             onClick={() => handleRemoveItem(index)}
+                            variant="subtle"
                           >
                             <BiTrash size={16} />
                           </ActionIcon>
@@ -497,31 +490,32 @@ ${clientServices}`;
                   </Table.Tbody>
                 </Table>
               </Box>
+
               <Button fullWidth my="md" onClick={handleSaveChanges}>
-                Guardar Cambios
+                Guardar cambios
               </Button>
             </Tabs.Panel>
 
-            {/* Pestaña 3: Facturar */}
+            {/* -------- PANEL: Facturar -------- */}
             <Tabs.Panel value="invoice">
               <Flex direction="column" gap="sm" mt="sm">
                 <Text fw={700} size="lg" mb="md">
-                  Resumen de Facturación
+                  Resumen de facturación
                 </Text>
 
-                {/* Filtro de citas del cliente */}
                 <Table.ScrollContainer minWidth={500}>
                   <Table
                     striped
                     highlightOnHover
                     withTableBorder
                     withColumnBorders
+                    verticalSpacing="xs"
                   >
                     <Table.Thead>
                       <Table.Tr>
                         <Table.Th>Servicio</Table.Th>
-                        <Table.Th>Precio Base</Table.Th>
-                        <Table.Th>Precio Usado</Table.Th>
+                        <Table.Th>Precio base</Table.Th>
+                        <Table.Th>Precio usado</Table.Th>
                         <Table.Th>Adicionales</Table.Th>
                         <Table.Th>Total</Table.Th>
                       </Table.Tr>
@@ -544,9 +538,7 @@ ${clientServices}`;
 
                           return (
                             <Table.Tr key={index}>
-                              {/* Servicio */}
                               <Table.Td>
-                                {" "}
                                 {appt.service ? (
                                   appt.service.name
                                 ) : (
@@ -556,7 +548,6 @@ ${clientServices}`;
                                 )}
                               </Table.Td>
 
-                              {/* Precio Base */}
                               <Table.Td>
                                 <Text>
                                   {new Intl.NumberFormat("es-CO", {
@@ -567,13 +558,12 @@ ${clientServices}`;
                                   }).format(appt.totalPrice || 0)}
                                 </Text>
                                 {appt.customPrice && (
-                                  <Text size="xs" color="red">
+                                  <Text size="xs" c="red">
                                     (No se usa para facturar)
                                   </Text>
                                 )}
                               </Table.Td>
 
-                              {/* Precio Usado */}
                               <Table.Td>
                                 <Text fw={700}>
                                   {new Intl.NumberFormat("es-CO", {
@@ -584,13 +574,12 @@ ${clientServices}`;
                                   }).format(usedPrice)}
                                 </Text>
                                 {appt.customPrice && (
-                                  <Text size="xs" color="green">
+                                  <Text size="xs" c="green">
                                     (Precio personalizado)
                                   </Text>
                                 )}
                               </Table.Td>
 
-                              {/* Adicionales */}
                               <Table.Td>
                                 {new Intl.NumberFormat("es-CO", {
                                   style: "currency",
@@ -600,7 +589,6 @@ ${clientServices}`;
                                 }).format(additionalTotal)}
                               </Table.Td>
 
-                              {/* Total */}
                               <Table.Td>
                                 {new Intl.NumberFormat("es-CO", {
                                   style: "currency",
@@ -616,22 +604,21 @@ ${clientServices}`;
                   </Table>
                 </Table.ScrollContainer>
 
-                {/* Total general */}
                 <Flex
                   justify="space-between"
                   align="center"
                   mt="xs"
                   style={{
-                    backgroundColor: "#e8f4fc", // Fondo resaltado
-                    borderRadius: "8px", // Bordes redondeados
-                    padding: "12px 16px", // Espaciado interno
-                    border: "2px solid #007bff", // Borde resaltado
+                    backgroundColor: "#e7f5ff",
+                    borderRadius: 8,
+                    padding: "10px 14px",
+                    border: "1px solid #1971c2",
                   }}
                 >
-                  <Text fw={900} size="xl" color="blue">
-                    Total General:
+                  <Text fw={800} size="sm" c="blue">
+                    Total general:
                   </Text>
-                  <Text fw={900} size="xl" color="green">
+                  <Text fw={900} size="lg" c="green">
                     {new Intl.NumberFormat("es-CO", {
                       style: "currency",
                       currency: "COP",
@@ -661,14 +648,12 @@ ${clientServices}`;
               </Flex>
             </Tabs.Panel>
           </Tabs>
-          {/* Botón para cerrar */}
-          <Group justify="right">
+
+          <Group justify="flex-end">
             <Button
               variant="outline"
-              onClick={(event) => {
-                event.stopPropagation();
-                setModalOpened(false);
-              }}
+              size="sm"
+              onClick={() => setModalOpened(false)}
             >
               Cerrar
             </Button>
@@ -676,91 +661,93 @@ ${clientServices}`;
         </Flex>
       </Modal>
 
-      {/* Card de la cita */}
+      {/* -------- CARD EN LA COLUMNA -------- */}
       <Paper
-        shadow="xs"
-        radius="sm"
+        shadow={isPastAppointment ? "xs" : "sm"}
+        radius="md"
+        withBorder
         style={{
-          backgroundColor: isPastAppointment
-            ? "#ffffff"
-            : appointment.employee.color,
+          backgroundColor: isPastAppointment ? "#ffffff" : employeeColor,
           color: textColor,
-          paddingTop: "10px",
-          paddingLeft: "5PX",
-          borderLeft: `4px solid ${borderColor}`,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          padding: "6px 8px 6px 8px",
           height: "100%",
-          overflow: "visible",
           position: "relative",
           cursor: "pointer",
+          fontSize: 10,
+          border: "1px solid gray"
         }}
         onClick={(e) => {
-          // Para saber si el usuario hizo clic en el ícono
-          const isIconClick = (e.target as HTMLElement).closest(
-            ".ignore-modal"
-          );
+          // clave para que NO se propague al onClick de la columna
+          e.stopPropagation();
+          const isIconClick = (e.target as HTMLElement).closest(".ignore-modal");
           if (!isIconClick) {
             setModalOpened(true);
           }
         }}
       >
+        {/* Badge "solicitado" */}
         {appointment.employeeRequestedByClient && (
           <Badge
             color="violet"
             size="xxs"
-            radius="xxs"
+            radius="sm"
             style={{
               position: "absolute",
-              top: "-1px",
-              right: "0px",
-              fontSize: "8px",
-              boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
+              top: 0,
+              right: 0,
+              fontSize: 7,
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
+              backgroundColor: "rgba(111, 66, 193, 0.9)",
             }}
           >
-            🌟Cita con {appointment.employee.names}
+            Solicitado
           </Badge>
         )}
-        <Text mt="xs" fw={800} style={{ fontSize: "10px" }}>
-          {format(appointment.startDate, "h:mm")}
-          {" - "}
-          {format(appointment.endDate, "h:mm a")}
-        </Text>
 
-        <Text style={{ color: textColor, fontSize: "12px" }}>
-          <Flex gap="xs">
-            {getIsBirthday(appointment.client.birthDate)
-              ? `🎉 ${appointment.client.name} 🎉`
-              : appointment.client.name}
-          </Flex>
-        </Text>
-
-        <Menu position="top-end" withArrow>
+        {/* Menú opciones */}
+        <Menu position="top-start" withArrow>
           <Menu.Target>
             <Tooltip label="Opciones" withArrow>
               <ActionIcon
                 className="ignore-modal"
                 variant="transparent"
                 color="dark"
+                size="xs"
                 style={{
                   position: "absolute",
-                  top: -5,
-                  left: -17,
+                  top: -4,
+                  left: -4,
                   zIndex: 10,
                 }}
               >
-                <BiDotsVertical size={24} />
+                <IoSettings size={10} />
               </ActionIcon>
             </Tooltip>
           </Menu.Target>
           <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
+            {handleToggleExpand && isExpanded && (
+              <Menu.Item
+                leftSection={
+                  isExpanded(appointment) ? (
+                    <BiCheck size={16} />
+                  ) : (
+                    <BiExpand size={16} />
+                  )
+                }
+                onClick={() => handleToggleExpand(appointment._id)}
+              >
+                {isExpanded(appointment) ? "Contraer detalle" : "Ver detalle"}
+              </Menu.Item>
+            )}
             <Menu.Item
               leftSection={<BiEdit size={16} />}
               disabled={!hasPermission("appointments:update")}
               onClick={() => onEditAppointment(appointment)}
             >
-              Editar Cita
+              Editar cita
             </Menu.Item>
             <Menu.Item
               leftSection={<BiTrash size={16} />}
@@ -768,7 +755,7 @@ ${clientServices}`;
               onClick={() => onCancelAppointment(appointment._id)}
               color="red"
             >
-              Cancelar Cita
+              Cancelar cita
             </Menu.Item>
             <Menu.Item
               leftSection={<BiCheck size={16} />}
@@ -776,10 +763,31 @@ ${clientServices}`;
               onClick={() => onConfirmAppointment(appointment._id)}
               color="green"
             >
-              Confirmar Cita Realizada
+              Confirmar realizada
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
+
+        {/* Horario */}
+        <Text fw={700} style={{ fontSize: 10, marginTop: 6}}>
+          {format(appointment.startDate, "h:mm")}
+          {" - "}
+          {format(appointment.endDate, "h:mm a")}
+        </Text>
+
+        {/* Cliente */}
+        <Text
+          style={{
+            color: textColor,
+            fontSize: 10,
+          }}
+        >
+          {isBirthday
+            ? `🎉 ${appointment.client.name} 🎉`
+            : appointment.client.name}
+        </Text>
+
+        {/* Ícono de recordatorio (esquina fija, informativo) */}
         <Tooltip
           label={
             appointment.reminderSent
@@ -790,19 +798,19 @@ ${clientServices}`;
         >
           <ActionIcon
             className="ignore-modal"
-            size="sm"
+            size="xs"
             variant="transparent"
             style={{
               position: "absolute",
-              bottom: "-8px",
-              left: "-11px",
-              pointerEvents: "auto", // para que no abra modal
+              bottom: -2,
+              right: -2, 
+              pointerEvents: "auto",
             }}
           >
             {appointment.reminderSent ? (
-              <BiCheckCircle size={10} color="teal" />
+              <BiCheckCircle size={12} color="teal" />
             ) : (
-              <BiTimeFive size={10} color="gray" />
+              <BiTimeFive size={12} color="gray" />
             )}
           </ActionIcon>
         </Tooltip>
@@ -811,4 +819,4 @@ ${clientServices}`;
   );
 };
 
-export default AppointmentCard;
+export default React.memo(AppointmentCard);

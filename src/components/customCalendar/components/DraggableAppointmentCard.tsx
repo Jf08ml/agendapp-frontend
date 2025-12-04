@@ -3,9 +3,7 @@ import { useDrag } from "react-dnd";
 import { ItemTypes } from "./subcomponents/ItemTypes";
 import AppointmentCard from "./AppointmentCard";
 import { Appointment } from "../../../services/appointmentService";
-import { Paper, Button } from "@mantine/core";
-import { BiExpand } from "react-icons/bi";
-import { MdExpandMore } from "react-icons/md";
+import { Paper } from "@mantine/core";
 
 interface DraggableAppointmentCardProps {
   appointment: Appointment;
@@ -28,14 +26,8 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
   isExpanded,
   handleToggleExpand,
 }) => {
-  // Ref local para acceder al DOM de la tarjeta
   const cardRef = useRef<HTMLDivElement | null>(null);
 
-  /**
-   * useDrag:
-   * - Definimos un item "dinámico": la función `item: (monitor) => ...`
-   *   nos permite calcular offsetY según dónde se inició el drag.
-   */
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.APPOINTMENT,
     item: (monitor) => {
@@ -67,49 +59,30 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
     }),
   }));
 
-  /**
-   * Combinar ref local (cardRef) con la ref de React DnD (drag).
-   * Así podemos acceder al DOM y también hacer draggable la tarjeta.
-   */
   const setRefs = (node: HTMLDivElement | null) => {
-    cardRef.current = node; // nuestro ref
-    drag(node); // ref de React DnD
+    cardRef.current = node;
+    drag(node);
   };
+
+  const expanded = isExpanded(appointment);
 
   return (
     <Paper
       ref={setRefs}
       className="appointment-card"
-      withBorder
+      radius="xs"
+      shadow={expanded ? "sm" : "xs"}
       style={{
         opacity: isDragging ? 0.5 : 1,
         cursor: "move",
         height: "100%",
         position: "relative",
+        overflow: "hidden",
+        backgroundColor: "#ffffff",
+        transition: "box-shadow 120ms ease, transform 120ms ease",
+        transform: expanded ? "translateY(-1px)" : "none",
       }}
     >
-      {/* Botón para expandir */}
-      <Button
-        size="compact-xs"
-        variant="subtle"
-        style={{
-          position: "absolute",
-          top: 0,
-          right: -5,
-          zIndex: 10, // Asegura que esté por encima del contenido
-        }}
-        onClick={(e) => {
-          e.stopPropagation(); // Evita interferencias con el drag and drop
-          handleToggleExpand(appointment._id);
-        }}
-      >
-        {isExpanded(appointment) ? (
-          <MdExpandMore size={16} />
-        ) : (
-          <BiExpand size={16} />
-        )}
-      </Button>
-
       <AppointmentCard
         appointment={appointment}
         setAppointments={setAppointments}
@@ -117,9 +90,11 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}
+        isExpanded={isExpanded}
+        handleToggleExpand={handleToggleExpand}
       />
     </Paper>
   );
 };
 
-export default DraggableAppointmentCard;
+export default React.memo(DraggableAppointmentCard);

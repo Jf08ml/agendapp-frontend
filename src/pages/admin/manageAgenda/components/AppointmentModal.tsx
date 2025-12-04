@@ -13,13 +13,15 @@ import {
   MultiSelectProps,
   Avatar,
   Card,
+  Loader,
 } from "@mantine/core";
+import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
 import TimeSelector from "./TimeSelector";
 import { addMinutes } from "date-fns";
 import { Service } from "../../../../services/serviceService";
 import { Employee } from "../../../../services/employeeService";
-import { Client } from "../../../../services/clientService";
+import { Client, searchClients } from "../../../../services/clientService";
 import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
@@ -54,7 +56,6 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   setNewAppointment,
   services,
   employees,
-  clients,
   // onServiceChange,
   onEmployeeChange,
   onClientChange,
@@ -65,8 +66,36 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
   const auth = useSelector((state: RootState) => state.auth);
+  
+  // 🚀 Estado para búsqueda asíncrona de clientes
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [debouncedSearch] = useDebouncedValue(clientSearchQuery, 300);
+  const [searchedClients, setSearchedClients] = useState<Client[]>([]);
+  const [loadingClients, setLoadingClients] = useState(false);
 
   const today = dayjs();
+  const organization = useSelector((state: RootState) => state.organization.organization);
+  const organizationId = organization?._id;
+
+  // 🚀 Búsqueda asíncrona de clientes con debounce
+  useEffect(() => {
+    if (!organizationId) return;
+    
+    const searchClientsAsync = async () => {
+      setLoadingClients(true);
+      try {
+        const results = await searchClients(organizationId, debouncedSearch, 20);
+        setSearchedClients(results);
+      } catch (error) {
+        console.error("Error buscando clientes:", error);
+        setSearchedClients([]);
+      } finally {
+        setLoadingClients(false);
+      }
+    };
+
+    searchClientsAsync();
+  }, [debouncedSearch, organizationId]);
 
   useEffect(() => {
     if (appointment) {
@@ -78,6 +107,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
       });
+      
+      // Si hay cliente en appointment, agregarlo a la lista de búsqueda
+      if (appointment.client && !searchedClients.find(c => c._id === appointment.client._id)) {
+        setSearchedClients(prev => [appointment.client, ...prev]);
+      }
     }
   }, [appointment, setNewAppointment]);
 
@@ -137,213 +171,553 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       <Modal
         opened={opened}
         onClose={onClose}
-        title={appointment ? "Editar Cita" : "Añadir nueva cita"}
+        title={
+          <Text size="xl" fw={700}>
+            {appointment ? "✏️ Editar Cita" : "📅 Nueva Cita"}
+          </Text>
+        }
         zIndex={300}
         centered
-        size="lg"
+        size="xl"
+        radius="md"
+        overlayProps={{
+          opacity: 0.3,
+          blur: 3,
+        }}
+        styles={{
+          body: {
+            padding: "1.5rem",
+          },
+          header: {
+            borderBottom: "1px solid #e9ecef",
+            paddingBottom: "1rem",
+          },
+        }}
       >
         <Box>
-          {/* Selector de clientes */}
-          <Select
-            label="Cliente"
-            size="md"
-            placeholder="Selecciona un cliente"
-            searchable
-            data={[
-              ...clients.map((client) => {
-                let isBirthday = false;
-                if (client.birthDate) {
-                  const birthDate = dayjs(client.birthDate);
-                  if (birthDate.isValid()) {
-                    isBirthday =
-                      birthDate.month() === today.month() &&
-                      birthDate.date() === today.date();
-                  }
-                }
-
-                return {
-                  value: client._id,
-                  label: isBirthday
-                    ? `🎉 ${client.name} 🎉`
-                    : auth.role === "admin"
-                    ? client.name + " - " + client.phoneNumber
-                    : client.name,
-                  isBirthday,
-                };
-              }),
-              { value: "create-client", label: "+ Crear nuevo cliente" },
-            ]}
-            value={newAppointment.client?._id || ""}
-            onChange={(value) => {
-              if (value === "create-client") {
-                setCreateClientModalOpened(true);
-              } else {
-                onClientChange(value);
-              }
-            }}
-            nothingFoundMessage={
-              <Box p="sm">
-                <Text size="sm" c="dimmed">
-                  No se encontraron clientes
-                </Text>
-                <Button
-                  mt="sm"
-                  fullWidth
-                  size="xs"
-                  onClick={() => setCreateClientModalOpened(true)}
-                >
-                  Crear cliente
-                </Button>
-              </Box>
-            }
-          />
-          {/* Otros Selects */}
-          <Select
-            label="Empleado"
-            size="md"
-            placeholder="Selecciona un empleado"
-            renderOption={renderMultiSelectOption}
-            data={employees.map((employee) => ({
-              value: employee._id,
-              label: employee.names,
-            }))}
-            value={newAppointment.employee?._id || ""}
-            onChange={(value) => onEmployeeChange(value)}
-            searchable
-            required
-          />
-
-          <Checkbox
-            size="sm"
-            my="xs"
-            mb="md"
-            label="Empleado solicitado por el cliente"
-            checked={!!newAppointment.employeeRequestedByClient}
-            onChange={(event) =>
-              setNewAppointment({
-                ...newAppointment,
-                employeeRequestedByClient: event.currentTarget.checked,
-              })
-            }
-          />
-
-          <Checkbox.Group
-            label="Servicios"
-            size="lg"
-            required
-            value={
-              // Array de IDs seleccionados
-              newAppointment.services
-                ? newAppointment.services.map((s) => s._id)
-                : []
-            }
-            onChange={(selectedIds) => {
-              // selectedIds es un array de IDs
-              const selectedServices = services.filter((s) =>
-                selectedIds.includes(s._id)
-              );
-              setNewAppointment((prev) => ({
-                ...prev,
-                services: selectedServices,
-              }));
+          {/* Sección: Cliente y Empleado */}
+          <Box
+            mb="xl"
+            p="md"
+            style={{
+              backgroundColor: "#f8f9fa",
+              borderRadius: 8,
+              border: "1px solid #e9ecef",
             }}
           >
-            {services.map((service) => {
-              const isSelected = newAppointment.services
-                ? newAppointment.services.some((s) => s._id === service._id)
-                : false;
+            <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
+              👤 Cliente y Profesional
+            </Text>
 
-              return (
-                <Card
-                  key={service._id}
-                  shadow={isSelected ? "lg" : "sm"}
-                  padding="xxs"
-                  withBorder
-                  style={{
-                    backgroundColor: isSelected ? "#f0f9ff" : "white",
-                    borderColor: isSelected ? "#3b82f6" : "#e2e8f0",
-                  }}
-                >
-                  <Group>
-                    <Checkbox
+            <Select
+              label="Cliente"
+              size="md"
+              placeholder="Escribe para buscar cliente..."
+              searchable
+              mb="md"
+              styles={{
+                input: {
+                  borderRadius: 8,
+                },
+              }}
+              data={[
+                ...searchedClients.map((client) => {
+                  let isBirthday = false;
+                  if (client.birthDate) {
+                    const birthDate = dayjs(client.birthDate);
+                    if (birthDate.isValid()) {
+                      isBirthday =
+                        birthDate.month() === today.month() &&
+                        birthDate.date() === today.date();
+                    }
+                  }
+
+                  return {
+                    value: client._id,
+                    label: isBirthday
+                      ? `🎉 ${client.name} 🎉`
+                      : auth.role === "admin"
+                      ? client.name + " - " + client.phoneNumber
+                      : client.name,
+                    isBirthday,
+                  };
+                }),
+                { value: "create-client", label: "+ Crear nuevo cliente" },
+              ]}
+              value={newAppointment.client?._id || ""}
+              searchValue={clientSearchQuery}
+              onSearchChange={setClientSearchQuery}
+              onChange={(value) => {
+                if (value === "create-client") {
+                  setCreateClientModalOpened(true);
+                } else {
+                  onClientChange(value);
+                }
+              }}
+              rightSection={loadingClients ? <Loader size="xs" /> : null}
+              nothingFoundMessage={
+                loadingClients ? (
+                  <Box p="sm" style={{ textAlign: "center" }}>
+                    <Loader size="sm" />
+                  </Box>
+                ) : (
+                  <Box p="sm">
+                    <Text size="sm" c="dimmed">
+                      {clientSearchQuery 
+                        ? `No se encontraron clientes con "${clientSearchQuery}"`
+                        : "Escribe para buscar clientes"}
+                    </Text>
+                    <Button
+                      mt="sm"
+                      fullWidth
                       size="xs"
-                      value={service._id}
-                      label={
-                        <div>
-                          <Text size="xs" fw={500}>
+                      onClick={() => setCreateClientModalOpened(true)}
+                    >
+                      Crear cliente
+                    </Button>
+                  </Box>
+                )
+              }
+            />
+
+            <Select
+              label="Empleado"
+              size="md"
+              placeholder="Selecciona un empleado"
+              renderOption={renderMultiSelectOption}
+              data={employees.map((employee) => ({
+                value: employee._id,
+                label: employee.names,
+              }))}
+              value={newAppointment.employee?._id || ""}
+              onChange={(value) => onEmployeeChange(value)}
+              searchable
+              required
+              styles={{
+                input: {
+                  borderRadius: 8,
+                },
+              }}
+            />
+
+            <Checkbox
+              size="sm"
+              mt="sm"
+              label="Empleado solicitado por el cliente"
+              checked={!!newAppointment.employeeRequestedByClient}
+              onChange={(event) =>
+                setNewAppointment({
+                  ...newAppointment,
+                  employeeRequestedByClient: event.currentTarget.checked,
+                })
+              }
+            />
+          </Box>
+
+          {/* Sección: Servicios */}
+          <Box
+            mb="xl"
+            p="md"
+            style={{
+              backgroundColor: "#f8f9fa",
+              borderRadius: 8,
+              border: "1px solid #e9ecef",
+            }}
+          >
+            <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
+              ✨ Servicios
+            </Text>
+
+            <Checkbox.Group
+              size="lg"
+              required
+              value={
+                // Array de IDs seleccionados
+                newAppointment.services
+                  ? newAppointment.services.map((s) => s._id)
+                  : []
+              }
+              onChange={(selectedIds) => {
+                // selectedIds es un array de IDs
+                const selectedServices = services.filter((s) =>
+                  selectedIds.includes(s._id)
+                );
+                setNewAppointment((prev) => ({
+                  ...prev,
+                  services: selectedServices,
+                }));
+              }}
+            >
+              <Box
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {services.map((service) => {
+                  const isSelected = newAppointment.services
+                    ? newAppointment.services.some((s) => s._id === service._id)
+                    : false;
+
+                  return (
+                    <Card
+                      key={service._id}
+                      shadow={isSelected ? "md" : "xs"}
+                      padding="xs"
+                      withBorder
+                      radius="md"
+                      style={{
+                        backgroundColor: isSelected ? "#e7f5ff" : "white",
+                        borderColor: isSelected ? "#228be6" : "#e9ecef",
+                        borderWidth: isSelected ? 2 : 1,
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      <Group gap="xs" wrap="nowrap" align="flex-start">
+                        <Checkbox
+                          size="xs"
+                          value={service._id}
+                          styles={{
+                            input: {
+                              cursor: "pointer",
+                            },
+                          }}
+                          mt={1}
+                        />
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Text size="sm" fw={600} style={{ lineHeight: 1.2 }}>
                             {service.name}
                           </Text>
-                        </div>
-                      }
-                    />
-                  </Group>
-                </Card>
-              );
-            })}
-          </Checkbox.Group>
+                          <Group gap={6} mt={2}>
+                            <Text size="xs" c="dimmed">
+                              ⏱️ {service.duration} min
+                            </Text>
+                            {service.price && (
+                              <Text size="xs" c="dimmed">
+                                💵{" "}
+                                {new Intl.NumberFormat("es-CO", {
+                                  style: "currency",
+                                  currency: "COP",
+                                  minimumFractionDigits: 0,
+                                }).format(service.price)}
+                              </Text>
+                            )}
+                          </Group>
+                        </Box>
+                      </Group>
+                    </Card>
+                  );
+                })}
+              </Box>
+            </Checkbox.Group>
+          </Box>
 
-          {/**Entrada para abono de citas */}
-          <NumberInput
-            label="Monto del Abono"
-            size="md"
-            placeholder="Ingresa el monto del abono"
-            prefix="$ "
-            thousandSeparator
-            min={0}
-            value={newAppointment.advancePayment || 0}
-            onChange={(value) =>
-              setNewAppointment((prev) => ({
-                ...prev,
-                advancePayment: typeof value === "number" ? value : 0,
-              }))
-            }
-            my="sm"
-          />
+          {/* Sección: Fecha y Hora */}
+          <Box
+            mb="xl"
+            p="md"
+            style={{
+              backgroundColor: "#f8f9fa",
+              borderRadius: 8,
+              border: "1px solid #e9ecef",
+            }}
+          >
+            <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
+              🕒 Fecha y Hora
+            </Text>
 
-          {/* Controles para fechas y horas */}
-          <Grid mt="md" gutter="sm">
-            <Grid.Col span={6}>
-              <DateSelector
-                label="Fecha de inicio"
-                value={newAppointment.startDate}
-                onChange={(date) =>
-                  setNewAppointment({ ...newAppointment, startDate: date })
-                }
-              />
-              <TimeSelector
-                label="Hora de inicio"
-                date={newAppointment.startDate}
-                onChange={(date) =>
-                  setNewAppointment({ ...newAppointment, startDate: date })
-                }
-              />
-            </Grid.Col>
+            <Grid gutter="md">
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <Box
+                  p="xs"
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: 8,
+                    border: "1px solid #e9ecef",
+                  }}
+                >
+                  <Text size="xs" fw={600} mb="xs" c="dimmed">
+                    Inicio
+                  </Text>
+                  <DateSelector
+                    label="Fecha"
+                    value={newAppointment.startDate}
+                    onChange={(date) =>
+                      setNewAppointment({ ...newAppointment, startDate: date })
+                    }
+                  />
+                  <TimeSelector
+                    label="Hora"
+                    date={newAppointment.startDate}
+                    onChange={(date) =>
+                      setNewAppointment({ ...newAppointment, startDate: date })
+                    }
+                  />
+                </Box>
+              </Grid.Col>
 
-            <Grid.Col span={6}>
-              <DateSelector
-                label="Fecha de fin"
-                value={newAppointment.endDate}
-                onChange={(date) =>
-                  setNewAppointment({ ...newAppointment, endDate: date })
-                }
-              />
-              <TimeSelector
-                label="Hora de fin"
-                date={newAppointment.endDate}
-                onChange={(date) =>
-                  setNewAppointment({ ...newAppointment, endDate: date })
-                }
-              />
-            </Grid.Col>
-          </Grid>
-          <Group mt="lg" justify="flex-end">
-            <Button variant="default" onClick={onClose}>
+              <Grid.Col span={{ base: 12, sm: 6 }}>
+                <Box
+                  p="xs"
+                  style={{
+                    backgroundColor: "white",
+                    borderRadius: 8,
+                    border: "1px solid #e9ecef",
+                  }}
+                >
+                  <Text size="xs" fw={600} mb="xs" c="dimmed">
+                    Fin
+                  </Text>
+                  <DateSelector
+                    label="Fecha"
+                    value={newAppointment.endDate}
+                    onChange={(date) =>
+                      setNewAppointment({ ...newAppointment, endDate: date })
+                    }
+                  />
+                  <TimeSelector
+                    label="Hora"
+                    date={newAppointment.endDate}
+                    onChange={(date) =>
+                      setNewAppointment({ ...newAppointment, endDate: date })
+                    }
+                  />
+                </Box>
+              </Grid.Col>
+            </Grid>
+          </Box>
+
+          {/* Sección: Pago */}
+          <Box
+            mb="xl"
+            p="md"
+            style={{
+              backgroundColor: "#f8f9fa",
+              borderRadius: 8,
+              border: "1px solid #e9ecef",
+            }}
+          >
+            <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
+              💰 Información de Pago
+            </Text>
+
+            <NumberInput
+              label="Monto del Abono"
+              size="md"
+              placeholder="Ingresa el monto del abono"
+              prefix="$ "
+              thousandSeparator
+              min={0}
+              value={newAppointment.advancePayment || 0}
+              onChange={(value) =>
+                setNewAppointment((prev) => ({
+                  ...prev,
+                  advancePayment: typeof value === "number" ? value : 0,
+                }))
+              }
+              styles={{
+                input: {
+                  borderRadius: 8,
+                },
+              }}
+            />
+
+            {(newAppointment.client || newAppointment.employee || (newAppointment.services && newAppointment.services.length > 0)) && (
+              <Box
+                mt="md"
+                p="md"
+                style={{
+                  backgroundColor: "#e7f5ff",
+                  borderRadius: 8,
+                  border: "1px solid #74c0fc",
+                }}
+              >
+                <Text size="sm" fw={700} mb="sm" c="blue">
+                  📋 Resumen de la Cita
+                </Text>
+
+                {newAppointment.client && (
+                  <Box mb="xs">
+                    <Text size="xs" c="dimmed" mb={2}>
+                      Cliente:
+                    </Text>
+                    <Text size="sm" fw={600}>
+                      {newAppointment.client.name}
+                    </Text>
+                  </Box>
+                )}
+
+                {newAppointment.employee && (
+                  <Box mb="xs">
+                    <Text size="xs" c="dimmed" mb={2}>
+                      Profesional:
+                    </Text>
+                    <Group gap="xs">
+                      <Avatar 
+                        src={newAppointment.employee.profileImage} 
+                        size={24} 
+                        radius="xl" 
+                      />
+                      <Text size="sm" fw={600}>
+                        {newAppointment.employee.names}
+                      </Text>
+                      {newAppointment.employeeRequestedByClient && (
+                        <Text size="xs" c="violet" fw={600}>
+                          (solicitado)
+                        </Text>
+                      )}
+                    </Group>
+                  </Box>
+                )}
+
+                {newAppointment.services && newAppointment.services.length > 0 && (
+                  <>
+                    <Box mb="xs">
+                      <Text size="xs" c="dimmed" mb={4}>
+                        Servicios:
+                      </Text>
+                      {newAppointment.services.map((service, index) => (
+                        <Box
+                          key={service._id}
+                          mb={4}
+                          p={6}
+                          style={{
+                            backgroundColor: "white",
+                            borderRadius: 6,
+                            border: "1px solid #d0ebff",
+                          }}
+                        >
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="sm" fw={500}>
+                              {index + 1}. {service.name}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              ⏱️ {service.duration} min
+                            </Text>
+                          </Group>
+                        </Box>
+                      ))}
+                    </Box>
+
+                    <Box
+                      mt="sm"
+                      pt="sm"
+                      style={{
+                        borderTop: "1px solid #a5d8ff",
+                      }}
+                    >
+                      <Group justify="space-between" mb={4}>
+                        <Text size="sm" c="dimmed">
+                          Total servicios:
+                        </Text>
+                        <Text size="sm" fw={700}>
+                          {new Intl.NumberFormat("es-CO", {
+                            style: "currency",
+                            currency: "COP",
+                            minimumFractionDigits: 0,
+                          }).format(
+                            newAppointment.services.reduce(
+                              (acc, s) => acc + (s.price || 0),
+                              0
+                            )
+                          )}
+                        </Text>
+                      </Group>
+
+                      {typeof newAppointment.advancePayment === "number" &&
+                        newAppointment.advancePayment > 0 && (
+                          <>
+                            <Group justify="space-between" mb={4}>
+                              <Text size="sm" c="dimmed">
+                                Abono:
+                              </Text>
+                              <Text size="sm" fw={600} c="green">
+                                -{" "}
+                                {new Intl.NumberFormat("es-CO", {
+                                  style: "currency",
+                                  currency: "COP",
+                                  minimumFractionDigits: 0,
+                                }).format(newAppointment.advancePayment)}
+                              </Text>
+                            </Group>
+                            <Group justify="space-between">
+                              <Text size="sm" fw={600}>
+                                Pendiente:
+                              </Text>
+                              <Text size="sm" fw={700} c="orange">
+                                {new Intl.NumberFormat("es-CO", {
+                                  style: "currency",
+                                  currency: "COP",
+                                  minimumFractionDigits: 0,
+                                }).format(
+                                  newAppointment.services.reduce(
+                                    (acc, s) => acc + (s.price || 0),
+                                    0
+                                  ) - (newAppointment.advancePayment || 0)
+                                )}
+                              </Text>
+                            </Group>
+                          </>
+                        )}
+                    </Box>
+                  </>
+                )}
+
+                {newAppointment.startDate && newAppointment.endDate && (
+                  <Box
+                    mt="sm"
+                    pt="sm"
+                    style={{
+                      borderTop: "1px solid #a5d8ff",
+                    }}
+                  >
+                    <Text size="xs" c="dimmed" mb={4}>
+                      Horario:
+                    </Text>
+                    <Text size="sm" fw={600}>
+                      {dayjs(newAppointment.startDate).format("DD/MM/YYYY")}
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                      {dayjs(newAppointment.startDate).format("h:mm A")} -{" "}
+                      {dayjs(newAppointment.endDate).format("h:mm A")}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+          {/* Botones de acción */}
+          <Group
+            mt="xl"
+            pt="md"
+            justify="space-between"
+            style={{
+              borderTop: "1px solid #e9ecef",
+            }}
+          >
+            <Button
+              variant="subtle"
+              onClick={onClose}
+              size="xs"
+              radius="md"
+              color="gray"
+            >
               Cancelar
             </Button>
             <Button
               onClick={onSave}
               disabled={creatingAppointment}
               loading={creatingAppointment}
+              size="xs"
+              radius="md"
+              leftSection={appointment ? "✏️" : "➕"}
+              styles={{
+                root: {
+                  minWidth: 160,
+                },
+              }}
             >
               {appointment ? "Actualizar Cita" : "Crear Cita"}
             </Button>
@@ -354,7 +728,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       {/* Modal para crear cliente */}
       <ClientFormModal
         opened={createClientModalOpened}
-        onClose={() => setCreateClientModalOpened(false)}
+        onClose={() => {
+          setCreateClientModalOpened(false);
+          // Recargar búsqueda después de crear cliente
+          if (organizationId) {
+            searchClients(organizationId, clientSearchQuery, 20).then(setSearchedClients);
+          }
+        }}
         fetchClients={fetchClients}
       />
     </>

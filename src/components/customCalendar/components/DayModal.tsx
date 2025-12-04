@@ -1,5 +1,5 @@
-import { FC, useState, useEffect, useMemo } from "react";
-import { Modal, Box, Button, Text } from "@mantine/core";
+import React, { FC, useState, useEffect, useMemo } from "react";
+import { Modal, Box, Button, Paper, Group, Badge, Flex } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, getHours, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -31,7 +31,7 @@ interface DayModalProps {
   onClose: () => void;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
-  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>; 
+  fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
@@ -50,7 +50,7 @@ const DayModal: FC<DayModalProps> = ({
   onCancelAppointment,
   onConfirmAppointment,
   employees,
-  setAppointments
+  setAppointments,
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
@@ -60,9 +60,13 @@ const DayModal: FC<DayModalProps> = ({
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
   const [currentDay, setCurrentDay] = useState<Date>(selectedDay || new Date());
-  const [localDayAppointments, setLocalDayAppointments] = useState<Appointment[] | null>(null);
+  const [localDayAppointments, setLocalDayAppointments] = useState<
+    Appointment[] | null
+  >(null);
   const [fetchingLocalDay, setFetchingLocalDay] = useState(false);
-  const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(null);
+  const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(
+    null
+  );
   const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<string[]>([]);
 
   // Actualizar el día cuando cambian las props
@@ -94,7 +98,9 @@ const DayModal: FC<DayModalProps> = ({
     } else {
       setLocalDayAppointments(null); // usar global
     }
-    return () => { mounted = false };
+    return () => {
+      mounted = false;
+    };
   }, [currentDay, appointmentsFromMonth, fetchAppointmentsForDay]);
 
   // Lo que va a mostrar
@@ -108,7 +114,9 @@ const DayModal: FC<DayModalProps> = ({
 
   const handleToggleEmployeeHidden = (employeeId: string) => {
     setHiddenEmployeeIds((prev) =>
-      prev.includes(employeeId) ? prev.filter((id) => id !== employeeId) : [...prev, employeeId]
+      prev.includes(employeeId)
+        ? prev.filter((id) => id !== employeeId)
+        : [...prev, employeeId]
     );
   };
 
@@ -123,11 +131,15 @@ const DayModal: FC<DayModalProps> = ({
   }, [employees, hiddenEmployeeIds]);
 
   const visibleEmployees = useMemo(() => {
-    return employeesSorted.filter((emp) => !hiddenEmployeeIds.includes(emp._id));
+    return employeesSorted.filter(
+      (emp) => !hiddenEmployeeIds.includes(emp._id)
+    );
   }, [employeesSorted, hiddenEmployeeIds]);
 
   const totalUniqueClients = useMemo(() => {
-    const clientIds = appointments.map((app) => app.client?._id).filter(Boolean);
+    const clientIds = appointments
+      .map((app) => app.client?._id)
+      .filter(Boolean);
     return new Set(clientIds).size;
   }, [appointments]);
 
@@ -140,7 +152,9 @@ const DayModal: FC<DayModalProps> = ({
       : 22;
 
     const earliestAppointment = appointments.length
-      ? Math.min(...appointments.map((app) => getHours(new Date(app.startDate))))
+      ? Math.min(
+          ...appointments.map((app) => getHours(new Date(app.startDate)))
+        )
       : orgStartHour;
 
     const latestAppointment = appointments.length
@@ -165,7 +179,8 @@ const DayModal: FC<DayModalProps> = ({
         now >= new Date(currentDay.setHours(startHour, 0, 0)) &&
         now <= new Date(currentDay.setHours(endHour, 0, 0))
       ) {
-        const totalMinutes = (now.getHours() - startHour) * 60 + now.getMinutes();
+        const totalMinutes =
+          (now.getHours() - startHour) * 60 + now.getMinutes();
         const position = (totalMinutes / 60) * HOUR_HEIGHT;
         setCurrentLinePosition(position);
       } else {
@@ -188,20 +203,21 @@ const DayModal: FC<DayModalProps> = ({
       opened={opened}
       onClose={onClose}
       fullScreen
-      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}
+      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", {
+        locale: es,
+      })}`}
       size="xl"
       styles={{ body: { padding: 0 } }}
     >
       <div
         style={{
           width: "100%",
-          height: "80vh",
+          height: "83vh",
           overflowX: "auto",
           overflowY: "auto",
-          position: "relative"
+          position: "relative",
         }}
         onClick={(event) => event.stopPropagation()}
-        // ...scroll on drag igual...
       >
         {/* Loader traslúcido encima del contenido solo cuando fetch de día */}
         {fetchingLocalDay && (
@@ -213,37 +229,12 @@ const DayModal: FC<DayModalProps> = ({
               background: "rgba(255,255,255,0.6)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             <CustomLoader loadingText="Obteniendo citas del día..." overlay />
           </div>
         )}
-        <Box
-          p="xs"
-          style={{
-            display: "flex",
-            alignItems: isSmallScreen ? "flex-start" : "center",
-            flexDirection: isSmallScreen ? "column" : "row",
-            justifyContent: "space-between",
-            gap: isSmallScreen ? 8 : 0,
-          }}
-        >
-          <Box style={{ display: "flex", gap: 8 }}>
-            <Button size="xs" variant="outline" onClick={goToPreviousDay}>
-              Día anterior
-            </Button>
-            <Button size="xs" variant="outline" onClick={goToNextDay}>
-              Día siguiente
-            </Button>
-          </Box>
-
-          <Text size="sm" mt={isSmallScreen ? 8 : 0}>
-            Total de citas: <strong>{appointments.length}</strong>
-            {"  "}•{"  "}
-            Total de clientes: <strong>{totalUniqueClients}</strong>
-          </Text>
-        </Box>
         <Box
           style={{
             display: "flex",
@@ -335,8 +326,49 @@ const DayModal: FC<DayModalProps> = ({
           </Box>
         </Box>
       </div>
+      <Paper
+        p="xs"
+        radius={0}
+        withBorder
+        style={{
+          borderTop: "1px solid rgba(0,0,0,0.06)",
+          backgroundColor: "white",
+        }}
+      >
+        <Group
+          justify="space-between"
+          align="center"
+          gap="xs"
+          style={{
+            flexDirection: "row",
+            gap: isSmallScreen ? 8 : 2,
+          }}
+        >
+          {/* Navegación de días */}
+          <Group gap={8}>
+            <Button size="xs" variant="subtle" onClick={goToPreviousDay}>
+              Día anterior
+            </Button>
+            <Button size="xs" variant="filled" onClick={goToNextDay}>
+              Día siguiente
+            </Button>
+          </Group>
+
+          {/* Resumen de stats */}
+          <Group gap={8}>
+            <Flex direction={isSmallScreen ? "column" : "row"} gap={8}>
+              <Badge size="sm" radius="xl" variant="light">
+                Citas: {appointments.length}
+              </Badge>
+              <Badge size="sm" radius="xl" variant="outline">
+                Clientes: {totalUniqueClients}
+              </Badge>
+            </Flex>
+          </Group>
+        </Group>
+      </Paper>
     </Modal>
   );
 };
 
-export default DayModal;
+export default React.memo(DayModal);

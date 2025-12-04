@@ -82,57 +82,67 @@ function buildTimeBuckets(
   range: [Date | null, Date | null],
   granularity: "day" | "week" | "month"
 ) {
-  const start =
-    range[0] ? dayjs(range[0]) : dayjs.min(items.map((i) => dayjs(i.startDate)));
-  const end =
-    range[1] ? dayjs(range[1]) : dayjs.max(items.map((i) => dayjs(i.startDate)));
-  if (!start || !end) return [];
+  if (!range[0] || !range[1]) return [];
+  
+  const start = dayjs(range[0]);
+  const end = dayjs(range[1]);
 
-  const cursor =
-    granularity === "day"
-      ? start.startOf("day")
-      : granularity === "week"
-      ? start.startOf("week")
-      : start.startOf("month");
-  const last =
-    granularity === "day"
-      ? end.endOf("day")
-      : granularity === "week"
-      ? end.endOf("week")
-      : end.endOf("month");
+  const buckets: { key: string; ingresos: number; citas: number; timestamp: number }[] = [];
+  const bucketMap = new Map<string, { ingresos: number; citas: number; timestamp: number }>();
 
-  const step =
-    granularity === "day"
-      ? { unit: "day", fmt: "DD/MM" as const }
-      : granularity === "week"
-      ? { unit: "week", fmt: "[Sem] WW" as const }
-      : { unit: "month", fmt: "MMM" as const };
+  // Función para generar la key según granularidad
+  const getKey = (date: dayjs.Dayjs) => {
+    if (granularity === "day") {
+      return date.format("DD/MM");
+    } else if (granularity === "week") {
+      // Usar el inicio de semana como referencia
+      const weekStart = date.startOf("week");
+      return `Sem ${weekStart.format("DD/MM")}`;
+    } else {
+      // Mes: incluir año para evitar colisiones entre años
+      return date.format("MMM YYYY");
+    }
+  };
 
-  const map = new Map<string, { key: string; ingresos: number; citas: number }>();
-
-  // Inicializa buckets en 0
-  for (let c = cursor.clone(); c.isBefore(last) || c.isSame(last); c = c.add(1, step.unit as any)) {
-    const key = c.format(step.fmt);
-    map.set(key, { key, ingresos: 0, citas: 0 });
+  // Inicializar buckets según granularidad
+  if (granularity === "day") {
+    for (let d = start.startOf("day"); d.isBefore(end) || d.isSame(end, "day"); d = d.add(1, "day")) {
+      const key = getKey(d);
+      bucketMap.set(key, { ingresos: 0, citas: 0, timestamp: d.valueOf() });
+    }
+  } else if (granularity === "week") {
+    for (let d = start.startOf("week"); d.isBefore(end.endOf("week")); d = d.add(1, "week")) {
+      const key = getKey(d);
+      bucketMap.set(key, { ingresos: 0, citas: 0, timestamp: d.valueOf() });
+    }
+  } else {
+    // month
+    for (let d = start.startOf("month"); d.isBefore(end) || d.isSame(end, "month"); d = d.add(1, "month")) {
+      const key = getKey(d);
+      bucketMap.set(key, { ingresos: 0, citas: 0, timestamp: d.valueOf() });
+    }
   }
 
-  // Suma datos (TODAS las citas, sin importar estado)
+  // Asignar citas a sus buckets
   items.forEach((a) => {
     const d = dayjs(a.startDate);
-    const key =
-      granularity === "day"
-        ? d.format("DD/MM")
-        : granularity === "week"
-        ? d.startOf("week").format("[Sem] WW")
-        : d.format("MMM");
-
-    const row = map.get(key);
-    if (!row) return;
-    row.citas += 1;
-    row.ingresos += getAppointmentPrice(a, services);
+    const key = getKey(d);
+    
+    const bucket = bucketMap.get(key);
+    if (bucket) {
+      bucket.citas += 1;
+      bucket.ingresos += getAppointmentPrice(a, services);
+    }
   });
 
-  return Array.from(map.values());
+  // Convertir a array y ordenar cronológicamente
+  bucketMap.forEach((value, key) => {
+    buckets.push({ key, ...value });
+  });
+
+  buckets.sort((a, b) => a.timestamp - b.timestamp);
+
+  return buckets.map(({ key, ingresos, citas }) => ({ key, ingresos, citas }));
 }
 
 /* ------------------ HEATMAP simple (día x hora) ------------------ */
@@ -204,6 +214,29 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<"day" | "week" | "month">("day");
 
+  // Ajustar rango cuando cambia granularidad
+  useEffect(() => {
+    if (granularity === "month") {
+      // Últimos 6 meses
+      setRange([
+        dayjs().subtract(5, "month").startOf("month").toDate(),
+        dayjs().endOf("month").toDate(),
+      ]);
+    } else if (granularity === "week") {
+      // Últimas 8 semanas
+      setRange([
+        dayjs().subtract(7, "week").startOf("week").toDate(),
+        dayjs().endOf("week").toDate(),
+      ]);
+    } else {
+      // Mes actual para días
+      setRange([
+        dayjs().startOf("month").toDate(),
+        dayjs().endOf("month").toDate(),
+      ]);
+    }
+  }, [granularity]);
+
   // Carga datos
   useEffect(() => {
     const load = async () => {
@@ -255,16 +288,14 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     });
   }, [appointments, range, employeeId, serviceId]);
 
-  // KPIs (TODAS las citas)
+  // 🎯 KPIs Principales (todas las citas)
   const totalAppts = filtered.length;
   const totalCustomers = new Set(filtered.map((a) => (a.client as any)?._id ?? a.client)).size;
+  
+  // Ingresos totales
   const totalRevenue = filtered.reduce((acc, a) => acc + getAppointmentPrice(a, services), 0);
+  
   const ticketAvg = totalAppts ? totalRevenue / totalAppts : 0;
-  // Mantengo la “tasa de cancelación” informativa sobre el total filtrado
-  const cancelRate =
-    totalAppts === 0
-      ? 0
-      : (filtered.filter((a) => a.status === "cancelled").length / totalAppts) * 100;
 
   // Serie temporal (TODAS las citas)
   const timeSeries = useMemo(
@@ -287,19 +318,75 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     return Array.from(map.values()).sort((a, b) => b.ingresos - a.ingresos);
   }, [filtered, employees, services]);
 
-  // Por servicio (TODAS las citas)
+  // 📊 Por servicio con más métricas
   const byService = useMemo(() => {
-    const map = new Map<string, { svc: ServiceLite; citas: number; ingresos: number }>();
+    const map = new Map<string, { 
+      svc: ServiceLite; 
+      citas: number; 
+      ingresos: number;
+      duracionTotal: number;
+      additionalItems: number;
+    }>();
     filtered.forEach((a) => {
       const svcId = (a.service as any)?._id;
       const svc = services.find((s) => s._id === svcId);
       if (!svc) return;
-      const row = map.get(svc._id) ?? { svc, citas: 0, ingresos: 0 };
+      const row = map.get(svc._id) ?? { 
+        svc, 
+        citas: 0, 
+        ingresos: 0, 
+        duracionTotal: 0,
+        additionalItems: 0
+      };
       row.citas += 1;
-      row.ingresos += getAppointmentPrice(a, services);
+      const precio = getAppointmentPrice(a, services);
+      row.ingresos += precio;
+      row.duracionTotal += svc.duration || 0;
+      row.additionalItems += (a.additionalItems?.length || 0);
       map.set(svc._id, row);
     });
-    return Array.from(map.values()).sort((a, b) => b.citas - a.citas);
+    return Array.from(map.values()).map(r => ({
+      ...r,
+      ingresosPorHora: r.duracionTotal > 0 ? (r.ingresos / (r.duracionTotal / 60)) : 0,
+    })).sort((a, b) => b.citas - a.citas);
+  }, [filtered, services]);
+
+  // 👥 Análisis de clientes
+  const byClient = useMemo(() => {
+    const map = new Map<string, { 
+      clientId: string;
+      clientName: string; 
+      citas: number; 
+      ingresos: number;
+      ultimaCita: Date;
+      servicios: Set<string>;
+    }>();
+    filtered.forEach((a) => {
+      const clientId = (a.client as any)?._id ?? a.client;
+      const clientName = (a.client as any)?.name ?? "Desconocido";
+      const row = map.get(clientId) ?? { 
+        clientId,
+        clientName, 
+        citas: 0, 
+        ingresos: 0,
+        ultimaCita: new Date(a.startDate),
+        servicios: new Set<string>()
+      };
+      row.citas += 1;
+      row.ingresos += getAppointmentPrice(a, services);
+      if (new Date(a.startDate) > row.ultimaCita) {
+        row.ultimaCita = new Date(a.startDate);
+      }
+      row.servicios.add((a.service as any)?._id ?? a.service);
+      map.set(clientId, row);
+    });
+    return Array.from(map.values()).map(r => ({
+      ...r,
+      servicios: r.servicios.size,
+      diasDesdeUltimaCita: dayjs().diff(dayjs(r.ultimaCita), 'day'),
+      esRecurrente: r.citas > 1,
+      ticketPromedio: r.ingresos / r.citas
+    })).sort((a, b) => b.ingresos - a.ingresos);
   }, [filtered, services]);
 
   // Heatmap demanda (día/ hora)
@@ -316,6 +403,64 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     const norm = matrix.map((row) => row.map((v) => v / max));
     return { raw: matrix, norm };
   }, [filtered]);
+
+  // 💡 Insights y recomendaciones automáticas
+  const insights = useMemo(() => {
+    const tips: { icon: string; title: string; message: string; color: string }[] = [];
+    
+    // Clientes en riesgo
+    const clientesEnRiesgo = byClient.filter(c => c.esRecurrente && c.diasDesdeUltimaCita > 60).length;
+    if (clientesEnRiesgo > 0) {
+      tips.push({
+        icon: "📞",
+        title: "Clientes inactivos",
+        message: `${clientesEnRiesgo} clientes recurrentes no visitan hace +60 días. Envía promociones para reactivarlos.`,
+        color: "yellow"
+      });
+    }
+    
+    // Servicios de baja demanda
+    const serviciosBajaDemanda = byService.filter(s => s.citas < 3 && services.length > 5);
+    if (serviciosBajaDemanda.length > 0) {
+      tips.push({
+        icon: "📢",
+        title: "Servicios poco vendidos",
+        message: `${serviciosBajaDemanda.length} servicios tienen baja demanda. Considera paquetes o descuentos especiales.`,
+        color: "blue"
+      });
+    }
+    
+    // Servicios rentables (ingresos/hora)
+    const servicioMasRentable = byService.reduce((prev, curr) => 
+      curr.ingresosPorHora > prev.ingresosPorHora ? curr : prev
+    , byService[0]);
+    if (servicioMasRentable && byService.length > 2) {
+      tips.push({
+        icon: "💎",
+        title: "Servicio estrella",
+        message: `"${servicioMasRentable.svc.name}" genera $${servicioMasRentable.ingresosPorHora.toFixed(0)}/hora. Promociónalo más.`,
+        color: "green"
+      });
+    }
+    
+    // Proyección fin de mes
+    if (range[0] && range[1]) {
+      const dias = dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1;
+      const ingresosDia = totalRevenue / dias;
+      const diasRestantes = dayjs(range[1]).endOf('month').diff(dayjs(), 'day');
+      if (diasRestantes > 0 && dias >= 7) {
+        const proyeccion = totalRevenue + (ingresosDia * diasRestantes);
+        tips.push({
+          icon: "📈",
+          title: "Proyección del mes",
+          message: `Al ritmo actual, terminarás con $${proyeccion.toLocaleString('es-CO')} (${diasRestantes} días restantes).`,
+          color: "teal"
+        });
+      }
+    }
+    
+    return tips;
+  }, [totalAppts, byClient, byService, totalRevenue, services.length, range]);
 
   return (
     <Stack>
@@ -355,24 +500,36 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
               searchable
               nothingFoundMessage="Sin resultados"
             />
-            <SegmentedControl
-              value={granularity}
-              onChange={(v: any) => setGranularity(v)}
-              data={[
-                { label: "Día", value: "day" },
-                { label: "Semana", value: "week" },
-                { label: "Mes", value: "month" },
-              ]}
-              size={isMobile ? "xs" : "sm"}
-            />
+            <div>
+              <SegmentedControl
+                value={granularity}
+                onChange={(v: any) => setGranularity(v)}
+                data={[
+                  { label: "Día", value: "day" },
+                  { label: "Semana", value: "week" },
+                  { label: "Mes", value: "month" },
+                ]}
+                size={isMobile ? "xs" : "sm"}
+              />
+              {granularity === "month" && (
+                <Text size="xs" c="dimmed" mt={4}>
+                  Mostrando últimos 6 meses. Modifica el rango para ver más.
+                </Text>
+              )}
+              {granularity === "week" && (
+                <Text size="xs" c="dimmed" mt={4}>
+                  Mostrando últimas 8 semanas. Modifica el rango para ver más.
+                </Text>
+              )}
+            </div>
           </Group>
         </Stack>
       </Card>
 
-      {/* KPIs */}
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 4, xl: 5 }}>
+      {/* KPIs Principales */}
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
         <KpiCard
-          label="Ingresos"
+          label="💰 Ingresos Totales"
           value={
             <NumberFormatter
               value={totalRevenue}
@@ -381,37 +538,114 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
               prefix="$ "
             />
           }
-          hint="Todas las citas"
+          hint={`${totalAppts} citas en total`}
         />
-        <KpiCard label="Citas" value={<>{totalAppts}</>} />
-        <KpiCard label="Clientes" value={<>{totalCustomers}</>} />
         <KpiCard
-          label="Ticket promedio"
+          label="📊 Total Citas"
+          value={<>{totalAppts}</>}
+          hint={`${totalCustomers} clientes únicos`}
+        />
+        <KpiCard
+          label="👥 Clientes Únicos"
+          value={<>{totalCustomers}</>}
+          hint={`${(totalAppts / (totalCustomers || 1)).toFixed(1)} citas/cliente`}
+        />
+        <KpiCard
+          label="🎯 Ticket Promedio"
           value={
             <NumberFormatter
-              value={ticketAvg || 0}
+              value={ticketAvg}
               thousandSeparator="."
               decimalSeparator=","
               prefix="$ "
+              decimalScale={0}
             />
           }
-          hint="Ingresos / citas"
-        />
-        <KpiCard
-          label="Cancelaciones"
-          value={<Text>{cancelRate.toFixed(1)}%</Text>}
-          hint="Sobre el total filtrado"
+          hint="Por cita"
         />
       </SimpleGrid>
+      
+      {/* KPIs Secundarios */}
+      <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
+        <Paper withBorder p="xs" radius="md">
+          <Group gap={4} align="center" wrap="nowrap">
+            <Text size="xs" c="dimmed">Ingresos/Día:</Text>
+            <Text size="sm" fw={600}>
+              <NumberFormatter
+                value={range[0] && range[1] ? totalRevenue / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1) : 0}
+                thousandSeparator="."
+                decimalSeparator=","
+                prefix="$"
+                decimalScale={0}
+              />
+            </Text>
+          </Group>
+        </Paper>
+        <Paper withBorder p="xs" radius="md">
+          <Group gap={4} align="center" wrap="nowrap">
+            <Text size="xs" c="dimmed">Citas/Día:</Text>
+            <Text size="sm" fw={600}>
+              {range[0] && range[1] ? (totalAppts / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1)).toFixed(1) : 0}
+            </Text>
+          </Group>
+        </Paper>
+        <Paper withBorder p="xs" radius="md">
+          <Group gap={4} align="center" wrap="nowrap">
+            <Text size="xs" c="dimmed">Nuevos Clientes:</Text>
+            <Text size="sm" fw={600}>
+              {byClient.filter(c => !c.esRecurrente).length}
+            </Text>
+          </Group>
+        </Paper>
+        <Paper withBorder p="xs" radius="md">
+          <Group gap={4} align="center" wrap="nowrap">
+            <Text size="xs" c="dimmed">Clientes VIP:</Text>
+            <Text size="sm" fw={600} c="grape">
+              {byClient.filter(c => c.citas >= 5).length}
+            </Text>
+          </Group>
+        </Paper>
+      </SimpleGrid>
+
+      {/* 💡 Insights y Recomendaciones */}
+      {insights.length > 0 && (
+        <Card withBorder radius="md" p="md" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+          <Text fw={700} size="lg" mb="sm" c="white">
+            💡 Insights del Negocio
+          </Text>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
+            {insights.map((insight, idx) => (
+              <Paper key={idx} p="sm" radius="md" withBorder style={{ background: 'rgba(255,255,255,0.95)' }}>
+                <Group gap="xs" align="flex-start" wrap="nowrap">
+                  <Text size="xl">{insight.icon}</Text>
+                  <Stack gap={2} style={{ flex: 1 }}>
+                    <Text fw={600} size="sm" c={insight.color}>
+                      {insight.title}
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.4 }}>
+                      {insight.message}
+                    </Text>
+                  </Stack>
+                </Group>
+              </Paper>
+            ))}
+          </SimpleGrid>
+        </Card>
+      )}
 
       {/* Serie temporal */}
       <Card withBorder radius="md" p="md">
-        <Text fw={700} size="lg" mb="xs">
-          Tendencia: ingresos y citas
-        </Text>
+        <Group justify="space-between" mb="xs">
+          <Text fw={700} size="lg">
+            Tendencia: ingresos y citas
+          </Text>
+          <Badge variant="light" color="blue">
+            {timeSeries.length} puntos
+          </Badge>
+        </Group>
         <Divider mb="sm" />
         <div style={{ width: "100%", height: 300 }}>
-          <ResponsiveContainer>
+          <ResponsiveContainer key={`chart-${granularity}-${range[0]?.getTime()}-${range[1]?.getTime()}`}>
             <LineChart data={timeSeries}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="key" />
@@ -442,32 +676,124 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
         </div>
       </Card>
 
+      {/* 🏆 Top Clientes VIP */}
+      <Card withBorder radius="md" p="md">
+        <Group justify="space-between" mb="xs">
+          <Text fw={700} size="lg">
+            🏆 Top Clientes
+          </Text>
+          <Badge size="lg" variant="light" color="grape">
+            {byClient.filter(c => c.esRecurrente).length} recurrentes
+          </Badge>
+        </Group>
+        <Divider mb="sm" />
+        <ScrollArea h={280}>
+          <Stack gap="xs">
+            {byClient.slice(0, 10).map((client, idx) => (
+              <Paper key={client.clientId} withBorder p="sm" radius="md">
+                <Group justify="space-between" wrap="nowrap">
+                  <Group gap="sm">
+                    <Avatar size="md" radius="xl" color="grape">
+                      {idx + 1}
+                    </Avatar>
+                    <Stack gap={0}>
+                      <Text fw={600} size="sm">{client.clientName}</Text>
+                      <Group gap="xs">
+                        <Text size="xs" c="dimmed">{client.citas} citas</Text>
+                        <Text size="xs" c="dimmed">•</Text>
+                        <Text size="xs" c="dimmed">{client.servicios} servicios</Text>
+                        {client.esRecurrente && (
+                          <>
+                            <Text size="xs" c="dimmed">•</Text>
+                            <Badge size="xs" variant="light" color="green">Recurrente</Badge>
+                          </>
+                        )}
+                        {client.diasDesdeUltimaCita > 60 && (
+                          <>
+                            <Text size="xs" c="dimmed">•</Text>
+                            <Badge size="xs" variant="light" color="orange">⚠️ {client.diasDesdeUltimaCita}d sin visitar</Badge>
+                          </>
+                        )}
+                      </Group>
+                    </Stack>
+                  </Group>
+                  <Stack gap={0} align="flex-end">
+                    <NumberFormatter
+                      value={client.ingresos}
+                      thousandSeparator="."
+                      decimalSeparator=","
+                      prefix="$"
+                      decimalScale={0}
+                      style={{ fontWeight: 600, fontSize: '0.9rem' }}
+                    />
+                    <Text size="xs" c="dimmed">
+                      Prom: <NumberFormatter value={client.ticketPromedio} thousandSeparator="." decimalSeparator="," prefix="$" decimalScale={0} />
+                    </Text>
+                  </Stack>
+                </Group>
+              </Paper>
+            ))}
+            {byClient.length === 0 && (
+              <Text c="dimmed" ta="center" py="xl">
+                No hay datos de clientes
+              </Text>
+            )}
+          </Stack>
+        </ScrollArea>
+      </Card>
+
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         {/* Servicios más vendidos */}
         <Card withBorder radius="md" p="md">
           <Text fw={700} size="lg" mb="xs">
-            Servicios más vendidos
+            📊 Análisis de Servicios
           </Text>
           <Divider mb="sm" />
-          <div style={{ width: "100%", height: 320 }}>
-            <ResponsiveContainer>
-              <BarChart
-                data={byService.map((r) => ({
-                  name: r.svc.name,
-                  citas: r.citas,
-                  ingresos: r.ingresos,
-                }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RTooltip />
-                <Legend />
-                <Bar dataKey="citas" name="Citas" fill="#0ea5e9" />
-                <Bar dataKey="ingresos" name="Ingresos" fill="#22c55e" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ScrollArea h={400}>
+            <Stack gap="sm">
+              {byService.map((row, idx) => (
+                <Paper key={row.svc._id} withBorder p="sm" radius="md">
+                  <Stack gap="xs">
+                    <Group justify="space-between" wrap="nowrap">
+                      <Group gap="sm">
+                        <Badge size="lg" variant="light" color="blue">{idx + 1}</Badge>
+                        <Stack gap={0}>
+                          <Text fw={600} size="sm">{row.svc.name}</Text>
+                          <Text size="xs" c="dimmed">
+                            {row.svc.duration}min • ${row.svc.price?.toLocaleString('es-CO')}
+                          </Text>
+                        </Stack>
+                      </Group>
+                      <Stack gap={0} align="flex-end">
+                        <NumberFormatter
+                          value={row.ingresos}
+                          thousandSeparator="."
+                          decimalSeparator=","
+                          prefix="$"
+                          decimalScale={0}
+                          style={{ fontWeight: 600 }}
+                        />
+                        <Text size="xs" c="dimmed">{row.citas} citas</Text>
+                      </Stack>
+                    </Group>
+                    <Group gap="xs" wrap="wrap">
+                      <Badge size="sm" variant="light" color="green">
+                        ${row.ingresosPorHora.toFixed(0)}/hora
+                      </Badge>
+                      <Badge size="sm" variant="light" color="blue">
+                        {row.duracionTotal} min totales
+                      </Badge>
+                      {row.additionalItems > 0 && (
+                        <Badge size="sm" variant="light" color="grape">
+                          +{row.additionalItems} add-ons
+                        </Badge>
+                      )}
+                    </Group>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+          </ScrollArea>
         </Card>
 
         {/* Heatmap día x hora */}

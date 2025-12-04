@@ -1,5 +1,6 @@
 import { FC } from "react";
 import { Box } from "@mantine/core";
+import { addMinutes } from "date-fns";
 import { HOUR_HEIGHT } from "../DayModal";
 
 interface TimeGridProps {
@@ -15,6 +16,10 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
   onOpenModal,
   selectedDay,
 }) => {
+  const marks = [0, 15, 30, 45];
+
+  const canCreate = hasPermission("appointments:create");
+
   return (
     <Box
       style={{
@@ -26,44 +31,45 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
         zIndex: 0,
       }}
     >
-      {timeIntervals.map((interval, index) => (
-        <Box
-          key={index}
-          style={{
-            position: "absolute",
-            top: `${index * HOUR_HEIGHT}px`,
-            left: 0,
-            right: 0,
-          }}
-        >
-          {/* Línea sólida para la hora principal */}
-          <Box
-            style={{
-              borderTop: "1px solid #e0e0e0",
-              height: `${HOUR_HEIGHT / 4}px`,
-            }}
-            onClick={() =>
-              hasPermission("appointments:create") &&
-              onOpenModal(selectedDay, interval)
-            }
-          />
+      {timeIntervals.map((interval, hourIndex) =>
+        marks.map((minutes, markIndex) => {
+          const isMainHour = minutes === 0;
+          const segmentHeight = HOUR_HEIGHT / marks.length;
+          const top =
+            hourIndex * HOUR_HEIGHT + segmentHeight * markIndex;
 
-          {/* Líneas punteadas para las mini-marcaciones */}
-          {[15, 30, 45].map((_, miniIndex) => (
+          const handleClick = () => {
+            if (!canCreate) return;
+            const date = addMinutes(interval, minutes);
+            onOpenModal(selectedDay, date);
+          };
+
+          return (
             <Box
-              key={miniIndex}
+              key={`${hourIndex}-${minutes}`}
               style={{
-                borderTop: "1px dashed rgb(171, 171, 173)",
-                height: `${HOUR_HEIGHT / 4}px`,
+                position: "absolute",
+                top,
+                left: 0,
+                right: 0,
+                height: segmentHeight,
+                cursor: canCreate ? "pointer" : "default",
               }}
-              onClick={() =>
-                hasPermission("appointments:create") &&
-                onOpenModal(selectedDay, interval)
-              }
-            />
-          ))}
-        </Box>
-      ))}
+              onClick={handleClick}
+            >
+              {/* Línea guía (hora o 15/30/45) */}
+              <Box
+                style={{
+                  borderTop: isMainHour
+                    ? "1px solid #e0e0e0"
+                    : "1px dashed rgb(171, 171, 173)",
+                  height: 0,
+                }}
+              />
+            </Box>
+          );
+        })
+      )}
     </Box>
   );
 };

@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { Container } from "@mantine/core";
+import React, { useState, useCallback, useMemo } from "react";
 import { Appointment } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
 import DayModal from "./components/DayModal";
@@ -41,30 +40,30 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
 
   // Decide si filtrar localmente o pedir por día
-  const handleNavigation = (direction: "prev" | "next") => {
+  const handleNavigation = useCallback((direction: "prev" | "next") => {
     const adjustDate = direction === "prev" ? subMonths : addMonths;
     const newDate = adjustDate(currentDate, 1);
     setCurrentDate(newDate);
     fetchAppointmentsForMonth(newDate);
-  };
+  }, [currentDate, setCurrentDate, fetchAppointmentsForMonth]);
 
-  const handleDayClick = (day: Date) => {
+  const handleDayClick = useCallback((day: Date) => {
     setSelectedDay(day);
     setModalOpened(true);
     // Si no, solo filtras local
-  };
+  }, []);
 
-  const getAppointmentsForDay = (day: Date) => {
+  const getAppointmentsForDay = useCallback((day: Date) => {
     return appointments
       .filter((event) => isSameDay(new Date(event.startDate), day))
       .sort(
         (a, b) =>
           new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
       );
-  };
+  }, [appointments]);
 
   return (
-    <Container size="lg" mt="xl">
+    <div style={{ maxWidth: "960px", margin: "0 auto", marginTop: "1rem" }}>
      <MonthView
         currentDate={currentDate}
         isMobile={isMobile}
@@ -72,13 +71,13 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         getAppointmentsForDay={getAppointmentsForDay}
         loadingMonth={loadingMonth}
         holidayConfig={{ country: "CO", language: "es" }}
-        onPrevMonth={() => handleNavigation("prev")}
-        onNextMonth={() => handleNavigation("next")}
-        onToday={() => {
-          const today = new Date();
-          setCurrentDate(today);
-          fetchAppointmentsForMonth(today);
-        }}
+        onPrevMonth={useCallback(() => handleNavigation("prev"), [handleNavigation])}
+        onNextMonth={useCallback(() => handleNavigation("next"), [handleNavigation])}
+        // onToday={() => {
+        //   const today = new Date();
+        //   setCurrentDate(today);
+        //   fetchAppointmentsForMonth(today);
+        // }}
       />
 
       {/* <Group justify="center" my="md">
@@ -112,8 +111,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         setAppointments={setAppointments}
         fetchAppointmentsForDay={fetchAppointmentsForDay}
       />
-    </Container>
+    </div>
   );
 };
 
-export default CustomCalendar;
+export default React.memo(CustomCalendar);

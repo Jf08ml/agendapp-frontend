@@ -83,9 +83,9 @@ export default function Header({ organization }: Props) {
             >
               {/* Truncado elegante del nombre */}
               {name ? (
-                <Text inherit >
+                <span style={{ color: 'inherit' }}>
                   {name}
-                </Text>
+                </span>
               ) : (
                 <Skeleton width={160} height={20} radius="sm" />
               )}

@@ -118,6 +118,7 @@ export default function AppWithBranding() {
 
     // Tamaños opcionales (conserva si te sirven)
     fontSizes: {
+      xxxs: "8px",
       xxs: "10px",
       xs: "12px",
       sm: "14px",

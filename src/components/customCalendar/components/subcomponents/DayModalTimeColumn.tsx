@@ -8,6 +8,8 @@ interface TimeColumnProps {
 }
 
 const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals }) => {
+  const marks = [0, 15, 30, 45];
+
   return (
     <Box
       style={{
@@ -25,57 +27,53 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals }) => {
           key={index}
           style={{
             height: `${HOUR_HEIGHT}px`,
-            position: "relative", // Permite posicionar los textos relativos a cada línea
+            position: "relative",
           }}
         >
-          {/* Hora principal */}
-          <Text
-            style={{
-              position: "absolute",
-              top: "-8px", // Justo encima de la línea
-              left: "4px",
-              fontSize: "10px",
-              backgroundColor: "#fff", // Fondo blanco para claridad
-              padding: "0 4px",
-            }}
-          >
-            {format(interval, "h:mm a")}
-          </Text>
+          {marks.map((minutes, idx) => {
+            const isMainHour = minutes === 0;
+            const top = (HOUR_HEIGHT * idx) / marks.length;
 
-          {/* Línea sólida para la hora principal */}
-          <Box
-            style={{
-              borderTop: "1px solid #ccc",
-              height: `${HOUR_HEIGHT / 4}px`,
-            }}
-          />
+            const date = addMinutes(interval, minutes);
 
-          {/* Mini-marcaciones para cada 15 minutos */}
-          {[15, 30, 45].map((minutes) => (
-            <Box
-              key={minutes}
-              style={{
-                height: `${HOUR_HEIGHT / 4}px`,
-                position: "relative", 
-                borderTop: "1px dashed rgb(171, 171, 173)",
-              }}
-            >
-              {/* Texto de la mini-marcación */}
-              <Text
+            return (
+              <Box
+                key={minutes}
                 style={{
                   position: "absolute",
-                  top: "-8px", // Texto encima de la línea
-                  left: "4px",
-                  fontSize: "10px",
-                  backgroundColor: "#fff",
-                  padding: "0 4px",
+                  top: `${top}px`,
+                  left: 0,
+                  right: 0,
+                  height: 0,
                 }}
-                c="dimmed"
               >
-                {format(addMinutes(interval, minutes), "h:mm a")}
-              </Text>
-            </Box>
-          ))}
+                {/* Línea de la marca */}
+                <Box
+                  style={{
+                    borderTop: isMainHour
+                      ? "1px solid #ccc"
+                      : "1px dashed rgb(171, 171, 173)",
+                  }}
+                />
+
+                {/* Texto pegado a esa misma línea */}
+                <Text
+                  c={isMainHour ? "dark" : "dimmed"}
+                  style={{
+                    position: "absolute",
+                    top: -8,
+                    left: 4,
+                    fontSize: isMainHour ? 10 : 9,
+                    backgroundColor: "#fff",
+                    padding: "0 4px",
+                    borderRadius: 999,
+                  }}
+                >
+                  {format(date, "h:mm a")}
+                </Text>
+              </Box>
+            );
+          })}
         </Box>
       ))}
     </Box>

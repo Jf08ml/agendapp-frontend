@@ -49,6 +49,26 @@ export const getClientsByOrganizationId = async (
     );
     return response.data.data;
   } catch (error) {
+    handleAxiosError(error, "Error al obtener los clientes");
+    return [];
+  }
+};
+
+// 🚀 Búsqueda optimizada de clientes con filtros
+export const searchClients = async (
+  organizationId: string,
+  searchQuery: string = "",
+  limit: number = 20
+): Promise<Client[]> => {
+  try {
+    const response = await apiClient.get<Response<Client[]>>(
+      `/organization/${organizationId}/search`,
+      {
+        params: { search: searchQuery, limit }
+      }
+    );
+    return response.data.data;
+  } catch (error) {
     handleAxiosError(error, "Error al obtener los clientes por organización");
     return [];
   }
