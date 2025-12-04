@@ -25,8 +25,6 @@ import { useMediaQuery } from "@mantine/hooks";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,

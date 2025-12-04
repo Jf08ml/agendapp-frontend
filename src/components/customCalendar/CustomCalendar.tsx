@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import { Appointment } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
 import DayModal from "./components/DayModal";
