@@ -85,17 +85,32 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       setLoadingClients(true);
       try {
         const results = await searchClients(organizationId, debouncedSearch, 20);
-        setSearchedClients(results);
+        
+        // Si hay un cliente seleccionado, asegurarse de que esté en la lista
+        if (
+          newAppointment.client &&
+          typeof newAppointment.client._id !== "undefined" &&
+          !results.find(c => c._id === newAppointment.client!._id)
+        ) {
+          setSearchedClients([newAppointment.client, ...results]);
+        } else {
+          setSearchedClients(results);
+        }
       } catch (error) {
         console.error("Error buscando clientes:", error);
-        setSearchedClients([]);
+        // Si hay error pero existe cliente seleccionado, mantenerlo
+        if (newAppointment.client) {
+          setSearchedClients([newAppointment.client]);
+        } else {
+          setSearchedClients([]);
+        }
       } finally {
         setLoadingClients(false);
       }
     };
 
     searchClientsAsync();
-  }, [debouncedSearch, organizationId]);
+  }, [debouncedSearch, organizationId, newAppointment.client]);
 
   useEffect(() => {
     if (appointment) {
@@ -252,7 +267,12 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   setCreateClientModalOpened(true);
                 } else {
                   onClientChange(value);
+                  setClientSearchQuery(""); // Limpiar búsqueda después de seleccionar
                 }
+              }}
+              onBlur={() => {
+                // No limpiar el searchQuery en blur, solo cuando se selecciona
+                // Esto evita que se borre mientras el usuario escribe
               }}
               rightSection={loadingClients ? <Loader size="xs" /> : null}
               nothingFoundMessage={
