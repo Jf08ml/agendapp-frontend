@@ -190,18 +190,24 @@ export default function OrganizationInfo() {
 
   const handleSave = async () => {
     if (!organizationId) return;
-    const res = form.validate();
-    if (res.hasErrors) {
+    
+    // Validar usando Zod directamente para evitar problemas con zodResolver
+    const validationResult = schema.safeParse(form.values);
+    
+    if (!validationResult.success) {
+      const errors = validationResult.error.flatten();
+      console.error("Errores de validación:", errors);
       showNotification({
         title: "Revisa los campos",
-        message: "Hay errores de validación",
+        message: Object.values(errors.fieldErrors).flat()[0] as string || "Hay errores de validación",
         color: "red",
       });
       return;
     }
+    
     try {
       setSaving(true);
-      const payload = form.values as any as Organization;
+      const payload = validationResult.data as Organization;
       const updated = await updateOrganization(organizationId, payload);
       if (!updated) throw new Error("Actualización vacía");
 

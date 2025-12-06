@@ -11,10 +11,37 @@ const hhmm = z
 // Acepta HH:mm o vacío "" para campos opcionales del form
 const hhmmOrEmpty = z.union([hhmm, z.literal("")]);
 
+// Helper para URLs opcionales: acepta URL válida, string vacío, undefined o null
+const optionalUrl = z
+  .union([
+    z.string().url(),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional();
+
+// Helper para strings opcionales que aceptan vacío, null o undefined  
+const optionalString = z
+  .union([
+    z.string(),
+    z.literal(""),
+    z.null(),
+    z.undefined(),
+  ])
+  .optional();
+
 export const schema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
-  email: z.string().email("Correo inválido").optional().or(z.literal("")),
-  phoneNumber: z.string().optional(),
+  email: z
+    .union([
+      z.string().email("Correo inválido"),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional(),
+  phoneNumber: optionalString,
 
   openingHours: z
     .object({
@@ -56,33 +83,33 @@ export const schema = z.object({
     )
     .optional(),
 
-  facebookUrl: z.string().url("URL inválida").optional().or(z.literal("")),
-  instagramUrl: z.string().url("URL inválida").optional().or(z.literal("")),
-  whatsappUrl: z.string().url("URL inválida").optional().or(z.literal("")),
-  tiktokUrl: z.string().url("URL inválida").optional().or(z.literal("")),
-  address: z.string().optional(),
+  facebookUrl: optionalUrl,
+  instagramUrl: optionalUrl,
+  whatsappUrl: optionalUrl,
+  tiktokUrl: optionalUrl,
+  address: optionalString,
   location: z
     .object({ lat: z.number(), lng: z.number() })
     .nullable()
     .optional(),
 
-  referredCount: z.number().min(0).optional(),
-  referredReward: z.string().optional(),
-  serviceCount: z.number().min(0).optional(),
-  serviceReward: z.string().optional(),
+  referredCount: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
+  referredReward: optionalString,
+  serviceCount: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
+  serviceReward: optionalString,
 
   branding: z
     .object({
-      logoUrl: z.string().url().optional(),
-      faviconUrl: z.string().url().optional(),
-      pwaIcon: z.string().url().optional(),
-      primaryColor: z.string().optional(),
-      secondaryColor: z.string().optional(),
-      themeColor: z.string().optional(),
-      footerTextColor: z.string().optional(),
-      pwaName: z.string().optional(),
-      pwaShortName: z.string().optional(),
-      pwaDescription: z.string().optional(),
+      logoUrl: optionalUrl,
+      faviconUrl: optionalUrl,
+      pwaIcon: optionalUrl,
+      primaryColor: optionalString,
+      secondaryColor: optionalString,
+      themeColor: optionalString,
+      footerTextColor: optionalString,
+      pwaName: optionalString,
+      pwaShortName: optionalString,
+      pwaDescription: optionalString,
     })
     .optional(),
 });

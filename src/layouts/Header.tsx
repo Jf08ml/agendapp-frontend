@@ -70,7 +70,7 @@ export default function Header({ organization }: Props) {
         {/* Izquierda: Branding + notificaciones (si autenticado) */}
         <Group gap="sm" wrap="nowrap">
           <Text
-            size="xl"
+            size="lg"
             fw={900}
             style={{ textShadow: "0 1px 2px rgba(0,0,0,.35)" }}
           >
@@ -79,7 +79,7 @@ export default function Header({ organization }: Props) {
               to="/"
               underline="never"
               c="white"
-              style={{ display: "inline-block", maxWidth: rem(240) }}
+              style={{ display: "inline-block", maxWidth: rem(280) }}
             >
               {/* Truncado elegante del nombre */}
               {name ? (
