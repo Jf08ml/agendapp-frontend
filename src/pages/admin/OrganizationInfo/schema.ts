@@ -97,6 +97,7 @@ export const schema = z.object({
   referredReward: optionalString,
   serviceCount: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
   serviceReward: optionalString,
+  showLoyaltyProgram: z.boolean().optional(),
 
   branding: z
     .object({

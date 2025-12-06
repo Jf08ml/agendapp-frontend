@@ -54,6 +54,7 @@ export interface Organization {
   branding?: Branding;
   domains?: string[];
   reservationPolicy?: ReservationPolicy;
+  showLoyaltyProgram?: boolean;
 }
 
 // Crear una nueva organización

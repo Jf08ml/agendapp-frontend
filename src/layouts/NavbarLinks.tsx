@@ -82,7 +82,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Plan de fidelidad",
           to: "/search-client",
           icon: <FaIdeal size={18} />,
-          canShow: true,
+          canShow: organization?.showLoyaltyProgram ?? true,
         },
         {
           label: "Reserva en línea",

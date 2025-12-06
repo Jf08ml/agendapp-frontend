@@ -12,6 +12,8 @@ import {
   Center,
   Anchor,
 } from "@mantine/core";
+import { useSelector } from "react-redux";
+import { RootState } from "../app/store";
 import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
@@ -78,8 +80,11 @@ function FeatureCard({
 export default function Home() {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
 
-  const features = [
+  const allFeatures = [
     {
       title: "Reserva en línea",
       icon: <BiCalendar size={28} color={primary} />,
@@ -94,6 +99,7 @@ export default function Home() {
       title: "Plan de fidelidad",
       icon: <FaIdeal size={28} color={primary} />,
       link: "/search-client",
+      show: organization?.showLoyaltyProgram ?? true,
     },
     {
       title: "Ubicación",
@@ -101,6 +107,8 @@ export default function Home() {
       link: "/location",
     },
   ];
+
+  const features = allFeatures.filter((f) => f.show !== false);
 
   return (
     <Container size="sm" py="xl">

@@ -74,6 +74,7 @@ export default function OrganizationInfo() {
             ...response,
             branding: ensureBranding(response.branding),
             domains: ensureArray(response.domains, []),
+            showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             openingHours: {
               start: response.openingHours?.start ?? "",
               end: response.openingHours?.end ?? "",

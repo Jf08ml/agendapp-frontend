@@ -32,9 +32,11 @@ export default function Header({ organization }: Props) {
   const navLinks = useMemo(
     () => [
       { label: "Nuestros Servicios", to: "/servicios-precios" },
-      { label: "Plan de fidelidad", to: "/" },
+      ...(organization?.showLoyaltyProgram !== false
+        ? [{ label: "Plan de fidelidad", to: "/search-client" }]
+        : []),
     ],
-    []
+    [organization?.showLoyaltyProgram]
   );
 
   // Redes (se renderizan dinámicamente según existan URLs)

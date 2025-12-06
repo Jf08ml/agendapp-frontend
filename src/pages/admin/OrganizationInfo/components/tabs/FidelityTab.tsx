@@ -1,4 +1,4 @@
-import { NumberInput, SimpleGrid, TextInput } from "@mantine/core";
+import { NumberInput, SimpleGrid, TextInput, Switch, Stack } from "@mantine/core";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -15,6 +15,13 @@ export default function FidelityTab({
       title="Programa de fidelidad"
       description="Configura metas y recompensas para referidos y servicios."
     >
+      <Stack gap="md">
+      <Switch
+        label="Mostrar programa de fidelidad"
+        description="Activa esta opción para mostrar el programa de fidelidad en la navegación del cliente"
+        {...form.getInputProps("showLoyaltyProgram", { type: "checkbox" })}
+        disabled={!isEditing}
+      />
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
         <NumberInput
           label="N.º de referidos"
@@ -39,6 +46,7 @@ export default function FidelityTab({
           disabled={!isEditing}
         />
       </SimpleGrid>
+      </Stack>
     </SectionCard>
   );
 }
