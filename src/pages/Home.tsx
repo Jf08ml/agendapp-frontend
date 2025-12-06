@@ -86,7 +86,7 @@ export default function Home() {
       link: "/online-reservation",
     },
     {
-      title: "Servicios y precios",
+      title: "Nuestros Servicios",
       icon: <GiPriceTag size={28} color={primary} />,
       link: "/servicios-precios",
     },

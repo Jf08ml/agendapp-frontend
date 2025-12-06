@@ -143,9 +143,11 @@ const ServiceDetailModal = ({
 
         <Group justify="space-between" wrap="wrap">
           <Group gap="xs">
-            <Badge size="lg" variant="dot" color={primary}>
-              {formatCOP(service.price)}
-            </Badge>
+            {!service.hidePrice && (
+              <Badge size="lg" variant="dot" color={primary}>
+                {formatCOP(service.price)}
+              </Badge>
+            )}
 
             {/* Usa `duration` (tu campo real) */}
             {typeof (service as any).duration === "number" && (
@@ -271,9 +273,11 @@ function CardsView({
               >
                 {name}
               </Text>
-              <Badge variant="light" color={primary} size="lg">
-                {price}
-              </Badge>
+              {!s.hidePrice && (
+                <Badge variant="light" color={primary} size="lg">
+                  {price}
+                </Badge>
+              )}
             </Flex>
           </Card>
         );
@@ -422,9 +426,11 @@ function PriceListView({
                           >
                             <BiInfoCircle size={16} />
                           </ActionIcon>
-                          <Badge variant="light" color={primary} size="sm">
-                            {formatCOP(s.price)}
-                          </Badge>
+                          {!s.hidePrice && (
+                            <Badge variant="light" color={primary} size="sm">
+                              {formatCOP(s.price)}
+                            </Badge>
+                          )}
                           {typeof (s as any).duration === "number" && (
                             <Badge
                               variant="light"
@@ -477,9 +483,11 @@ function PriceListView({
                           </Text>
                         </Table.Td>
                         <Table.Td width="20%">
-                          <Badge size="lg" variant="dot" color={primary}>
-                            {formatCOP(s.price)}
-                          </Badge>
+                          {!s.hidePrice && (
+                            <Badge size="lg" variant="dot" color={primary}>
+                              {formatCOP(s.price)}
+                            </Badge>
+                          )}
                         </Table.Td>
                         <Table.Td width="25%" style={{ textAlign: "right" }}>
                           <Button
@@ -591,7 +599,7 @@ const ServicesAndPrices: React.FC = () => {
   if (loading) {
     return (
       <Stack gap="md">
-        <Title order={2}>Servicios y precios</Title>
+        <Title order={2}>Nuestros Servicios</Title>
         <Group>
           <Skeleton height={40} w={260} />
           <Skeleton height={40} w={180} />
@@ -612,7 +620,7 @@ const ServicesAndPrices: React.FC = () => {
           order={2}
           style={{ color: theme.colors[primary][7], fontWeight: 900 }}
         >
-          Servicios y precios
+          Lista de servicios
         </Title>
         <Text c="dimmed" size="sm">
           Explora por categoría, compara precios y abre los detalles para ver

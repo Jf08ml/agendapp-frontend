@@ -11,6 +11,7 @@ export interface Service {
   price: number;
   duration: number;
   isActive?: boolean;
+  hidePrice?: boolean;
 }
 
 interface CreateServicePayload {

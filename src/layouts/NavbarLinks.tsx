@@ -73,7 +73,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
       title: "Explora",
       items: [
         {
-          label: "Precios y servicios",
+          label: "Nuestros Servicios",
           to: "/servicios-precios",
           icon: <GiPriceTag size={18} />,
           canShow: true,

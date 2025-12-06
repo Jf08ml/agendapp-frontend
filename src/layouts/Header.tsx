@@ -31,7 +31,7 @@ export default function Header({ organization }: Props) {
   // Links del centro (solo desktop). Agrega/edita a tu gusto:
   const navLinks = useMemo(
     () => [
-      { label: "Precios y servicios", to: "/servicios-precios" },
+      { label: "Nuestros Servicios", to: "/servicios-precios" },
       { label: "Plan de fidelidad", to: "/" },
     ],
     []

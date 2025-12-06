@@ -17,6 +17,7 @@ import {
   Paper,
   Box,
   Badge,
+  Switch,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
@@ -45,6 +46,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     price: 0,
     duration: 0,
     images: [],
+    hidePrice: false,
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
@@ -62,6 +64,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         price: 0,
         duration: 0,
         images: [],
+        hidePrice: false,
       });
       setImageFiles([]);
     }
@@ -156,6 +159,12 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 value={editingService.description ?? ""}
                 onChange={(e) => setEditingService({ ...editingService, description: e.currentTarget.value })}
                 minRows={2}
+              />
+              <Switch
+                label="Ocultar precio al cliente"
+                description="El precio se ocultará en la vista pública del cliente"
+                checked={editingService.hidePrice ?? false}
+                onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
               />
             </Stack>
           </Paper>

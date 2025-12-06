@@ -49,8 +49,8 @@ const generalRoutes = [
     path: "/servicios-precios",
     component: ServicesAndPrices,
     MediaMetadata: {
-      title: "Servicios y Precios",
-      description: "Consulta nuestros servicios y precios en Galaxia Glamour.",
+      title: "Nuestros Servicios",
+      description: "Consulta nuestros  en Galaxia Glamour.",
     },
   },
   // {
