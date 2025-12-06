@@ -55,6 +55,8 @@ export interface Organization {
   domains?: string[];
   reservationPolicy?: ReservationPolicy;
   showLoyaltyProgram?: boolean;
+  welcomeTitle?: string;
+  welcomeDescription?: string;
 }
 
 // Crear una nueva organización

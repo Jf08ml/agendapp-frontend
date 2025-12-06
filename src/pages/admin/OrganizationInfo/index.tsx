@@ -75,6 +75,8 @@ export default function OrganizationInfo() {
             branding: ensureBranding(response.branding),
             domains: ensureArray(response.domains, []),
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
+            welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
+            welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
             openingHours: {
               start: response.openingHours?.start ?? "",
               end: response.openingHours?.end ?? "",

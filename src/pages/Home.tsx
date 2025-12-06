@@ -113,11 +113,11 @@ export default function Home() {
   return (
     <Container size="sm" py="xl">
       <Title ta="center" fw={900} mb="xs" c={primary}>
-        ¡Hola! Bienvenido
+        {organization?.welcomeTitle || "¡Hola! Bienvenido"}
       </Title>
       <Text ta="center" c="dimmed" mb="lg">
-        Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo
-        encontrarás! ✨
+        {organization?.welcomeDescription ||
+          "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨"}
       </Text>
 
       <SimpleGrid
