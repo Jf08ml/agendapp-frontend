@@ -614,7 +614,7 @@ const ServicesAndPrices: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box p="md">
       <Stack gap="xs" mb="sm">
         <Title
           order={2}

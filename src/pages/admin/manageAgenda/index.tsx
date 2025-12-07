@@ -659,7 +659,7 @@ const ScheduleView: React.FC = () => {
   }
 
   return (
-   <Box pos="relative">
+   <Box pos="relative" p="md">
     {sendingReminders && (
       <CustomLoader loadingText="Enviando recordatorios.." overlay />
     )}
