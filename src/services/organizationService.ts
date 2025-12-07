@@ -28,6 +28,13 @@ export interface Branding {
   manifest?: object;
 }
 
+export interface ReminderSettings {
+  enabled?: boolean;
+  hoursBefore?: number;
+  sendTimeStart?: string;
+  sendTimeEnd?: string;
+}
+
 export interface Organization {
   _id?: string;
   name: string;
@@ -58,6 +65,7 @@ export interface Organization {
   welcomeTitle?: string;
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards";
+  reminderSettings?: ReminderSettings;
 }
 
 // Crear una nueva organización

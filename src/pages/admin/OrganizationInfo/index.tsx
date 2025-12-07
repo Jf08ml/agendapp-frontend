@@ -78,6 +78,12 @@ export default function OrganizationInfo() {
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
             homeLayout: response.homeLayout ?? "modern",
+            reminderSettings: {
+              enabled: response.reminderSettings?.enabled ?? true,
+              hoursBefore: response.reminderSettings?.hoursBefore ?? 24,
+              sendTimeStart: response.reminderSettings?.sendTimeStart ?? "07:00",
+              sendTimeEnd: response.reminderSettings?.sendTimeEnd ?? "20:00",
+            },
             openingHours: {
               start: response.openingHours?.start ?? "",
               end: response.openingHours?.end ?? "",

@@ -102,6 +102,15 @@ export const schema = z.object({
   welcomeDescription: optionalString,
   homeLayout: z.enum(["modern", "minimal", "cards"]).optional(),
 
+  reminderSettings: z
+    .object({
+      enabled: z.boolean().optional(),
+      hoursBefore: z.number().int().min(1).max(72).optional(),
+      sendTimeStart: hhmmOrEmpty.optional(),
+      sendTimeEnd: hhmmOrEmpty.optional(),
+    })
+    .optional(),
+
   branding: z
     .object({
       logoUrl: optionalUrl,
