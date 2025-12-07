@@ -127,10 +127,7 @@ const LoginAdmin: React.FC = () => {
             input: {
               backgroundColor: "rgba(255,255,255,0.9)",
               color: "#000",
-            },
-            placeholder: {
-              color: "#555",
-            },
+            }
           }}
         />
 
@@ -145,10 +142,7 @@ const LoginAdmin: React.FC = () => {
               input: {
                 backgroundColor: "rgba(255,255,255,0.9)",
                 color: "#000",
-              },
-              placeholder: {
-                color: "#555",
-              },
+              }
             }}
           />
           <Button
