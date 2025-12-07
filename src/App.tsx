@@ -96,7 +96,6 @@ function App() {
       <Analytics />
 
       <AppShell
-        padding="md"
         navbar={{
           width: 300,
           breakpoint: "sm",

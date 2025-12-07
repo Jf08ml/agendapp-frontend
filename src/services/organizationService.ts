@@ -57,6 +57,7 @@ export interface Organization {
   showLoyaltyProgram?: boolean;
   welcomeTitle?: string;
   welcomeDescription?: string;
+  homeLayout?: "modern" | "minimal" | "cards";
 }
 
 // Crear una nueva organización

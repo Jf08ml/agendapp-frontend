@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack, TextInput, Textarea } from "@mantine/core";
+import { SimpleGrid, Stack, TextInput, Textarea, Select } from "@mantine/core";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -47,6 +47,17 @@ export default function ContactTab({
         description="Personaliza el mensaje que verán tus clientes en la página de inicio."
       >
         <Stack gap="md">
+          <Select
+            label="Diseño de página de inicio"
+            description="Elige cómo se mostrará la página principal a tus clientes"
+            {...form.getInputProps("homeLayout")}
+            disabled={!isEditing}
+            data={[
+              { value: "modern", label: "Moderno - Con gradientes difuminados" },
+              { value: "minimal", label: "Minimalista - Diseño limpio y simple" },
+              { value: "cards", label: "Tarjetas - Enfoque en servicios" },
+            ]}
+          />
           <TextInput
             label="Título de bienvenida"
             placeholder="¡Hola! Bienvenido"

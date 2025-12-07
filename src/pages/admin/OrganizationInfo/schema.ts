@@ -100,6 +100,7 @@ export const schema = z.object({
   showLoyaltyProgram: z.boolean().optional(),
   welcomeTitle: optionalString,
   welcomeDescription: optionalString,
+  homeLayout: z.enum(["modern", "minimal", "cards"]).optional(),
 
   branding: z
     .object({

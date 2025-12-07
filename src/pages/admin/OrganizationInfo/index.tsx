@@ -77,6 +77,7 @@ export default function OrganizationInfo() {
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
+            homeLayout: response.homeLayout ?? "modern",
             openingHours: {
               start: response.openingHours?.start ?? "",
               end: response.openingHours?.end ?? "",
