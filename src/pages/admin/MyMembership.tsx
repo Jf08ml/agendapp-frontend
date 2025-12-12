@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/MyMembership.tsx
 import { useEffect, useState } from "react";
@@ -142,7 +143,7 @@ export default function MyMembership() {
             <Text size="sm" fw={600}>
               {status.ui.statusMessage}
             </Text>
-            {status.ui.actionRequired && (
+            {status.ui.showRenewalButton && (
               <Button
                 size="xs"
                 mt="sm"
