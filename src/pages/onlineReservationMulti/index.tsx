@@ -46,6 +46,7 @@ import {
 import dayjs from "dayjs";
 import { buildStartFrom, getId } from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
+import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
 export default function MultiBookingWizard() {
   const [services, setServices] = useState<Service[]>([]);
@@ -456,6 +457,37 @@ export default function MultiBookingWizard() {
               {finishInfo?.dateText ?? "—"}.
             </Text>
             <Divider my="md" />
+
+            {/* Deposit Alert - Mostrar solo si hay reservas y está habilitado */}
+            {finishInfo && dates.length > 0 && (
+              <ReservationDepositAlert
+                clientName={customerDetails.name}
+                serviceName={
+                  dates.length === 1
+                    ? services.find((s) => s._id === dates[0].serviceId)
+                        ?.name || "Múltiples servicios"
+                    : "Múltiples servicios"
+                }
+                servicePrice={dates.reduce((total, date) => {
+                  const service = services.find(
+                    (s) => s._id === date.serviceId
+                  );
+                  return total + (service?.price || 0);
+                }, 0)}
+                appointmentTime={dates[0]?.date ? dayjs(dates[0].date).format("DD/MM/YYYY") : ""}
+                appointmentDate={
+                  (() => {
+                    const value = Array.isArray(times) && times.length > 0
+                      ? times[0].time
+                      : typeof times === "object" && "startTime" in times
+                      ? times.startTime
+                      : "";
+                    return value instanceof Date ? dayjs(value).format("HH:mm") : value || undefined;
+                  })()
+                }
+              />
+            )}
+
             <Group
               justify={isMobile ? "stretch" : "center"}
               gap="sm"

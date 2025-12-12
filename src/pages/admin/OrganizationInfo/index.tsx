@@ -9,7 +9,7 @@ import { showNotification } from "@mantine/notifications";
 import { IoAlertCircle } from "react-icons/io5";
 import { GrOrganization } from "react-icons/gr";
 import { RiGlobalLine } from "react-icons/ri";
-import { BiLocationPlus } from "react-icons/bi";
+import { BiLocationPlus, BiCreditCard } from "react-icons/bi";
 import { MdBrandingWatermark } from "react-icons/md";
 
 import { RootState } from "../../../app/store";
@@ -31,6 +31,7 @@ import SocialMediaTab from "./components/tabs/SocialMediaTab";
 import LocationTab from "./components/tabs/LocationTab";
 import FidelityTab from "./components/tabs/FidelityTab";
 import BrandingTab from "./components/tabs/BrandingTab";
+import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
 
 import { schema, FormValues } from "./schema";
 import { ensureBranding, ensureDomains } from "./utils";
@@ -317,6 +318,16 @@ export default function OrganizationInfo() {
           >
             Branding
           </Tabs.Tab>
+          <Tabs.Tab
+            value="payments"
+            leftSection={
+              <BiCreditCard
+                style={{ width: rem(12), height: rem(12) }}
+              />
+            }
+          >
+            Métodos de Pago
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="contact" pt="md">
@@ -351,6 +362,30 @@ export default function OrganizationInfo() {
             uploadingFavicon={uploadingFavicon}
             uploadingPwaIcon={uploadingPwaIcon}
             onUpload={onUpload}
+          />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="payments" pt="md">
+          <PaymentMethodsTab
+            paymentMethods={org.paymentMethods || []}
+            requireReservationDeposit={org.requireReservationDeposit}
+            reservationDepositPercentage={org.reservationDepositPercentage}
+            onSave={async ({ methods, requireDeposit, depositPercentage }) => {
+              if (!organizationId) return;
+              await updateOrganization(organizationId, {
+                paymentMethods: methods,
+                requireReservationDeposit: requireDeposit,
+                reservationDepositPercentage: depositPercentage,
+              });
+              const updatedOrg = {
+                ...org,
+                paymentMethods: methods,
+                requireReservationDeposit: requireDeposit,
+                reservationDepositPercentage: depositPercentage,
+              };
+              setOrg(updatedOrg);
+              dispatch(updateOrganizationState(updatedOrg));
+            }}
           />
         </Tabs.Panel>
       </Tabs>

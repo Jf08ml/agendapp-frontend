@@ -24,7 +24,7 @@ export function PaymentMethodsModal({
   const organization = useSelector((state: RootState) => state.organization.organization);
   
   // Información de pago (puedes mover esto a variables de entorno o configuración)
-  const NEQUI_NUMBER = "3184345284"; // Número de WhatsApp del administrador
+  const NEQUI_NUMBER = "3132735116"; // Número de WhatsApp del administrador
   const NEQUI_NAME = "Juan Felipe Lasso";
 
   const amount = planPrice || membership?.planId?.price || 0;

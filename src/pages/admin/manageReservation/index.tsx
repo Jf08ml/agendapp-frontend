@@ -18,7 +18,15 @@ import {
   Tooltip,
   Alert,
   Loader,
+  Collapse,
+  useMantineTheme,
+  useMantineColorScheme,
+  TextInput,
+  Switch,
+  Box,
+  Divider,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import {
@@ -41,8 +49,12 @@ import {
   BiUser,
   BiCheck,
   BiInfoCircle,
+  BiChevronDown,
+  BiChevronUp,
+  BiFilter,
 } from "react-icons/bi";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
+import { ReservationDepositAlert } from "../../../components/ReservationDepositAlert";
 import {
   selectReservationPolicy,
   selectSavingPolicy,
@@ -57,6 +69,7 @@ const ReservationsList: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const [initialLoading, setInitialLoading] = useState(false);
   const [rowLoading, setRowLoading] = useState<
@@ -80,6 +93,25 @@ const ReservationsList: React.FC = () => {
   );
   const orgPolicy = useSelector(selectReservationPolicy);
   const savingPolicy = useSelector(selectSavingPolicy);
+
+  const theme = useMantineTheme();
+  const { colorScheme } = useMantineColorScheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
+  // ------- FILTROS -------
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "pending" | "approved" | "rejected" | "auto_approved"
+  >("all");
+  const [employeeFilter, setEmployeeFilter] = useState<string | "all">("all");
+  const [serviceFilter, setServiceFilter] = useState<string | "all">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showOnlyFuture, setShowOnlyFuture] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
+  useEffect(() => {
+    // En mobile, empezamos con filtros colapsados; en desktop, abiertos
+    setFiltersOpen(!isMobile);
+  }, [isMobile]);
 
   // ------- LOADERS HELPERS -------
   const setRowBusy = (id: string, action: RowAction | null) =>
@@ -162,6 +194,23 @@ const ReservationsList: React.FC = () => {
     [employees]
   );
 
+  // Servicios únicos para el filtro
+  const serviceSelectData = useMemo(() => {
+    const map = new Map<string, string>();
+    reservations.forEach((r) => {
+      const serviceObj =
+        typeof r.serviceId === "object" ? r.serviceId : null;
+      if (serviceObj?._id && serviceObj?.name) {
+        map.set(serviceObj._id, serviceObj.name);
+      }
+    });
+
+    return Array.from(map.entries()).map(([value, label]) => ({
+      value,
+      label,
+    }));
+  }, [reservations]);
+
   const policyBadge = useMemo(() => {
     return orgPolicy === "auto_if_available" ? (
       <Badge color="green" variant="filled">
@@ -178,6 +227,81 @@ const ReservationsList: React.FC = () => {
     orgPolicy === "auto_if_available"
       ? "Las reservas se confirman y crean la cita automáticamente si hay disponibilidad inmediata. Si no hay cupo, la reserva queda pendiente."
       : "Las reservas requieren aprobación manual. No se crean citas automáticamente.";
+
+  // ------- LISTA FILTRADA + ORDENADA -------
+  const filteredReservations = useMemo(() => {
+    const now = dayjs();
+    const statusPriority: Record<string, number> = {
+      pending: 0,
+      auto_approved: 1,
+      approved: 2,
+      rejected: 3,
+    };
+
+    let list = [...reservations];
+
+    // 1) Solo futuras
+    if (showOnlyFuture) {
+      list = list.filter((r) =>
+        dayjs(r.startDate).isAfter(now.subtract(1, "minute"))
+      );
+    }
+
+    // 2) Filtro por estado
+    if (statusFilter !== "all") {
+      list = list.filter((r) => r.status === statusFilter);
+    }
+
+    // 3) Filtro por empleado
+    if (employeeFilter !== "all") {
+      list = list.filter((r) => r.employeeId === employeeFilter);
+    }
+
+    // 4) Filtro por servicio
+    if (serviceFilter !== "all") {
+      list = list.filter((r) => {
+        const serviceObj =
+          typeof r.serviceId === "object" ? r.serviceId : null;
+        return serviceObj?._id === serviceFilter;
+      });
+    }
+
+    // 5) Búsqueda por cliente (nombre / teléfono / email)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter((r) => {
+        const name = r.customerDetails?.name?.toLowerCase() ?? "";
+        const phone = (r.customerDetails as any)?.phone?.toLowerCase?.() ?? "";
+        const email = (r.customerDetails as any)?.email?.toLowerCase?.() ?? "";
+        return (
+          name.includes(term) || phone.includes(term) || email.includes(term)
+        );
+      });
+    }
+
+    // 6) Orden: estado (pendiente primero) + fecha ascendente
+    list.sort((a, b) => {
+      const statusDiff =
+        (statusPriority[a.status] ?? 99) -
+        (statusPriority[b.status] ?? 99);
+      if (statusDiff !== 0) return statusDiff;
+
+      return (
+        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      );
+    });
+
+    return list;
+  }, [
+    reservations,
+    showOnlyFuture,
+    statusFilter,
+    employeeFilter,
+    serviceFilter,
+    searchTerm,
+  ]);
+
+  const hasReservations = reservations.length > 0;
 
   // ------- ACTIONS -------
   const handleUpdateStatus = async (
@@ -323,7 +447,7 @@ const ReservationsList: React.FC = () => {
     }
   };
 
-  // ------- RENDER -------
+  // ------- RENDER HELPERS -------
   const renderSkeletonRows = (rows = 6) =>
     Array.from({ length: rows }).map((_, idx) => (
       <Table.Tr key={`sk-${idx}`}>
@@ -347,6 +471,173 @@ const ReservationsList: React.FC = () => {
       </Table.Tr>
     ));
 
+  const renderMobileReservationCard = (reservation: Reservation) => {
+    const busy = isRowBusy(reservation._id!);
+    const isExpanded = expandedRows[reservation._id!];
+    const serviceObj =
+      typeof reservation.serviceId === "object" ? reservation.serviceId : null;
+    const servicePrice = serviceObj?.price || 0;
+    const serviceName = serviceObj?.name || "Sin especificar";
+
+    return (
+      <Card
+        key={reservation._id}
+        withBorder
+        radius="lg"
+        shadow="xs"
+        mb="sm"
+        p="md"
+      >
+        <Group justify="space-between" align="flex-start" mb="xs">
+          <Stack gap={4} style={{ flex: 1 }}>
+            <Group gap={6} align="center">
+              <Badge size="xs" variant="outline" radius="lg">
+                {dayjs(reservation.startDate).format("DD/MM HH:mm")}
+              </Badge>
+              <Badge
+                size="xs"
+                color={getBadgeColor(reservation.status)}
+                variant="light"
+                radius="lg"
+              >
+                {translateStatus(reservation.status)}
+              </Badge>
+            </Group>
+
+            <Text fw={600} size="sm">
+              {serviceName}
+            </Text>
+
+            <Text size="xs" c="dimmed">
+              Cliente:{" "}
+              <Text span fw={500} c="dark">
+                {reservation.customerDetails?.name ?? "—"}
+              </Text>
+            </Text>
+          </Stack>
+
+          <Menu
+            withArrow
+            position="bottom-end"
+            shadow="sm"
+            disabled={busy}
+          >
+            <Menu.Target>
+              <ActionIcon
+                variant="subtle"
+                radius="xl"
+                loading={busy}
+                aria-label="Acciones"
+              >
+                <BiDotsVertical />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {orgPolicy === "manual" &&
+                reservation.status === "pending" && (
+                  <>
+                    <Menu.Item
+                      leftSection={
+                        rowLoading[reservation._id!] === "approve" ? (
+                          <Skeleton height={12} width={12} circle />
+                        ) : (
+                          <BiCheck size={16} />
+                        )
+                      }
+                      onClick={() =>
+                        handleUpdateStatus(reservation._id!, "approved")
+                      }
+                      disabled={busy}
+                    >
+                      Aprobar
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={
+                        rowLoading[reservation._id!] === "reject" ? (
+                          <Skeleton height={12} width={12} circle />
+                        ) : (
+                          <BiXCircle size={16} />
+                        )
+                      }
+                      color="red"
+                      onClick={() =>
+                        handleUpdateStatus(reservation._id!, "rejected")
+                      }
+                      disabled={busy}
+                    >
+                      Rechazar
+                    </Menu.Item>
+                  </>
+                )}
+
+              <Menu.Item
+                leftSection={<BiUser size={16} />}
+                onClick={() => handleOpenAssignModal(reservation._id!)}
+                disabled={busy}
+              >
+                Cambiar empleado
+              </Menu.Item>
+
+              <Menu.Item
+                leftSection={
+                  rowLoading[reservation._id!] === "delete" ? (
+                    <Skeleton height={12} width={12} circle />
+                  ) : (
+                    <BiTrash size={16} />
+                  )
+                }
+                color="gray"
+                onClick={() => handleDelete(reservation._id!)}
+                disabled={busy}
+              >
+                Eliminar
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+
+        {reservation.status === "pending" &&
+          organization?.requireReservationDeposit && (
+            <>
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={isExpanded ? <BiChevronUp /> : <BiChevronDown />}
+                onClick={() =>
+                  setExpandedRows((prev) => ({
+                    ...prev,
+                    [reservation._id!]: !prev[reservation._id!],
+                  }))
+                }
+              >
+                {isExpanded
+                  ? "Ocultar info de depósito"
+                  : "Ver info de depósito"}
+              </Button>
+
+              <Collapse in={isExpanded}>
+                <Box mt="xs">
+                  <ReservationDepositAlert
+                    reservationId={reservation._id}
+                    clientName={reservation.customerDetails?.name}
+                    serviceName={serviceName}
+                    servicePrice={servicePrice}
+                    appointmentDate={dayjs(reservation.startDate).format(
+                      "DD/MM/YYYY"
+                    )}
+                    appointmentTime={dayjs(reservation.startDate).format(
+                      "HH:mm"
+                    )}
+                  />
+                </Box>
+              </Collapse>
+            </>
+          )}
+      </Card>
+    );
+  };
+
+  // ------- RENDER -------
   return (
     <>
       {savingPolicy && (
@@ -430,47 +721,177 @@ const ReservationsList: React.FC = () => {
         </Group>
       </Modal>
 
-      <Card shadow="sm" radius="md" withBorder style={{ position: "relative" }}>
-        <Group justify="space-between" align="center" mb="sm">
-          <Group align="center" gap="sm">
-            <Text size="xl" fw={600}>
+      <Card shadow="sm" radius="lg" withBorder style={{ position: "relative" }}>
+        {/* Header */}
+        <Group justify="space-between" align="flex-start" mb="sm">
+          <Stack gap={2}>
+            <Text size={isMobile ? "lg" : "xl"} fw={600}>
               Reservas de la organización
             </Text>
+            <Text size="xs" c="dimmed">
+              Revisa, filtra y gestiona las reservas creadas desde tu página o
+              WhatsApp.
+            </Text>
+          </Stack>
+
+          <Stack gap={4} align="flex-end">
             <Tooltip label={policyHelpText} withArrow>
               <span>{policyBadge}</span>
             </Tooltip>
-          </Group>
+            <Group gap="xs" align="flex-end">
+              <Select
+                w={isMobile ? 200 : 260}
+                label="Política de agendamiento"
+                value={orgPolicy}
+                onChange={(val) =>
+                  val && handleChangePolicy(val as ReservationPolicy)
+                }
+                data={[
+                  { value: "manual", label: "Aprobación manual" },
+                  {
+                    value: "auto_if_available",
+                    label: "Automático si hay disponibilidad",
+                  },
+                ]}
+                disabled={!organization?._id || savingPolicy}
+                comboboxProps={{ withinPortal: true }}
+                rightSection={savingPolicy ? <Loader size="xs" /> : null}
+              />
+              {savingPolicy && (
+                <Group gap={6} align="center">
+                  <Loader size="xs" />
+                  <Text size="xs" c="dimmed" aria-live="polite">
+                    Guardando…
+                  </Text>
+                </Group>
+              )}
+            </Group>
+          </Stack>
+        </Group>
 
-          {/* Selector de política */}
-          <Group gap="xs">
-            <Select
-              w={260}
-              label="Política de agendamiento"
-              value={orgPolicy}
-              onChange={(val) =>
-                val && handleChangePolicy(val as ReservationPolicy)
-              }
-              data={[
-                { value: "manual", label: "Aprobación manual" },
-                {
-                  value: "auto_if_available",
-                  label: "Automático si hay disponibilidad",
-                },
-              ]}
-              disabled={!organization?._id || savingPolicy}
-              comboboxProps={{ withinPortal: true }}
-              rightSection={savingPolicy ? <Loader size="xs" /> : null}
-            />
-            {savingPolicy && (
-              <Group gap={6} align="center" ml="xs">
-                <Loader size="xs" />
-                <Text size="sm" c="dimmed" aria-live="polite">
-                  Guardando…
-                </Text>
-              </Group>
+        <Divider mb="md" />
+
+        {/* FILTROS */}
+        <Box
+          mb="md"
+          p="sm"
+          bg={colorScheme === "dark" ? "dark.7" : "gray.0"}
+          style={{ borderRadius: theme.radius.md }}
+        >
+          <Group justify="space-between" align="center" mb={isMobile ? "xs" : 8}>
+            <Group gap={6}>
+              <BiFilter size={16} />
+              <Text size="sm" fw={500}>
+                Filtros
+              </Text>
+              <Text size="xs" c="dimmed">
+                Ajusta la vista según estado, empleado, servicio o cliente.
+              </Text>
+            </Group>
+
+            {isMobile && (
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={filtersOpen ? <BiChevronUp /> : <BiChevronDown />}
+                onClick={() => setFiltersOpen((prev) => !prev)}
+              >
+                {filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
+              </Button>
             )}
           </Group>
-        </Group>
+
+          <Collapse in={filtersOpen}>
+            <Group
+              justify="space-between"
+              align="flex-end"
+              wrap="wrap"
+              gap="sm"
+            >
+              <Group gap="sm" align="flex-end">
+                <Select
+                  label="Estado"
+                  placeholder="Todos"
+                  value={statusFilter}
+                  onChange={(val) =>
+                    setStatusFilter((val as typeof statusFilter) || "all")
+                  }
+                  data={[
+                    { value: "all", label: "Todos" },
+                    { value: "pending", label: "Pendiente" },
+                    { value: "approved", label: "Aprobada" },
+                    { value: "auto_approved", label: "Auto-aprobada" },
+                    { value: "rejected", label: "Rechazada" },
+                  ]}
+                  w={170}
+                />
+
+                <Select
+                  label="Empleado"
+                  placeholder="Todos"
+                  value={employeeFilter}
+                  onChange={(val) =>
+                    setEmployeeFilter((val as string) || "all")
+                  }
+                  data={[
+                    { value: "all", label: "Todos" },
+                    ...employeesSelectData,
+                  ]}
+                  w={190}
+                  searchable
+                />
+
+                <Select
+                  label="Servicio"
+                  placeholder="Todos"
+                  value={serviceFilter}
+                  onChange={(val) =>
+                    setServiceFilter((val as string) || "all")
+                  }
+                  data={[
+                    { value: "all", label: "Todos" },
+                    ...serviceSelectData,
+                  ]}
+                  w={190}
+                  searchable
+                />
+              </Group>
+
+              <Group gap="sm" align="flex-end">
+                <TextInput
+                  label="Buscar cliente"
+                  placeholder="Nombre, teléfono o email"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.currentTarget.value)}
+                  w={220}
+                />
+
+                <Switch
+                  size="sm"
+                  checked={showOnlyFuture}
+                  onChange={(event) =>
+                    setShowOnlyFuture(event.currentTarget.checked)
+                  }
+                  label="Solo futuras"
+                />
+
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setEmployeeFilter("all");
+                    setServiceFilter("all");
+                    setSearchTerm("");
+                    setShowOnlyFuture(true);
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              </Group>
+            </Group>
+          </Collapse>
+        </Box>
 
         <Alert
           variant="light"
@@ -505,172 +926,266 @@ const ReservationsList: React.FC = () => {
           </Stack>
         )}
 
-        <Table.ScrollContainer minWidth={640} type="native" mah={520}>
-          <Table
-            withTableBorder
-            withColumnBorders
-            striped
-            highlightOnHover
-            stickyHeader
-          >
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Fecha</Table.Th>
-                <Table.Th>Servicio</Table.Th>
-                <Table.Th>Cliente</Table.Th>
-                <Table.Th>Estado</Table.Th>
-                <Table.Th style={{ width: 80, textAlign: "center" }}>
-                  Acciones
-                </Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {initialLoading ? (
-                renderSkeletonRows()
-              ) : reservations.length === 0 ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5}>
-                    <Center py="xl">
-                      <Stack gap={6} align="center">
-                        <Text c="dimmed">No hay reservas para mostrar.</Text>
-                        <Text size="sm" c="dimmed">
-                          Cuando se creen reservas, aparecerán aquí.
-                        </Text>
-                      </Stack>
-                    </Center>
-                  </Table.Td>
-                </Table.Tr>
-              ) : (
-                reservations.map((reservation) => {
-                  const busy = isRowBusy(reservation._id!);
-                  return (
-                    <Table.Tr key={reservation._id}>
-                      <Table.Td>
-                        {dayjs(reservation.startDate).format(
-                          "DD/MM/YYYY HH:mm"
-                        )}
-                      </Table.Td>
-                      <Table.Td>
-                        {typeof reservation.serviceId === "string"
-                          ? reservation.serviceId
-                          : reservation.serviceId?.name || "Sin especificar"}
-                      </Table.Td>
-                      <Table.Td>
-                        {reservation.customerDetails?.name ?? "—"}
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          fullWidth
-                          color={getBadgeColor(reservation.status)}
-                        >
-                          {translateStatus(reservation.status)}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td style={{ textAlign: "center" }}>
-                        <Menu
-                          withArrow
-                          position="bottom-end"
-                          shadow="sm"
-                          disabled={busy}
-                        >
-                          <Menu.Target>
-                            <ActionIcon
-                              variant="light"
-                              radius="md"
-                              loading={busy}
-                              aria-label="Acciones"
-                            >
-                              <BiDotsVertical />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {orgPolicy === "manual" &&
-                              reservation.status === "pending" && (
-                                <>
-                                  <Menu.Item
-                                    leftSection={
-                                      rowLoading[reservation._id!] ===
-                                      "approve" ? (
-                                        <Skeleton
-                                          height={12}
-                                          width={12}
-                                          circle
-                                        />
-                                      ) : (
-                                        <BiCheck size={16} />
-                                      )
-                                    }
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        reservation._id!,
-                                        "approved"
-                                      )
-                                    }
-                                    disabled={busy}
-                                  >
-                                    Aprobar
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    leftSection={
-                                      rowLoading[reservation._id!] ===
-                                      "reject" ? (
-                                        <Skeleton
-                                          height={12}
-                                          width={12}
-                                          circle
-                                        />
-                                      ) : (
-                                        <BiXCircle size={16} />
-                                      )
-                                    }
-                                    color="red"
-                                    onClick={() =>
-                                      handleUpdateStatus(
-                                        reservation._id!,
-                                        "rejected"
-                                      )
-                                    }
-                                    disabled={busy}
-                                  >
-                                    Rechazar
-                                  </Menu.Item>
-                                </>
-                              )}
-
-                            <Menu.Item
-                              leftSection={<BiUser size={16} />}
-                              onClick={() =>
-                                handleOpenAssignModal(reservation._id!)
-                              }
-                              disabled={busy}
-                            >
-                              Cambiar empleado
-                            </Menu.Item>
-
-                            <Menu.Item
-                              leftSection={
-                                rowLoading[reservation._id!] === "delete" ? (
-                                  <Skeleton height={12} width={12} circle />
-                                ) : (
-                                  <BiTrash size={16} />
-                                )
-                              }
-                              color="gray"
-                              onClick={() => handleDelete(reservation._id!)}
-                              disabled={busy}
-                            >
-                              Eliminar
-                            </Menu.Item>
-                          </Menu.Dropdown>
-                        </Menu>
-                      </Table.Td>
-                    </Table.Tr>
-                  );
-                })
+        {initialLoading ? (
+          isMobile ? (
+            <Stack>
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <Card key={idx} withBorder radius="lg" shadow="xs" p="md">
+                  <Skeleton height={10} mb="xs" />
+                  <Skeleton height={10} mb="xs" />
+                  <Skeleton height={10} width="60%" />
+                </Card>
+              ))}
+            </Stack>
+          ) : (
+            <Table.ScrollContainer minWidth={640} type="native" mah={520}>
+              <Table
+                withTableBorder
+                withColumnBorders
+                striped
+                highlightOnHover
+                stickyHeader
+              >
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Fecha</Table.Th>
+                    <Table.Th>Servicio</Table.Th>
+                    <Table.Th>Cliente</Table.Th>
+                    <Table.Th>Estado</Table.Th>
+                    <Table.Th style={{ width: 80, textAlign: "center" }}>
+                      Acciones
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>{renderSkeletonRows()}</Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          )
+        ) : filteredReservations.length === 0 ? (
+          <Center py="xl">
+            <Stack gap={6} align="center">
+              <Text c="dimmed">
+                {hasReservations
+                  ? "No hay reservas que coincidan con los filtros."
+                  : "No hay reservas para mostrar."}
+              </Text>
+              {hasReservations && (
+                <Text size="sm" c="dimmed">
+                  Ajusta los filtros o limpia la búsqueda para ver más
+                  resultados.
+                </Text>
               )}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+            </Stack>
+          </Center>
+        ) : isMobile ? (
+          <Stack>
+            {filteredReservations.map((reservation) =>
+              renderMobileReservationCard(reservation)
+            )}
+          </Stack>
+        ) : (
+          <Table.ScrollContainer minWidth={640} type="native" mah={520}>
+            <Table
+              withTableBorder
+              withColumnBorders
+              striped
+              highlightOnHover
+              stickyHeader
+            >
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Fecha</Table.Th>
+                  <Table.Th>Servicio</Table.Th>
+                  <Table.Th>Cliente</Table.Th>
+                  <Table.Th>Estado</Table.Th>
+                  <Table.Th style={{ width: 80, textAlign: "center" }}>
+                    Acciones
+                  </Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {filteredReservations.map((reservation) => {
+                  const busy = isRowBusy(reservation._id!);
+                  const isExpanded = expandedRows[reservation._id!];
+                  const serviceObj =
+                    typeof reservation.serviceId === "object"
+                      ? reservation.serviceId
+                      : null;
+                  const servicePrice = serviceObj?.price || 0;
+                  const serviceName = serviceObj?.name || "Sin especificar";
+
+                  return (
+                    <React.Fragment key={reservation._id}>
+                      <Table.Tr>
+                        <Table.Td>
+                          {reservation.status === "pending" &&
+                            organization?.requireReservationDeposit && (
+                              <ActionIcon
+                                variant="subtle"
+                                size="sm"
+                                onClick={() =>
+                                  setExpandedRows((prev) => ({
+                                    ...prev,
+                                    [reservation._id!]: !prev[reservation._id!],
+                                  }))
+                                }
+                                mr="xs"
+                              >
+                                {isExpanded ? (
+                                  <BiChevronUp />
+                                ) : (
+                                  <BiChevronDown />
+                                )}
+                              </ActionIcon>
+                            )}
+                          {dayjs(reservation.startDate).format(
+                            "DD/MM/YYYY HH:mm"
+                          )}
+                        </Table.Td>
+                        <Table.Td>{serviceName}</Table.Td>
+                        <Table.Td>
+                          {reservation.customerDetails?.name ?? "—"}
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge
+                            fullWidth
+                            color={getBadgeColor(reservation.status)}
+                          >
+                            {translateStatus(reservation.status)}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: "center" }}>
+                          <Menu
+                            withArrow
+                            position="bottom-end"
+                            shadow="sm"
+                            disabled={busy}
+                          >
+                            <Menu.Target>
+                              <ActionIcon
+                                variant="light"
+                                radius="md"
+                                loading={busy}
+                                aria-label="Acciones"
+                              >
+                                <BiDotsVertical />
+                              </ActionIcon>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              {orgPolicy === "manual" &&
+                                reservation.status === "pending" && (
+                                  <>
+                                    <Menu.Item
+                                      leftSection={
+                                        rowLoading[reservation._id!] ===
+                                        "approve" ? (
+                                          <Skeleton
+                                            height={12}
+                                            width={12}
+                                            circle
+                                          />
+                                        ) : (
+                                          <BiCheck size={16} />
+                                        )
+                                      }
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          reservation._id!,
+                                          "approved"
+                                        )
+                                      }
+                                      disabled={busy}
+                                    >
+                                      Aprobar
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      leftSection={
+                                        rowLoading[reservation._id!] ===
+                                        "reject" ? (
+                                          <Skeleton
+                                            height={12}
+                                            width={12}
+                                            circle
+                                          />
+                                        ) : (
+                                          <BiXCircle size={16} />
+                                        )
+                                      }
+                                      color="red"
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          reservation._id!,
+                                          "rejected"
+                                        )
+                                      }
+                                      disabled={busy}
+                                    >
+                                      Rechazar
+                                    </Menu.Item>
+                                  </>
+                                )}
+
+                              <Menu.Item
+                                leftSection={<BiUser size={16} />}
+                                onClick={() =>
+                                  handleOpenAssignModal(reservation._id!)
+                                }
+                                disabled={busy}
+                              >
+                                Cambiar empleado
+                              </Menu.Item>
+
+                              <Menu.Item
+                                leftSection={
+                                  rowLoading[reservation._id!] === "delete" ? (
+                                    <Skeleton height={12} width={12} circle />
+                                  ) : (
+                                    <BiTrash size={16} />
+                                  )
+                                }
+                                color="gray"
+                                onClick={() => handleDelete(reservation._id!)}
+                                disabled={busy}
+                              >
+                                Eliminar
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                          </Menu>
+                        </Table.Td>
+                      </Table.Tr>
+
+                      {reservation.status === "pending" &&
+                        organization?.requireReservationDeposit && (
+                          <Table.Tr>
+                            <Table.Td colSpan={5} p={0}>
+                              <Collapse in={isExpanded}>
+                                <Box p="md">
+                                  <ReservationDepositAlert
+                                    reservationId={reservation._id}
+                                    clientName={
+                                      reservation.customerDetails?.name
+                                    }
+                                    serviceName={serviceName}
+                                    servicePrice={servicePrice}
+                                    appointmentDate={dayjs(
+                                      reservation.startDate
+                                    ).format("DD/MM/YYYY")}
+                                    appointmentTime={dayjs(
+                                      reservation.startDate
+                                    ).format("HH:mm")}
+                                  />
+                                </Box>
+                              </Collapse>
+                            </Table.Td>
+                          </Table.Tr>
+                        )}
+                    </React.Fragment>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        )}
       </Card>
     </>
   );

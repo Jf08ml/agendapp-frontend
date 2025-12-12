@@ -10,6 +10,10 @@ import {
 import { Reservation } from "../../services/reservationService";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
+import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
+import dayjs from "dayjs";
 
 interface BookingCompletedProps {
   isBookingConfirmed: boolean;
@@ -24,6 +28,8 @@ const BookingCompleted: React.FC<BookingCompletedProps> = ({
   services,
   employees,
 }) => {
+  const organization = useSelector((state: RootState) => state.organization.organization);
+  
   const customerDetails = bookingData.customerDetails || {
     name: "",
     email: "",
@@ -36,6 +42,13 @@ const BookingCompleted: React.FC<BookingCompletedProps> = ({
       ? services.find((service) => service._id === bookingData.serviceId)
           ?.name || "No especificado"
       : bookingData.serviceId?.name || "No especificado";
+
+  // Resolver el precio del servicio
+  const servicePrice =
+    typeof bookingData.serviceId === "string"
+      ? services.find((service) => service._id === bookingData.serviceId)
+          ?.price || 0
+      : bookingData.serviceId?.price || 0;
 
   // Resolver el nombre del empleado
   const employeeName =
@@ -115,6 +128,19 @@ const BookingCompleted: React.FC<BookingCompletedProps> = ({
               </Text>
             </Group>
           </Box>
+
+          <Divider />
+
+          {/* Alerta de depósito si está habilitado */}
+          {organization?.requireReservationDeposit && (
+            <ReservationDepositAlert
+              clientName={customerDetails.name}
+              serviceName={serviceName}
+              servicePrice={servicePrice}
+              appointmentDate={bookingData.startDate ? dayjs(bookingData.startDate).format("DD/MM/YYYY") : undefined}
+              appointmentTime={bookingData.startDate ? dayjs(bookingData.startDate).format("HH:mm") : undefined}
+            />
+          )}
         </Stack>
       ) : (
         <Stack align="center" m="md">

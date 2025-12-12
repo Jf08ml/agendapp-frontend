@@ -35,6 +35,15 @@ export interface ReminderSettings {
   sendTimeEnd?: string;
 }
 
+export interface PaymentMethod {
+  type: "nequi" | "bancolombia" | "daviplata" | "otros";
+  accountName?: string;
+  accountNumber?: string;
+  phoneNumber?: string;
+  qrCodeUrl?: string;
+  notes?: string;
+}
+
 export interface Organization {
   _id?: string;
   name: string;
@@ -62,6 +71,9 @@ export interface Organization {
   domains?: string[];
   reservationPolicy?: ReservationPolicy;
   showLoyaltyProgram?: boolean;
+  paymentMethods?: PaymentMethod[];
+  requireReservationDeposit?: boolean;
+  reservationDepositPercentage?: number;
   welcomeTitle?: string;
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards";
