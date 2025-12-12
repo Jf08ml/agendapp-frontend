@@ -15,6 +15,7 @@ import { BiCalendar, BiCalendarCheck } from "react-icons/bi";
 import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
 import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { IoAnalytics } from "react-icons/io5";
+import { FaBell, FaCrown } from "react-icons/fa";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -165,6 +166,18 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/analytics-dashboard",
           icon: <IoAnalytics size={18} />,
           canShow: can.analyticsRead,
+        },
+        {
+          label: "Mi Membresía",
+          to: "/my-membership",
+          icon: <FaCrown size={18} />,
+          canShow: can.businessInfo, // Solo admins ven esto
+        },
+        {
+          label: "Notificaciones de Membresía",
+          to: "/membership-notifications",
+          icon: <FaBell size={18} />,
+          canShow: can.businessInfo, // Solo admins ven esto
         },
       ],
     },

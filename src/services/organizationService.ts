@@ -66,6 +66,10 @@ export interface Organization {
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards";
   reminderSettings?: ReminderSettings;
+  // Sistema de membresías
+  currentMembershipId?: string;
+  membershipStatus?: "active" | "trial" | "suspended" | "none";
+  hasAccessBlocked?: boolean;
 }
 
 // Crear una nueva organización

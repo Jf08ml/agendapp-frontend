@@ -11,10 +11,14 @@ import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useSelector } from "react-redux";
 import { RootState } from "./app/store";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 import NotificationsMenu from "./layouts/NotificationsMenu";
+import { MembershipAlert } from "./components/MembershipAlert";
+import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
+import { getCurrentMembership, Membership } from "./services/membershipService";
+
 
 function App() {
   const { userId, isAuthenticated } = useSelector(
@@ -25,6 +29,8 @@ function App() {
   );
   const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
+  const [paymentModalOpened, setPaymentModalOpened] = useState(false);
+  const [currentMembership, setCurrentMembership] = useState<Membership | null>(null);
 
   // Branding dinámico
   const color = organization?.branding?.primaryColor || "#DE739E";
@@ -32,6 +38,35 @@ function App() {
 
   // Inicializa autenticación en el cliente
   useAuthInitializer();
+
+  // Cargar membresía actual
+  useEffect(() => {
+    const loadMembership = async () => {
+      if (organization?._id) {
+        try {
+          const membership = await getCurrentMembership(organization._id);
+          setCurrentMembership(membership);
+        } catch (error) {
+          console.error("Error al cargar membresía:", error);
+        }
+      }
+    };
+    loadMembership();
+  }, [organization?._id]);
+
+  // Escuchar evento de membresía suspendida
+  useEffect(() => {
+    const handleMembershipSuspended = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.error("Membresía suspendida:", customEvent.detail);
+      setPaymentModalOpened(true);
+    };
+
+    window.addEventListener("membership-suspended", handleMembershipSuspended);
+    return () => {
+      window.removeEventListener("membership-suspended", handleMembershipSuspended);
+    };
+  }, []);
 
   // Push notification setup (igual que antes)
   useEffect(() => {
@@ -158,6 +193,14 @@ function App() {
           </div>
         </AppShell.Navbar>
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
+          {/* Alerta de membresía para usuarios autenticados */}
+          {isAuthenticated && organization?._id && (
+            <MembershipAlert 
+              organizationId={organization._id}
+              onRenewClick={() => setPaymentModalOpened(true)} 
+            />
+          )}
+          
           <Routes>
             {generalRoutes.map((route, index) => (
               <Route
@@ -173,6 +216,13 @@ function App() {
           <Footer />
         </AppShell.Footer>
       </AppShell>
+
+      {/* Modal de pago */}
+      <PaymentMethodsModal
+        opened={paymentModalOpened}
+        onClose={() => setPaymentModalOpened(false)}
+        membership={currentMembership}
+      />
     </Router>
   );
 }

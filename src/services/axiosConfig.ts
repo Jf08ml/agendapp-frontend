@@ -14,9 +14,35 @@ const addTenantHeader = (api: AxiosInstance) => {
   return api;
 };
 
+const addMembershipInterceptor = (api: AxiosInstance) => {
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      // Detectar error 403 por membresía suspendida
+      if (
+        error.response?.status === 403 &&
+        error.response?.data?.reason === "membership_suspended"
+      ) {
+        // Dispatch de evento personalizado para mostrar modal/notificación
+        const event = new CustomEvent("membership-suspended", {
+          detail: {
+            message: error.response.data.message,
+            orgId: error.response.data.orgId,
+          },
+        });
+        window.dispatchEvent(event);
+      }
+      return Promise.reject(error);
+    }
+  );
+  return api;
+};
+
 const createAxiosInstance = (baseURL: string): AxiosInstance => {
   const api = axios.create({ baseURL });
-  return addTenantHeader(api);
+  addTenantHeader(api);
+  addMembershipInterceptor(api);
+  return api;
 };
 
 // Crear instancias de Axios para diferentes partes de la API

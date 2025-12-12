@@ -17,6 +17,10 @@ import Home from "../pages/Home";
 import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
+import MembershipManagement from "../pages/superadmin/MembershipManagement";
+import MembershipNotifications from "../pages/admin/MembershipNotifications";
+import MyMembership from "../pages/admin/MyMembership";
+import ServiceSuspended from "../pages/ServiceSuspended";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 
@@ -194,6 +198,38 @@ const generalRoutes = [
       description: "Ve analiticas del negocio",
     },
   },
+  {
+    path: "/membership-notifications",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <MembershipNotifications {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Notificaciones de Membresía",
+      description: "Ver notificaciones relacionadas con tu membresía",
+    },
+  },
+  {
+    path: "/my-membership",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <MyMembership {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Mi Membresía",
+      description: "Ver detalles de tu membresía y plan",
+    },
+  },
+  {
+    path: "/service-suspended",
+    component: ServiceSuspended,
+    MediaMetadata: {
+      title: "Servicio Suspendido",
+      description: "Tu servicio ha sido suspendido",
+    },
+  },
 
   // Superadmin routes
   {
@@ -206,6 +242,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Superadmin Organizaciones",
       description: "Administra todas las organizaciones.",
+    },
+  },
+  {
+    path: "/superadmin-memberships",
+    component: (props: JSX.IntrinsicAttributes) => (
+
+        <MembershipManagement {...props} />
+
+    ),
+    MediaMetadata: {
+      title: "Gestión de Membresías",
+      description: "Administra las membresías de todas las organizaciones.",
     },
   },
 ];
