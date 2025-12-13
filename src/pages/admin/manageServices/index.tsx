@@ -29,6 +29,9 @@ import {
   BsPencil,
   BsSearch,
   BsThreeDotsVertical,
+  BsPlusCircle,
+  BsCheckCircle,
+  BsXCircle,
 } from "react-icons/bs";
 import { showNotification } from "@mantine/notifications";
 import {
@@ -215,9 +218,18 @@ const AdminServices: React.FC = () => {
   };
 
   const Toolbar = (
-    <Card withBorder radius="md" p="md" mb="md">
-      <Group justify="space-between" align="end" wrap="wrap" gap="sm">
-        <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
+    <Card withBorder radius="md" p="md" mb="md" shadow="sm">
+      <Stack gap="md">
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
+          <Button 
+            leftSection={<BsPlusCircle size={18} />}
+            onClick={() => { setIsModalOpen(true); setEditingService(null); }}
+            size={isMobile ? "sm" : "md"}
+          >
+            Nuevo servicio
+          </Button>
+        </Group>
 
         <Group wrap="wrap" gap="sm" align="end">
           <TextInput
@@ -225,46 +237,46 @@ const AdminServices: React.FC = () => {
             placeholder="Buscar por nombre, tipo o descripción…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.currentTarget.value)}
-            w={isMobile ? "100%" : 280}
+            style={{ flex: isMobile ? '1 1 100%' : '1 1 280px', minWidth: isMobile ? '100%' : 240 }}
           />
 
           <Select
             label="Tipo"
-            data={[{ value: "__all__", label: "Todos" }, ...allTypes.map((t) => ({ value: t, label: t }))]}
+            data={[{ value: "__all__", label: "Todos los tipos" }, ...allTypes.map((t) => ({ value: t, label: t }))]}
             value={typeFilter ?? "__all__"}
             onChange={(v) => setTypeFilter(v ?? "__all__")}
             clearable={false}
             w={isMobile ? "48%" : 180}
           />
 
-          <SegmentedControl
-            value={status}
-            onChange={(v: any) => setStatus(v)}
-            data={[
-              { label: "Todos", value: "all" },
-              { label: "Activos", value: "active" },
-              { label: "Inactivos", value: "inactive" },
-            ]}
-            size={isMobile ? "xs" : "sm"}
-          />
+          <Box style={{ flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
+            <Text size="xs" fw={500} mb={4}>Estado</Text>
+            <SegmentedControl
+              value={status}
+              onChange={(v: any) => setStatus(v)}
+              data={[
+                { label: "Todos", value: "all" },
+                { label: "Activos", value: "active" },
+                { label: "Inactivos", value: "inactive" },
+              ]}
+              size={isMobile ? "xs" : "sm"}
+              fullWidth={isMobile}
+            />
+          </Box>
 
           <Select
             label="Ordenar por"
             data={[
               { value: "alpha", label: "Nombre (A–Z)" },
-              { value: "price", label: "Precio (desc)" },
-              { value: "duration", label: "Duración (desc)" },
+              { value: "price", label: "Precio (mayor)" },
+              { value: "duration", label: "Duración (mayor)" },
             ]}
             value={sortBy}
             onChange={(v) => setSortBy((v as any) ?? "alpha")}
             w={isMobile ? "48%" : 180}
           />
-
-          <Button onClick={() => { setIsModalOpen(true); setEditingService(null); }}>
-            Agregar servicio
-          </Button>
         </Group>
-      </Group>
+      </Stack>
     </Card>
   );
 
@@ -311,7 +323,13 @@ const AdminServices: React.FC = () => {
                 shadow="sm"
                 radius="md"
                 withBorder
-                style={{ position: "relative" }}
+                style={{ 
+                  position: "relative",
+                  opacity: service.isActive ? 1 : 0.7,
+                  borderColor: service.isActive ? undefined : 'var(--mantine-color-gray-4)',
+                  transition: 'all 0.2s ease',
+                }}
+                className={service.isActive ? '' : 'inactive-service'}
               >
                 {/* Imagen principal */}
                 {service.images?.length ? (
@@ -321,13 +339,14 @@ const AdminServices: React.FC = () => {
                         src={typeof service.images[0] === "string" ? (service.images[0] as string) : undefined}
                         alt={service.name}
                         fit="cover"
+                        style={{ filter: service.isActive ? 'none' : 'grayscale(50%)' }}
                       />
                     </AspectRatio>
                   </Card.Section>
                 ) : (
                   <Card.Section>
                     <AspectRatio ratio={4 / 3}>
-                      <Center bg="gray.1">
+                      <Center bg={service.isActive ? "gray.1" : "gray.2"}>
                         <Text c="dimmed" size="sm">Sin imagen</Text>
                       </Center>
                     </AspectRatio>
@@ -336,59 +355,101 @@ const AdminServices: React.FC = () => {
 
                 {/* Estado */}
                 <Badge
-                  variant={service.isActive ? "filled" : "light"}
+                  variant="filled"
                   color={service.isActive ? "green" : "gray"}
+                  leftSection={service.isActive ? <BsCheckCircle size={12} /> : <BsXCircle size={12} />}
                   style={{ position: "absolute", top: rem(8), left: rem(8) }}
+                  size="md"
                 >
                   {service.isActive ? "Activo" : "Inactivo"}
                 </Badge>
 
                 {/* Menú de acciones */}
-                <Menu shadow="md" width={180} position="bottom-end">
+                <Menu shadow="md" width={200} position="bottom-end">
                   <Menu.Target>
                     <ActionIcon
-                      variant="subtle"
-                      style={{ position: "absolute", top: rem(4), right: rem(4) }}
+                      variant="filled"
+                      color="gray"
+                      style={{ position: "absolute", top: rem(8), right: rem(8) }}
                       aria-label="Acciones"
+                      size="lg"
                     >
-                      <BsThreeDotsVertical />
+                      <BsThreeDotsVertical size={18} />
                     </ActionIcon>
                   </Menu.Target>
                   <Menu.Dropdown>
-                    <Menu.Item leftSection={<BsPencil />} onClick={() => { setIsModalOpen(true); setEditingService(service); }}>
-                      Editar
+                    <Menu.Label>Acciones del servicio</Menu.Label>
+                    <Menu.Item 
+                      leftSection={<BsPencil />} 
+                      onClick={() => { setIsModalOpen(true); setEditingService(service); }}
+                    >
+                      Editar servicio
                     </Menu.Item>
-                    <Menu.Item onClick={() => toggleStatus(service._id)}>
+                    <Menu.Item 
+                      leftSection={service.isActive ? <BsXCircle /> : <BsCheckCircle />}
+                      onClick={() => toggleStatus(service._id)}
+                      color={service.isActive ? "orange" : "green"}
+                    >
                       {service.isActive ? "Desactivar" : "Activar"}
                     </Menu.Item>
                     <Menu.Divider />
-                    <Menu.Item color="red" leftSection={<BsTrash />} onClick={() => confirmDelete(service._id, index)}>
-                      Eliminar
+                    <Menu.Item 
+                      color="red" 
+                      leftSection={<BsTrash />} 
+                      onClick={() => confirmDelete(service._id, index)}
+                    >
+                      Eliminar servicio
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
 
                 {/* Contenido */}
                 <Card.Section p="md">
-                  <Group justify="space-between" mb={6}>
-                    <Text fw={700}>{service.name}</Text>
-                    <Tooltip label="Duración" withArrow>
-                      <Badge variant="light">{service.duration} min</Badge>
+                  <Group justify="space-between" mb={8}>
+                    <Text fw={700} size="lg" lineClamp={1}>{service.name}</Text>
+                    <Tooltip label="Duración del servicio" withArrow>
+                      <Badge variant="light" color="blue" size="lg">
+                        {service.duration} min
+                      </Badge>
                     </Tooltip>
                   </Group>
-                  <Text size="sm" c="dimmed" mb={6}>{service.type}</Text>
+                  
+                  <Group mb={8}>
+                    <Badge variant="dot" color="violet" size="md">
+                      {service.type}
+                    </Badge>
+                  </Group>
+
                   {service.description && (
-                    <Text size="sm" lineClamp={3} c="dimmed" mb="sm">
+                    <Text size="sm" lineClamp={2} c="dimmed" mb="md" style={{ minHeight: 40 }}>
                       {service.description}
                     </Text>
                   )}
-                  <Group justify="space-between">
-                    <Badge color="blue" variant="filled">
+                  
+                  <Group justify="space-between" align="center" mt="md">
+                    <Badge color={service.isActive ? "teal" : "gray"} variant="light" size="xl" radius="md">
                       ${service.price.toLocaleString()}
                     </Badge>
-                    <Text size="sm" c="dimmed">
-                      ID: {service._id.slice(-4)}
-                    </Text>
+                    <Group gap={6}>
+                      <Tooltip label="Editar" withArrow>
+                        <ActionIcon 
+                          variant="light" 
+                          color="blue"
+                          onClick={() => { setIsModalOpen(true); setEditingService(service); }}
+                        >
+                          <BsPencil size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Eliminar" withArrow>
+                        <ActionIcon 
+                          variant="light" 
+                          color="red"
+                          onClick={() => confirmDelete(service._id, index)}
+                        >
+                          <BsTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
                   </Group>
                 </Card.Section>
               </Card>
