@@ -20,6 +20,7 @@ export function MembershipAlert({
   const [membershipStatus, setMembershipStatus] =
     useState<MembershipStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -40,7 +41,18 @@ export function MembershipAlert({
     return () => clearInterval(interval);
   }, [organizationId]);
 
-  if (loading || !membershipStatus?.hasActiveMembership) {
+  // Auto-cerrar después de 5 segundos
+  useEffect(() => {
+    if (!loading && membershipStatus?.hasActiveMembership) {
+      const timer = setTimeout(() => {
+        setDismissed(true);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, membershipStatus]);
+
+  if (loading || !membershipStatus?.hasActiveMembership || dismissed) {
     return null;
   }
 
@@ -117,7 +129,8 @@ export function MembershipAlert({
       }
       color={ui.statusColor}
       mb="md"
-      withCloseButton={false}
+      withCloseButton={true}
+      onClose={() => setDismissed(true)}
     >
       <Text size="sm" mb="xs">
         {ui.statusMessage}
