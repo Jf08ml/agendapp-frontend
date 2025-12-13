@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/OrganizationInfo/components/tabs/PaymentMethodsTab.tsx
 import { useState } from "react";
+import { UseFormReturnType } from "@mantine/form";
 import {
   Stack,
   Button,
@@ -22,37 +23,39 @@ import {
   Divider,
 } from "@mantine/core";
 import { BiPlus, BiEdit, BiTrash, BiInfoCircle } from "react-icons/bi";
-import { PaymentMethod } from "../../../../../services/organizationService";
 import { uploadImage } from "../../../../../services/imageService";
 import { notifications } from "@mantine/notifications";
+import { FormValues } from "../../schema";
+
+// Tipo local para el formulario (sin valores null)
+type PaymentMethodFormData = {
+  type: "nequi" | "bancolombia" | "daviplata" | "otros";
+  accountName: string;
+  accountNumber: string;
+  phoneNumber: string;
+  qrCodeUrl: string;
+  notes: string;
+};
 
 interface PaymentMethodsTabProps {
-  paymentMethods: PaymentMethod[];
-  requireReservationDeposit?: boolean;
-  reservationDepositPercentage?: number;
-  onSave: (data: {
-    methods: PaymentMethod[];
-    requireDeposit: boolean;
-    depositPercentage: number;
-  }) => Promise<void>;
+  form: UseFormReturnType<FormValues>;
+  isEditing: boolean;
 }
 
 export default function PaymentMethodsTab({
-  paymentMethods = [],
-  requireReservationDeposit = false,
-  reservationDepositPercentage = 50,
-  onSave,
+  form,
+  isEditing,
 }: PaymentMethodsTabProps) {
-  const [methods, setMethods] = useState<PaymentMethod[]>(paymentMethods);
-  const [requireDeposit, setRequireDeposit] = useState(requireReservationDeposit);
-  const [depositPercentage, setDepositPercentage] = useState(reservationDepositPercentage);
+  const methods = form.values.paymentMethods || [];
+  const requireDeposit = form.values.requireReservationDeposit ?? false;
+  const depositPercentage = form.values.reservationDepositPercentage ?? 50;
+
   const [modalOpened, setModalOpened] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
   const [uploadingQR, setUploadingQR] = useState(false);
 
   // Form state
-  const [formData, setFormData] = useState<PaymentMethod>({
+  const [formData, setFormData] = useState<PaymentMethodFormData>({
     type: "nequi",
     accountName: "",
     accountNumber: "",
@@ -71,7 +74,16 @@ export default function PaymentMethodsTab({
   const handleOpenModal = (index?: number) => {
     if (index !== undefined && index !== null) {
       setEditingIndex(index);
-      setFormData(methods[index]);
+      const method = methods[index];
+      // Normalizar null a string vacío para el formulario
+      setFormData({
+        type: method.type,
+        accountName: method.accountName || "",
+        accountNumber: method.accountNumber || "",
+        phoneNumber: method.phoneNumber || "",
+        qrCodeUrl: method.qrCodeUrl || "",
+        notes: method.notes || "",
+      });
     } else {
       setEditingIndex(null);
       setFormData({
@@ -98,13 +110,13 @@ export default function PaymentMethodsTab({
     } else {
       updatedMethods.push(formData);
     }
-    setMethods(updatedMethods);
+    form.setFieldValue("paymentMethods", updatedMethods);
     handleCloseModal();
   };
 
   const handleDeleteMethod = (index: number) => {
     const updatedMethods = methods.filter((_, i) => i !== index);
-    setMethods(updatedMethods);
+    form.setFieldValue("paymentMethods", updatedMethods);
   };
 
   const handleUploadQR = async (file: File | null) => {
@@ -113,12 +125,16 @@ export default function PaymentMethodsTab({
     setUploadingQR(true);
     try {
       const imageUrl = await uploadImage(file);
-      setFormData({ ...formData, qrCodeUrl: imageUrl });
-      notifications.show({
-        title: "QR subido",
-        message: "El código QR se ha subido correctamente",
-        color: "green",
-      });
+      if (imageUrl) {
+        setFormData({ ...formData, qrCodeUrl: imageUrl });
+        notifications.show({
+          title: "QR subido",
+          message: "El código QR se ha subido correctamente",
+          color: "green",
+        });
+      } else {
+        throw new Error("No se recibió URL de la imagen");
+      }
     } catch (error) {
       console.error("Error uploading QR code:", error);
       notifications.show({
@@ -131,38 +147,15 @@ export default function PaymentMethodsTab({
     }
   };
 
-  const handleSaveAll = async () => {
-    setLoading(true);
-    try {
-      await onSave({
-        methods,
-        requireDeposit,
-        depositPercentage,
-      });
-      notifications.show({
-        title: "Guardado",
-        message: "Métodos de pago actualizados correctamente",
-        color: "green",
-      });
-    } catch (error) {
-        console.error("Error saving payment methods:", error);
-      notifications.show({
-        title: "Error",
-        message: "No se pudieron guardar los métodos de pago",
-        color: "red",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <Stack gap="md">
-      <Alert icon={<BiInfoCircle />} color="blue" variant="light">
-        Configura tus métodos de pago para que tus clientes puedan realizar pagos.
-        Puedes agregar datos bancarios y códigos QR.
-      </Alert>
-
+      {!isEditing && (
+        <Alert icon={<BiInfoCircle />} color="blue" variant="light">
+          Configura tus métodos de pago para que tus clientes puedan realizar pagos.
+          Puedes agregar datos bancarios y códigos QR.
+        </Alert>
+      )}
+      
       {/* Configuración de depósito para reservas */}
       <Card withBorder padding="md">
         <Stack gap="md">
@@ -174,7 +167,8 @@ export default function PaymentMethodsTab({
             label="Requerir abono para aprobar reservas"
             description="Los clientes deberán hacer un abono antes de que la reserva sea aprobada"
             checked={requireDeposit}
-            onChange={(e) => setRequireDeposit(e.currentTarget.checked)}
+            onChange={(e) => form.setFieldValue("requireReservationDeposit", e.currentTarget.checked)}
+            disabled={!isEditing}
           />
 
           {requireDeposit && (
@@ -182,11 +176,12 @@ export default function PaymentMethodsTab({
               label="Porcentaje de abono requerido"
               description="Porcentaje del total que el cliente debe abonar"
               value={depositPercentage}
-              onChange={(val) => setDepositPercentage(val as number)}
+              onChange={(val) => form.setFieldValue("reservationDepositPercentage", val as number)}
               min={0}
               max={100}
               suffix="%"
               step={5}
+              disabled={!isEditing}
             />
           )}
         </Stack>
@@ -198,13 +193,15 @@ export default function PaymentMethodsTab({
         <Text size="lg" fw={600}>
           Métodos de Pago Configurados
         </Text>
-        <Button
-          leftSection={<BiPlus />}
-          onClick={() => handleOpenModal()}
-          variant="light"
-        >
-          Agregar Método
-        </Button>
+        {isEditing && (
+          <Button
+            leftSection={<BiPlus />}
+            onClick={() => handleOpenModal()}
+            variant="light"
+          >
+            Agregar Método
+          </Button>
+        )}
       </Group>
 
       <Stack gap="sm">
@@ -257,31 +254,29 @@ export default function PaymentMethodsTab({
                   )}
                 </Stack>
 
-                <Group gap="xs" wrap="nowrap">
-                  <ActionIcon
-                    variant="light"
-                    color="blue"
-                    onClick={() => handleOpenModal(index)}
-                  >
-                    <BiEdit size={18} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="light"
-                    color="red"
-                    onClick={() => handleDeleteMethod(index)}
-                  >
-                    <BiTrash size={18} />
-                  </ActionIcon>
-                </Group>
+                {isEditing && (
+                  <Group gap="xs" wrap="nowrap">
+                    <ActionIcon
+                      variant="light"
+                      color="blue"
+                      onClick={() => handleOpenModal(index)}
+                    >
+                      <BiEdit size={18} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      onClick={() => handleDeleteMethod(index)}
+                    >
+                      <BiTrash size={18} />
+                    </ActionIcon>
+                  </Group>
+                )}
               </Group>
             </Card>
           ))
         )}
       </Stack>
-
-      <Button onClick={handleSaveAll} loading={loading} disabled={loading}>
-        Guardar Métodos de Pago
-      </Button>
 
       {/* Modal para agregar/editar método */}
       <Modal

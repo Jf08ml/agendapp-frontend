@@ -79,6 +79,9 @@ export default function OrganizationInfo() {
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
             homeLayout: response.homeLayout ?? "modern",
+            paymentMethods: ensureArray(response.paymentMethods, []),
+            requireReservationDeposit: response.requireReservationDeposit ?? false,
+            reservationDepositPercentage: response.reservationDepositPercentage ?? 50,
             reminderSettings: {
               enabled: response.reminderSettings?.enabled ?? true,
               hoursBefore: response.reminderSettings?.hoursBefore ?? 24,
@@ -367,25 +370,8 @@ export default function OrganizationInfo() {
 
         <Tabs.Panel value="payments" pt="md">
           <PaymentMethodsTab
-            paymentMethods={org.paymentMethods || []}
-            requireReservationDeposit={org.requireReservationDeposit}
-            reservationDepositPercentage={org.reservationDepositPercentage}
-            onSave={async ({ methods, requireDeposit, depositPercentage }) => {
-              if (!organizationId) return;
-              await updateOrganization(organizationId, {
-                paymentMethods: methods,
-                requireReservationDeposit: requireDeposit,
-                reservationDepositPercentage: depositPercentage,
-              });
-              const updatedOrg = {
-                ...org,
-                paymentMethods: methods,
-                requireReservationDeposit: requireDeposit,
-                reservationDepositPercentage: depositPercentage,
-              };
-              setOrg(updatedOrg);
-              dispatch(updateOrganizationState(updatedOrg));
-            }}
+            form={form}
+            isEditing={isEditing}
           />
         </Tabs.Panel>
       </Tabs>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiReservation } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
@@ -95,10 +96,15 @@ export const createMultipleReservations = async (
   data: CreateMultipleReservationsPayload
 ): Promise<Reservation[] | undefined> => {
   try {
-    const response = await apiReservation.post<Response<Reservation[]>>(
+    const response = await apiReservation.post<Response<any>>(
       "/multi",
       data
     );
+    // El backend retorna { policy, outcome, reservations: [...] }
+    // Necesitamos extraer el array de reservations
+    if (response.data.data?.reservations && Array.isArray(response.data.data.reservations)) {
+      return response.data.data.reservations;
+    }
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al crear reservas múltiples");

@@ -79,6 +79,7 @@ export default function MultiBookingWizard() {
     count: number;
     customer: string;
     dateText: string;
+    reservationIds: string[];
   } | null>(null);
 
   // Bloquea navegación/reenvíos tras terminar
@@ -227,10 +228,14 @@ export default function MultiBookingWizard() {
 
       let count = 0;
       let firstDateText = "";
+      let reservationIds: string[] = [];
 
       if (!splitDates) {
         const payload = buildMultiplePayload();
-        await createMultipleReservations(payload);
+        const result = await createMultipleReservations(payload);
+        if (result && Array.isArray(result)) {
+          reservationIds = result.map(r => r._id).filter((id): id is string => !!id);
+        }
         count = (times as MultiServiceBlockSelection).intervals.length;
         const start =
           (times as MultiServiceBlockSelection).startTime ??
@@ -239,7 +244,10 @@ export default function MultiBookingWizard() {
       } else {
         const singles = buildSingles();
         for (const p of singles) {
-          await createReservation(p);
+          const result = await createReservation(p);
+          if (result?._id) {
+            reservationIds.push(result._id);
+          }
         }
         count = singles.length;
         firstDateText = dayjs(singles[0].startDate).format("DD/MM/YYYY HH:mm");
@@ -249,6 +257,7 @@ export default function MultiBookingWizard() {
         count,
         customer: customerDetails.name || "Cliente",
         dateText: firstDateText,
+        reservationIds,
       });
 
       setCompleted(true);
@@ -459,8 +468,9 @@ export default function MultiBookingWizard() {
             <Divider my="md" />
 
             {/* Deposit Alert - Mostrar solo si hay reservas y está habilitado */}
-            {finishInfo && dates.length > 0 && (
+            {finishInfo && dates.length > 0 && finishInfo.reservationIds.length > 0 && (
               <ReservationDepositAlert
+                reservationId={finishInfo.reservationIds[0]}
                 clientName={customerDetails.name}
                 serviceName={
                   dates.length === 1
@@ -474,8 +484,8 @@ export default function MultiBookingWizard() {
                   );
                   return total + (service?.price || 0);
                 }, 0)}
-                appointmentTime={dates[0]?.date ? dayjs(dates[0].date).format("DD/MM/YYYY") : ""}
-                appointmentDate={
+                appointmentDate={dates[0]?.date ? dayjs(dates[0].date).format("DD/MM/YYYY") : ""}
+                appointmentTime={
                   (() => {
                     const value = Array.isArray(times) && times.length > 0
                       ? times[0].time

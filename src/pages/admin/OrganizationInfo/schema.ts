@@ -125,6 +125,22 @@ export const schema = z.object({
       pwaDescription: optionalString,
     })
     .optional(),
+
+  // Métodos de pago para reservas de clientes
+  paymentMethods: z
+    .array(
+      z.object({
+        type: z.enum(["nequi", "bancolombia", "daviplata", "otros"]),
+        accountName: optionalString,
+        accountNumber: optionalString,
+        phoneNumber: optionalString,
+        qrCodeUrl: optionalUrl,
+        notes: optionalString,
+      })
+    )
+    .optional(),
+  requireReservationDeposit: z.boolean().optional(),
+  reservationDepositPercentage: z.number().min(0).max(100).optional(),
 });
 
 export type FormValues = z.infer<typeof schema>;

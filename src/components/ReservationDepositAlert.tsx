@@ -72,13 +72,13 @@ export function ReservationDepositAlert({
 
     const message = encodeURIComponent(
       `Hola! Adjunto comprobante de pago para mi reserva:\n\n` +
-      `📅 Fecha: ${appointmentDate || "N/A"}\n` +
-      `🕐 Hora: ${appointmentTime || "N/A"}\n` +
-      `💇 Servicio: ${serviceName || "N/A"}\n` +
-      `👤 Cliente: ${clientName || "N/A"}\n` +
-      `💰 Abono: $${depositAmount.toLocaleString()} COP (${depositPercentage}%)\n` +
-      `📝 ID Reserva: ${reservationId || "N/A"}\n\n` +
-      `Espero confirmación de la reserva. Gracias!`
+      `Fecha: ${appointmentDate || "N/A"}\n` +
+      `Hora: ${appointmentTime || "N/A"}\n` +
+      `Servicio: ${serviceName || "N/A"}\n` +
+      `Cliente: ${clientName || "N/A"}\n` +
+      `Abono: $${depositAmount.toLocaleString()} COP (${depositPercentage}%)\n` +
+      `ID Reserva: ${reservationId || "N/A"}\n\n` +
+      `Espero confirmacion de la reserva. Gracias!`
     );
 
     window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
