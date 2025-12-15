@@ -6,10 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <meta
-      http-equiv="Cache-Control"
-      content="no-store, no-cache, must-revalidate"
-    />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
 
@@ -17,18 +14,14 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="google" content="notranslate" />
 
-    <!-- Preconnect para acelerar la descarga de fuentes -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-    <!-- Inter (UI) y Poppins (titulares) -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
       rel="stylesheet"
     />
 
     <title>Mi agenda</title>
-
     <style>
       :root {
         --gg-primary: #de739e;
@@ -145,21 +138,27 @@
         padding: 10px 14px;
         font-size: 14px;
         font-weight: 600;
-        background: linear-gradient(
-          135deg,
-          #de739e,
-          #f29fba
-        );
+        background: linear-gradient(135deg, #de739e, #f29fba);
         color: #0c0c10;
-        cursor: default;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 6px;
+        margin-bottom: 8px;
       }
 
       .inapp-button span.icon {
         font-size: 16px;
+      }
+
+      .inapp-link {
+        text-align: center;
+        display: block;
+        color: var(--gg-primary);
+        font-size: 13px;
+        text-decoration: underline;
+        margin-bottom: 6px;
       }
 
       .inapp-hint {
@@ -168,25 +167,28 @@
         color: rgba(255, 255, 255, 0.6);
         text-align: center;
       }
-
-      #root {
-        min-height: 100vh;
-      }
     </style>
   </head>
 
   <body>
     <div id="root"></div>
 
-    <!-- 🛡️ Carga condicional de la app -->
     <script type="module">
       const ua = navigator.userAgent || "";
-      const isInAppBrowser =
-        /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+      const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+
+      const rawHost = window.location.hostname || "";
+      const hostWithoutWww = rawHost.replace(/^www\./, "");
+      const baseName = hostWithoutWww.split(".")[0] || "tu agenda";
+      const brandName = baseName
+        .split("-")
+        .map((p) => (p.length ? p[0].toUpperCase() + p.slice(1) : ""))
+        .join(" ");
 
       if (isInAppBrowser) {
-        // ❌ NO cargamos el bundle de React → evitamos que el WebView se rompa
         const root = document.getElementById("root");
+        const currentUrl = window.location.href;
+
         if (root) {
           root.innerHTML = `
             <div class="inapp-wrapper">
@@ -195,7 +197,7 @@
                   <span class="inapp-dot"></span>
                   <span>Estás viendo esto dentro de la app</span>
                 </div>
-                <h1 class="inapp-title">Abre Galaxia Glamour en tu navegador</h1>
+                <h1 class="inapp-title">Abre ${brandName} en tu navegador</h1>
                 <p class="inapp-subtitle">
                   Para ver correctamente la agenda y reservar tu cita, abre esta página en Safari o en tu navegador preferido.
                 </p>
@@ -206,26 +208,40 @@
                   </li>
                   <li>
                     <span class="step-number">2</span>
-                    <span>Toca la opción <strong>"Abrir en el navegador"</strong> o similar.</span>
-                  </li>
-                  <li>
-                    <span class="step-number">3</span>
-                    <span>Desde allí podrás usar todas las funciones de Galaxia Glamour sin problemas.</span>
+                    <span>Toca la opción <strong>"Abrir en el navegador"</strong> o copia el enlace.</span>
                   </li>
                 </ul>
-                <button class="inapp-button" type="button">
-                  <span class="icon">🔓</span>
-                  Abrir en el navegador
+                <button class="inapp-button" id="copyLinkBtn">
+                  <span class="icon">📋</span>
+                  Copiar enlace
                 </button>
+                <a href="${currentUrl}" target="_blank" rel="noopener noreferrer" class="inapp-link">
+                  Abrir enlace en navegador
+                </a>
                 <p class="inapp-hint">
-                  Si no ves la opción, mantén presionado el enlace en la bio o en el chat y elige <strong>"Abrir en Safari"</strong>.
+                  Si no ves la opción, mantén presionado el enlace y elige <strong>"Abrir en Safari"</strong>.
                 </p>
               </div>
             </div>
           `;
+
+          // Funcionalidad del botón de copiar
+          const copyBtn = document.getElementById("copyLinkBtn");
+          copyBtn?.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(currentUrl);
+              copyBtn.innerHTML = "✅ Enlace copiado";
+              copyBtn.disabled = true;
+              setTimeout(() => {
+                copyBtn.innerHTML = '<span class="icon">📋</span> Copiar enlace';
+                copyBtn.disabled = false;
+              }, 2500);
+            } catch {
+              alert("No se pudo copiar el enlace, copia manualmente: " + currentUrl);
+            }
+          });
         }
       } else {
-        // ✅ Navegadores normales: cargamos la app Vite/React con normalidad
         import("/src/main.tsx");
       }
     </script>
