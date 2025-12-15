@@ -6,9 +6,13 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate"
+    />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+
     <link rel="icon" type="image/png" href="/favicon.ico" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="google" content="notranslate" />
@@ -24,89 +28,206 @@
     />
 
     <title>Mi agenda</title>
+
     <style>
-      html,
-      body {
-        font-family: "Inter", sans-serif;
+      :root {
+        --gg-primary: #de739e;
+        --gg-bg: #0b0b10;
       }
 
-      #debug-logs {
-        position: fixed;
-        top: 0;
-        left: 0;
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: var(--gg-bg);
+        color: #ffffff;
+      }
+
+      .inapp-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: radial-gradient(
+            circle at top left,
+            rgba(222, 115, 158, 0.25),
+            transparent 55%
+          ),
+          radial-gradient(
+            circle at bottom right,
+            rgba(255, 255, 255, 0.08),
+            transparent 60%
+          ),
+          var(--gg-bg);
+      }
+
+      .inapp-card {
+        max-width: 420px;
         width: 100%;
-        max-height: 200px;
-        overflow-y: auto;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        font-family: monospace;
-        font-size: 12px;
-        z-index: 9999;
-        padding: 10px;
-        display: none;
+        border-radius: 24px;
+        padding: 24px 22px 20px;
+        background: rgba(10, 10, 14, 0.9);
+        border: 1px solid rgba(222, 115, 158, 0.35);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(18px);
+      }
+
+      .inapp-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: rgba(222, 115, 158, 0.1);
+        color: rgba(255, 255, 255, 0.75);
+        margin-bottom: 10px;
+      }
+
+      .inapp-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--gg-primary);
+      }
+
+      .inapp-title {
+        font-family: "Poppins", system-ui, sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        margin: 0 0 8px;
+      }
+
+      .inapp-subtitle {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.8);
+        margin: 0 0 18px;
+      }
+
+      .inapp-steps {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 20px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.9);
+      }
+
+      .inapp-steps li {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 8px;
+      }
+
+      .inapp-steps span.step-number {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        border: 1px solid rgba(222, 115, 158, 0.8);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: var(--gg-primary);
+      }
+
+      .inapp-button {
+        width: 100%;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 600;
+        background: linear-gradient(
+          135deg,
+          #de739e,
+          #f29fba
+        );
+        color: #0c0c10;
+        cursor: default;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .inapp-button span.icon {
+        font-size: 16px;
+      }
+
+      .inapp-hint {
+        margin-top: 8px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.6);
+        text-align: center;
+      }
+
+      #root {
+        min-height: 100vh;
       }
     </style>
   </head>
 
   <body>
     <div id="root"></div>
-    <div id="debug-logs"></div>
-
-    <!-- 🔍 Logger de errores (lo mantenemos) -->
-    <script>
-      (function () {
-        var logEl = document.getElementById("debug-logs");
-        if (!logEl) return;
-
-        function log(msg) {
-          logEl.style.display = "block";
-          logEl.textContent += msg + "\n";
-        }
-
-        window.onerror = function (message, source, lineno, colno, error) {
-          log("Error: " + message + " @ " + source + ":" + lineno + ":" + colno);
-        };
-
-        window.onunhandledrejection = function (event) {
-          var reason = event.reason;
-          var msg =
-            reason && reason.message ? reason.message : String(reason);
-          log("UnhandledRejection: " + msg);
-        };
-
-        log("Debug logger inicializado. UA: " + navigator.userAgent);
-      })();
-    </script>
 
     <!-- 🛡️ Carga condicional de la app -->
     <script type="module">
       const ua = navigator.userAgent || "";
-      const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+      const isInAppBrowser =
+        /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
 
       if (isInAppBrowser) {
-        // ❌ NO cargamos el bundle de React → evitamos el crash
+        // ❌ NO cargamos el bundle de React → evitamos que el WebView se rompa
         const root = document.getElementById("root");
         if (root) {
           root.innerHTML = `
-            <div style="
-              padding: 24px;
-              font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            ">
-              <h1 style="font-size: 20px; margin-bottom: 12px;">
-                Abre Galaxia Glamour en tu navegador
-              </h1>
-              <p style="font-size: 14px; line-height: 1.4;">
-                Para una mejor experiencia, toca el icono de los tres puntos (⋯) y selecciona
-                <strong>"Abrir en el navegador"</strong>.
-              </p>
+            <div class="inapp-wrapper">
+              <div class="inapp-card">
+                <div class="inapp-pill">
+                  <span class="inapp-dot"></span>
+                  <span>Estás viendo esto dentro de la app</span>
+                </div>
+                <h1 class="inapp-title">Abre Galaxia Glamour en tu navegador</h1>
+                <p class="inapp-subtitle">
+                  Para ver correctamente la agenda y reservar tu cita, abre esta página en Safari o en tu navegador preferido.
+                </p>
+                <ul class="inapp-steps">
+                  <li>
+                    <span class="step-number">1</span>
+                    <span>Busca el ícono de los <strong>tres puntos (⋯)</strong> en la parte superior.</span>
+                  </li>
+                  <li>
+                    <span class="step-number">2</span>
+                    <span>Toca la opción <strong>"Abrir en el navegador"</strong> o similar.</span>
+                  </li>
+                  <li>
+                    <span class="step-number">3</span>
+                    <span>Desde allí podrás usar todas las funciones de Galaxia Glamour sin problemas.</span>
+                  </li>
+                </ul>
+                <button class="inapp-button" type="button">
+                  <span class="icon">🔓</span>
+                  Abrir en el navegador
+                </button>
+                <p class="inapp-hint">
+                  Si no ves la opción, mantén presionado el enlace en la bio o en el chat y elige <strong>"Abrir en Safari"</strong>.
+                </p>
+              </div>
             </div>
           `;
         }
       } else {
         // ✅ Navegadores normales: cargamos la app Vite/React con normalidad
-        import("/src/main.tsx");
+        import "/src/main.tsx";
       }
     </script>
   </body>
 </html>
-
