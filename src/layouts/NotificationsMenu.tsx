@@ -60,7 +60,16 @@ export default function NotificationsMenu({
   };
 
   useEffect(() => {
-    fetchNotifications();
+    void fetchNotifications();
+
+    const hasServiceWorker =
+      typeof navigator !== "undefined" &&
+      "serviceWorker" in navigator &&
+      !!navigator.serviceWorker;
+
+    if (!hasServiceWorker) {
+      return;
+    }
 
     // SW listener con cleanup correcto
     const onSwMessage = (event: MessageEvent) => {
