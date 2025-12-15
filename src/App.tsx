@@ -1,5 +1,13 @@
 // src/App.tsx
-import { AppShell, Avatar, Burger, Flex, UnstyledButton, Text, Anchor } from "@mantine/core";
+import {
+  AppShell,
+  Avatar,
+  Burger,
+  Flex,
+  UnstyledButton,
+  Text,
+  Anchor,
+} from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -19,7 +27,6 @@ import { MembershipAlert } from "./components/MembershipAlert";
 import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
 import { getCurrentMembership, Membership } from "./services/membershipService";
 
-
 function App() {
   const { userId, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
@@ -30,7 +37,9 @@ function App() {
   const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
   const [paymentModalOpened, setPaymentModalOpened] = useState(false);
-  const [currentMembership, setCurrentMembership] = useState<Membership | null>(null);
+  const [currentMembership, setCurrentMembership] = useState<Membership | null>(
+    null
+  );
 
   // Branding dinámico
   const color = organization?.branding?.primaryColor || "#DE739E";
@@ -64,56 +73,82 @@ function App() {
 
     window.addEventListener("membership-suspended", handleMembershipSuspended);
     return () => {
-      window.removeEventListener("membership-suspended", handleMembershipSuspended);
+      window.removeEventListener(
+        "membership-suspended",
+        handleMembershipSuspended
+      );
     };
   }, []);
 
-  // Push notification setup (igual que antes)
+  // App.tsx
   useEffect(() => {
     const requestNotificationPermission = async () => {
-      if (isAuthenticated && userId) {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          const registration = await navigator.serviceWorker.ready;
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
-          });
+      // 1) Chequear que el usuario esté autenticado
+      if (!isAuthenticated || !userId) return;
 
-          // Enviar la suscripción al backend
-          await createSubscription({
-            endpoint: subscription.endpoint,
-            keys: {
-              p256dh: subscription.toJSON().keys?.p256dh ?? "",
-              auth: subscription.toJSON().keys?.auth ?? "",
-            },
-            userId,
-          });
-        }
+      // 2) Detectar navegadores embebidos (Instagram, Telegram, Facebook, etc.)
+      const ua = navigator.userAgent || "";
+      const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+
+      if (isInAppBrowser) {
+        // En in-app browsers de iOS NO hay web push, así que salimos aquí
+        return;
       }
+
+      // 3) Verificar que existan las APIs antes de usarlas
+      if (
+        typeof Notification === "undefined" ||
+        !("serviceWorker" in navigator) ||
+        !("PushManager" in window)
+      ) {
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
+      });
+
+      await createSubscription({
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.toJSON().keys?.p256dh ?? "",
+          auth: subscription.toJSON().keys?.auth ?? "",
+        },
+        userId,
+      });
     };
 
-    requestNotificationPermission();
+    void requestNotificationPermission();
   }, [isAuthenticated, userId]);
 
   // Actualización automática de Service Worker
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/custom-sw.js").then((registration) => {
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker)
-            installingWorker.onstatechange = () => {
-              if (installingWorker.state === "installed") {
-                if (navigator.serviceWorker.controller) {
-                  console.log("Nueva versión disponible. Actualizando...");
-                  window.location.reload();
-                }
-              }
-            };
-        };
-      });
+    const ua = navigator.userAgent || "";
+    const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+
+    if (!("serviceWorker" in navigator) || isInAppBrowser) {
+      return;
     }
+
+    navigator.serviceWorker.register("/custom-sw.js").then((registration) => {
+      registration.onupdatefound = () => {
+        const installingWorker = registration.installing;
+        if (installingWorker)
+          installingWorker.onstatechange = () => {
+            if (installingWorker.state === "installed") {
+              if (navigator.serviceWorker.controller) {
+                console.log("Nueva versión disponible. Actualizando...");
+                window.location.reload();
+              }
+            }
+          };
+      };
+    });
   }, []);
 
   // Loader mientras carga la organización/branding
@@ -195,12 +230,12 @@ function App() {
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
           {/* Alerta de membresía para usuarios autenticados */}
           {isAuthenticated && organization?._id && (
-            <MembershipAlert 
+            <MembershipAlert
               organizationId={organization._id}
-              onRenewClick={() => setPaymentModalOpened(true)} 
+              onRenewClick={() => setPaymentModalOpened(true)}
             />
           )}
-          
+
           <Routes>
             {generalRoutes.map((route, index) => (
               <Route
