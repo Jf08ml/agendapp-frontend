@@ -1,249 +1,54 @@
 <!doctype html>
 <html lang="es" translate="no">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
 
-    <link rel="icon" type="image/png" href="/favicon.ico" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="google" content="notranslate" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="icon" type="image/png" href="/favicon.ico" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="google" content="notranslate" />
+  
+  <!-- Preconnect para acelerar la descarga de fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
-      rel="stylesheet"
-    />
+  <!-- Inter (UI) y Poppins (titulares) -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap"
+    rel="stylesheet">
 
-    <title>Mi agenda</title>
-    <style>
-      :root {
-        --gg-primary: #de739e;
-        --gg-bg: #0b0b10;
-      }
+  <title>Mi agenda</title>
+  <style>
+    html,
+    body {
+      font-family: 'Inter', sans-serif;
+    }
 
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
-          "Segoe UI", sans-serif;
-        background: var(--gg-bg);
-        color: #ffffff;
-      }
+    #debug-logs {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 9999;
+      padding: 10px;
+      display: none;
+    }
+  </style>
+</head>
 
-      .inapp-wrapper {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-        background: radial-gradient(
-            circle at top left,
-            rgba(222, 115, 158, 0.25),
-            transparent 55%
-          ),
-          radial-gradient(
-            circle at bottom right,
-            rgba(255, 255, 255, 0.08),
-            transparent 60%
-          ),
-          var(--gg-bg);
-      }
+<body>
+  <div id="root"></div>
+  <div id="debug-logs"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 
-      .inapp-card {
-        max-width: 420px;
-        width: 100%;
-        border-radius: 24px;
-        padding: 24px 22px 20px;
-        background: rgba(10, 10, 14, 0.9);
-        border: 1px solid rgba(222, 115, 158, 0.35);
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(18px);
-      }
-
-      .inapp-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 11px;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        background: rgba(222, 115, 158, 0.1);
-        color: rgba(255, 255, 255, 0.75);
-        margin-bottom: 10px;
-      }
-
-      .inapp-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: var(--gg-primary);
-      }
-
-      .inapp-title {
-        font-family: "Poppins", system-ui, sans-serif;
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        margin: 0 0 8px;
-      }
-
-      .inapp-subtitle {
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.8);
-        margin: 0 0 18px;
-      }
-
-      .inapp-steps {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 20px;
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.9);
-      }
-
-      .inapp-steps li {
-        display: flex;
-        gap: 8px;
-        align-items: flex-start;
-        margin-bottom: 8px;
-      }
-
-      .inapp-steps span.step-number {
-        flex-shrink: 0;
-        width: 18px;
-        height: 18px;
-        border-radius: 999px;
-        border: 1px solid rgba(222, 115, 158, 0.8);
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        color: var(--gg-primary);
-      }
-
-      .inapp-button {
-        width: 100%;
-        border: none;
-        border-radius: 999px;
-        padding: 10px 14px;
-        font-size: 14px;
-        font-weight: 600;
-        background: linear-gradient(135deg, #de739e, #f29fba);
-        color: #0c0c10;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        margin-bottom: 8px;
-      }
-
-      .inapp-button span.icon {
-        font-size: 16px;
-      }
-
-      .inapp-link {
-        text-align: center;
-        display: block;
-        color: var(--gg-primary);
-        font-size: 13px;
-        text-decoration: underline;
-        margin-bottom: 6px;
-      }
-
-      .inapp-hint {
-        margin-top: 8px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.6);
-        text-align: center;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div id="root"></div>
-
-    <script type="module">
-      const ua = navigator.userAgent || "";
-      const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
-
-      const rawHost = window.location.hostname || "";
-      const hostWithoutWww = rawHost.replace(/^www\./, "");
-      const baseName = hostWithoutWww.split(".")[0] || "tu agenda";
-      const brandName = baseName
-        .split("-")
-        .map((p) => (p.length ? p[0].toUpperCase() + p.slice(1) : ""))
-        .join(" ");
-
-      if (isInAppBrowser) {
-        const root = document.getElementById("root");
-        const currentUrl = window.location.href;
-
-        if (root) {
-          root.innerHTML = `
-            <div class="inapp-wrapper">
-              <div class="inapp-card">
-                <div class="inapp-pill">
-                  <span class="inapp-dot"></span>
-                  <span>Estás viendo esto dentro de la app</span>
-                </div>
-                <h1 class="inapp-title">Abre ${brandName} en tu navegador</h1>
-                <p class="inapp-subtitle">
-                  Para ver correctamente la agenda y reservar tu cita, abre esta página en Safari o en tu navegador preferido.
-                </p>
-                <ul class="inapp-steps">
-                  <li>
-                    <span class="step-number">1</span>
-                    <span>Busca el ícono de los <strong>tres puntos (⋯)</strong> en la parte superior.</span>
-                  </li>
-                  <li>
-                    <span class="step-number">2</span>
-                    <span>Toca la opción <strong>"Abrir en el navegador"</strong> o copia el enlace.</span>
-                  </li>
-                </ul>
-                <button class="inapp-button" id="copyLinkBtn">
-                  <span class="icon">📋</span>
-                  Copiar enlace
-                </button>
-                <a href="${currentUrl}" target="_blank" rel="noopener noreferrer" class="inapp-link">
-                  Abrir enlace en navegador
-                </a>
-                <p class="inapp-hint">
-                  Si no ves la opción, mantén presionado el enlace y elige <strong>"Abrir en Safari"</strong>.
-                </p>
-              </div>
-            </div>
-          `;
-
-          // Funcionalidad del botón de copiar
-          const copyBtn = document.getElementById("copyLinkBtn");
-          copyBtn?.addEventListener("click", async () => {
-            try {
-              await navigator.clipboard.writeText(currentUrl);
-              copyBtn.innerHTML = "✅ Enlace copiado";
-              copyBtn.disabled = true;
-              setTimeout(() => {
-                copyBtn.innerHTML = '<span class="icon">📋</span> Copiar enlace';
-                copyBtn.disabled = false;
-              }, 2500);
-            } catch {
-              alert("No se pudo copiar el enlace, copia manualmente: " + currentUrl);
-            }
-          });
-        }
-      } else {
-        import("/src/main.tsx");
-      }
-    </script>
-  </body>
 </html>
