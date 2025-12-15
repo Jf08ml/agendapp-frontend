@@ -59,9 +59,10 @@ export default function Home() {
       break;
   }
 
+
   return (
     <>
-      <LayoutComponent features={features} welcomeTitle={welcomeTitle} welcomeDescription={welcomeDescription} />
+      <LayoutComponent features={features} welcomeTitle={welcomeTitle} welcomeDescription={welcomeDescription} organizationId={organization?._id} />
 
       <Box py="xl" style={{ position: "relative", zIndex: 10 }}>
         <Center>

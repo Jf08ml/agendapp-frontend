@@ -11,6 +11,7 @@ import {
   Stack,
   Paper,
   Group,
+  Button,
 } from "@mantine/core";
 import { ReactNode } from "react";
 
@@ -26,6 +27,7 @@ interface HomeLayoutProps {
   features: Feature[];
   welcomeTitle: string;
   welcomeDescription: string;
+  organizationId?: string;
 }
 
 // ============= MODERN LAYOUT (Actual) =============
@@ -214,12 +216,15 @@ export function MinimalLayout({
   features,
   welcomeTitle,
   welcomeDescription,
+  organizationId,
 }: HomeLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
 
+  const showStoreButton = organizationId === "6730cbcdee1f12ea45bfc6bb";
+
   return (
-    <Box style={{ minHeight: "100vh", backgroundColor: theme.white }}>
+    <Box>
       <Container size="sm" py={{ base: 48, sm: 80 }}>
         {/* Hero Section */}
         <Stack gap="md" mb={{ base: 40, sm: 60 }}>
@@ -264,11 +269,7 @@ export function MinimalLayout({
               }}
               className="minimal-card"
             >
-              <Group
-                gap="md"
-                align="center"
-                wrap="nowrap"
-              >
+              <Group gap="md" align="center" wrap="nowrap">
                 <Box
                   style={{
                     width: rem(40),
@@ -292,6 +293,26 @@ export function MinimalLayout({
             </Paper>
           ))}
         </Stack>
+        {showStoreButton && (
+          <Group justify="center" mt="xl">
+            <Button
+              component="a"
+              href="https://store.galaxiaglamour.com/catalogo"
+              target="_blank"
+              radius="xl"
+              size="md"
+              variant="gradient"
+              gradient={{
+                from: theme.colors[theme.primaryColor][6],
+                to: theme.colors[theme.primaryColor][4],
+                deg: 45,
+              }}
+              style={{ fontWeight: 600 }}
+            >
+              🛍️ Tienda de insumos de pestañas
+            </Button>
+          </Group>
+        )}
       </Container>
 
       <style>
@@ -363,7 +384,10 @@ export function CardsLayout({
         </Paper>
 
         {/* Features Grid */}
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 2 }} spacing={{ base: "md", sm: "lg" }}>
+        <SimpleGrid
+          cols={{ base: 1, sm: 2, md: 2 }}
+          spacing={{ base: "md", sm: "lg" }}
+        >
           {features.map((f) => (
             <Card
               key={f.link}
@@ -380,7 +404,7 @@ export function CardsLayout({
               }}
               className="cards-card"
             >
-              <Stack  align="center" ta="center">
+              <Stack align="center" ta="center">
                 <Box
                   style={{
                     width: rem(64),
@@ -433,4 +457,3 @@ export function CardsLayout({
     </Box>
   );
 }
-
