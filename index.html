@@ -52,7 +52,7 @@
     <div id="root"></div>
     <div id="debug-logs"></div>
 
-    <!-- 🔍 Logger para ver errores en Instagram / Telegram -->
+    <!-- 🔍 Logger de errores (lo mantenemos) -->
     <script>
       (function () {
         var logEl = document.getElementById("debug-logs");
@@ -78,6 +78,35 @@
       })();
     </script>
 
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- 🛡️ Carga condicional de la app -->
+    <script type="module">
+      const ua = navigator.userAgent || "";
+      const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
+
+      if (isInAppBrowser) {
+        // ❌ NO cargamos el bundle de React → evitamos el crash
+        const root = document.getElementById("root");
+        if (root) {
+          root.innerHTML = `
+            <div style="
+              padding: 24px;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            ">
+              <h1 style="font-size: 20px; margin-bottom: 12px;">
+                Abre Galaxia Glamour en tu navegador
+              </h1>
+              <p style="font-size: 14px; line-height: 1.4;">
+                Para una mejor experiencia, toca el icono de los tres puntos (⋯) y selecciona
+                <strong>"Abrir en el navegador"</strong>.
+              </p>
+            </div>
+          `;
+        }
+      } else {
+        // ✅ Navegadores normales: cargamos la app Vite/React con normalidad
+        import("/src/main.tsx");
+      }
+    </script>
   </body>
 </html>
+
