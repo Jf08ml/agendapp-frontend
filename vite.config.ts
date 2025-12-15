@@ -62,6 +62,7 @@ export default defineConfig({
       devOptions: {
         enabled: false,
       },
+      injectRegister: null,
     }),
   ],
   // server: {
