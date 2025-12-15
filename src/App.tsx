@@ -60,7 +60,8 @@ function App() {
         }
       }
     };
-    loadMembership();
+
+    void loadMembership();
   }, [organization?._id]);
 
   // Escuchar evento de membresía suspendida
@@ -80,27 +81,25 @@ function App() {
     };
   }, []);
 
-  // App.tsx
+  // 🔔 Notificaciones push (con guards para Instagram / Telegram / FB in-app)
   useEffect(() => {
     const requestNotificationPermission = async () => {
-      // 1) Chequear que el usuario esté autenticado
       if (!isAuthenticated || !userId) return;
 
-      // 2) Detectar navegadores embebidos (Instagram, Telegram, Facebook, etc.)
       const ua = navigator.userAgent || "";
       const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
 
+      // En navegadores embebidos no intentamos usar push
       if (isInAppBrowser) {
-        // En in-app browsers de iOS NO hay web push, así que salimos aquí
         return;
       }
 
-      // 3) Verificar que existan las APIs antes de usarlas
-      if (
-        typeof Notification === "undefined" ||
-        !("serviceWorker" in navigator) ||
-        !("PushManager" in window)
-      ) {
+      // Verificar que existan las APIs antes de usarlas
+      const hasNotification = typeof Notification !== "undefined";
+      const hasServiceWorker = "serviceWorker" in navigator;
+      const hasPushManager = "PushManager" in window;
+
+      if (!hasNotification || !hasServiceWorker || !hasPushManager) {
         return;
       }
 
@@ -126,7 +125,7 @@ function App() {
     void requestNotificationPermission();
   }, [isAuthenticated, userId]);
 
-  // Actualización automática de Service Worker
+  // 🔄 Actualización automática de Service Worker (evitando in-app browsers)
   useEffect(() => {
     const ua = navigator.userAgent || "";
     const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
@@ -135,20 +134,27 @@ function App() {
       return;
     }
 
-    navigator.serviceWorker.register("/custom-sw.js").then((registration) => {
-      registration.onupdatefound = () => {
-        const installingWorker = registration.installing;
-        if (installingWorker)
-          installingWorker.onstatechange = () => {
-            if (installingWorker.state === "installed") {
-              if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker
+      .register("/custom-sw.js")
+      .then((registration) => {
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (
+                installingWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
                 console.log("Nueva versión disponible. Actualizando...");
                 window.location.reload();
               }
-            }
-          };
-      };
-    });
+            };
+          }
+        };
+      })
+      .catch((err) => {
+        console.error("Error registrando el service worker:", err);
+      });
   }, []);
 
   // Loader mientras carga la organización/branding
@@ -205,6 +211,7 @@ function App() {
             <Header organization={organization} />
           </Flex>
         </AppShell.Header>
+
         <AppShell.Navbar
           p="md"
           bg={color}
@@ -227,6 +234,7 @@ function App() {
             </Text>
           </div>
         </AppShell.Navbar>
+
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
           {/* Alerta de membresía para usuarios autenticados */}
           {isAuthenticated && organization?._id && (
