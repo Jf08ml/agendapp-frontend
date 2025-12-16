@@ -232,10 +232,10 @@ export default function OpeningHoursTab({
           <TimeInput
             label="Desde"
             value={newBreak.start}
-            onChange={(val) =>
+            onChange={(e) =>
               setNewBreak((s) => ({
                 ...s,
-                start: typeof val === "string" ? val : "",
+                start: e.currentTarget.value,
               }))
             }
             onBlur={() =>
@@ -246,13 +246,14 @@ export default function OpeningHoursTab({
             }
             disabled={!isEditing}
           />
+
           <TimeInput
             label="Hasta"
             value={newBreak.end}
-            onChange={(val) =>
+            onChange={(e) =>
               setNewBreak((s) => ({
                 ...s,
-                end: typeof val === "string" ? val : "",
+                end: e.currentTarget.value,
               }))
             }
             onBlur={() =>
@@ -263,6 +264,7 @@ export default function OpeningHoursTab({
             }
             disabled={!isEditing}
           />
+
           <TextInput
             label="Nota (opcional)"
             placeholder="Almuerzo, inventario, etc."
