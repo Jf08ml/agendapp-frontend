@@ -215,9 +215,13 @@ export default function StepMultiServiceSummary({
                   {arr.map((t) => {
                     const svc = svcMap[t.serviceId];
                     const d = dates.find((x) => x.serviceId === t.serviceId);
-                    const emp = d?.employeeId
-                      ? empMap[d.employeeId]
+
+                    const effectiveEmpId =
+                      t.employeeId ?? d?.employeeId ?? null;
+                    const emp = effectiveEmpId
+                      ? empMap[effectiveEmpId]
                       : undefined;
+
                     const displayDate = d?.date
                       ? capitalize(dayjs(d.date).format("dddd, D MMM YYYY"))
                       : "—";

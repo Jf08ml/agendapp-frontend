@@ -96,6 +96,7 @@ export default function OrganizationInfo() {
                 [1, 2, 3, 4, 5]
               ),
               breaks: ensureBreaks(response.openingHours?.breaks),
+              stepMinutes: response.openingHours?.stepMinutes ?? 5,
             },
           };
 

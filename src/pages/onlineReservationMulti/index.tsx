@@ -44,7 +44,15 @@ import {
   type CreateReservationPayload,
 } from "../../services/reservationService";
 import dayjs from "dayjs";
-import { buildStartFrom, getId } from "./bookingUtilsMulti";
+import {
+  getAppointmentsByOrganizationId,
+  type Appointment,
+} from "../../services/appointmentService";
+import {
+  buildStartFrom,
+  getId,
+  pickEmployeeWithLessAppointmentsForSlot,
+} from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
@@ -234,7 +242,9 @@ export default function MultiBookingWizard() {
         const payload = buildMultiplePayload();
         const result = await createMultipleReservations(payload);
         if (result && Array.isArray(result)) {
-          reservationIds = result.map(r => r._id).filter((id): id is string => !!id);
+          reservationIds = result
+            .map((r) => r._id)
+            .filter((id): id is string => !!id);
         }
         count = (times as MultiServiceBlockSelection).intervals.length;
         const start =
@@ -243,12 +253,79 @@ export default function MultiBookingWizard() {
         if (start) firstDateText = dayjs(start).format("DD/MM/YYYY HH:mm");
       } else {
         const singles = buildSingles();
+
+        const dayCache = new Map<string, Appointment[]>();
+
         for (const p of singles) {
-          const result = await createReservation(p);
-          if (result?._id) {
-            reservationIds.push(result._id);
+          // si ya viene employeeId, normal
+          if (p.employeeId) {
+            const result = await createReservation(p);
+            if (result?._id) reservationIds.push(result._id);
+            continue;
           }
+
+          // ---- Auto-assign ----
+          const svc = services.find((s) => s._id === p.serviceId);
+          if (!svc) throw new Error("Servicio no encontrado");
+
+          const start = dayjs(p.startDate);
+          const end = start.add(svc.duration ?? 0, "minute");
+          const dk = start.format("YYYY-MM-DD");
+
+          let allAppointments = dayCache.get(dk);
+          if (!allAppointments) {
+            const startISO = start.startOf("day").toISOString();
+            const endISO = start.endOf("day").toISOString();
+            allAppointments = await getAppointmentsByOrganizationId(
+              orgId,
+              startISO,
+              endISO
+            );
+            dayCache.set(dk, allAppointments);
+          }
+
+          // empleados elegibles para el servicio
+          const eligibleEmpIds = employees
+            .filter((e) => e.isActive)
+            .filter((e) => {
+              const svcIds = (e.services || []).map((x: any) =>
+                typeof x === "string" ? x : x._id
+              );
+              return svcIds.includes(p.serviceId);
+            })
+            .map((e) => e._id);
+
+          // appointmentsByEmp
+          const appointmentsByEmp: Record<string, Appointment[]> = {};
+          for (const empId of eligibleEmpIds) {
+            appointmentsByEmp[empId] = allAppointments.filter(
+              (a) => a.employee && a.employee._id === empId
+            );
+          }
+
+          const chosenEmpId = pickEmployeeWithLessAppointmentsForSlot({
+            date: start.toDate(),
+            from: start.toDate(),
+            to: end.toDate(),
+            candidateEmployeeIds: eligibleEmpIds,
+            appointmentsByEmp,
+          });
+
+          if (!chosenEmpId) {
+            throw new Error(
+              `No hay empleados disponibles para ${
+                svc.name
+              } a las ${start.format("HH:mm")} (${dk}).`
+            );
+          }
+
+          const result = await createReservation({
+            ...p,
+            employeeId: chosenEmpId,
+          });
+          if (result?._id) reservationIds.push(result._id);
         }
+
         count = singles.length;
         firstDateText = dayjs(singles[0].startDate).format("DD/MM/YYYY HH:mm");
       }
@@ -468,35 +545,42 @@ export default function MultiBookingWizard() {
             <Divider my="md" />
 
             {/* Deposit Alert - Mostrar solo si hay reservas y está habilitado */}
-            {finishInfo && dates.length > 0 && finishInfo.reservationIds.length > 0 && (
-              <ReservationDepositAlert
-                reservationId={finishInfo.reservationIds[0]}
-                clientName={customerDetails.name}
-                serviceName={
-                  dates.length === 1
-                    ? services.find((s) => s._id === dates[0].serviceId)
-                        ?.name || "Múltiples servicios"
-                    : "Múltiples servicios"
-                }
-                servicePrice={dates.reduce((total, date) => {
-                  const service = services.find(
-                    (s) => s._id === date.serviceId
-                  );
-                  return total + (service?.price || 0);
-                }, 0)}
-                appointmentDate={dates[0]?.date ? dayjs(dates[0].date).format("DD/MM/YYYY") : ""}
-                appointmentTime={
-                  (() => {
-                    const value = Array.isArray(times) && times.length > 0
-                      ? times[0].time
-                      : typeof times === "object" && "startTime" in times
-                      ? times.startTime
-                      : "";
-                    return value instanceof Date ? dayjs(value).format("HH:mm") : value || undefined;
-                  })()
-                }
-              />
-            )}
+            {finishInfo &&
+              dates.length > 0 &&
+              finishInfo.reservationIds.length > 0 && (
+                <ReservationDepositAlert
+                  reservationId={finishInfo.reservationIds[0]}
+                  clientName={customerDetails.name}
+                  serviceName={
+                    dates.length === 1
+                      ? services.find((s) => s._id === dates[0].serviceId)
+                          ?.name || "Múltiples servicios"
+                      : "Múltiples servicios"
+                  }
+                  servicePrice={dates.reduce((total, date) => {
+                    const service = services.find(
+                      (s) => s._id === date.serviceId
+                    );
+                    return total + (service?.price || 0);
+                  }, 0)}
+                  appointmentDate={
+                    dates[0]?.date
+                      ? dayjs(dates[0].date).format("DD/MM/YYYY")
+                      : ""
+                  }
+                  appointmentTime={(() => {
+                    const value =
+                      Array.isArray(times) && times.length > 0
+                        ? times[0].time
+                        : typeof times === "object" && "startTime" in times
+                        ? times.startTime
+                        : "";
+                    return value instanceof Date
+                      ? dayjs(value).format("HH:mm")
+                      : value || undefined;
+                  })()}
+                />
+              )}
 
             <Group
               justify={isMobile ? "stretch" : "center"}

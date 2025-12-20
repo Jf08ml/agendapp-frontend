@@ -43,6 +43,7 @@ type OpeningHoursSafe = {
   end: string;
   businessDays: number[];
   breaks: OpeningBreak[];
+  stepMinutes: number;
 };
 
 // Helpers
@@ -105,13 +106,14 @@ export default function OpeningHoursTab({
       ...(form.values.openingHours?.businessDays ?? [1, 2, 3, 4, 5]),
     ],
     breaks: [...(form.values.openingHours?.breaks ?? [])],
+    stepMinutes: form.values.openingHours?.stepMinutes ?? 5,
   };
 
   const breaks: OpeningBreak[] = opening.breaks;
   const businessDays: number[] = opening.businessDays;
 
   // Estados locales de texto para evitar que TimeInput vuelva a "--:--"
-  const [startLocal, setStartLocal] = useState<string>(opening.start || "");
+  const [, setStartLocal] = useState<string>(opening.start || "");
   const [, setEndLocal] = useState<string>(opening.end || "");
 
   // Si desde fuera cambian (ej. reset), sincroniza
@@ -164,8 +166,6 @@ export default function OpeningHoursTab({
     });
   };
 
-  console.log(startLocal);
-
   return (
     <SectionCard
       title="Horario de atención"
@@ -213,6 +213,28 @@ export default function OpeningHoursTab({
           ))}
         </Group>
       </Box>
+
+      <NativeSelect
+        label="Intervalo de inicio (minutos) - Reserva en línea"
+        description="Define cada cuánto aparecen horarios disponibles en la reserva en línea (ej: 5 muestra 8:50, 10 muestra 8:50 si cae en múltiplos de 10, 15 no lo mostrará)."
+        value={String(opening.stepMinutes)}
+        onChange={(e) => {
+          if (!isEditing) return;
+          const v = Number(e.currentTarget.value);
+          form.setValues({
+            ...form.values,
+            openingHours: { ...opening, stepMinutes: v },
+          });
+        }}
+        data={[
+          { value: "5", label: "Cada 5 minutos (recomendado)" },
+          { value: "10", label: "Cada 10 minutos" },
+          { value: "15", label: "Cada 15 minutos" },
+          { value: "30", label: "Cada 30 minutos" },
+        ]}
+        disabled={!isEditing}
+        mt="lg"
+      />
 
       <Box mt="lg">
         <Text fw={600} mb={6}>

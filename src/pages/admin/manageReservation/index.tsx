@@ -72,9 +72,9 @@ const ReservationsList: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const [initialLoading, setInitialLoading] = useState(false);
-  const [rowLoading, setRowLoading] = useState<
-    Record<string, RowAction | null>
-  >({});
+  const [rowLoading, setRowLoading] = useState<Record<string, RowAction | null>>(
+    {}
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -118,6 +118,31 @@ const ReservationsList: React.FC = () => {
     setRowLoading((prev) => ({ ...prev, [id]: action }));
 
   const isRowBusy = (id: string) => Boolean(rowLoading[id]);
+
+  // ------- HELPERS: EMPLEADO -------
+  const employeeNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((e) => map.set(e._id, e.names));
+    return map;
+  }, [employees]);
+
+  const getEmployeeName = (reservation: Reservation): string | null => {
+    // 1) Si el backend lo trae poblado como "employee"
+    const populated = (reservation as any)?.employeeId?.names;
+    if (typeof populated === "string" && populated.trim()) return populated.trim();
+    console.log(populated)
+    // 2) Si solo viene employeeId
+    if (
+      typeof reservation.employeeId === "string" &&
+      employeeNameById.has(reservation.employeeId)
+    ) {
+      return employeeNameById.get(reservation.employeeId) ?? null;
+    }
+    return null;
+  };
+
+  const hasEmployeeAssigned = (reservation: Reservation) =>
+    Boolean((reservation as any)?.employee?._id || reservation.employeeId);
 
   // ------- FETCH DATA -------
   useEffect(() => {
@@ -198,8 +223,7 @@ const ReservationsList: React.FC = () => {
   const serviceSelectData = useMemo(() => {
     const map = new Map<string, string>();
     reservations.forEach((r) => {
-      const serviceObj =
-        typeof r.serviceId === "object" ? r.serviceId : null;
+      const serviceObj = typeof r.serviceId === "object" ? r.serviceId : null;
       if (serviceObj?._id && serviceObj?.name) {
         map.set(serviceObj._id, serviceObj.name);
       }
@@ -260,8 +284,7 @@ const ReservationsList: React.FC = () => {
     // 4) Filtro por servicio
     if (serviceFilter !== "all") {
       list = list.filter((r) => {
-        const serviceObj =
-          typeof r.serviceId === "object" ? r.serviceId : null;
+        const serviceObj = typeof r.serviceId === "object" ? r.serviceId : null;
         return serviceObj?._id === serviceFilter;
       });
     }
@@ -282,13 +305,10 @@ const ReservationsList: React.FC = () => {
     // 6) Orden: estado (pendiente primero) + fecha ascendente
     list.sort((a, b) => {
       const statusDiff =
-        (statusPriority[a.status] ?? 99) -
-        (statusPriority[b.status] ?? 99);
+        (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99);
       if (statusDiff !== 0) return statusDiff;
 
-      return (
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-      );
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
 
     return list;
@@ -320,17 +340,14 @@ const ReservationsList: React.FC = () => {
       return;
     }
 
-    if (newStatus === "approved" && !reservation.employeeId) {
+    if (newStatus === "approved" && !hasEmployeeAssigned(reservation)) {
       setAssigningReservationId(reservationId);
       setAssignModalOpen(true);
       return;
     }
 
     try {
-      setRowBusy(
-        reservationId,
-        newStatus === "approved" ? "approve" : "reject"
-      );
+      setRowBusy(reservationId, newStatus === "approved" ? "approve" : "reject");
       await updateReservation(reservationId, { status: newStatus });
       showNotification({
         title: "Actualizado",
@@ -461,6 +478,9 @@ const ReservationsList: React.FC = () => {
           <Skeleton height={12} radius="sm" />
         </Table.Td>
         <Table.Td>
+          <Skeleton height={12} radius="sm" />
+        </Table.Td>
+        <Table.Td>
           <Skeleton height={24} radius="xl" />
         </Table.Td>
         <Table.Td>
@@ -479,6 +499,9 @@ const ReservationsList: React.FC = () => {
     const servicePrice = serviceObj?.price || 0;
     const serviceName = serviceObj?.name || "Sin especificar";
 
+    const empName = getEmployeeName(reservation);
+    const hasEmp = hasEmployeeAssigned(reservation);
+
     return (
       <Card
         key={reservation._id}
@@ -490,10 +513,11 @@ const ReservationsList: React.FC = () => {
       >
         <Group justify="space-between" align="flex-start" mb="xs">
           <Stack gap={4} style={{ flex: 1 }}>
-            <Group gap={6} align="center">
+            <Group gap={6} align="center" wrap="wrap">
               <Badge size="xs" variant="outline" radius="lg">
                 {dayjs(reservation.startDate).format("DD/MM HH:mm")}
               </Badge>
+
               <Badge
                 size="xs"
                 color={getBadgeColor(reservation.status)}
@@ -502,6 +526,15 @@ const ReservationsList: React.FC = () => {
               >
                 {translateStatus(reservation.status)}
               </Badge>
+
+              {/* ✅ Requiere empleado (manual + pending + sin empleado) */}
+              {orgPolicy === "manual" &&
+                reservation.status === "pending" &&
+                !hasEmp && (
+                  <Badge size="xs" color="orange" variant="light" radius="lg">
+                    Requiere empleado
+                  </Badge>
+                )}
             </Group>
 
             <Text fw={600} size="sm">
@@ -514,14 +547,29 @@ const ReservationsList: React.FC = () => {
                 {reservation.customerDetails?.name ?? "—"}
               </Text>
             </Text>
+
+            {/* ✅ Empleado visible en la card */}
+            <Text size="xs" c="dimmed">
+              Empleado:{" "}
+              {hasEmp ? (
+                <Text span fw={500} c="dark">
+                  {empName ?? "Asignado"}
+                </Text>
+              ) : (
+                <Badge
+                  size="xs"
+                  color="red"
+                  variant="light"
+                  radius="lg"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  Sin asignar
+                </Badge>
+              )}
+            </Text>
           </Stack>
 
-          <Menu
-            withArrow
-            position="bottom-end"
-            shadow="sm"
-            disabled={busy}
-          >
+          <Menu withArrow position="bottom-end" shadow="sm" disabled={busy}>
             <Menu.Target>
               <ActionIcon
                 variant="subtle"
@@ -533,42 +581,37 @@ const ReservationsList: React.FC = () => {
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              {orgPolicy === "manual" &&
-                reservation.status === "pending" && (
-                  <>
-                    <Menu.Item
-                      leftSection={
-                        rowLoading[reservation._id!] === "approve" ? (
-                          <Skeleton height={12} width={12} circle />
-                        ) : (
-                          <BiCheck size={16} />
-                        )
-                      }
-                      onClick={() =>
-                        handleUpdateStatus(reservation._id!, "approved")
-                      }
-                      disabled={busy}
-                    >
-                      Aprobar
-                    </Menu.Item>
-                    <Menu.Item
-                      leftSection={
-                        rowLoading[reservation._id!] === "reject" ? (
-                          <Skeleton height={12} width={12} circle />
-                        ) : (
-                          <BiXCircle size={16} />
-                        )
-                      }
-                      color="red"
-                      onClick={() =>
-                        handleUpdateStatus(reservation._id!, "rejected")
-                      }
-                      disabled={busy}
-                    >
-                      Rechazar
-                    </Menu.Item>
-                  </>
-                )}
+              {orgPolicy === "manual" && reservation.status === "pending" && (
+                <>
+                  <Menu.Item
+                    leftSection={
+                      rowLoading[reservation._id!] === "approve" ? (
+                        <Skeleton height={12} width={12} circle />
+                      ) : (
+                        <BiCheck size={16} />
+                      )
+                    }
+                    onClick={() => handleUpdateStatus(reservation._id!, "approved")}
+                    disabled={busy}
+                  >
+                    Aprobar
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={
+                      rowLoading[reservation._id!] === "reject" ? (
+                        <Skeleton height={12} width={12} circle />
+                      ) : (
+                        <BiXCircle size={16} />
+                      )
+                    }
+                    color="red"
+                    onClick={() => handleUpdateStatus(reservation._id!, "rejected")}
+                    disabled={busy}
+                  >
+                    Rechazar
+                  </Menu.Item>
+                </>
+              )}
 
               <Menu.Item
                 leftSection={<BiUser size={16} />}
@@ -610,9 +653,7 @@ const ReservationsList: React.FC = () => {
                   }))
                 }
               >
-                {isExpanded
-                  ? "Ocultar info de depósito"
-                  : "Ver info de depósito"}
+                {isExpanded ? "Ocultar info de depósito" : "Ver info de depósito"}
               </Button>
 
               <Collapse in={isExpanded}>
@@ -625,9 +666,7 @@ const ReservationsList: React.FC = () => {
                     appointmentDate={dayjs(reservation.startDate).format(
                       "DD/MM/YYYY"
                     )}
-                    appointmentTime={dayjs(reservation.startDate).format(
-                      "HH:mm"
-                    )}
+                    appointmentTime={dayjs(reservation.startDate).format("HH:mm")}
                   />
                 </Box>
               </Collapse>
@@ -703,18 +742,14 @@ const ReservationsList: React.FC = () => {
               setDeleteConfirmOpen(false);
               setDeletingReservationId(null);
             }}
-            disabled={
-              !!(deletingReservationId && isRowBusy(deletingReservationId))
-            }
+            disabled={!!(deletingReservationId && isRowBusy(deletingReservationId))}
           >
             Cancelar
           </Button>
           <Button
             color="red"
             onClick={confirmDelete}
-            loading={
-              !!(deletingReservationId && isRowBusy(deletingReservationId))
-            }
+            loading={!!(deletingReservationId && isRowBusy(deletingReservationId))}
           >
             Eliminar
           </Button>
@@ -743,9 +778,7 @@ const ReservationsList: React.FC = () => {
                 w={isMobile ? 200 : 260}
                 label="Política de agendamiento"
                 value={orgPolicy}
-                onChange={(val) =>
-                  val && handleChangePolicy(val as ReservationPolicy)
-                }
+                onChange={(val) => val && handleChangePolicy(val as ReservationPolicy)}
                 data={[
                   { value: "manual", label: "Aprobación manual" },
                   {
@@ -802,20 +835,13 @@ const ReservationsList: React.FC = () => {
           </Group>
 
           <Collapse in={filtersOpen}>
-            <Group
-              justify="space-between"
-              align="flex-end"
-              wrap="wrap"
-              gap="sm"
-            >
+            <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
               <Group gap="sm" align="flex-end">
                 <Select
                   label="Estado"
                   placeholder="Todos"
                   value={statusFilter}
-                  onChange={(val) =>
-                    setStatusFilter((val as typeof statusFilter) || "all")
-                  }
+                  onChange={(val) => setStatusFilter((val as typeof statusFilter) || "all")}
                   data={[
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Pendiente" },
@@ -830,13 +856,8 @@ const ReservationsList: React.FC = () => {
                   label="Empleado"
                   placeholder="Todos"
                   value={employeeFilter}
-                  onChange={(val) =>
-                    setEmployeeFilter((val as string) || "all")
-                  }
-                  data={[
-                    { value: "all", label: "Todos" },
-                    ...employeesSelectData,
-                  ]}
+                  onChange={(val) => setEmployeeFilter((val as string) || "all")}
+                  data={[{ value: "all", label: "Todos" }, ...employeesSelectData]}
                   w={190}
                   searchable
                 />
@@ -845,13 +866,8 @@ const ReservationsList: React.FC = () => {
                   label="Servicio"
                   placeholder="Todos"
                   value={serviceFilter}
-                  onChange={(val) =>
-                    setServiceFilter((val as string) || "all")
-                  }
-                  data={[
-                    { value: "all", label: "Todos" },
-                    ...serviceSelectData,
-                  ]}
+                  onChange={(val) => setServiceFilter((val as string) || "all")}
+                  data={[{ value: "all", label: "Todos" }, ...serviceSelectData]}
                   w={190}
                   searchable
                 />
@@ -869,9 +885,7 @@ const ReservationsList: React.FC = () => {
                 <Switch
                   size="sm"
                   checked={showOnlyFuture}
-                  onChange={(event) =>
-                    setShowOnlyFuture(event.currentTarget.checked)
-                  }
+                  onChange={(event) => setShowOnlyFuture(event.currentTarget.checked)}
                   label="Solo futuras"
                 />
 
@@ -901,15 +915,15 @@ const ReservationsList: React.FC = () => {
         >
           {orgPolicy === "auto_if_available" ? (
             <Text size="sm">
-              Al crear una <strong>reserva</strong>, si existe cupo inmediato
-              según el servicio, empleado (si aplica) y horario, se{" "}
+              Al crear una <strong>reserva</strong>, si existe cupo inmediato según
+              el servicio, empleado (si aplica) y horario, se{" "}
               <strong>confirma</strong> y se crea la <strong>cita</strong>{" "}
               automáticamente. Si no, la reserva quedará <em>pendiente</em>.
             </Text>
           ) : (
             <Text size="sm">
-              Las reservas requieren <strong>aprobación</strong> antes de crear
-              una cita.
+              Las reservas requieren <strong>aprobación</strong> antes de crear una
+              cita.
             </Text>
           )}
         </Alert>
@@ -938,19 +952,14 @@ const ReservationsList: React.FC = () => {
               ))}
             </Stack>
           ) : (
-            <Table.ScrollContainer minWidth={640} type="native" mah={520}>
-              <Table
-                withTableBorder
-                withColumnBorders
-                striped
-                highlightOnHover
-                stickyHeader
-              >
+            <Table.ScrollContainer minWidth={760} type="native" mah={520}>
+              <Table withTableBorder withColumnBorders striped highlightOnHover stickyHeader>
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
                     <Table.Th>Servicio</Table.Th>
                     <Table.Th>Cliente</Table.Th>
+                    <Table.Th>Empleado</Table.Th>
                     <Table.Th>Estado</Table.Th>
                     <Table.Th style={{ width: 80, textAlign: "center" }}>
                       Acciones
@@ -971,48 +980,43 @@ const ReservationsList: React.FC = () => {
               </Text>
               {hasReservations && (
                 <Text size="sm" c="dimmed">
-                  Ajusta los filtros o limpia la búsqueda para ver más
-                  resultados.
+                  Ajusta los filtros o limpia la búsqueda para ver más resultados.
                 </Text>
               )}
             </Stack>
           </Center>
         ) : isMobile ? (
           <Stack>
-            {filteredReservations.map((reservation) =>
-              renderMobileReservationCard(reservation)
-            )}
+            {filteredReservations.map((reservation) => renderMobileReservationCard(reservation))}
           </Stack>
         ) : (
-          <Table.ScrollContainer minWidth={640} type="native" mah={520}>
-            <Table
-              withTableBorder
-              withColumnBorders
-              striped
-              highlightOnHover
-              stickyHeader
-            >
+          <Table.ScrollContainer minWidth={760} type="native" mah={520}>
+            <Table withTableBorder withColumnBorders striped highlightOnHover stickyHeader>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Fecha</Table.Th>
                   <Table.Th>Servicio</Table.Th>
                   <Table.Th>Cliente</Table.Th>
+                  <Table.Th>Empleado</Table.Th>
                   <Table.Th>Estado</Table.Th>
                   <Table.Th style={{ width: 80, textAlign: "center" }}>
                     Acciones
                   </Table.Th>
                 </Table.Tr>
               </Table.Thead>
+
               <Table.Tbody>
                 {filteredReservations.map((reservation) => {
                   const busy = isRowBusy(reservation._id!);
                   const isExpanded = expandedRows[reservation._id!];
+
                   const serviceObj =
-                    typeof reservation.serviceId === "object"
-                      ? reservation.serviceId
-                      : null;
+                    typeof reservation.serviceId === "object" ? reservation.serviceId : null;
                   const servicePrice = serviceObj?.price || 0;
                   const serviceName = serviceObj?.name || "Sin especificar";
+
+                  const empName = getEmployeeName(reservation);
+                  const hasEmp = hasEmployeeAssigned(reservation);
 
                   return (
                     <React.Fragment key={reservation._id}>
@@ -1031,36 +1035,44 @@ const ReservationsList: React.FC = () => {
                                 }
                                 mr="xs"
                               >
-                                {isExpanded ? (
-                                  <BiChevronUp />
-                                ) : (
-                                  <BiChevronDown />
-                                )}
+                                {isExpanded ? <BiChevronUp /> : <BiChevronDown />}
                               </ActionIcon>
                             )}
-                          {dayjs(reservation.startDate).format(
-                            "DD/MM/YYYY HH:mm"
-                          )}
+                          {dayjs(reservation.startDate).format("DD/MM/YYYY HH:mm")}
                         </Table.Td>
+
                         <Table.Td>{serviceName}</Table.Td>
+
+                        <Table.Td>{reservation.customerDetails?.name ?? "—"}</Table.Td>
+
+                        {/* ✅ NUEVO: Empleado */}
                         <Table.Td>
-                          {reservation.customerDetails?.name ?? "—"}
+                          {hasEmp ? (
+                            <Badge variant="light" color="grape">
+                              {empName ?? "Asignado"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="light" color="red">
+                              Sin asignar
+                            </Badge>
+                          )}
+                          {orgPolicy === "manual" &&
+                            reservation.status === "pending" &&
+                            !hasEmp && (
+                              <Badge ml={6} variant="light" color="orange">
+                                Requiere empleado
+                              </Badge>
+                            )}
                         </Table.Td>
+
                         <Table.Td>
-                          <Badge
-                            fullWidth
-                            color={getBadgeColor(reservation.status)}
-                          >
+                          <Badge fullWidth color={getBadgeColor(reservation.status)}>
                             {translateStatus(reservation.status)}
                           </Badge>
                         </Table.Td>
+
                         <Table.Td style={{ textAlign: "center" }}>
-                          <Menu
-                            withArrow
-                            position="bottom-end"
-                            shadow="sm"
-                            disabled={busy}
-                          >
+                          <Menu withArrow position="bottom-end" shadow="sm" disabled={busy}>
                             <Menu.Target>
                               <ActionIcon
                                 variant="light"
@@ -1072,64 +1084,45 @@ const ReservationsList: React.FC = () => {
                               </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                              {orgPolicy === "manual" &&
-                                reservation.status === "pending" && (
-                                  <>
-                                    <Menu.Item
-                                      leftSection={
-                                        rowLoading[reservation._id!] ===
-                                        "approve" ? (
-                                          <Skeleton
-                                            height={12}
-                                            width={12}
-                                            circle
-                                          />
-                                        ) : (
-                                          <BiCheck size={16} />
-                                        )
-                                      }
-                                      onClick={() =>
-                                        handleUpdateStatus(
-                                          reservation._id!,
-                                          "approved"
-                                        )
-                                      }
-                                      disabled={busy}
-                                    >
-                                      Aprobar
-                                    </Menu.Item>
-                                    <Menu.Item
-                                      leftSection={
-                                        rowLoading[reservation._id!] ===
-                                        "reject" ? (
-                                          <Skeleton
-                                            height={12}
-                                            width={12}
-                                            circle
-                                          />
-                                        ) : (
-                                          <BiXCircle size={16} />
-                                        )
-                                      }
-                                      color="red"
-                                      onClick={() =>
-                                        handleUpdateStatus(
-                                          reservation._id!,
-                                          "rejected"
-                                        )
-                                      }
-                                      disabled={busy}
-                                    >
-                                      Rechazar
-                                    </Menu.Item>
-                                  </>
-                                )}
+                              {orgPolicy === "manual" && reservation.status === "pending" && (
+                                <>
+                                  <Menu.Item
+                                    leftSection={
+                                      rowLoading[reservation._id!] === "approve" ? (
+                                        <Skeleton height={12} width={12} circle />
+                                      ) : (
+                                        <BiCheck size={16} />
+                                      )
+                                    }
+                                    onClick={() =>
+                                      handleUpdateStatus(reservation._id!, "approved")
+                                    }
+                                    disabled={busy}
+                                  >
+                                    Aprobar
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    leftSection={
+                                      rowLoading[reservation._id!] === "reject" ? (
+                                        <Skeleton height={12} width={12} circle />
+                                      ) : (
+                                        <BiXCircle size={16} />
+                                      )
+                                    }
+                                    color="red"
+                                    onClick={() =>
+                                      handleUpdateStatus(reservation._id!, "rejected")
+                                    }
+                                    disabled={busy}
+                                  >
+                                    Rechazar
+                                  </Menu.Item>
+                                </>
+                              )}
 
                               <Menu.Item
                                 leftSection={<BiUser size={16} />}
-                                onClick={() =>
-                                  handleOpenAssignModal(reservation._id!)
-                                }
+                                onClick={() => handleOpenAssignModal(reservation._id!)}
                                 disabled={busy}
                               >
                                 Cambiar empleado
@@ -1157,22 +1150,19 @@ const ReservationsList: React.FC = () => {
                       {reservation.status === "pending" &&
                         organization?.requireReservationDeposit && (
                           <Table.Tr>
-                            <Table.Td colSpan={5} p={0}>
+                            {/* ✅ colSpan actualizado por la nueva columna */}
+                            <Table.Td colSpan={6} p={0}>
                               <Collapse in={isExpanded}>
                                 <Box p="md">
                                   <ReservationDepositAlert
                                     reservationId={reservation._id}
-                                    clientName={
-                                      reservation.customerDetails?.name
-                                    }
+                                    clientName={reservation.customerDetails?.name}
                                     serviceName={serviceName}
                                     servicePrice={servicePrice}
-                                    appointmentDate={dayjs(
-                                      reservation.startDate
-                                    ).format("DD/MM/YYYY")}
-                                    appointmentTime={dayjs(
-                                      reservation.startDate
-                                    ).format("HH:mm")}
+                                    appointmentDate={dayjs(reservation.startDate).format(
+                                      "DD/MM/YYYY"
+                                    )}
+                                    appointmentTime={dayjs(reservation.startDate).format("HH:mm")}
                                   />
                                 </Box>
                               </Collapse>

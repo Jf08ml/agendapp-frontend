@@ -67,6 +67,8 @@ export const schema = z.object({
             })
         )
         .optional(),
+
+      stepMinutes: z.number().int().min(1).max(60).optional()
     })
     // Validación cruzada start < end (solo si ambos están presentes y no vacíos)
     .refine(

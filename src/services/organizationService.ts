@@ -12,6 +12,7 @@ export interface OpeningHours {
   end?: string;
   businessDays?: number[]; // 0..6
   breaks?: { day: number; start: string; end: string; note?: string }[];
+  stepMinutes?: number;
 }
 
 export interface Branding {

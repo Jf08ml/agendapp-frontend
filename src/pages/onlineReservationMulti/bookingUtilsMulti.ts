@@ -120,6 +120,7 @@ export function generateAvailableTimes(
   appointments: Appointment[],
   opening?: OpeningConstraints
 ): string[] {
+  console.log(opening);
   const stepMinutes = opening?.stepMinutes ?? 15;
 
   // si no es día laboral, retorna []
@@ -223,6 +224,145 @@ export function findAvailableMultiServiceSlots(
         from: slotStart.toDate(),
         to: slotEnd.toDate(),
       });
+      slotStart = slotEnd;
+    }
+
+    if (isAvailable) {
+      blocks.push({ start: t.toDate(), times });
+    }
+  }
+
+  return blocks;
+}
+
+// ---------- Auto-asignación: menos citas ese día ----------
+
+function overlapsRange(appt: Appointment, from: dayjs.Dayjs, to: dayjs.Dayjs) {
+  return (
+    dayjs(appt.startDate).isBefore(to) && dayjs(appt.endDate).isAfter(from)
+  );
+}
+
+function dayKey(d: Date) {
+  return dayjs(d).format("YYYY-MM-DD");
+}
+
+export function pickEmployeeWithLessAppointmentsForSlot(opts: {
+  date: Date; // día del slot
+  from: Date; // inicio exacto
+  to: Date; // fin exacto
+  candidateEmployeeIds: string[];
+  appointmentsByEmp: Record<string, Appointment[]>;
+}): string | null {
+  const { date, from, to, candidateEmployeeIds, appointmentsByEmp } = opts;
+  if (!candidateEmployeeIds?.length) return null;
+
+  const fromDj = dayjs(from);
+  const toDj = dayjs(to);
+  const dk = dayKey(date);
+
+  // 1) filtra a los que realmente están libres en ese rango
+  const free = candidateEmployeeIds.filter((empId) => {
+    const appts = appointmentsByEmp[empId] ?? [];
+    return !appts.some((a) => overlapsRange(a, fromDj, toDj));
+  });
+
+  if (free.length === 0) return null;
+
+  // 2) cuenta citas del día (no solo overlaps del rango)
+  //    (asumiendo que appointmentsByEmp ya viene filtrado por día, aún así lo hacemos robusto)
+  const counts = free.map((empId) => {
+    const appts = appointmentsByEmp[empId] ?? [];
+    const countThatDay = appts.filter(
+      (a) => dayKey(new Date(a.startDate)) === dk
+    ).length;
+    return { empId, count: countThatDay };
+  });
+
+  // 3) menor cantidad
+  counts.sort((a, b) => a.count - b.count);
+  return counts[0].empId;
+}
+
+export type EligibleByService = Record<string, string[]>;
+
+/**
+ * Igual que findAvailableMultiServiceSlots, pero si svc.employeeId es null:
+ * - busca entre empleados elegibles para ese servicio
+ * - elige el que esté libre en ese rango y tenga menos citas ese día
+ * - devuelve el bloque con employeeId ya asignado por tramo
+ */
+export function findAvailableMultiServiceSlotsAuto(
+  day: Date,
+  services: ChainService[],
+  appointmentsByEmp: Record<string, Appointment[]>,
+  eligibleByService: EligibleByService,
+  opening?: OpeningConstraints
+): MultiServiceSlot[] {
+  if (!day || !services.length) return [];
+  if (!isBusinessDay(day, opening?.businessDays)) return [];
+
+  const stepMinutes = opening?.stepMinutes ?? 15;
+  const { winStart, winEnd } = getWorkWindow(day, opening ?? {});
+  const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
+
+  const blocks: MultiServiceSlot[] = [];
+
+  for (
+    let t = winStart.clone();
+    t.clone().add(totalDuration, "minute").isSameOrBefore(winEnd);
+    t = t.add(stepMinutes, "minute")
+  ) {
+    let isAvailable = true;
+    const times: { employeeId: string | null; from: Date; to: Date }[] = [];
+
+    let slotStart = t.clone();
+
+    for (const svc of services) {
+      const slotEnd = slotStart.clone().add(svc.duration, "minute");
+      if (slotEnd.isAfter(winEnd)) {
+        isAvailable = false;
+        break;
+      }
+
+      // respeta breaks
+      if (isInBreak(slotStart, slotEnd, opening?.breaks)) {
+        isAvailable = false;
+        break;
+      }
+
+      // candidatos: fijo o elegibles del servicio
+      const candidates = svc.employeeId
+        ? [svc.employeeId]
+        : eligibleByService[svc.serviceId] ?? [];
+
+      if (!candidates.length) {
+        isAvailable = false;
+        break;
+      }
+
+      // elige empleado para este tramo
+      const chosenEmpId = svc.employeeId
+        ? svc.employeeId
+        : pickEmployeeWithLessAppointmentsForSlot({
+            date: day,
+            from: slotStart.toDate(),
+            to: slotEnd.toDate(),
+            candidateEmployeeIds: candidates,
+            appointmentsByEmp,
+          });
+
+      if (!chosenEmpId) {
+        isAvailable = false;
+        break;
+      }
+
+      times.push({
+        employeeId: chosenEmpId,
+        from: slotStart.toDate(),
+        to: slotEnd.toDate(),
+      });
+
       slotStart = slotEnd;
     }
 
