@@ -82,6 +82,9 @@ export default function MultiBookingWizard() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // Ref para guardar la función de actualización del cliente
+  const updateClientRef = useRef<(() => Promise<boolean>) | null>(null);
+
   // Datos para la pantalla de éxito
   const [finishInfo, setFinishInfo] = useState<{
     count: number;
@@ -166,9 +169,12 @@ export default function MultiBookingWizard() {
     );
   }, [times, selected.length]);
 
-  const hasCustomerData =
-    customerDetails.name.trim().length > 0 &&
-    customerDetails.phone.trim().length >= 7;
+  const hasCustomerData = (() => {
+    const hasName = customerDetails.name.trim().length > 0;
+    const hasPhone = customerDetails.phone.trim().length >= 7;
+    console.log('[DEBUG] hasCustomerData check:', { hasName, hasPhone, name: customerDetails.name, phone: customerDetails.phone });
+    return hasName && hasPhone;
+  })();
 
   if (!organization?._id) {
     return (
@@ -232,6 +238,15 @@ export default function MultiBookingWizard() {
       if (!hasCustomerData) {
         setCurrentStep(3);
         return;
+      }
+
+      // 🔄 Actualizar cliente si existe (nuevo flujo)
+      if (updateClientRef.current) {
+        console.log('[DEBUG] Actualizando información del cliente antes de reservar...');
+        const updated = await updateClientRef.current();
+        if (!updated) {
+          console.warn('[WARN] No se pudo actualizar el cliente, continuando con la reserva...');
+        }
       }
 
       let count = 0;
@@ -425,11 +440,16 @@ export default function MultiBookingWizard() {
                 typeof updater === "function"
                   ? (updater as any)(base)
                   : updater;
+              console.log('[DEBUG] setBookingData called:', { base, next });
               if (next?.customerDetails) {
+                console.log('[DEBUG] Updating customerDetails:', next.customerDetails);
                 setCustomerDetails(
                   next.customerDetails as typeof customerDetails
                 );
               }
+            }}
+            onClientUpdateReady={(updateFn) => {
+              updateClientRef.current = updateFn;
             }}
           />
         );
@@ -634,7 +654,10 @@ export default function MultiBookingWizard() {
             {currentStep === 3 && (
               <NextBtn
                 disabled={!hasCustomerData}
-                onClick={() => setCurrentStep(4)}
+                onClick={() => {
+                  console.log('[DEBUG] Step 3 Next button clicked', { hasCustomerData, customerDetails });
+                  setCurrentStep(4);
+                }}
               >
                 Continuar
               </NextBtn>
@@ -698,7 +721,10 @@ export default function MultiBookingWizard() {
               {currentStep === 3 && (
                 <NextBtn
                   disabled={!hasCustomerData}
-                  onClick={() => setCurrentStep(4)}
+                  onClick={() => {
+                    console.log('[DEBUG] Step 3 Next button clicked (mobile)', { hasCustomerData, customerDetails });
+                    setCurrentStep(4);
+                  }}
                 >
                   Continuar
                 </NextBtn>
