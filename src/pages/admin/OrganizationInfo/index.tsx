@@ -75,6 +75,7 @@ export default function OrganizationInfo() {
             ...response,
             branding: ensureBranding(response.branding),
             domains: ensureArray(response.domains, []),
+            default_country: response.default_country ?? "CO", // 🌍 País por defecto
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",

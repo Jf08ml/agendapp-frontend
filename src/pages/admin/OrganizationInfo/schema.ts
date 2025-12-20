@@ -42,6 +42,7 @@ export const schema = z.object({
     ])
     .optional(),
   phoneNumber: optionalString,
+  default_country: z.string().length(2, "Código de país ISO2 inválido").optional(),
 
   openingHours: z
     .object({

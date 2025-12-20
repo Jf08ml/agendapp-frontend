@@ -56,6 +56,7 @@ export interface Organization {
   address?: string;
   password?: string;
   phoneNumber: string;
+  default_country?: string; // 🌍 País por defecto (ISO2: CO, MX, PE, etc.)
   facebookUrl?: string;
   instagramUrl?: string;
   whatsappUrl?: string;

@@ -34,6 +34,25 @@ export default function ContactTab({
             {...form.getInputProps("phoneNumber")}
             disabled={!isEditing}
           />
+          <Select
+            label="País por defecto"
+            description="País para validar números telefónicos de nuevos clientes"
+            {...form.getInputProps("default_country")}
+            disabled={!isEditing}
+            data={[
+              { value: "CO", label: "🇨🇴 Colombia" },
+              { value: "MX", label: "🇲🇽 México" },
+              { value: "PE", label: "🇵🇪 Perú" },
+              { value: "EC", label: "🇪🇨 Ecuador" },
+              { value: "VE", label: "🇻🇪 Venezuela" },
+              { value: "PA", label: "🇵🇦 Panamá" },
+              { value: "CL", label: "🇨🇱 Chile" },
+              { value: "AR", label: "🇦🇷 Argentina" },
+              { value: "BR", label: "🇧🇷 Brasil" },
+              { value: "US", label: "🇺🇸 Estados Unidos" },
+              { value: "CA", label: "🇨🇦 Canadá" },
+            ]}
+          />
           <TextInput
             label="Dominios"
             value={(domains || []).join(", ")}

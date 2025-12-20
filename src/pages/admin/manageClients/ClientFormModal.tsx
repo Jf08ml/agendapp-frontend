@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { TextInput, Button, Box, Modal, Group } from "@mantine/core";
@@ -6,6 +7,8 @@ import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { DateInput } from "@mantine/dates";
+import InternationalPhoneInput from "../../../components/InternationalPhoneInput";
+import { CountryCode } from "libphonenumber-js";
 
 interface ClientFormModalProps {
   opened: boolean;
@@ -24,15 +27,24 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
 }) => {
   const [name, setName] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [phoneE164, setPhoneE164] = useState<string | null>(null);
+  const [, setPhoneCountry] = useState<CountryCode | null>(null);
+  const [phoneValid, setPhoneValid] = useState<boolean>(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   const organizationId = useSelector((state: RootState) => state.auth.organizationId);
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
   const resetForm = () => {
     setName("");
     setPhoneNumber("");
+    setPhoneE164(null);
+    setPhoneCountry(null);
+    setPhoneValid(false);
+    setPhoneError(null);
     setEmail("");
     setBirthDate(null);
     setClient?.(null);
@@ -41,25 +53,33 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   useEffect(() => {
     if (client) {
       setName(client.name.trim());
-      setPhoneNumber(formatPhoneNumber(client.phoneNumber.trim()));
+      setPhoneNumber(client.phoneNumber.trim());
       setEmail(client.email?.trim() || "");
       setBirthDate(client.birthDate ? new Date(client.birthDate) : null);
+      
+      // Resetear estados de validación al cargar cliente existente
+      setPhoneError(null);
+      setPhoneValid(true); // Asumimos que cliente existente tiene teléfono válido
     } else {
       resetForm();
     }
   }, [client, opened]);
 
   const handleSubmit = async (): Promise<void> => {
+    // Validación del teléfono antes de enviar
+    if (!phoneValid || !phoneE164) {
+      setPhoneError("Por favor ingresa un número de teléfono válido");
+      return;
+    }
+
     setLoading(true);
     try {
       if (!organizationId) throw new Error("Organization ID is required");
 
-      const formattedPhoneNumber = phoneNumber.replace(/\s/g, "");
-
       if (client) {
         await updateClient(client._id, {
           name: name.trim(),
-          phoneNumber: formattedPhoneNumber,
+          phoneNumber: phoneE164, // Enviar E.164 al backend
           email: email.trim(),
           birthDate: birthDate || null,
         });
@@ -73,7 +93,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       } else {
         await createClient({
           name: name.trim(),
-          phoneNumber: formattedPhoneNumber,
+          phoneNumber: phoneE164, // Enviar E.164 al backend
           email: email.trim(),
           organizationId,
           birthDate: birthDate || null,
@@ -90,11 +110,11 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       fetchClients();
       resetForm();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       showNotification({
         title: "Error",
-        message: client ? "Error al actualizar el cliente" : "Error al crear el cliente",
+        message: err.message || (client ? "Error al actualizar el cliente" : "Error al crear el cliente"),
         color: "red",
         autoClose: 3000,
       });
@@ -107,13 +127,16 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
     (event: ChangeEvent<HTMLInputElement>) => setter(event.target.value);
 
-  const formatPhoneNumber = (value: string) =>
-    value.replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{0,4})/, (_m, a, b, c) =>
-      c ? `${a} ${b} ${c}` : `${a} ${b}`
-    );
-
-  const handlePhoneNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setPhoneNumber(formatPhoneNumber(event.target.value));
+  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean) => {
+    setPhoneE164(phone_e164);
+    setPhoneCountry(phone_country);
+    setPhoneValid(isValid);
+    
+    if (!isValid && phone_e164) {
+      setPhoneError("Número de teléfono inválido");
+    } else {
+      setPhoneError(null);
+    }
   };
 
   return (
@@ -138,15 +161,17 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
             onChange={handleInputChange(setName)}
             required
           />
-          <TextInput
-            mt="sm"
-            label="Teléfono"
-            placeholder="300 000 0000"
-            value={phoneNumber}
-            onChange={handlePhoneNumberChange}
-            required
-          />
         </Group>
+
+        <InternationalPhoneInput
+          value={phoneNumber}
+          organizationDefaultCountry={organization?.default_country as CountryCode}
+          onChange={handlePhoneChange}
+          error={phoneError}
+          label="Teléfono"
+          placeholder="300 000 0000"
+          required
+        />
 
         <Group grow align="flex-start">
           <TextInput

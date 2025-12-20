@@ -15,13 +15,15 @@ import { getClientByPhoneNumberAndOrganization } from "../../services/clientServ
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { Reservation } from "../../services/reservationService";
+import InternationalPhoneInput from "../../components/InternationalPhoneInput";
+import { CountryCode } from "libphonenumber-js";
+import { normalizePhoneNumber } from "../../utils/phoneUtils";
 
 interface StepCustomerDataProps {
   bookingData: Partial<Reservation>;
   setBookingData: React.Dispatch<React.SetStateAction<Partial<Reservation>>>;
 }
 
-const phoneOnlyDigits = (v: string) => v.replace(/\D+/g, "");
 const isValidEmail = (v: string) =>
   !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -44,17 +46,16 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneValid, setPhoneValid] = useState<boolean>(false);
+  const [phoneE164, setPhoneE164] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [foundName, setFoundName] = useState<string | null>(null);
-
-  const minPhoneLen = 7;
 
   const handleInputChange = (
     field: keyof Reservation["customerDetails"],
     value: string | Date | null
   ) => {
     // limpia errores al tipear
-    if (field === "phone") setPhoneError(null);
     if (field === "email") setEmailError(null);
 
     setBookingData((prev) => ({
@@ -66,13 +67,28 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     }));
   };
 
-  const handlePhoneBlur = async () => {
-    const raw = customerDetails.phone || "";
-    const digits = phoneOnlyDigits(raw);
+  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean) => {
+    setPhoneE164(phone_e164);
+    setPhoneValid(isValid);
+    setPhoneError(null);
+    
+    // Actualizar bookingData con el E.164
+    if (isValid && phone_e164) {
+      setBookingData((prev) => ({
+        ...prev,
+        customerDetails: {
+          ...(prev.customerDetails || customerDetails),
+          phone: phone_e164, // Guardar en formato E.164
+        },
+      }));
+    } else if (!isValid && phone_e164) {
+      setPhoneError("Número de teléfono inválido");
+    }
+  };
 
-    // validación mínima
-    if (!digits || digits.length < minPhoneLen) {
-      setPhoneError(`Ingresa al menos ${minPhoneLen} dígitos`);
+  const handlePhoneBlur = async () => {
+    if (!phoneValid || !phoneE164) {
+      setPhoneError("Ingresa un número de teléfono válido");
       return;
     }
 
@@ -81,7 +97,8 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
     try {
       const orgId = organization?._id as string;
-      const client = await getClientByPhoneNumberAndOrganization(digits, orgId);
+      // Buscar por E.164 (el backend ya lo soporta)
+      const client = await getClientByPhoneNumberAndOrganization(phoneE164, orgId);
 
       if (client) {
         // Rellena datos si vienen vacíos o distintos
@@ -93,7 +110,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
               ...prevDetails,
               name: prevDetails.name?.trim() ? prevDetails.name : client.name || "",
               email: prevDetails.email?.trim() ? prevDetails.email : client.email || "",
-              phone: raw, // mantenemos lo que el usuario digitó (con o sin espacios)
+              phone: phoneE164, // Mantener E.164
               birthDate: client.birthDate ? new Date(client.birthDate) : prevDetails.birthDate ?? null,
             },
           };
@@ -126,17 +143,22 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     <Stack>
       {/* Teléfono arriba para auto-lookup */}
       <Stack gap={6}>
-        <TextInput
-          label="Teléfono"
-          placeholder="Ingresa tu número de teléfono"
-          value={customerDetails.phone}
-          onChange={(e) => handleInputChange("phone", e.currentTarget.value)}
+        <InternationalPhoneInput
+          value={customerDetails.phone || ""}
+          organizationDefaultCountry={organization?.default_country as CountryCode}
+          onChange={handlePhoneChange}
           onBlur={handlePhoneBlur}
-          rightSection={isCheckingPhone ? <Loader size="xs" /> : null}
           error={phoneError}
-          autoComplete="tel"
-          inputMode="tel"
+          label="Teléfono"
+          placeholder="300 000 0000"
+          required
         />
+        {isCheckingPhone && (
+          <Group gap="xs">
+            <Loader size="xs" />
+            <Text size="xs" c="dimmed">Verificando cliente...</Text>
+          </Group>
+        )}
         {foundName && !isCheckingPhone && (
           <Group gap="xs">
             <Text size="xs" c="dimmed">
