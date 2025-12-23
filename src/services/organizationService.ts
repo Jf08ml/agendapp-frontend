@@ -45,6 +45,21 @@ export interface PaymentMethod {
   notes?: string;
 }
 
+export interface DaySchedule {
+  day: number; // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  isOpen?: boolean;
+  isAvailable?: boolean;
+  start: string;
+  end: string;
+  breaks?: { start: string; end: string; note?: string }[];
+}
+
+export interface WeeklySchedule {
+  enabled: boolean;
+  schedule: DaySchedule[];
+  stepMinutes?: number;
+}
+
 export interface Organization {
   _id?: string;
   name: string;
@@ -68,6 +83,7 @@ export interface Organization {
   serviceCount?: number;
   serviceReward?: string;
   openingHours?: OpeningHours;
+  weeklySchedule?: WeeklySchedule;
   clientIdWhatsapp?: string | null;
   branding?: Branding;
   domains?: string[];

@@ -14,6 +14,7 @@ import {
 import { TimeInput } from "@mantine/dates";
 import { UseFormReturnType } from "@mantine/form";
 import SectionCard from "../SectionCard";
+import WeeklyScheduleSection from "../WeeklyScheduleSection";
 import type { FormValues } from "../../schema";
 import { useEffect, useMemo, useState } from "react";
 import { BiPlus, BiTrash } from "react-icons/bi";
@@ -352,6 +353,17 @@ export default function OpeningHoursTab({
             )}
           </Table.Tbody>
         </Table>
+      </Box>
+
+      {/* NUEVO: Sistema de horarios semanales personalizados */}
+      <Box mt="xl">
+        <WeeklyScheduleSection
+          value={form.values.weeklySchedule || { enabled: false, schedule: [], stepMinutes: 30 }}
+          onChange={(weeklySchedule) => {
+            form.setFieldValue('weeklySchedule', weeklySchedule);
+          }}
+          disabled={!isEditing}
+        />
       </Box>
     </SectionCard>
   );

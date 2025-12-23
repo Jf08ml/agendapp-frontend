@@ -1,5 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Modal, Box, Button, Paper, Group, Badge, Flex } from "@mantine/core";
+import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, getHours, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -13,12 +13,14 @@ import {
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
+import { BiCalendar, BiListUl } from "react-icons/bi";
 
 /* Subcomponentes */
 import Header from "./subcomponents/DayModalHeader";
 import TimeColumn from "./subcomponents/DayModalTimeColumn";
 import TimeGrid from "./subcomponents/DayModalTimeGrid";
 import EmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
+import DayModalCompactView from "./subcomponents/DayModalCompactView";
 import CustomLoader from "../../../components/customLoader/CustomLoader"; // Importa tu loader aquí
 
 export const HOUR_HEIGHT = 60;
@@ -60,6 +62,7 @@ const DayModal: FC<DayModalProps> = ({
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
   const [currentDay, setCurrentDay] = useState<Date>(selectedDay || new Date());
+  const [viewMode, setViewMode] = useState<"calendar" | "compact">("calendar");
   const [localDayAppointments, setLocalDayAppointments] = useState<
     Appointment[] | null
   >(null);
@@ -203,9 +206,36 @@ const DayModal: FC<DayModalProps> = ({
       opened={opened}
       onClose={onClose}
       fullScreen
-      title={`Agenda para el ${format(currentDay, "EEEE, d MMMM", {
-        locale: es,
-      })}`}
+      title={
+        <Group gap="md" align="center">
+          <span>{`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}</span>
+          <SegmentedControl
+            size="xs"
+            value={viewMode}
+            onChange={(value) => setViewMode(value as "calendar" | "compact")}
+            data={[
+              {
+                value: "calendar",
+                label: (
+                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <BiCalendar size={14} />
+                    <span>Calendario</span>
+                  </Box>
+                ),
+              },
+              {
+                value: "compact",
+                label: (
+                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <BiListUl size={14} />
+                    <span>Compacta</span>
+                  </Box>
+                ),
+              },
+            ]}
+          />
+        </Group>
+      }
       size="xl"
       styles={{ body: { padding: 0 } }}
     >
@@ -235,96 +265,108 @@ const DayModal: FC<DayModalProps> = ({
             <CustomLoader loadingText="Obteniendo citas del día..." overlay />
           </div>
         )}
-        <Box
-          style={{
-            display: "flex",
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            backgroundColor: "white",
-          }}
-        >
-          <Header
-            employees={employeesSorted}
-            hiddenEmployeeIds={hiddenEmployeeIds}
-            onToggleEmployeeHidden={handleToggleEmployeeHidden}
-          />
-        </Box>
-        <Box style={{ display: "flex", position: "relative" }}>
-          <Box
-            style={{
-              display: "flex",
-              position: "sticky",
-              left: 0,
-              zIndex: 100,
-              backgroundColor: "white",
-            }}
-          >
-            <TimeColumn timeIntervals={timeIntervals} />
-          </Box>
-          <Box style={{ flex: 1, position: "relative" }}>
-            {currentLinePosition !== null && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: `${currentLinePosition}px`,
-                  width: "100%",
-                  height: "2px",
-                  backgroundColor: "red",
-                  zIndex: 10,
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderLeft: "8px solid red",
-                    borderRight: "8px solid transparent",
-                    borderBottom: "8px solid transparent",
-                    borderTop: "8px solid transparent",
-                    position: "absolute",
-                  }}
-                />
-              </div>
-            )}
 
-            <TimeGrid
-              timeIntervals={timeIntervals}
-              hasPermission={hasPermission}
-              onOpenModal={onOpenModal}
-              selectedDay={currentDay}
-            />
+        {/* Vista compacta */}
+        {viewMode === "compact" ? (
+          <DayModalCompactView
+            appointments={appointments}
+            onEditAppointment={onEditAppointment}
+          />
+        ) : (
+          /* Vista de calendario */
+          <>
             <Box
               style={{
                 display: "flex",
-                position: "relative",
-                zIndex: 1,
+                position: "sticky",
+                top: 0,
+                zIndex: 100,
+                backgroundColor: "white",
               }}
             >
-              {visibleEmployees.map((employee) => (
-                <EmployeeColumn
-                  key={employee._id}
-                  employee={employee}
-                  appoinments={appointments}
-                  setAppointments={setAppointments}
-                  appointmentsByEmployee={appointmentsByEmployee}
-                  startHour={startHour}
-                  endHour={endHour}
-                  selectedDay={currentDay}
-                  isExpanded={isExpanded}
-                  handleToggleExpand={handleToggleExpand}
-                  onEditAppointment={onEditAppointment}
-                  onCancelAppointment={onCancelAppointment}
-                  onConfirmAppointment={onConfirmAppointment}
+              <Header
+                employees={employeesSorted}
+                hiddenEmployeeIds={hiddenEmployeeIds}
+                onToggleEmployeeHidden={handleToggleEmployeeHidden}
+              />
+            </Box>
+            <Box style={{ display: "flex", position: "relative" }}>
+              <Box
+                style={{
+                  display: "flex",
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 100,
+                  backgroundColor: "white",
+                }}
+              >
+                <TimeColumn timeIntervals={timeIntervals} />
+              </Box>
+              <Box style={{ flex: 1, position: "relative" }}>
+                {currentLinePosition !== null && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: `${currentLinePosition}px`,
+                      width: "100%",
+                      height: "2px",
+                      backgroundColor: "red",
+                      zIndex: 10,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 0,
+                        height: 0,
+                        borderLeft: "8px solid red",
+                        borderRight: "8px solid transparent",
+                        borderBottom: "8px solid transparent",
+                        borderTop: "8px solid transparent",
+                        position: "absolute",
+                      }}
+                    />
+                  </div>
+                )}
+
+                <TimeGrid
+                  timeIntervals={timeIntervals}
                   hasPermission={hasPermission}
                   onOpenModal={onOpenModal}
+                  selectedDay={currentDay}
                 />
-              ))}
+                <Box
+                  style={{
+                    display: "flex",
+                    position: "relative",
+                    zIndex: 1,
+                  }}
+                >
+                  {visibleEmployees.map((employee) => (
+                    <EmployeeColumn
+                      key={employee._id}
+                      employee={employee}
+                      appoinments={appointments}
+                      setAppointments={setAppointments}
+                      appointmentsByEmployee={appointmentsByEmployee}
+                      startHour={startHour}
+                      endHour={endHour}
+                      selectedDay={currentDay}
+                      isExpanded={isExpanded}
+                      handleToggleExpand={handleToggleExpand}
+                      onEditAppointment={onEditAppointment}
+                      onCancelAppointment={onCancelAppointment}
+                      onConfirmAppointment={onConfirmAppointment}
+                      hasPermission={hasPermission}
+                      onOpenModal={onOpenModal}
+                    />
+                  ))}
+                </Box>
+              </Box>
             </Box>
-          </Box>
-        </Box>
+          </>
+        )}
       </div>
       <Paper
         p="xs"

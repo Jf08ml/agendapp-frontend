@@ -22,6 +22,43 @@ import "dayjs/locale/es";
 
 dayjs.locale("es");
 
+// Helper para asegurar Date valido
+const ensureDate = (d: unknown): Date | null => {
+  if (!d) return null;
+  
+  // Si ya es Date valido
+  if (d instanceof Date) {
+    return isNaN(d.getTime()) ? null : d;
+  }
+  
+  // Si es string, intentar parsear
+  if (typeof d === "string") {
+    // Verificar si es string ISO o fecha parseable
+    const parsed = new Date(d);
+    if (!isNaN(parsed.getTime())) return parsed;
+    
+    // Intentar con dayjs para formatos mas flexibles
+    const dj = dayjs(d);
+    if (dj.isValid()) return dj.toDate();
+  }
+  
+  // Si es numero (timestamp)
+  if (typeof d === "number") {
+    const parsed = new Date(d);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+  
+  return null;
+};
+
+// Helper para formatear fecha con fallback
+const safeFormat = (d: unknown, format: string, fallback = "-"): string => {
+  const date = ensureDate(d);
+  if (!date) return fallback;
+  const dj = dayjs(date);
+  return dj.isValid() ? dj.format(format) : fallback;
+};
+
 interface Props {
   splitDates: boolean;
   services: Service[];
@@ -85,7 +122,7 @@ export default function StepMultiServiceSummary({
                   {dates[0]?.date && (
                     <Badge variant="outline">
                       {capitalize(
-                        dayjs(dates[0].date).format("dddd, D MMM YYYY")
+                        safeFormat(dates[0].date, "dddd, D MMM YYYY", "-")
                       )}
                     </Badge>
                   )}
@@ -111,13 +148,13 @@ export default function StepMultiServiceSummary({
           (() => {
             const block = times as MultiServiceBlockSelection;
             const displayDate = dates[0]?.date
-              ? capitalize(dayjs(dates[0].date).format("dddd, D MMM YYYY"))
-              : "—";
+              ? capitalize(safeFormat(dates[0].date, "dddd, D MMM YYYY", "-"))
+              : "-";
             const startText = block.startTime
-              ? dayjs(block.startTime).format("h:mm A")
+              ? safeFormat(block.startTime, "h:mm A", "-")
               : block.intervals?.[0]
-              ? dayjs(block.intervals[0].from).format("h:mm A")
-              : "—";
+              ? safeFormat(block.intervals[0].from, "h:mm A", "-")
+              : "-";
 
             // total del bloque
             const blockTotal = block.intervals.reduce((acc, iv) => {
@@ -182,8 +219,8 @@ export default function StepMultiServiceSummary({
                               </Text>
                             </Group>
                             <Text c="dimmed" size="sm">
-                              {dayjs(iv.from).format("h:mm A")} –{" "}
-                              {dayjs(iv.to).format("h:mm A")}
+                              {safeFormat(iv.from, "h:mm A", "-")} -{" "}
+                              {safeFormat(iv.to, "h:mm A", "-")}
                               {emp ? ` · ${emp.names}` : " · Sin preferencia"}
                             </Text>
                           </Stack>
@@ -223,8 +260,8 @@ export default function StepMultiServiceSummary({
                       : undefined;
 
                     const displayDate = d?.date
-                      ? capitalize(dayjs(d.date).format("dddd, D MMM YYYY"))
-                      : "—";
+                      ? capitalize(safeFormat(d.date, "dddd, D MMM YYYY", "-"))
+                      : "-";
                     const price = toNumber(svc?.price);
 
                     return (

@@ -51,7 +51,6 @@ import {
 import {
   buildStartFrom,
   getId,
-  pickEmployeeWithLessAppointmentsForSlot,
 } from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
@@ -310,21 +309,9 @@ export default function MultiBookingWizard() {
             })
             .map((e) => e._id);
 
-          // appointmentsByEmp
-          const appointmentsByEmp: Record<string, Appointment[]> = {};
-          for (const empId of eligibleEmpIds) {
-            appointmentsByEmp[empId] = allAppointments.filter(
-              (a) => a.employee && a.employee._id === empId
-            );
-          }
-
-          const chosenEmpId = pickEmployeeWithLessAppointmentsForSlot({
-            date: start.toDate(),
-            from: start.toDate(),
-            to: end.toDate(),
-            candidateEmployeeIds: eligibleEmpIds,
-            appointmentsByEmp,
-          });
+          // ✅ Simplificado: tomar el primer empleado elegible
+          // El backend ya maneja la auto-asignación inteligente en los nuevos endpoints
+          const chosenEmpId = eligibleEmpIds[0] || null;
 
           if (!chosenEmpId) {
             throw new Error(

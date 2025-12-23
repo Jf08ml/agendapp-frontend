@@ -16,9 +16,11 @@ import {
   Center,
   Stack,
   Text,
+  Tabs,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { BsSearch } from "react-icons/bs";
+import { BiCalendar, BiGroup } from "react-icons/bi";
 import { showNotification } from "@mantine/notifications";
 import {
   createEmployee,
@@ -35,6 +37,7 @@ import {
 import EmployeeCard from "./components/EmployeeCard";
 import EmployeeDetailsModal from "./components/EmployeeDetailsModal";
 import AdvanceModal from "./components/AdvanceModal";
+import ScheduleOverview from "./components/ScheduleOverview";
 import { openConfirmModal } from "@mantine/modals";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -65,6 +68,8 @@ const AdminEmployees: React.FC = () => {
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<string | null>("employees");
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
@@ -278,106 +283,133 @@ const AdminEmployees: React.FC = () => {
 
   return (
     <Container fluid>
-      {/* Toolbar */}
+      {/* Header */}
       <Card withBorder radius="md" p="md" mb="md">
-        <Group justify="space-between" align="end" wrap="wrap" gap="sm">
+        <Group justify="space-between" align="center" mb="md">
           <Title order={isMobile ? 3 : 2}>Administrar Empleados</Title>
-          <Group wrap="wrap" gap="sm" align="end">
-            <TextInput
-              leftSection={<BsSearch />}
-              placeholder="Buscar por nombre, cargo, correo o teléfono…"
-              value={search}
-              onChange={(e) => setSearch(e.currentTarget.value)}
-              w={isMobile ? "100%" : 300}
-            />
-            <Select
-              label="Servicio"
-              data={serviceOptions}
-              value={serviceFilter}
-              onChange={(v) => setServiceFilter(v ?? "__all__")}
-              w={isMobile ? "48%" : 200}
-            />
-            <SegmentedControl
-              value={status}
-              onChange={(v: any) => setStatus(v)}
-              data={[
-                { label: "Todos", value: "all" },
-                { label: "Activos", value: "active" },
-                { label: "Inactivos", value: "inactive" },
-              ]}
-              size={isMobile ? "xs" : "sm"}
-            />
-            <Select
-              label="Ordenar por"
-              data={[
-                { value: "alpha", label: "Nombre (A–Z)" },
-                { value: "position", label: "Cargo (A–Z)" },
-                { value: "recent", label: "Más recientes" },
-              ]}
-              value={sortBy}
-              onChange={(v) => setSortBy((v as any) ?? "alpha")}
-              w={isMobile ? "48%" : 180}
-            />
-            <Button
-              onClick={() => {
-                setIsModalOpen(true);
-                setEditingEmployee(null);
-              }}
-            >
-              Agregar empleado
-            </Button>
-          </Group>
         </Group>
-      </Card>
 
-      <Divider my="sm" />
+        <Tabs value={activeTab} onChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Tab value="employees" leftSection={<BiGroup size={16} />}>
+              Empleados
+            </Tabs.Tab>
+            <Tabs.Tab value="schedules" leftSection={<BiCalendar size={16} />}>
+              Vista de Horarios
+            </Tabs.Tab>
+          </Tabs.List>
 
-      {/* Grid */}
-      {!initialLoaded ? (
-        <Grid>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={i}>
-              <Card withBorder radius="md" p="md">
-                <Skeleton height={72} circle mb="sm" />
-                <Skeleton height={12} width="60%" mb="xs" />
-                <Skeleton height={10} width="40%" mb="xs" />
-                <Skeleton height={10} width="30%" />
-              </Card>
-            </Grid.Col>
-          ))}
-        </Grid>
-      ) : filtered.length === 0 ? (
-        <Center mih={240}>
-          <Stack align="center" gap="xs">
-            <Text c="dimmed">No hay empleados para los filtros aplicados.</Text>
-            <Button
-              variant="light"
-              onClick={() => {
-                setSearch("");
-                setServiceFilter("__all__");
-                setStatus("all");
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          </Stack>
-        </Center>
-      ) : (
-        <Grid>
-          {filtered.map((employee) => (
-            <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={employee._id}>
-              <EmployeeCard
-                employee={employee}
-                onEdit={handleEditEmployee}
-                onDelete={handleDeleteEmployee}
-                onActive={(id) => handleActiveEmployee(id, true)}
-                onViewDetails={showEmployeeDetailsModal}
-                onShowAdvanceModal={handleShowAdvanceModal}
+          <Tabs.Panel value="employees" pt="md">
+            {/* Toolbar de filtros */}
+            <Group justify="flex-end" wrap="wrap" gap="sm" mb="md">
+              <TextInput
+                leftSection={<BsSearch />}
+                placeholder="Buscar por nombre, cargo, correo o teléfono…"
+                value={search}
+                onChange={(e) => setSearch(e.currentTarget.value)}
+                w={isMobile ? "100%" : 300}
               />
-            </Grid.Col>
-          ))}
-        </Grid>
-      )}
+              <Select
+                label="Servicio"
+                data={serviceOptions}
+                value={serviceFilter}
+                onChange={(v) => setServiceFilter(v ?? "__all__")}
+                w={isMobile ? "48%" : 200}
+              />
+              <SegmentedControl
+                value={status}
+                onChange={(v: any) => setStatus(v)}
+                data={[
+                  { label: "Todos", value: "all" },
+                  { label: "Activos", value: "active" },
+                  { label: "Inactivos", value: "inactive" },
+                ]}
+                size={isMobile ? "xs" : "sm"}
+              />
+              <Select
+                label="Ordenar por"
+                data={[
+                  { value: "alpha", label: "Nombre (A–Z)" },
+                  { value: "position", label: "Cargo (A–Z)" },
+                  { value: "recent", label: "Más recientes" },
+                ]}
+                value={sortBy}
+                onChange={(v) => setSortBy((v as any) ?? "alpha")}
+                w={isMobile ? "48%" : 180}
+              />
+              <Button
+                onClick={() => {
+                  setIsModalOpen(true);
+                  setEditingEmployee(null);
+                }}
+              >
+                Agregar empleado
+              </Button>
+            </Group>
+
+            <Divider my="sm" />
+
+            {/* Grid */}
+            {!initialLoaded ? (
+              <Grid>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={i}>
+                    <Card withBorder radius="md" p="md">
+                      <Skeleton height={72} circle mb="sm" />
+                      <Skeleton height={12} width="60%" mb="xs" />
+                      <Skeleton height={10} width="40%" mb="xs" />
+                      <Skeleton height={10} width="30%" />
+                    </Card>
+                  </Grid.Col>
+                ))}
+              </Grid>
+            ) : filtered.length === 0 ? (
+              <Center mih={240}>
+                <Stack align="center" gap="xs">
+                  <Text c="dimmed">
+                    No hay empleados para los filtros aplicados.
+                  </Text>
+                  <Button
+                    variant="light"
+                    onClick={() => {
+                      setSearch("");
+                      setServiceFilter("__all__");
+                      setStatus("all");
+                    }}
+                  >
+                    Limpiar filtros
+                  </Button>
+                </Stack>
+              </Center>
+            ) : (
+              <Grid>
+                {filtered.map((employee) => (
+                  <Grid.Col
+                    span={{ base: 12, md: 6, lg: 3 }}
+                    key={employee._id}
+                  >
+                    <EmployeeCard
+                      employee={employee}
+                      onEdit={handleEditEmployee}
+                      onDelete={handleDeleteEmployee}
+                      onActive={(id) => handleActiveEmployee(id, true)}
+                      onViewDetails={showEmployeeDetailsModal}
+                      onShowAdvanceModal={handleShowAdvanceModal}
+                    />
+                  </Grid.Col>
+                ))}
+              </Grid>
+            )}
+          </Tabs.Panel>
+
+          <Tabs.Panel value="schedules" pt="md">
+            <ScheduleOverview
+              organizationId={organizationId!}
+              employees={employees.filter((e) => e.isActive)}
+            />
+          </Tabs.Panel>
+        </Tabs>
+      </Card>
 
       {/* Modales */}
       <ModalCreateEdit

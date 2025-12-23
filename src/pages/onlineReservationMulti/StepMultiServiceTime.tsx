@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+﻿/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -16,6 +16,8 @@ import {
   Button,
 } from "@mantine/core";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import {
@@ -25,18 +27,10 @@ import {
   ServiceTimeSelection,
 } from "../../types/multiBooking";
 import {
-  getAppointmentsByOrganizationId,
-  Appointment,
-} from "../../services/appointmentService";
-import {
-  generateAvailableTimes,
-  findAvailableMultiServiceSlots,
-  findAvailableMultiServiceSlotsAuto,
-  OpeningConstraints,
-  buildStartFrom, // ✅ IMPORTANTE (ya existe en tu bookingUtilsMulti.ts)
-} from "./bookingUtilsMulti";
-import { useSelector } from "react-redux";
-import { RootState } from "../../app/store";
+  getMultiServiceBlocks,
+  getAvailableSlotsBatch,
+  BatchSlotRequest,
+} from "../../services/scheduleService";
 
 interface StepMultiServiceTimeProps {
   organizationId: string;
@@ -59,7 +53,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
 
-  // Bloques encadenados (mismo día)
+  // Bloques encadenados (mismo dia)
   const [blockOptions, setBlockOptions] = useState<
     {
       intervals: {
@@ -70,11 +64,11 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       }[];
       start: Date;
       end: Date;
-      rangeLabel: string; // "9:00 AM – 10:30 AM"
+      rangeLabel: string;
     }[]
   >([]);
 
-  // Horarios por servicio (días distintos)
+  // Horarios por servicio (dias distintos)
   const [serviceTimes, setServiceTimes] = useState<
     { serviceId: string; options: string[] }[]
   >([]);
@@ -96,17 +90,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
   const dateMissing = dates.length === 0 || !dates[0]?.date;
 
-  const org = useSelector((s: RootState) => s.organization.organization);
-
-  const opening: OpeningConstraints = {
-    start: org?.openingHours?.start || "",
-    end: org?.openingHours?.end || "",
-    businessDays: org?.openingHours?.businessDays || [1, 2, 3, 4, 5],
-    breaks: org?.openingHours?.breaks || [],
-    stepMinutes: (org as any)?.openingHours?.stepMinutes || 5,
-  };
-
-  // Helpers selección actual
+  // Helpers seleccion actual
   const selectedBlock = !Array.isArray(value)
     ? (value as MultiServiceBlockSelection)
     : null;
@@ -116,54 +100,6 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     : [];
 
   const isBlockSelected = !!selectedBlock?.startTime;
-
-  // =========================
-  // ✅ Helpers: auto-asignación
-  // =========================
-  const getEligibleEmployeeIdsForService = (serviceId: string) => {
-    return employees
-      .filter((e) => e.isActive)
-      .filter((e) => {
-        const svcIds = (e.services || []).map((svc: any) =>
-          typeof svc === "string" ? svc : svc._id
-        );
-        return svcIds.includes(serviceId);
-      })
-      .map((e) => e._id);
-  };
-
-  const isSlotFree = (
-    appts: Appointment[],
-    from: dayjs.Dayjs,
-    to: dayjs.Dayjs
-  ) => {
-    return !appts.some(
-      (a) =>
-        dayjs(a.startDate).isBefore(to) && dayjs(a.endDate).isAfter(from)
-    );
-  };
-
-  const pickEmployeeLeastAppointmentsAndFree = (args: {
-    candidateIds: string[];
-    appointmentsByEmp: Record<string, Appointment[]>;
-    from: dayjs.Dayjs;
-    to: dayjs.Dayjs;
-  }): string | null => {
-    const { candidateIds, appointmentsByEmp, from, to } = args;
-    if (!candidateIds.length) return null;
-
-    const candidatesFree = candidateIds
-      .filter((id) => isSlotFree(appointmentsByEmp[id] ?? [], from, to))
-      .map((id) => ({
-        id,
-        count: (appointmentsByEmp[id] ?? []).length,
-      }));
-
-    if (candidatesFree.length === 0) return null;
-
-    candidatesFree.sort((a, b) => a.count - b.count);
-    return candidatesFree[0].id;
-  };
 
   // Al seleccionar bloque: colapsar el grid
   useEffect(() => {
@@ -216,168 +152,89 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
       try {
         // =========================
-        // Escenario 1: MISMO DÍA
+        // Escenario 1: MISMO DIA
         // =========================
         if (!splitDates && dates[0]?.date) {
-          const startISO = dayjs(dates[0].date).startOf("day").toISOString();
-          const endISO = dayjs(dates[0].date).endOf("day").toISOString();
-
-          const allAppointments = await getAppointmentsByOrganizationId(
-            organizationId,
-            startISO,
-            endISO
-          );
-
           // 1) servicios encadenados (algunos pueden venir con employeeId null)
           const chainServices = selectedServices.map((sel) => {
             const service = services.find((s) => s._id === sel.serviceId);
             return {
+              serviceId: sel.serviceId,
               employeeId: sel.employeeId, // puede ser null
               duration: service?.duration ?? 0,
-              serviceId: sel.serviceId,
             };
           });
 
-          // 2) elegibles por servicio (empleados activos que prestan el servicio)
-          const eligibleByService: Record<string, string[]> = {};
-          for (const sel of selectedServices) {
-            eligibleByService[sel.serviceId] = getEligibleEmployeeIdsForService(
-              sel.serviceId
-            );
+          // Llamar al backend para obtener bloques
+          const response = await getMultiServiceBlocks(
+            dayjs(dates[0].date).format("YYYY-MM-DD"),
+            organizationId,
+            chainServices
+          );
+
+          if (!response || !response.blocks) {
+            setBlockOptions([]);
+            return;
           }
 
-          // 3) appointmentsByEmp para la unión de todos los elegibles (y también los fijos)
-          const unionEmpIds = new Set<string>();
-          for (const sel of selectedServices) {
-            if (sel.employeeId) unionEmpIds.add(sel.employeeId);
-            (eligibleByService[sel.serviceId] || []).forEach((id) =>
-              unionEmpIds.add(id)
-            );
-          }
+          // Helper para combinar fecha + hora "HH:mm" -> Date
+          const dateStr = dayjs(dates[0].date).format("YYYY-MM-DD");
+          const toFullDate = (timeStr: string): Date => {
+            // timeStr puede ser "09:00" o "9:00" o ya un ISO
+            if (timeStr.includes("T") || timeStr.includes("-")) {
+              // Ya es ISO
+              return new Date(timeStr);
+            }
+            // Es solo hora HH:mm
+            return dayjs(`${dateStr} ${timeStr}`, "YYYY-MM-DD HH:mm").toDate();
+          };
 
-          const appointmentsByEmp: Record<string, Appointment[]> = {};
-          for (const id of unionEmpIds) {
-            appointmentsByEmp[id] = allAppointments.filter(
-              (a) => a.employee && a.employee._id === id
-            );
-          }
-
-          // 4) si TODOS traen empleado fijo => normal; si NO => AUTO
-          const hasAnyNull = chainServices.some((s) => !s.employeeId);
-
-          const bloques = hasAnyNull
-            ? findAvailableMultiServiceSlotsAuto(
-                dates[0].date!,
-                chainServices,
-                appointmentsByEmp,
-                eligibleByService,
-                opening
-              )
-            : findAvailableMultiServiceSlots(
-                dates[0].date!,
-                chainServices,
-                appointmentsByEmp,
-                opening
-              );
-
-          const mapped = bloques.map((block) => {
-            const start = block.start;
-            const end = block.times?.[block.times.length - 1]?.to ?? block.start;
-
-            return {
-              intervals: block.times.map((t, idx) => ({
-                serviceId: chainServices[idx].serviceId,
-                employeeId: t.employeeId, // ✅ ya viene asignado incluso si era “Sin preferencia”
-                from: t.from,
-                to: t.to,
-              })),
-              start,
-              end,
-              rangeLabel: `${dayjs(start).format("h:mm A")} – ${dayjs(end).format(
-                "h:mm A"
-              )}`,
-            };
-          });
+          // Mapear respuesta del backend
+          const mapped = response.blocks.map((block) => ({
+            intervals: block.intervals.map((interval: { serviceId: string; employeeId: string | null; start: string; end: string }) => ({
+              serviceId: interval.serviceId,
+              employeeId: interval.employeeId,
+              from: toFullDate(interval.start),
+              to: toFullDate(interval.end),
+            })),
+            start: new Date(block.start),
+            end: new Date(block.end),
+            rangeLabel: `${dayjs(block.start).format("h:mm A")} - ${dayjs(block.end).format("h:mm A")}`,
+          }));
 
           setBlockOptions(mapped);
         }
 
         // =========================
-        // Escenario 2: DÍAS DIFERENTES
+        // Escenario 2: DIAS DIFERENTES
         // =========================
         else if (splitDates) {
-          const perService: { serviceId: string; options: string[] }[] = [];
-
-          for (const d of dates) {
-            if (!d.date) continue;
-
-            const service = services.find((s) => s._id === d.serviceId);
-            if (!service) {
-              perService.push({ serviceId: d.serviceId, options: [] });
-              continue;
-            }
-
-            const startISO = dayjs(d.date).startOf("day").toISOString();
-            const endISO = dayjs(d.date).endOf("day").toISOString();
-
-            const allAppointments = await getAppointmentsByOrganizationId(
-              organizationId,
-              startISO,
-              endISO
-            );
-
-            // empleados elegibles para este servicio
-            const eligibleEmpIds = getEligibleEmployeeIdsForService(d.serviceId);
-
-            // appointmentsByEmp para todos los elegibles
-            const appointmentsByEmp: Record<string, Appointment[]> = {};
-            for (const empId of eligibleEmpIds) {
-              appointmentsByEmp[empId] = allAppointments.filter(
-                (a) => a.employee && a.employee._id === empId
-              );
-            }
-
-            // Caso A: con empleado escogido
-            if (d.employeeId) {
-              const appts = appointmentsByEmp[d.employeeId] ?? [];
-              const availableTimes = generateAvailableTimes(
-                d.date,
-                service.duration,
-                appts,
-                opening
-              );
-              perService.push({ serviceId: d.serviceId, options: availableTimes });
-              continue;
-            }
-
-            // Caso B: Sin preferencia -> unión de horarios de todos los elegibles
-            const set = new Set<string>();
-            for (const empId of eligibleEmpIds) {
-              const appts = appointmentsByEmp[empId] ?? [];
-              const times = generateAvailableTimes(
-                d.date,
-                service.duration,
-                appts,
-                opening
-              );
-              times.forEach((t) => set.add(t));
-            }
-
-            // ordena por hora real
-            const sorted = Array.from(set).sort((a, b) => {
-              const A = dayjs(
-                `${dayjs(d.date).format("YYYY-MM-DD")} ${a}`,
-                "YYYY-MM-DD h:mm A"
-              ).valueOf();
-              const B = dayjs(
-                `${dayjs(d.date).format("YYYY-MM-DD")} ${b}`,
-                "YYYY-MM-DD h:mm A"
-              ).valueOf();
-              return A - B;
+          // Construir requests para el batch
+          const requests: BatchSlotRequest[] = dates
+            .filter((d) => d.date)
+            .map((d) => {
+              const service = services.find((s) => s._id === d.serviceId);
+              return {
+                date: dayjs(d.date).format("YYYY-MM-DD"),
+                serviceId: d.serviceId,
+                employeeId: d.employeeId || null,
+                duration: service?.duration ?? 0,
+              };
             });
 
-            perService.push({ serviceId: d.serviceId, options: sorted });
+          // Llamar al backend
+          const response = await getAvailableSlotsBatch(organizationId, requests);
+
+          if (!response || !response.results) {
+            setServiceTimes([]);
+            return;
           }
+
+          // Mapear respuesta
+          const perService = response.results.map((result) => ({
+            serviceId: result.serviceId,
+            options: result.slots,
+          }));
 
           setServiceTimes(perService);
         }
@@ -389,60 +246,21 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     if (!dateMissing) void load();
   }, [dates, selectedServices, services, organizationId, splitDates, dateMissing]);
 
-  // Handler para bloque único (todos el mismo día)
+  // Handler para bloque unico (todos el mismo dia)
   const handleBlockSelect = (start: Date, intervals: any[]) => {
     onChange({ startTime: start, intervals });
     setShowBlockPicker(false);
   };
 
-  // ✅ Handler para selección de hora individual (días distintos)
-  //    Si viene sin preferencia, asigna automáticamente “el que tenga menos citas ese día”,
-  //    pero SOLO entre los que estén libres en ese slot.
+  // Handler para seleccion de hora individual (dias distintos)
+  // El backend ya se encarga de asignar el mejor empleado si no hay preferencia
   const handleTimeSelect = async (serviceId: string, time: string) => {
     const current = splitValue || [];
     const fromDates = dates.find((d) => d.serviceId === serviceId);
     const prev = current.find((v) => v.serviceId === serviceId);
 
     const dateForService = fromDates?.date ?? prev?.date ?? null;
-
-    let employeeId = fromDates?.employeeId ?? prev?.employeeId ?? null;
-
-    // ✅ auto-asignar si no hay empleado
-    if (!employeeId && dateForService) {
-      const svc = services.find((s) => s._id === serviceId);
-      const duration = svc?.duration ?? 0;
-
-      const start = buildStartFrom(dateForService, time); // dayjs
-      const end = start.clone().add(duration, "minute");
-
-      const startISO = dayjs(dateForService).startOf("day").toISOString();
-      const endISO = dayjs(dateForService).endOf("day").toISOString();
-
-      const allAppointments = await getAppointmentsByOrganizationId(
-        organizationId,
-        startISO,
-        endISO
-      );
-
-      const eligibleEmpIds = getEligibleEmployeeIdsForService(serviceId);
-
-      const appointmentsByEmp: Record<string, Appointment[]> = {};
-      for (const empId of eligibleEmpIds) {
-        appointmentsByEmp[empId] = allAppointments.filter(
-          (a) => a.employee && a.employee._id === empId
-        );
-      }
-
-      employeeId = pickEmployeeLeastAppointmentsAndFree({
-        candidateIds: eligibleEmpIds,
-        appointmentsByEmp,
-        from: start,
-        to: end,
-      });
-
-      // si nadie está libre, no bloqueamos el UI: dejamos null, pero igual guardamos hora.
-      // (Opcional: podrías mostrar una notificación)
-    }
+    const employeeId = fromDates?.employeeId ?? prev?.employeeId ?? null;
 
     const next: ServiceTimeSelection[] = [
       ...current.filter((v) => v.serviceId !== serviceId),
@@ -504,35 +322,37 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     );
   };
 
-  // Rango inicio–fin para modo split (con duración)
+  // Rango inicio-fin para modo split (con duracion)
   const toRangeLabel = (
     dateForService: Date | null,
     startLabel: string,
     durationMin: number
   ) => {
     if (!dateForService) return startLabel;
-    const base = dayjs(dateForService);
+    
+    // Asegurar que dateForService sea un Date valido
+    const baseDate = dateForService instanceof Date 
+      ? dateForService 
+      : new Date(dateForService);
+    
+    if (isNaN(baseDate.getTime())) return startLabel;
+    
+    const base = dayjs(baseDate);
+    const dateStr = base.format("YYYY-MM-DD");
 
-    const start = dayjs(
-      `${base.format("YYYY-MM-DD")} ${startLabel}`,
-      "YYYY-MM-DD h:mm A",
-      true
-    ).isValid()
-      ? dayjs(
-          `${base.format("YYYY-MM-DD")} ${startLabel}`,
-          "YYYY-MM-DD h:mm A",
-          true
-        )
-      : dayjs(
-          `${base.format("YYYY-MM-DD")} ${startLabel}`,
-          "YYYY-MM-DD HH:mm",
-          true
-        );
+    // Intentar varios formatos de hora
+    let start = dayjs(`${dateStr} ${startLabel}`, "YYYY-MM-DD h:mm A");
+    if (!start.isValid()) {
+      start = dayjs(`${dateStr} ${startLabel}`, "YYYY-MM-DD HH:mm");
+    }
+    if (!start.isValid()) {
+      start = dayjs(`${dateStr} ${startLabel}`, "YYYY-MM-DD H:mm");
+    }
 
     if (!start.isValid()) return startLabel;
 
     const end = start.add(durationMin, "minute");
-    return `${start.format("h:mm A")} – ${end.format("h:mm A")}`;
+    return `${start.format("h:mm A")} - ${end.format("h:mm A")}`;
   };
 
   // === RENDER ===
@@ -540,7 +360,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     return (
       <Stack align="center" justify="center" style={{ minHeight: 120 }} gap="xs">
         <Loader />
-        <Text size="sm">Buscando horarios disponibles…</Text>
+        <Text size="sm">Buscando horarios disponibles...</Text>
       </Stack>
     );
   }
@@ -564,13 +384,13 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       </Text>
       <Divider />
 
-      {/* ===== MODO 1: Todos el mismo día ===== */}
+      {/* ===== MODO 1: Todos el mismo dia ===== */}
       {!splitDates && (
         <>
           {blockOptions.length === 0 ? (
             <Notification color="red" title="Sin bloques disponibles">
-              No hay bloques disponibles para la combinación seleccionada
-              (verifica empleados y duración).
+              No hay bloques disponibles para la combinacion seleccionada
+              (verifica empleados y duracion).
             </Notification>
           ) : (
             <Paper withBorder p="sm">
@@ -583,7 +403,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                 <Text size="xs" c="dimmed">
                   {dates?.[0]?.date
                     ? dayjs(dates[0].date).format("DD/MM/YYYY")
-                    : "—"}
+                    : "-"}
                 </Text>
               </Group>
 
@@ -604,7 +424,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                     uniqueEmpIds.length === 1
                       ? employees.find((e) => e._id === uniqueEmpIds[0])
                           ?.names ?? "Sin preferencia"
-                      : "Múltiples profesionales";
+                      : "Multiples profesionales";
 
                   return `${who} · ${totalMin} min`;
                 })()}
@@ -639,7 +459,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                           </Text>
                           <Text size="xs" c="dimmed">
                             {durationMin != null && `${durationMin} min · `}
-                            {dayjs(i.from).format("h:mm A")} –{" "}
+                            {dayjs(i.from).format("h:mm A")} -{" "}
                             {dayjs(i.to).format("h:mm A")}
                           </Text>
                         </Stack>
@@ -651,7 +471,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                 <>
                   <Group justify="space-between" mb="xs">
                     <Text fw={700} size="sm">
-                      Horas disponibles (inicio–fin)
+                      Horas disponibles (inicio-fin)
                     </Text>
                     <Text size="xs" c="dimmed">
                       {blockOptions.length} opciones
@@ -685,7 +505,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
         </>
       )}
 
-      {/* ===== MODO 2: Servicios en días diferentes ===== */}
+      {/* ===== MODO 2: Servicios en dias diferentes ===== */}
       {splitDates &&
         serviceTimes.map((s) => {
           const sel = splitValue.find((v) => v.serviceId === s.serviceId);
@@ -711,7 +531,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                   {service?.name ?? "Servicio"}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  {dateForService ? dayjs(dateForService).format("DD/MM/YYYY") : "—"}
+                  {dateForService ? dayjs(dateForService).format("DD/MM/YYYY") : "-"}
                 </Text>
               </Group>
 
@@ -750,7 +570,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                     <>
                       <Group justify="space-between" mb="xs">
                         <Text fw={700} size="sm">
-                          Horas disponibles (inicio–fin)
+                          Horas disponibles (inicio-fin)
                         </Text>
                         <Text size="xs" c="dimmed">
                           {s.options.length} opciones

@@ -13,6 +13,7 @@ import {
   Divider,
   Group,
   Modal,
+  Tabs,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import {
@@ -24,6 +25,7 @@ import {
   getAdvancesByEmployee,
 } from "../../../../services/advanceService";
 import { Employee } from "../../../../services/employeeService";
+import EmployeeScheduleSection from "./EmployeeScheduleSection";
 import dayjs from "dayjs";
 
 interface EmployeeDetailsModalProps {
@@ -199,11 +201,18 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title="Detalles del Empleado"
-      size="lg"
+      title={`Detalles - ${employee?.names || "Empleado"}`}
+      size="xl"
       centered
     >
       <Box>
+        <Tabs defaultValue="payroll">
+          <Tabs.List>
+            <Tabs.Tab value="payroll">Nómina y Pagos</Tabs.Tab>
+            <Tabs.Tab value="schedule">Horario de Disponibilidad</Tabs.Tab>
+          </Tabs.List>
+
+          <Tabs.Panel value="payroll" pt="md">
         <Card shadow="lg" radius="md" p="md" withBorder>
           <Flex justify="space-between" align="center">
             <Box>
@@ -367,6 +376,17 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
             )}
           </ScrollArea>
         </Card>
+          </Tabs.Panel>
+
+          <Tabs.Panel value="schedule" pt="md">
+            {employee && (
+              <EmployeeScheduleSection
+                employeeId={employee._id}
+                employeeName={employee.names}
+              />
+            )}
+          </Tabs.Panel>
+        </Tabs>
       </Box>
     </Modal>
   );

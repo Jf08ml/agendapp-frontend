@@ -86,6 +86,33 @@ export const schema = z.object({
     )
     .optional(),
 
+  // NUEVO: Sistema de horarios semanales personalizados
+  weeklySchedule: z
+    .object({
+      enabled: z.boolean().optional(),
+      stepMinutes: z.number().int().min(5).max(60).optional(),
+      schedule: z
+        .array(
+          z.object({
+            day: z.number().int().min(0).max(6),
+            isOpen: z.boolean(),
+            start: hhmm.optional(),
+            end: hhmm.optional(),
+            breaks: z
+              .array(
+                z.object({
+                  start: hhmm,
+                  end: hhmm,
+                  note: z.string().optional(),
+                })
+              )
+              .optional(),
+          })
+        )
+        .optional(),
+    })
+    .optional(),
+
   facebookUrl: optionalUrl,
   instagramUrl: optionalUrl,
   whatsappUrl: optionalUrl,

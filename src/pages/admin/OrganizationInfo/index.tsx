@@ -99,6 +99,11 @@ export default function OrganizationInfo() {
               breaks: ensureBreaks(response.openingHours?.breaks),
               stepMinutes: response.openingHours?.stepMinutes ?? 5,
             },
+            weeklySchedule: response.weeklySchedule ?? {
+              enabled: false,
+              schedule: [],
+              stepMinutes: 30,
+            },
           };
 
           setOrg(normalized);
