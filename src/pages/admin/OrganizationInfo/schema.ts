@@ -58,19 +58,31 @@ export const schema = z.object({
         .array(
           z
             .object({
-              day: z.number().int().min(0).max(6),
-              start: hhmm,
-              end: hhmm,
+              day: z.union([
+                z.number().int().min(0).max(6),
+                z.null(),
+                z.undefined()
+              ]).optional(),
+              start: hhmm.optional(),
+              end: hhmm.optional(),
               note: z.string().optional(),
             })
-            .refine((b) => b.start < b.end, {
+            .refine((b) => {
+              // Solo validar si el break tiene datos
+              if (!b.start || !b.end) return true;
+              return b.start < b.end;
+            }, {
               message: "La hora 'Desde' debe ser menor que 'Hasta'",
               path: ["end"],
             })
         )
         .optional(),
 
-      stepMinutes: z.number().int().min(1).max(60).optional()
+      stepMinutes: z.union([
+        z.number().int().min(1).max(60),
+        z.null(),
+        z.undefined()
+      ]).optional()
     })
     // Validación cruzada start < end (solo si ambos están presentes y no vacíos)
     .refine(
@@ -91,7 +103,11 @@ export const schema = z.object({
   weeklySchedule: z
     .object({
       enabled: z.boolean().optional(),
-      stepMinutes: z.number().int().min(5).max(60).optional(),
+      stepMinutes: z.union([
+        z.number().int().min(5).max(60),
+        z.null(),
+        z.undefined()
+      ]).optional(),
       schedule: z
         .array(
           z.object({
@@ -102,8 +118,8 @@ export const schema = z.object({
             breaks: z
               .array(
                 z.object({
-                  start: hhmm,
-                  end: hhmm,
+                  start: hhmm.optional(),
+                  end: hhmm.optional(),
                   note: z.string().optional(),
                 })
               )
@@ -136,7 +152,11 @@ export const schema = z.object({
   reminderSettings: z
     .object({
       enabled: z.boolean().optional(),
-      hoursBefore: z.number().int().min(1).max(72).optional(),
+      hoursBefore: z.union([
+        z.number().int().min(1).max(72),
+        z.null(),
+        z.undefined()
+      ]).optional(),
       sendTimeStart: hhmmOrEmpty.optional(),
       sendTimeEnd: hhmmOrEmpty.optional(),
     })
@@ -171,7 +191,11 @@ export const schema = z.object({
     )
     .optional(),
   requireReservationDeposit: z.boolean().optional(),
-  reservationDepositPercentage: z.number().min(0).max(100).optional(),
+  reservationDepositPercentage: z.union([
+    z.number().min(0).max(100),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 });
 
 export type FormValues = z.infer<typeof schema>;
