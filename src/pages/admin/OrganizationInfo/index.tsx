@@ -76,6 +76,7 @@ export default function OrganizationInfo() {
             branding: ensureBranding(response.branding),
             domains: ensureArray(response.domains, []),
             default_country: response.default_country ?? "CO", // 🌍 País por defecto
+            timezone: response.timezone ?? "America/Bogota", // 🕐 Zona horaria
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",

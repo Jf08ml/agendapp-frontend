@@ -72,6 +72,7 @@ export interface Organization {
   password?: string;
   phoneNumber: string;
   default_country?: string; // 🌍 País por defecto (ISO2: CO, MX, PE, etc.)
+  timezone?: string; // 🕐 Zona horaria (IANA: America/Bogota, America/Mexico_City, etc.)
   facebookUrl?: string;
   instagramUrl?: string;
   whatsappUrl?: string;

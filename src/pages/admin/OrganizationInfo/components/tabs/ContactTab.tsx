@@ -53,6 +53,32 @@ export default function ContactTab({
               { value: "CA", label: "🇨🇦 Canadá" },
             ]}
           />
+          <Select
+            label="Zona horaria"
+            description="Zona horaria donde opera tu negocio"
+            {...form.getInputProps("timezone")}
+            disabled={!isEditing}
+            searchable
+            data={[
+              { value: "America/Bogota", label: "🇨🇴 Colombia (GMT-5)" },
+              { value: "America/Mexico_City", label: "🇲🇽 México Centro (GMT-6)" },
+              { value: "America/Tijuana", label: "🇲🇽 México Pacífico (GMT-8)" },
+              { value: "America/Cancun", label: "🇲🇽 México Caribe (GMT-5)" },
+              { value: "America/Lima", label: "🇵🇪 Perú (GMT-5)" },
+              { value: "America/Guayaquil", label: "🇪🇨 Ecuador (GMT-5)" },
+              { value: "America/Caracas", label: "🇻🇪 Venezuela (GMT-4)" },
+              { value: "America/Panama", label: "🇵🇦 Panamá (GMT-5)" },
+              { value: "America/Santiago", label: "🇨🇱 Chile (GMT-3)" },
+              { value: "America/Argentina/Buenos_Aires", label: "🇦🇷 Argentina (GMT-3)" },
+              { value: "America/Sao_Paulo", label: "🇧🇷 Brasil (GMT-3)" },
+              { value: "America/New_York", label: "🇺🇸 Nueva York (GMT-5)" },
+              { value: "America/Chicago", label: "🇺🇸 Chicago (GMT-6)" },
+              { value: "America/Denver", label: "🇺🇸 Denver (GMT-7)" },
+              { value: "America/Los_Angeles", label: "🇺🇸 Los Ángeles (GMT-8)" },
+              { value: "America/Toronto", label: "🇨🇦 Toronto (GMT-5)" },
+              { value: "Europe/Madrid", label: "🇪🇸 España (GMT+1)" },
+            ]}
+          />
           <TextInput
             label="Dominios"
             value={(domains || []).join(", ")}
