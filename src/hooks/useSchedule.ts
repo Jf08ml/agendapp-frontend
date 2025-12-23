@@ -39,8 +39,11 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
     setError(null);
 
     try {
+      // Enviar fecha en formato YYYY-MM-DD sin timezone
+      const dateStr = targetDate.toISOString().split('T')[0];
+      
       const response = await axios.post('/api/schedule/available-slots', {
-        date: targetDate.toISOString(),
+        date: dateStr,
         organizationId: orgId,
         employeeId: empId || undefined,
         serviceDuration: duration || serviceDuration,

@@ -49,7 +49,7 @@ import {
   type Appointment,
 } from "../../services/appointmentService";
 import {
-  buildStartFrom,
+  buildDateTimeForBackend,
   getId,
 } from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
@@ -189,12 +189,17 @@ export default function MultiBookingWizard() {
   // Payloads
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
     const block = times as MultiServiceBlockSelection;
+    const startDateTime = block.startTime ?? block.intervals[0].from;
+    
+    // Convertir a formato sin timezone
+    const startDateStr = dayjs(startDateTime).format('YYYY-MM-DDTHH:mm:ss');
+    
     return {
       services: block.intervals.map((iv) => ({
         serviceId: iv.serviceId,
         employeeId: iv.employeeId ?? null,
       })),
-      startDate: block.startTime ?? block.intervals[0].from,
+      startDate: startDateStr,
       customerDetails,
       organizationId: orgId,
     } satisfies CreateMultipleReservationsPayload;
@@ -216,12 +221,13 @@ export default function MultiBookingWizard() {
       if (!t.time)
         throw new Error(`Falta hora para el servicio "${svc?.name ?? sid}"`);
 
-      const start = buildStartFrom(d.date, t.time);
+      // Usar formato sin timezone para que el backend lo interprete correctamente
+      const startDate = buildDateTimeForBackend(d.date, t.time);
 
       return {
         serviceId: sid,
         employeeId: d.employeeId ?? null,
-        startDate: start.toISOString(), // ISO para evitar problemas de TZ/serialización
+        startDate, // Formato: "YYYY-MM-DDTHH:mm:ss" sin timezone
         customerDetails,
         organizationId: orgId,
         status: "pending",

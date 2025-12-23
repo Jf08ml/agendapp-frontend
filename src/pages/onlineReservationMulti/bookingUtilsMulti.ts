@@ -40,6 +40,19 @@ export function buildStartFrom(dateVal: Date, timeStr: string) {
     .millisecond(0);
 }
 
+/**
+ * Convierte una fecha+hora a formato que el backend puede interpretar correctamente
+ * en la timezone de la organización
+ * @param dateVal - Fecha seleccionada
+ * @param timeStr - Hora seleccionada (ej: "10:00", "10:00 AM")
+ * @returns String en formato "YYYY-MM-DDTHH:mm:ss" sin timezone
+ */
+export function buildDateTimeForBackend(dateVal: Date, timeStr: string): string {
+  const combined = buildStartFrom(dateVal, timeStr);
+  // Retornar formato ISO SIN timezone para que el backend lo interprete en su timezone
+  return combined.format('YYYY-MM-DDTHH:mm:ss');
+}
+
 // ---------- Tipos (mantener para compatibilidad) ----------
 
 export interface ChainService {
