@@ -331,7 +331,11 @@ export default function OpeningHoursTab({
             ) : (
               breaks.map((b, idx) => (
                 <Table.Tr key={`${b.day}-${b.start}-${b.end}-${idx}`}>
-                  <Table.Td>{DAY_LABELS[b.day]}</Table.Td>
+                  <Table.Td>
+                    {b.day !== null && b.day !== undefined 
+                      ? DAY_LABELS[b.day] 
+                      : <Text c="dimmed" size="sm">Todos los días</Text>}
+                  </Table.Td>
                   <Table.Td>{b.start}</Table.Td>
                   <Table.Td>{b.end}</Table.Td>
                   <Table.Td>{b.note || "—"}</Table.Td>

@@ -58,11 +58,7 @@ export const schema = z.object({
         .array(
           z
             .object({
-              day: z.union([
-                z.number().int().min(0).max(6),
-                z.null(),
-                z.undefined()
-              ]).optional(),
+              day: z.number().int().min(0).max(6).optional(), // Opcional para compatibilidad con datos existentes
               start: hhmm.optional(),
               end: hhmm.optional(),
               note: z.string().optional(),
