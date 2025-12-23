@@ -1,56 +1,28 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Text,
   Box,
   Group,
-  ActionIcon,
   Menu,
   SimpleGrid,
   Anchor,
-  Tooltip,
   Skeleton,
   rem,
-  Indicator,
+  Tooltip,
+  ActionIcon,
 } from "@mantine/core";
-import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp, FaBell } from "react-icons/fa";
-import { useMemo, useEffect, useState } from "react";
+import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
-import { RootState } from "../app/store";
 import { useMediaQuery } from "@mantine/hooks";
-// import NotificationsMenu from "./NotificationsMenu";
 import { Organization } from "../services/organizationService";
-import { getMembershipNotifications } from "../services/membershipService";
 
 type Props = { organization: Organization | null };
 
 export default function Header({ organization }: Props) {
   const isXS = useMediaQuery("(max-width: 428px)");
-  const auth = useSelector((state: RootState) => state.auth);
-  const orgState = useSelector((state: RootState) => state.organization);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl } =
     organization || {};
-
-  // Cargar notificaciones de membresía si está autenticado
-  useEffect(() => {
-    if (auth.isAuthenticated && orgState.organization?._id) {
-      loadNotifications();
-    }
-  }, [auth.isAuthenticated, orgState.organization?._id]);
-
-  const loadNotifications = async () => {
-    try {
-      if (!orgState.organization?._id) return;
-      const notifications = await getMembershipNotifications(orgState.organization._id);
-      const unread = notifications.filter((n: any) => !n.read).length;
-      setUnreadCount(unread);
-    } catch (error) {
-      console.error("Error loading membership notifications:", error);
-    }
-  };
 
   // Links del centro (solo desktop). Agrega/edita a tu gusto:
   const navLinks = useMemo(
@@ -117,36 +89,6 @@ export default function Header({ organization }: Props) {
               )}
             </Anchor>
           </Text>
-
-          {/* Notificaciones de membresía */}
-          {auth.isAuthenticated && (
-            <Tooltip label="Notificaciones de Membresía" withArrow>
-              <Indicator
-                inline
-                label={unreadCount > 0 ? unreadCount : undefined}
-                size={16}
-                color="red"
-                disabled={unreadCount === 0}
-              >
-                <ActionIcon
-                  component={Link}
-                  to="/membership-notifications"
-                  radius="xl"
-                  size="md"
-                  variant="subtle"
-                  styles={{
-                    root: {
-                      color: "white",
-                      background: "transparent",
-                    },
-                  }}
-                  aria-label="Notificaciones de membresía"
-                >
-                  <FaBell size={18} />
-                </ActionIcon>
-              </Indicator>
-            </Tooltip>
-          )}
         </Group>
 
         {/* Centro: Links (solo ≥ sm). Oculte en mobile porque ya tienes el Burger en AppShell */}

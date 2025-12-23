@@ -18,7 +18,7 @@ import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
 import MembershipManagement from "../pages/superadmin/MembershipManagement";
-import MembershipNotifications from "../pages/admin/MembershipNotifications";
+
 import MyMembership from "../pages/admin/MyMembership";
 import ServiceSuspended from "../pages/ServiceSuspended";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
@@ -196,18 +196,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Analiticas del negocio",
       description: "Ve analiticas del negocio",
-    },
-  },
-  {
-    path: "/membership-notifications",
-    component: (props: JSX.IntrinsicAttributes) => (
-      <ProtectedRoute>
-        <MembershipNotifications {...props} />
-      </ProtectedRoute>
-    ),
-    MediaMetadata: {
-      title: "Notificaciones de Membresía",
-      description: "Ver notificaciones relacionadas con tu membresía",
     },
   },
   {

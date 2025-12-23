@@ -15,7 +15,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // Rutas permitidas incluso si el servicio está suspendido
   const allowedRoutesWhenSuspended = [
     "/my-membership",
-    "/membership-notifications",
     "/service-suspended",
   ];
 

@@ -173,12 +173,6 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           icon: <FaCrown size={18} />,
           canShow: can.businessInfo, // Solo admins ven esto
         },
-        {
-          label: "Notificaciones de Membresía",
-          to: "/membership-notifications",
-          icon: <FaBell size={18} />,
-          canShow: can.businessInfo, // Solo admins ven esto
-        },
       ],
     },
   ];

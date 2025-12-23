@@ -22,10 +22,10 @@ import { RootState } from "./app/store";
 import { useEffect, useState } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
-import NotificationsMenu from "./layouts/NotificationsMenu";
-import { MembershipAlert } from "./components/MembershipAlert";
+
 import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
 import { getCurrentMembership, Membership } from "./services/membershipService";
+import NotificationsMenu from "./layouts/NotificationsMenu";
 
 function App() {
   const { userId, isAuthenticated } = useSelector(
@@ -236,14 +236,6 @@ function App() {
         </AppShell.Navbar>
 
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
-          {/* Alerta de membresía para usuarios autenticados */}
-          {isAuthenticated && organization?._id && (
-            <MembershipAlert
-              organizationId={organization._id}
-              onRenewClick={() => setPaymentModalOpened(true)}
-            />
-          )}
-
           <Routes>
             {generalRoutes.map((route, index) => (
               <Route

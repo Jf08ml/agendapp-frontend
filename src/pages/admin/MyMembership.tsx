@@ -117,20 +117,31 @@ export default function MyMembership() {
     <Container size="lg" py="xl">
       <Stack gap="xl">
         {/* Header */}
-        <Group justify="space-between">
+        <Group justify="space-between" wrap="wrap">
           <div>
             <Title order={2}>Mi Membresía</Title>
             <Text c="dimmed" size="sm">
               Gestiona tu suscripción y pagos
             </Text>
           </div>
-          <Badge
-            size="xl"
-            variant="filled"
-            color={getStatusColor(membership.status)}
-          >
-            {getStatusLabel(membership.status)}
-          </Badge>
+          <Group gap="md">
+            <Badge
+              size="xl"
+              variant="filled"
+              color={getStatusColor(membership.status)}
+            >
+              {getStatusLabel(membership.status)}
+            </Badge>
+            <Button
+              size="lg"
+              leftSection={<CgCreditCard size={20} />}
+              onClick={() => setPaymentModalOpened(true)}
+              variant="filled"
+              color="blue"
+            >
+              Renovar Membresía
+            </Button>
+          </Group>
         </Group>
 
         {/* Alerta de estado */}
@@ -380,17 +391,6 @@ export default function MyMembership() {
             </Grid.Col>
           </Grid>
         </Paper>
-
-        {/* Acciones */}
-        <Group justify="center">
-          <Button
-            size="lg"
-            leftSection={<CgCreditCard size={20} />}
-            onClick={() => setPaymentModalOpened(true)}
-          >
-            Renovar Membresía
-          </Button>
-        </Group>
       </Stack>
 
       {/* Modal de Pago */}

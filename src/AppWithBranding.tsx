@@ -8,8 +8,8 @@ import { Notifications } from "@mantine/notifications";
 import GoogleMapsProvider from "./utils/GoogleMapsProvider";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import App from "./App";
 import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
+import App from "./App";
 
 // Función para crear paleta de 10 colores iguales con HEX
 function createCustomPalette(

@@ -9,8 +9,8 @@ export interface Notification {
   employeeId?: string;
   organizationId: string;
   status: "unread" | "read";
-  type: "reservation";
-  frontendRoute: "string";
+  type: "reservation" | "membership";
+  frontendRoute: string;
   createdAt: Date;
   updatedAt: Date;
 }
