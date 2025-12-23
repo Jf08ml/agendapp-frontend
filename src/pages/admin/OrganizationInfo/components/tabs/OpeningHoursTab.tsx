@@ -358,9 +358,18 @@ export default function OpeningHoursTab({
       {/* NUEVO: Sistema de horarios semanales personalizados */}
       <Box mt="xl">
         <WeeklyScheduleSection
-          value={form.values.weeklySchedule || { enabled: false, schedule: [], stepMinutes: 30 }}
+          value={{
+            enabled: form.values.weeklySchedule?.enabled ?? false,
+            schedule: (form.values.weeklySchedule?.schedule ?? []).map((s) => ({
+              ...s,
+              start: s.start ?? "",
+              end: s.end ?? "",
+              breaks: s.breaks ?? [], // Asegura que breaks siempre sea un array
+            })),
+            stepMinutes: form.values.weeklySchedule?.stepMinutes ?? 30,
+          }}
           onChange={(weeklySchedule) => {
-            form.setFieldValue('weeklySchedule', weeklySchedule);
+            form.setFieldValue("weeklySchedule", weeklySchedule);
           }}
           disabled={!isEditing}
         />

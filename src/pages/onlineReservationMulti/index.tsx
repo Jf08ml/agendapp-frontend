@@ -283,7 +283,7 @@ export default function MultiBookingWizard() {
           if (!svc) throw new Error("Servicio no encontrado");
 
           const start = dayjs(p.startDate);
-          const end = start.add(svc.duration ?? 0, "minute");
+          // const end = start.add(svc.duration ?? 0, "minute");
           const dk = start.format("YYYY-MM-DD");
 
           let allAppointments = dayCache.get(dk);
