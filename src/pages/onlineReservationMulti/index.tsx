@@ -48,10 +48,7 @@ import {
   getAppointmentsByOrganizationId,
   type Appointment,
 } from "../../services/appointmentService";
-import {
-  buildDateTimeForBackend,
-  getId,
-} from "./bookingUtilsMulti";
+import { buildDateTimeForBackend, getId } from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
@@ -171,7 +168,6 @@ export default function MultiBookingWizard() {
   const hasCustomerData = (() => {
     const hasName = customerDetails.name.trim().length > 0;
     const hasPhone = customerDetails.phone.trim().length >= 7;
-    console.log('[DEBUG] hasCustomerData check:', { hasName, hasPhone, name: customerDetails.name, phone: customerDetails.phone });
     return hasName && hasPhone;
   })();
 
@@ -190,10 +186,10 @@ export default function MultiBookingWizard() {
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
     const block = times as MultiServiceBlockSelection;
     const startDateTime = block.startTime ?? block.intervals[0].from;
-    
+
     // Convertir a formato sin timezone
-    const startDateStr = dayjs(startDateTime).format('YYYY-MM-DDTHH:mm:ss');
-    
+    const startDateStr = dayjs(startDateTime).format("YYYY-MM-DDTHH:mm:ss");
+
     return {
       services: block.intervals.map((iv) => ({
         serviceId: iv.serviceId,
@@ -247,11 +243,7 @@ export default function MultiBookingWizard() {
 
       // 🔄 Actualizar cliente si existe (nuevo flujo)
       if (updateClientRef.current) {
-        console.log('[DEBUG] Actualizando información del cliente antes de reservar...');
-        const updated = await updateClientRef.current();
-        if (!updated) {
-          console.warn('[WARN] No se pudo actualizar el cliente, continuando con la reserva...');
-        }
+        await updateClientRef.current();
       }
 
       let count = 0;
@@ -433,9 +425,7 @@ export default function MultiBookingWizard() {
                 typeof updater === "function"
                   ? (updater as any)(base)
                   : updater;
-              console.log('[DEBUG] setBookingData called:', { base, next });
               if (next?.customerDetails) {
-                console.log('[DEBUG] Updating customerDetails:', next.customerDetails);
                 setCustomerDetails(
                   next.customerDetails as typeof customerDetails
                 );
@@ -648,7 +638,6 @@ export default function MultiBookingWizard() {
               <NextBtn
                 disabled={!hasCustomerData}
                 onClick={() => {
-                  console.log('[DEBUG] Step 3 Next button clicked', { hasCustomerData, customerDetails });
                   setCurrentStep(4);
                 }}
               >
@@ -715,7 +704,6 @@ export default function MultiBookingWizard() {
                 <NextBtn
                   disabled={!hasCustomerData}
                   onClick={() => {
-                    console.log('[DEBUG] Step 3 Next button clicked (mobile)', { hasCustomerData, customerDetails });
                     setCurrentStep(4);
                   }}
                 >

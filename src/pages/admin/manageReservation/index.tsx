@@ -72,9 +72,9 @@ const ReservationsList: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const [initialLoading, setInitialLoading] = useState(false);
-  const [rowLoading, setRowLoading] = useState<Record<string, RowAction | null>>(
-    {}
-  );
+  const [rowLoading, setRowLoading] = useState<
+    Record<string, RowAction | null>
+  >({});
   const [error, setError] = useState<string | null>(null);
 
   const [assignModalOpen, setAssignModalOpen] = useState(false);
@@ -129,8 +129,9 @@ const ReservationsList: React.FC = () => {
   const getEmployeeName = (reservation: Reservation): string | null => {
     // 1) Si el backend lo trae poblado como "employee"
     const populated = (reservation as any)?.employeeId?.names;
-    if (typeof populated === "string" && populated.trim()) return populated.trim();
-    console.log(populated)
+    if (typeof populated === "string" && populated.trim())
+      return populated.trim();
+    console.log(populated);
     // 2) Si solo viene employeeId
     if (
       typeof reservation.employeeId === "string" &&
@@ -347,7 +348,10 @@ const ReservationsList: React.FC = () => {
     }
 
     try {
-      setRowBusy(reservationId, newStatus === "approved" ? "approve" : "reject");
+      setRowBusy(
+        reservationId,
+        newStatus === "approved" ? "approve" : "reject"
+      );
       await updateReservation(reservationId, { status: newStatus });
       showNotification({
         title: "Actualizado",
@@ -591,7 +595,9 @@ const ReservationsList: React.FC = () => {
                         <BiCheck size={16} />
                       )
                     }
-                    onClick={() => handleUpdateStatus(reservation._id!, "approved")}
+                    onClick={() =>
+                      handleUpdateStatus(reservation._id!, "approved")
+                    }
                     disabled={busy}
                   >
                     Aprobar
@@ -605,7 +611,9 @@ const ReservationsList: React.FC = () => {
                       )
                     }
                     color="red"
-                    onClick={() => handleUpdateStatus(reservation._id!, "rejected")}
+                    onClick={() =>
+                      handleUpdateStatus(reservation._id!, "rejected")
+                    }
                     disabled={busy}
                   >
                     Rechazar
@@ -653,7 +661,9 @@ const ReservationsList: React.FC = () => {
                   }))
                 }
               >
-                {isExpanded ? "Ocultar info de depósito" : "Ver info de depósito"}
+                {isExpanded
+                  ? "Ocultar info de depósito"
+                  : "Ver info de depósito"}
               </Button>
 
               <Collapse in={isExpanded}>
@@ -666,7 +676,9 @@ const ReservationsList: React.FC = () => {
                     appointmentDate={dayjs(reservation.startDate).format(
                       "DD/MM/YYYY"
                     )}
-                    appointmentTime={dayjs(reservation.startDate).format("HH:mm")}
+                    appointmentTime={dayjs(reservation.startDate).format(
+                      "HH:mm"
+                    )}
                   />
                 </Box>
               </Collapse>
@@ -742,14 +754,18 @@ const ReservationsList: React.FC = () => {
               setDeleteConfirmOpen(false);
               setDeletingReservationId(null);
             }}
-            disabled={!!(deletingReservationId && isRowBusy(deletingReservationId))}
+            disabled={
+              !!(deletingReservationId && isRowBusy(deletingReservationId))
+            }
           >
             Cancelar
           </Button>
           <Button
             color="red"
             onClick={confirmDelete}
-            loading={!!(deletingReservationId && isRowBusy(deletingReservationId))}
+            loading={
+              !!(deletingReservationId && isRowBusy(deletingReservationId))
+            }
           >
             Eliminar
           </Button>
@@ -778,7 +794,9 @@ const ReservationsList: React.FC = () => {
                 w={isMobile ? 200 : 260}
                 label="Política de agendamiento"
                 value={orgPolicy}
-                onChange={(val) => val && handleChangePolicy(val as ReservationPolicy)}
+                onChange={(val) =>
+                  val && handleChangePolicy(val as ReservationPolicy)
+                }
                 data={[
                   { value: "manual", label: "Aprobación manual" },
                   {
@@ -811,7 +829,11 @@ const ReservationsList: React.FC = () => {
           bg={colorScheme === "dark" ? "dark.7" : "gray.0"}
           style={{ borderRadius: theme.radius.md }}
         >
-          <Group justify="space-between" align="center" mb={isMobile ? "xs" : 8}>
+          <Group
+            justify="space-between"
+            align="center"
+            mb={isMobile ? "xs" : 8}
+          >
             <Group gap={6}>
               <BiFilter size={16} />
               <Text size="sm" fw={500}>
@@ -835,13 +857,20 @@ const ReservationsList: React.FC = () => {
           </Group>
 
           <Collapse in={filtersOpen}>
-            <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+            <Group
+              justify="space-between"
+              align="flex-end"
+              wrap="wrap"
+              gap="sm"
+            >
               <Group gap="sm" align="flex-end">
                 <Select
                   label="Estado"
                   placeholder="Todos"
                   value={statusFilter}
-                  onChange={(val) => setStatusFilter((val as typeof statusFilter) || "all")}
+                  onChange={(val) =>
+                    setStatusFilter((val as typeof statusFilter) || "all")
+                  }
                   data={[
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Pendiente" },
@@ -856,8 +885,13 @@ const ReservationsList: React.FC = () => {
                   label="Empleado"
                   placeholder="Todos"
                   value={employeeFilter}
-                  onChange={(val) => setEmployeeFilter((val as string) || "all")}
-                  data={[{ value: "all", label: "Todos" }, ...employeesSelectData]}
+                  onChange={(val) =>
+                    setEmployeeFilter((val as string) || "all")
+                  }
+                  data={[
+                    { value: "all", label: "Todos" },
+                    ...employeesSelectData,
+                  ]}
                   w={190}
                   searchable
                 />
@@ -867,7 +901,10 @@ const ReservationsList: React.FC = () => {
                   placeholder="Todos"
                   value={serviceFilter}
                   onChange={(val) => setServiceFilter((val as string) || "all")}
-                  data={[{ value: "all", label: "Todos" }, ...serviceSelectData]}
+                  data={[
+                    { value: "all", label: "Todos" },
+                    ...serviceSelectData,
+                  ]}
                   w={190}
                   searchable
                 />
@@ -885,7 +922,9 @@ const ReservationsList: React.FC = () => {
                 <Switch
                   size="sm"
                   checked={showOnlyFuture}
-                  onChange={(event) => setShowOnlyFuture(event.currentTarget.checked)}
+                  onChange={(event) =>
+                    setShowOnlyFuture(event.currentTarget.checked)
+                  }
                   label="Solo futuras"
                 />
 
@@ -915,15 +954,15 @@ const ReservationsList: React.FC = () => {
         >
           {orgPolicy === "auto_if_available" ? (
             <Text size="sm">
-              Al crear una <strong>reserva</strong>, si existe cupo inmediato según
-              el servicio, empleado (si aplica) y horario, se{" "}
+              Al crear una <strong>reserva</strong>, si existe cupo inmediato
+              según el servicio, empleado (si aplica) y horario, se{" "}
               <strong>confirma</strong> y se crea la <strong>cita</strong>{" "}
               automáticamente. Si no, la reserva quedará <em>pendiente</em>.
             </Text>
           ) : (
             <Text size="sm">
-              Las reservas requieren <strong>aprobación</strong> antes de crear una
-              cita.
+              Las reservas requieren <strong>aprobación</strong> antes de crear
+              una cita.
             </Text>
           )}
         </Alert>
@@ -953,7 +992,13 @@ const ReservationsList: React.FC = () => {
             </Stack>
           ) : (
             <Table.ScrollContainer minWidth={760} type="native" mah={520}>
-              <Table withTableBorder withColumnBorders striped highlightOnHover stickyHeader>
+              <Table
+                withTableBorder
+                withColumnBorders
+                striped
+                highlightOnHover
+                stickyHeader
+              >
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
@@ -980,18 +1025,27 @@ const ReservationsList: React.FC = () => {
               </Text>
               {hasReservations && (
                 <Text size="sm" c="dimmed">
-                  Ajusta los filtros o limpia la búsqueda para ver más resultados.
+                  Ajusta los filtros o limpia la búsqueda para ver más
+                  resultados.
                 </Text>
               )}
             </Stack>
           </Center>
         ) : isMobile ? (
           <Stack>
-            {filteredReservations.map((reservation) => renderMobileReservationCard(reservation))}
+            {filteredReservations.map((reservation) =>
+              renderMobileReservationCard(reservation)
+            )}
           </Stack>
         ) : (
           <Table.ScrollContainer minWidth={760} type="native" mah={520}>
-            <Table withTableBorder withColumnBorders striped highlightOnHover stickyHeader>
+            <Table
+              withTableBorder
+              withColumnBorders
+              striped
+              highlightOnHover
+              stickyHeader
+            >
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Fecha</Table.Th>
@@ -1011,7 +1065,9 @@ const ReservationsList: React.FC = () => {
                   const isExpanded = expandedRows[reservation._id!];
 
                   const serviceObj =
-                    typeof reservation.serviceId === "object" ? reservation.serviceId : null;
+                    typeof reservation.serviceId === "object"
+                      ? reservation.serviceId
+                      : null;
                   const servicePrice = serviceObj?.price || 0;
                   const serviceName = serviceObj?.name || "Sin especificar";
 
@@ -1035,15 +1091,23 @@ const ReservationsList: React.FC = () => {
                                 }
                                 mr="xs"
                               >
-                                {isExpanded ? <BiChevronUp /> : <BiChevronDown />}
+                                {isExpanded ? (
+                                  <BiChevronUp />
+                                ) : (
+                                  <BiChevronDown />
+                                )}
                               </ActionIcon>
                             )}
-                          {dayjs(reservation.startDate).format("DD/MM/YYYY HH:mm")}
+                          {dayjs(reservation.startDate).format(
+                            "DD/MM/YYYY HH:mm"
+                          )}
                         </Table.Td>
 
                         <Table.Td>{serviceName}</Table.Td>
 
-                        <Table.Td>{reservation.customerDetails?.name ?? "—"}</Table.Td>
+                        <Table.Td>
+                          {reservation.customerDetails?.name ?? "—"}
+                        </Table.Td>
 
                         {/* ✅ NUEVO: Empleado */}
                         <Table.Td>
@@ -1066,13 +1130,21 @@ const ReservationsList: React.FC = () => {
                         </Table.Td>
 
                         <Table.Td>
-                          <Badge fullWidth color={getBadgeColor(reservation.status)}>
+                          <Badge
+                            fullWidth
+                            color={getBadgeColor(reservation.status)}
+                          >
                             {translateStatus(reservation.status)}
                           </Badge>
                         </Table.Td>
 
                         <Table.Td style={{ textAlign: "center" }}>
-                          <Menu withArrow position="bottom-end" shadow="sm" disabled={busy}>
+                          <Menu
+                            withArrow
+                            position="bottom-end"
+                            shadow="sm"
+                            disabled={busy}
+                          >
                             <Menu.Target>
                               <ActionIcon
                                 variant="light"
@@ -1084,45 +1156,64 @@ const ReservationsList: React.FC = () => {
                               </ActionIcon>
                             </Menu.Target>
                             <Menu.Dropdown>
-                              {orgPolicy === "manual" && reservation.status === "pending" && (
-                                <>
-                                  <Menu.Item
-                                    leftSection={
-                                      rowLoading[reservation._id!] === "approve" ? (
-                                        <Skeleton height={12} width={12} circle />
-                                      ) : (
-                                        <BiCheck size={16} />
-                                      )
-                                    }
-                                    onClick={() =>
-                                      handleUpdateStatus(reservation._id!, "approved")
-                                    }
-                                    disabled={busy}
-                                  >
-                                    Aprobar
-                                  </Menu.Item>
-                                  <Menu.Item
-                                    leftSection={
-                                      rowLoading[reservation._id!] === "reject" ? (
-                                        <Skeleton height={12} width={12} circle />
-                                      ) : (
-                                        <BiXCircle size={16} />
-                                      )
-                                    }
-                                    color="red"
-                                    onClick={() =>
-                                      handleUpdateStatus(reservation._id!, "rejected")
-                                    }
-                                    disabled={busy}
-                                  >
-                                    Rechazar
-                                  </Menu.Item>
-                                </>
-                              )}
+                              {orgPolicy === "manual" &&
+                                reservation.status === "pending" && (
+                                  <>
+                                    <Menu.Item
+                                      leftSection={
+                                        rowLoading[reservation._id!] ===
+                                        "approve" ? (
+                                          <Skeleton
+                                            height={12}
+                                            width={12}
+                                            circle
+                                          />
+                                        ) : (
+                                          <BiCheck size={16} />
+                                        )
+                                      }
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          reservation._id!,
+                                          "approved"
+                                        )
+                                      }
+                                      disabled={busy}
+                                    >
+                                      Aprobar
+                                    </Menu.Item>
+                                    <Menu.Item
+                                      leftSection={
+                                        rowLoading[reservation._id!] ===
+                                        "reject" ? (
+                                          <Skeleton
+                                            height={12}
+                                            width={12}
+                                            circle
+                                          />
+                                        ) : (
+                                          <BiXCircle size={16} />
+                                        )
+                                      }
+                                      color="red"
+                                      onClick={() =>
+                                        handleUpdateStatus(
+                                          reservation._id!,
+                                          "rejected"
+                                        )
+                                      }
+                                      disabled={busy}
+                                    >
+                                      Rechazar
+                                    </Menu.Item>
+                                  </>
+                                )}
 
                               <Menu.Item
                                 leftSection={<BiUser size={16} />}
-                                onClick={() => handleOpenAssignModal(reservation._id!)}
+                                onClick={() =>
+                                  handleOpenAssignModal(reservation._id!)
+                                }
                                 disabled={busy}
                               >
                                 Cambiar empleado
@@ -1156,13 +1247,17 @@ const ReservationsList: React.FC = () => {
                                 <Box p="md">
                                   <ReservationDepositAlert
                                     reservationId={reservation._id}
-                                    clientName={reservation.customerDetails?.name}
+                                    clientName={
+                                      reservation.customerDetails?.name
+                                    }
                                     serviceName={serviceName}
                                     servicePrice={servicePrice}
-                                    appointmentDate={dayjs(reservation.startDate).format(
-                                      "DD/MM/YYYY"
-                                    )}
-                                    appointmentTime={dayjs(reservation.startDate).format("HH:mm")}
+                                    appointmentDate={dayjs(
+                                      reservation.startDate
+                                    ).format("DD/MM/YYYY")}
+                                    appointmentTime={dayjs(
+                                      reservation.startDate
+                                    ).format("HH:mm")}
                                   />
                                 </Box>
                               </Collapse>

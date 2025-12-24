@@ -110,7 +110,6 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     // Solo actualizar si el valor realmente cambió
     const newPhone = phone_e164 ?? "";
     if (customerDetails.phone !== newPhone) {
-      console.log('[DEBUG] handlePhoneChange - updating phone:', { old: customerDetails.phone, new: newPhone, country: phone_country });
       setBookingData((prev) => ({
         ...prev,
         customerDetails: {
@@ -211,9 +210,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
       // Solo actualizar si hay cambios
       if (Object.keys(updates).length > 0) {
-        console.log('[DEBUG] Actualizando cliente al nuevo modelo:', clientId, updates);
         await updateClient(clientId, updates);
-        console.log('[DEBUG] Cliente actualizado exitosamente');
       }
       
       return true;

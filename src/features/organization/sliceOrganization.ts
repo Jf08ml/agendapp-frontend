@@ -64,10 +64,9 @@ export const fetchOrganization = createAsyncThunk(
   async (organizationId: string, { rejectWithValue }) => {
     try {
       const organization = await getOrganizationById(organizationId);
-      console.log("Fetched organization by ID:", organization);
       return organization;
     } catch (error) {
-      console.log("Error fetching organization:", error);
+      console.error("Error fetching organization:", error);
       return rejectWithValue(
         "Error al cargar la información de la organización"
       );
@@ -83,7 +82,7 @@ export const fetchOrganizationConfig = createAsyncThunk(
       const organization = await getOrganizationConfig();
       return organization;
     } catch (error) {
-      console.log("Error fetching organization by domain:", error);
+      console.error("Error fetching organization by domain:", error);
       return rejectWithValue("Error al cargar la organización por dominio");
     }
   }
