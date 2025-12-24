@@ -5,7 +5,7 @@ import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
-import { ModernLayout, MinimalLayout, CardsLayout } from "./HomeLayouts";
+import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout } from "./HomeLayouts";
 
 export default function Home() {
   const theme = useMantineTheme();
@@ -42,7 +42,7 @@ export default function Home() {
 
   const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
-  const homeLayout = organization?.homeLayout || "modern";
+  const homeLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing";
 
   // Seleccionar el layout según la configuración
   let LayoutComponent;
@@ -52,6 +52,9 @@ export default function Home() {
       break;
     case "cards":
       LayoutComponent = CardsLayout;
+      break;
+    case "landing":
+      LayoutComponent = LandingLayout;
       break;
     case "modern":
     default:

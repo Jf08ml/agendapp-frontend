@@ -101,6 +101,7 @@ export default function ContactTab({
               { value: "modern", label: "Moderno - Con gradientes difuminados" },
               { value: "minimal", label: "Minimalista - Diseño limpio y simple" },
               { value: "cards", label: "Tarjetas - Enfoque en servicios" },
+              { value: "landing", label: "Landing - Página de presentación completa" },
             ]}
           />
           <TextInput
