@@ -368,7 +368,11 @@ export default function OpeningHoursTab({
               ...s,
               start: s.start ?? "",
               end: s.end ?? "",
-              breaks: s.breaks ?? [], // Asegura que breaks siempre sea un array
+              breaks: (s.breaks ?? []).map((b) => ({
+                start: b.start ?? "",
+                end: b.end ?? "",
+                note: b.note,
+              })),
             })),
             stepMinutes: form.values.weeklySchedule?.stepMinutes ?? 30,
           }}
