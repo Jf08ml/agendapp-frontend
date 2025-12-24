@@ -607,7 +607,7 @@ export function LandingLayout({
                         <Box
                           style={{
                             width: "100%",
-                            height: 200,
+                            height: "300px",
                             position: "relative",
                             overflow: "hidden",
                           }}
