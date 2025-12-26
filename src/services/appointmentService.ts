@@ -66,8 +66,24 @@ interface Response<T> {
 
 /** ---- Helpers ---- */
 const asId = (x: any) => (typeof x === "string" ? x : x?._id ?? x?.id ?? x);
-const asISO = (d: Date | string) =>
-  typeof d === "string" ? new Date(d).toISOString() : d.toISOString();
+
+/**
+ * Convierte una fecha a formato sin zona horaria (YYYY-MM-DDTHH:mm:ss)
+ * para que el backend la interprete en la timezone de la organización.
+ * 
+ * Evita usar .toISOString() que convierte a UTC y causa desfases horarios.
+ */
+const asISO = (d: Date | string) => {
+  const date = typeof d === "string" ? new Date(d) : d;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+};
 
 // Obtener todas las citas
 export const getAppointments = async (): Promise<Appointment[]> => {
@@ -198,9 +214,18 @@ export const updateAppointment = async (
   updatedData: Partial<Appointment>
 ): Promise<Appointment | undefined> => {
   try {
+    // Transformar fechas al formato correcto sin timezone
+    const payload = { ...updatedData };
+    if (payload.startDate) {
+      payload.startDate = asISO(payload.startDate) as any;
+    }
+    if (payload.endDate) {
+      payload.endDate = asISO(payload.endDate) as any;
+    }
+    
     const response = await apiAppointment.put<Response<Appointment>>(
       `/${appointmentId}`,
-      updatedData
+      payload
     );
     return response.data.data;
   } catch (error) {
