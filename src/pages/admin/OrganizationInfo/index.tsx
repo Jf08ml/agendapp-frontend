@@ -76,7 +76,7 @@ export default function OrganizationInfo() {
             branding: ensureBranding(response.branding),
             domains: ensureArray(response.domains, []),
             default_country: response.default_country ?? "CO", // 🌍 País por defecto
-            timezone: response.timezone ?? "America/Bogota", // 🕐 Zona horaria
+            timezone: response.timezone || undefined, // 🕐 Zona horaria - NO resetear a Colombia
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
@@ -238,6 +238,7 @@ export default function OrganizationInfo() {
         ...updated,
         branding: ensureBranding(updated.branding),
         domains: ensureDomains(updated.domains),
+        timezone: updated.timezone || undefined, // Preservar timezone del backend
       };
       setOrg(normalized);
       form.setValues(normalized as any);

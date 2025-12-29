@@ -1,7 +1,9 @@
 import { SimpleGrid, Stack, TextInput, Textarea, Select, Switch, NumberInput, Group, Text } from "@mantine/core";
+import { useMemo } from "react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
+import { TIMEZONES_BY_COUNTRY, getAllTimezones, type CountryCode } from "../../constants/timezoneByCountry";
 
 export default function ContactTab({
   form,
@@ -12,6 +14,15 @@ export default function ContactTab({
   isEditing: boolean;
   domains: string[];
 }) {
+  const selectedCountry = form.values.default_country as CountryCode | undefined;
+
+  // Filtrar timezones según el país seleccionado
+  const availableTimezones = useMemo(() => {
+    if (!selectedCountry || !TIMEZONES_BY_COUNTRY[selectedCountry]) {
+      return getAllTimezones();
+    }
+    return TIMEZONES_BY_COUNTRY[selectedCountry];
+  }, [selectedCountry]);
   return (
     <Stack gap="md">
       <SectionCard
@@ -55,29 +66,16 @@ export default function ContactTab({
           />
           <Select
             label="Zona horaria"
-            description="Zona horaria donde opera tu negocio"
+            description={selectedCountry 
+              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : 'España'}` 
+              : "Selecciona un país primero"}
             {...form.getInputProps("timezone")}
-            disabled={!isEditing}
+            disabled={!isEditing || !selectedCountry}
             searchable
-            data={[
-              { value: "America/Bogota", label: "🇨🇴 Colombia (GMT-5)" },
-              { value: "America/Mexico_City", label: "🇲🇽 México Centro (GMT-6)" },
-              { value: "America/Tijuana", label: "🇲🇽 México Pacífico (GMT-8)" },
-              { value: "America/Cancun", label: "🇲🇽 México Caribe (GMT-5)" },
-              { value: "America/Lima", label: "🇵🇪 Perú (GMT-5)" },
-              { value: "America/Guayaquil", label: "🇪🇨 Ecuador (GMT-5)" },
-              { value: "America/Caracas", label: "🇻🇪 Venezuela (GMT-4)" },
-              { value: "America/Panama", label: "🇵🇦 Panamá (GMT-5)" },
-              { value: "America/Santiago", label: "🇨🇱 Chile (GMT-3)" },
-              { value: "America/Argentina/Buenos_Aires", label: "🇦🇷 Argentina (GMT-3)" },
-              { value: "America/Sao_Paulo", label: "🇧🇷 Brasil (GMT-3)" },
-              { value: "America/New_York", label: "🇺🇸 Nueva York (GMT-5)" },
-              { value: "America/Chicago", label: "🇺🇸 Chicago (GMT-6)" },
-              { value: "America/Denver", label: "🇺🇸 Denver (GMT-7)" },
-              { value: "America/Los_Angeles", label: "🇺🇸 Los Ángeles (GMT-8)" },
-              { value: "America/Toronto", label: "🇨🇦 Toronto (GMT-5)" },
-              { value: "Europe/Madrid", label: "🇪🇸 España (GMT+1)" },
-            ]}
+            data={availableTimezones.map(tz => ({
+              value: tz.value,
+              label: `${tz.label} ${tz.offset}`,
+            }))}
           />
           <TextInput
             label="Dominios"
