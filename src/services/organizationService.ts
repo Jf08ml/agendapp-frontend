@@ -97,6 +97,7 @@ export interface Organization {
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards";
   reminderSettings?: ReminderSettings;
+  currency?: string;
   // Sistema de membresías
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "suspended" | "none";

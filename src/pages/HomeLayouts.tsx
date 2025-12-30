@@ -19,6 +19,8 @@ import {
 import { ReactNode, useEffect, useState } from "react";
 import { getServicesByOrganizationId, Service } from "../services/serviceService";
 import { formatCurrency } from "../utils/formatCurrency";
+import { useSelector } from "react-redux";
+import { selectOrganization } from "../features/organization/sliceOrganization";
 
 // ============= SHARED TYPES =============
 interface Feature {
@@ -41,6 +43,7 @@ export function ModernLayout({
   welcomeTitle,
   welcomeDescription,
 }: HomeLayoutProps) {
+  const org = useSelector(selectOrganization);
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
   const primaryLight = theme.colors[theme.primaryColor][0];
@@ -200,6 +203,8 @@ export function ModernLayout({
             </Card>
           ))}
         </SimpleGrid>
+        {/* Example services list with currency-aware formatting (if services present) */}
+        {/* If you fetch services and show prices here, prefer using: formatCurrency(price, org?.currency) */}
       </Container>
 
       <style>
@@ -474,6 +479,7 @@ export function LandingLayout({
   const primary = theme.colors[theme.primaryColor][6];
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const org = useSelector(selectOrganization);
 
   useEffect(() => {
     const loadTopServices = async () => {
@@ -682,7 +688,7 @@ export function LandingLayout({
                           <div>
                             {!service.hidePrice && (
                               <Text fw={700} fz="xl" c={primary}>
-                                {formatCurrency(service.price)}
+                                {formatCurrency(service.price, org?.currency || "COP")}
                               </Text>
                             )}
                             <Text size="xs" c="dimmed">

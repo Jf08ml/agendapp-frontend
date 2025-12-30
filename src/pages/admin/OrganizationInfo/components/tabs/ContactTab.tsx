@@ -77,6 +77,18 @@ export default function ContactTab({
               label: `${tz.label} ${tz.offset}`,
             }))}
           />
+          <Select
+            label="Moneda"
+            description="Moneda principal usada por la organización"
+            {...form.getInputProps("currency")}
+            disabled={!isEditing}
+            data={[
+              { value: "COP", label: "COP - Peso colombiano" },
+              { value: "MXN", label: "MXN - Peso mexicano" },
+              { value: "USD", label: "USD - Dólar americano" },
+              { value: "EUR", label: "EUR - Euro" },
+            ]}
+          />
           <TextInput
             label="Dominios"
             value={(domains || []).join(", ")}

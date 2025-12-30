@@ -21,6 +21,8 @@ import { showNotification } from "@mantine/notifications";
 import { Employee } from "../../../../services/employeeService";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { formatCurrency } from "../../../../utils/formatCurrency";
+import { useSelector } from "react-redux";
+import { selectOrganization } from "../../../../features/organization/sliceOrganization";
 
 interface AdvanceModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ interface AdvanceModalProps {
 
 const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
   const [advances, setAdvances] = useState<Advance[]>([]);
+  const org = useSelector(selectOrganization);
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [advanceDescription, setAdvanceDescription] = useState<string>("");
   const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
@@ -182,7 +185,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
                 <Table.Td>
                   {new Date(advance.date).toLocaleDateString()}
                 </Table.Td>
-                <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
+                <Table.Td>{formatCurrency(advance.amount, org?.currency || "COP")}</Table.Td>
                 <Table.Td>{advance.description}</Table.Td>
                 <Table.Td>
                   <ActionIcon
@@ -213,7 +216,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
       </Table>
       <Divider my="sm" />
       <Text fw={600} ta="right">
-        Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0))}
+        Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0), org?.currency || "COP")}
       </Text>
     </Modal>
   );

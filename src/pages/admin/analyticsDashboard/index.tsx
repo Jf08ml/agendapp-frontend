@@ -7,7 +7,6 @@ import {
   Group,
   Stack,
   Text,
-  NumberFormatter,
   SimpleGrid,
   Paper,
   Badge,
@@ -43,6 +42,8 @@ dayjs.extend(weekOfYear);
 
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
+import { formatCurrency } from "../../../utils/formatCurrency";
+import { getAppointmentsAggregatedByOrganizationId } from "../../../services/appointmentService";
 
 import {
   getAppointmentsByOrganizationId,
@@ -295,11 +296,36 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
   
   const ticketAvg = totalAppts ? totalRevenue / totalAppts : 0;
 
-  // Serie temporal (TODAS las citas)
-  const timeSeries = useMemo(
-    () => buildTimeBuckets(filtered, services, range, granularity),
-    [filtered, services, range, granularity]
-  );
+  // Serie temporal (TODAS las citas) - preferimos buckets del backend (timezone-aware)
+  const [timeSeries, setTimeSeries] = useState<any[]>([]);
+  const [loadingBuckets, setLoadingBuckets] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!organization?._id || !range[0] || !range[1]) return;
+      setLoadingBuckets(true);
+      try {
+        const buckets = await getAppointmentsAggregatedByOrganizationId(
+          organization._id,
+          dayjs(range[0]).format('YYYY-MM-DD'),
+          dayjs(range[1]).format('YYYY-MM-DD'),
+          granularity,
+          undefined
+        );
+        if (buckets && buckets.length > 0) {
+          setTimeSeries(buckets.map((b: any) => ({ key: b.key, ingresos: b.ingresos, citas: b.citas, timestamp: b.timestamp })));
+        } else {
+          setTimeSeries(buildTimeBuckets(filtered, services, range, granularity));
+        }
+      } catch (err) {
+        console.error('Error cargando buckets:', err);
+        setTimeSeries(buildTimeBuckets(filtered, services, range, granularity));
+      } finally {
+        setLoadingBuckets(false);
+      }
+    };
+    void load();
+  }, [organization?._id, range[0], range[1], granularity, filtered, services]);
 
   // Por empleado (TODAS las citas)
   const byEmployee = useMemo(() => {
@@ -451,7 +477,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
         tips.push({
           icon: "📈",
           title: "Proyección del mes",
-          message: `Al ritmo actual, terminarás con $${proyeccion.toLocaleString('es-CO')} (${diasRestantes} días restantes).`,
+          message: `Al ritmo actual, terminarás con ${formatCurrency(proyeccion, organization?.currency || 'COP')} (${diasRestantes} días restantes).`,
           color: "teal"
         });
       }
@@ -528,14 +554,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
         <KpiCard
           label="💰 Ingresos Totales"
-          value={
-            <NumberFormatter
-              value={totalRevenue}
-              thousandSeparator="."
-              decimalSeparator=","
-              prefix="$ "
-            />
-          }
+          value={<>{formatCurrency(totalRevenue, organization?.currency || 'COP')}</>}
           hint={`${totalAppts} citas en total`}
         />
         <KpiCard
@@ -550,15 +569,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
         />
         <KpiCard
           label="🎯 Ticket Promedio"
-          value={
-            <NumberFormatter
-              value={ticketAvg}
-              thousandSeparator="."
-              decimalSeparator=","
-              prefix="$ "
-              decimalScale={0}
-            />
-          }
+          value={<>{formatCurrency(ticketAvg, organization?.currency || 'COP')}</>}
           hint="Por cita"
         />
       </SimpleGrid>
@@ -569,13 +580,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
           <Group gap={4} align="center" wrap="nowrap">
             <Text size="xs" c="dimmed">Ingresos/Día:</Text>
             <Text size="sm" fw={600}>
-              <NumberFormatter
-                value={range[0] && range[1] ? totalRevenue / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1) : 0}
-                thousandSeparator="."
-                decimalSeparator=","
-                prefix="$"
-                decimalScale={0}
-              />
+              {formatCurrency(range[0] && range[1] ? totalRevenue / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1) : 0, organization?.currency || 'COP')}
             </Text>
           </Group>
         </Paper>
@@ -716,16 +721,9 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
                     </Stack>
                   </Group>
                   <Stack gap={0} align="flex-end">
-                    <NumberFormatter
-                      value={client.ingresos}
-                      thousandSeparator="."
-                      decimalSeparator=","
-                      prefix="$"
-                      decimalScale={0}
-                      style={{ fontWeight: 600, fontSize: '0.9rem' }}
-                    />
+                    <Text fw={600} style={{ fontSize: '0.9rem' }}>{formatCurrency(client.ingresos || 0, organization?.currency || 'COP')}</Text>
                     <Text size="xs" c="dimmed">
-                      Prom: <NumberFormatter value={client.ticketPromedio} thousandSeparator="." decimalSeparator="," prefix="$" decimalScale={0} />
+                      Prom: {formatCurrency(client.ticketPromedio || 0, organization?.currency || 'COP')}
                     </Text>
                   </Stack>
                 </Group>
@@ -758,25 +756,18 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
                         <Stack gap={0}>
                           <Text fw={600} size="sm">{row.svc.name}</Text>
                           <Text size="xs" c="dimmed">
-                            {row.svc.duration}min • ${row.svc.price?.toLocaleString('es-CO')}
+                            {row.svc.duration}min • {formatCurrency(row.svc.price || 0, organization?.currency || 'COP')}
                           </Text>
                         </Stack>
                       </Group>
                       <Stack gap={0} align="flex-end">
-                        <NumberFormatter
-                          value={row.ingresos}
-                          thousandSeparator="."
-                          decimalSeparator=","
-                          prefix="$"
-                          decimalScale={0}
-                          style={{ fontWeight: 600 }}
-                        />
+                        <Text fw={600}>{formatCurrency(row.ingresos || 0, organization?.currency || 'COP')}</Text>
                         <Text size="xs" c="dimmed">{row.citas} citas</Text>
                       </Stack>
                     </Group>
                     <Group gap="xs" wrap="wrap">
                       <Badge size="sm" variant="light" color="green">
-                        ${row.ingresosPorHora.toFixed(0)}/hora
+                        {formatCurrency(row.ingresosPorHora || 0, organization?.currency || 'COP')}/hora
                       </Badge>
                       <Badge size="sm" variant="light" color="blue">
                         {row.duracionTotal} min totales
@@ -870,14 +861,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
                     </Group>
                   </Table.Td>
                   <Table.Td>{row.citas}</Table.Td>
-                  <Table.Td>
-                    <NumberFormatter
-                      value={row.ingresos}
-                      thousandSeparator="."
-                      decimalSeparator=","
-                      prefix="$ "
-                    />
-                  </Table.Td>
+                  <Table.Td>{formatCurrency(row.ingresos || 0, organization?.currency || 'COP')}</Table.Td>
                 </Table.Tr>
               ))}
               {byEmployee.length === 0 && (

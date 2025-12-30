@@ -40,6 +40,7 @@ import localizedFormat from "dayjs/plugin/localizedFormat";
 import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
+import { formatCurrency } from "../../../utils/formatCurrency";
 import { showNotification } from "@mantine/notifications";
 import { IoSettings } from "react-icons/io5";
 
@@ -102,6 +103,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
 
   const { role } = useSelector((state: RootState) => state.auth);
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
   const [customPrice, setCustomPrice] = useState<number | null>(
     appointment.customPrice || 0
@@ -297,12 +299,7 @@ ${clientServices}`;
 
                     <Text size="sm">
                       <strong>Abono:</strong>{" "}
-                      {new Intl.NumberFormat("es-CO", {
-                        style: "currency",
-                        currency: "COP",
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      }).format(appointment.advancePayment)}
+                      {formatCurrency(appointment.advancePayment, organization?.currency || "COP")}
                     </Text>
 
                     <Text size="sm">
@@ -469,12 +466,7 @@ ${clientServices}`;
                       <Table.Tr key={index}>
                         <Table.Td>{item.name}</Table.Td>
                         <Table.Td>
-                          {new Intl.NumberFormat("es-CO", {
-                            style: "currency",
-                            currency: "COP",
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          }).format(item.price)}
+                          {formatCurrency(item.price, organization?.currency || "COP")}
                         </Table.Td>
                         <Table.Td>
                           <ActionIcon
@@ -550,12 +542,7 @@ ${clientServices}`;
 
                               <Table.Td>
                                 <Text>
-                                  {new Intl.NumberFormat("es-CO", {
-                                    style: "currency",
-                                    currency: "COP",
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0,
-                                  }).format(appt.totalPrice || 0)}
+                                  {formatCurrency(appt.totalPrice || 0, organization?.currency || "COP")}
                                 </Text>
                                 {appt.customPrice && (
                                   <Text size="xs" c="red">
@@ -566,12 +553,7 @@ ${clientServices}`;
 
                               <Table.Td>
                                 <Text fw={700}>
-                                  {new Intl.NumberFormat("es-CO", {
-                                    style: "currency",
-                                    currency: "COP",
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0,
-                                  }).format(usedPrice)}
+                                  {formatCurrency(usedPrice, organization?.currency || "COP")}
                                 </Text>
                                 {appt.customPrice && (
                                   <Text size="xs" c="green">
@@ -581,21 +563,11 @@ ${clientServices}`;
                               </Table.Td>
 
                               <Table.Td>
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 0,
-                                }).format(additionalTotal)}
+                                {formatCurrency(additionalTotal, organization?.currency || "COP")}
                               </Table.Td>
 
                               <Table.Td>
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 0,
-                                }).format(total)}
+                                {formatCurrency(total, organization?.currency || "COP")}
                               </Table.Td>
                             </Table.Tr>
                           );
@@ -619,12 +591,7 @@ ${clientServices}`;
                     Total general:
                   </Text>
                   <Text fw={900} size="lg" c="green">
-                    {new Intl.NumberFormat("es-CO", {
-                      style: "currency",
-                      currency: "COP",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(
+                    {formatCurrency(
                       appoinments
                         .filter(
                           (appt) => appt.client._id === appointment.client._id
@@ -641,7 +608,8 @@ ${clientServices}`;
                             : (appt.totalPrice || 0) + additionalTotal;
 
                           return acc + total;
-                        }, 0)
+                        }, 0),
+                      organization?.currency || "COP"
                     )}
                   </Text>
                 </Flex>

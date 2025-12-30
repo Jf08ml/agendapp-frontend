@@ -25,6 +25,7 @@ import { Client, searchClients } from "../../../../services/clientService";
 import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
+import { formatCurrency } from "../../../../utils/formatCurrency";
 import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
@@ -417,11 +418,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                             {service.price && (
                               <Text size="xs" c="dimmed">
                                 💵{" "}
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  minimumFractionDigits: 0,
-                                }).format(service.price)}
+                                {formatCurrency(service.price, organization?.currency || "COP")}
                               </Text>
                             )}
                           </Group>
@@ -633,15 +630,12 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                           Total servicios:
                         </Text>
                         <Text size="sm" fw={700}>
-                          {new Intl.NumberFormat("es-CO", {
-                            style: "currency",
-                            currency: "COP",
-                            minimumFractionDigits: 0,
-                          }).format(
+                          {formatCurrency(
                             newAppointment.services.reduce(
                               (acc, s) => acc + (s.price || 0),
                               0
-                            )
+                            ),
+                            organization?.currency || "COP"
                           )}
                         </Text>
                       </Group>
@@ -655,11 +649,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                               </Text>
                               <Text size="sm" fw={600} c="green">
                                 -{" "}
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  minimumFractionDigits: 0,
-                                }).format(newAppointment.advancePayment)}
+                                {formatCurrency(newAppointment.advancePayment, organization?.currency || "COP")}
                               </Text>
                             </Group>
                             <Group justify="space-between">
@@ -667,15 +657,12 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                 Pendiente:
                               </Text>
                               <Text size="sm" fw={700} c="orange">
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  minimumFractionDigits: 0,
-                                }).format(
+                                {formatCurrency(
                                   newAppointment.services.reduce(
                                     (acc, s) => acc + (s.price || 0),
                                     0
-                                  ) - (newAppointment.advancePayment || 0)
+                                  ) - (newAppointment.advancePayment || 0),
+                                  organization?.currency || "COP"
                                 )}
                               </Text>
                             </Group>

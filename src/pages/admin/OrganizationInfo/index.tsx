@@ -105,6 +105,7 @@ export default function OrganizationInfo() {
               schedule: [],
               stepMinutes: 30,
             },
+            currency: response.currency ?? "COP",
           };
 
           setOrg(normalized);
@@ -239,6 +240,7 @@ export default function OrganizationInfo() {
         branding: ensureBranding(updated.branding),
         domains: ensureDomains(updated.domains),
         timezone: updated.timezone || undefined, // Preservar timezone del backend
+        currency: updated.currency || undefined,
       };
       setOrg(normalized);
       form.setValues(normalized as any);

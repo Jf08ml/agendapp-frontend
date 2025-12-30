@@ -24,6 +24,7 @@ import { Carousel } from "@mantine/carousel";
 import { useMediaQuery } from "@mantine/hooks";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store"; // Ajusta tu import
+import { formatCurrency } from "../utils/formatCurrency";
 import {
   getServicesByOrganizationId,
   Service,
@@ -31,14 +32,6 @@ import {
 import { BiImage, BiSearch, BiX } from "react-icons/bi";
 
 // ---------------- Utils ----------------
-const formatCOP = (n?: number) =>
-  typeof n === "number"
-    ? new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        maximumFractionDigits: 0,
-      }).format(n)
-    : "$0";
 
 const normalize = (s: string) =>
   (s || "")
@@ -256,7 +249,7 @@ const ServicesAndPrices: React.FC = () => {
             <Group justify="space-between" align="center">
               {!modalService.hidePrice && (
                 <Text fz="xl" fw={800} c={primary}>
-                  {formatCOP(modalService.price)}
+                  {formatCurrency(modalService.price, organization?.currency || "COP")}
                 </Text>
               )}
               {typeof (modalService as any).duration === "number" && (
@@ -287,6 +280,7 @@ const ServiceCard = ({
   primaryColor: string;
 }) => {
   const image = service.images?.[0];
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
   return (
     <Card
@@ -346,7 +340,7 @@ const ServiceCard = ({
         <Group justify="space-between" align="flex-end" mt="xs">
           {!service.hidePrice ? (
             <Text fw={800} size="lg" c={primaryColor}>
-              {formatCOP(service.price)}
+              {formatCurrency(service.price, organization?.currency || "COP")}
             </Text>
           ) : (
             <Text size="sm" c="dimmed" fs="italic">

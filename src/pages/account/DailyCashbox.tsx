@@ -27,6 +27,8 @@ import {
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
+import { selectOrganization } from "../../features/organization/sliceOrganization";
+import { formatCurrency } from "../../utils/formatCurrency";
 import { startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import dayjs from "dayjs";
 import localeData from "dayjs/plugin/localeData";
@@ -57,6 +59,7 @@ const DailyCashbox: React.FC = () => {
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
+  const org = useSelector(selectOrganization);
 
   // Recalcula rangos cuando cambia el intervalo
   useEffect(() => {
@@ -244,12 +247,7 @@ const DailyCashbox: React.FC = () => {
     }
   };
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      maximumFractionDigits: 0,
-    }).format(value);
+  // Use shared formatCurrency util with organization's currency
 
   const formattedRangeLabel =
     startDate && endDate
@@ -335,7 +333,7 @@ const DailyCashbox: React.FC = () => {
             <Text size="lg" fw={800}>
               Total Ingresos:{" "}
               <Badge variant="light" size="xl">
-                {formatCurrency(totalIncome)}
+                {formatCurrency(totalIncome, org?.currency || "COP")}
               </Badge>
             </Text>
           </div>
@@ -372,10 +370,10 @@ const DailyCashbox: React.FC = () => {
             <Accordion.Panel>
               {Object.entries(servicesSummary).length > 0 ? (
                 Object.entries(servicesSummary).map(([serviceName, data]) => (
-                  <Flex key={serviceName} justify="space-between" my="xs">
+                    <Flex key={serviceName} justify="space-between" my="xs">
                     <Text>{serviceName}</Text>
                     <Text>
-                      {data.count} cita(s) – {formatCurrency(data.total)}
+                      {data.count} cita(s) – {formatCurrency(data.total, org?.currency || "COP")}
                     </Text>
                   </Flex>
                 ))
@@ -463,25 +461,25 @@ const DailyCashbox: React.FC = () => {
 
                           <Table.Td>
                             <Group gap="xs" wrap="nowrap">
-                              <Text>{formatCurrency(total)}</Text>
+                              <Text>{formatCurrency(total, org?.currency || "COP")}</Text>
 
                               {isCustom && (
                                 <Tooltip
                                   label={
                                     <>
                                       <div>
-                                        Base: {formatCurrency(basePrice)}
+                                        Base: {formatCurrency(basePrice, org?.currency || "COP")}
                                       </div>
                                       <div>
                                         Custom:{" "}
                                         {formatCurrency(
-                                          appointment.customPrice!
+                                          appointment.customPrice!, org?.currency || "COP"
                                         )}
                                       </div>
                                       {additionalTotal > 0 && (
                                         <div>
                                           Adicionales:{" "}
-                                          {formatCurrency(additionalTotal)}
+                                          {formatCurrency(additionalTotal, org?.currency || "COP")}
                                         </div>
                                       )}
                                       <div
@@ -490,7 +488,7 @@ const DailyCashbox: React.FC = () => {
                                           fontWeight: 600,
                                         }}
                                       >
-                                        Total: {formatCurrency(total)}
+                                        Total: {formatCurrency(total, org?.currency || "COP")}
                                       </div>
                                     </>
                                   }
@@ -512,16 +510,16 @@ const DailyCashbox: React.FC = () => {
                               <Text size="xs" c="dimmed">
                                 Base:{" "}
                                 <Text span td="line-through">
-                                  {formatCurrency(basePrice)}
+                                  {formatCurrency(basePrice, org?.currency || "COP")}
                                 </Text>{" "}
-                                →{" "}
+                                → {" "}
                                 <Text span fw={600}>
-                                  {formatCurrency(appointment.customPrice!)}
+                                  {formatCurrency(appointment.customPrice!, org?.currency || "COP")}
                                 </Text>
                                 {additionalTotal > 0 && (
                                   <>
                                     {" "}
-                                    + Adic.: {formatCurrency(additionalTotal)}
+                                    + Adic.: {formatCurrency(additionalTotal, org?.currency || "COP")}
                                   </>
                                 )}
                               </Text>

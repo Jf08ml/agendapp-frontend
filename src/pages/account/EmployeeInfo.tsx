@@ -21,6 +21,8 @@ import {
 import { Advance, getAdvancesByEmployee } from "../../services/advanceService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
+import { selectOrganization } from "../../features/organization/sliceOrganization";
+import { formatCurrency as formatCurrencyUtil } from "../../utils/formatCurrency";
 import { addDays, startOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import dayjs from "dayjs";
 
@@ -157,11 +159,8 @@ const EmployeeInfo: React.FC = () => {
     });
   };
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-    }).format(value);
+  const org = useSelector(selectOrganization);
+  const formatCurrency = (value: number) => formatCurrencyUtil(value, org?.currency || "COP");
 
   const getStatusStyles = (status: string) => {
     switch (status) {

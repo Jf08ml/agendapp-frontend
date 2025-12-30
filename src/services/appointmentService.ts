@@ -163,6 +163,30 @@ export const getAppointmentsByClient = async (
   }
 };
 
+// Obtener buckets agregados (day/week/month) desde backend
+export const getAppointmentsAggregatedByOrganizationId = async (
+  organizationId: string,
+  startDate?: string,
+  endDate?: string,
+  granularity: 'day' | 'week' | 'month' = 'day',
+  employeeIds?: string[]
+): Promise<Array<{ key: string; ingresos: number; citas: number; timestamp: number | null }>> => {
+  try {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (granularity) params.append('granularity', granularity);
+    if (employeeIds && employeeIds.length > 0) params.append('employeeIds', employeeIds.join(','));
+
+    const url = `/organization/${organizationId}/aggregated${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await apiAppointment.get<Response<any[]>>(url);
+    return response.data.data || [];
+  } catch (error) {
+    handleAxiosError(error, 'Error al obtener buckets agregados');
+    return [];
+  }
+};
+
 // Crear una nueva cita
 export const createAppointment = async (
   appointmentData: CreateAppointmentPayload

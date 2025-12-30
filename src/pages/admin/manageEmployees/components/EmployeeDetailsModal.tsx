@@ -27,6 +27,9 @@ import {
 import { Employee } from "../../../../services/employeeService";
 import EmployeeScheduleSection from "./EmployeeScheduleSection";
 import dayjs from "dayjs";
+import { useSelector } from "react-redux";
+import { selectOrganization } from "../../../../features/organization/sliceOrganization";
+import { formatCurrency as formatCurrencyUtil } from "../../../../utils/formatCurrency";
 
 interface EmployeeDetailsModalProps {
   isOpen: boolean;
@@ -178,11 +181,9 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     });
   };
 
+  const org = useSelector(selectOrganization);
   const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-    }).format(value);
+    formatCurrencyUtil(value, org?.currency || "COP");
 
   const getStatusStyles = (status: string) => {
     switch (status) {
@@ -265,16 +266,16 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
 
         <Card shadow="lg" radius="md" p="md" withBorder>
           <Title order={4}>Resumen de Nómina</Title>
-          <Text>
-            Total Ganado: {formatCurrency(payroll?.totalEarnings || 0)}
-          </Text>
-          <Text>
-            Total Restado (Avances):{" "}
-            {formatCurrency(payroll?.totalAdvances || 0)}
-          </Text>
-          <Text c="blue" fw={500}>
-            Total a Recibir: {formatCurrency(payroll?.finalEarnings || 0)}
-          </Text>
+            <Text>
+              Total Ganado: {formatCurrency(payroll?.totalEarnings || 0)}
+            </Text>
+            <Text>
+              Total Restado (Avances):{" "}
+              {formatCurrency(payroll?.totalAdvances || 0)}
+            </Text>
+            <Text c="blue" fw={500}>
+              Total a Recibir: {formatCurrency(payroll?.finalEarnings || 0)}
+            </Text>
         </Card>
 
         <Divider my="lg" />
