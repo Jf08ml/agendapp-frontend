@@ -298,7 +298,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
 
   // Serie temporal (TODAS las citas) - preferimos buckets del backend (timezone-aware)
   const [timeSeries, setTimeSeries] = useState<any[]>([]);
-  const [loadingBuckets, setLoadingBuckets] = useState(false);
+  const [, setLoadingBuckets] = useState(false);
 
   useEffect(() => {
     const load = async () => {
