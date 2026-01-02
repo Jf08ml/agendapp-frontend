@@ -185,10 +185,17 @@ export default function MultiBookingWizard() {
   // Payloads
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
     const block = times as MultiServiceBlockSelection;
-    const startDateTime = block.startTime ?? block.intervals[0].from;
-
-    // Convertir a formato sin timezone
-    const startDateStr = dayjs(startDateTime).format("YYYY-MM-DDTHH:mm:ss");
+    
+    // 🔧 FIX: Usar el string original si existe, evita conversiones de timezone
+    let startDateStr: string;
+    if ((block as any).startTimeStr) {
+      // Tenemos el string original del backend, úsalo directamente
+      startDateStr = (block as any).startTimeStr;
+    } else {
+      // Fallback: construir desde el Date (puede tener problemas de timezone)
+      const startDateTime = block.startTime ?? block.intervals[0].from;
+      startDateStr = dayjs(startDateTime).format("YYYY-MM-DDTHH:mm:ss");
+    }
 
     return {
       services: block.intervals.map((iv) => ({

@@ -196,9 +196,14 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
               employeeId: interval.employeeId,
               from: toFullDate(interval.start),
               to: toFullDate(interval.end),
+              // 🔧 FIX: Guardar los strings originales para mostrar sin conversión de timezone
+              startStr: interval.start,
+              endStr: interval.end,
             })),
             start: new Date(block.start),
             end: new Date(block.end),
+            // 🔧 FIX: Guardar el string original del bloque para enviarlo al backend
+            startStr: block.start,
             rangeLabel: `${dayjs(block.start).format("h:mm A")} - ${dayjs(block.end).format("h:mm A")}`,
           }));
 
@@ -247,8 +252,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   }, [dates, selectedServices, services, organizationId, splitDates, dateMissing]);
 
   // Handler para bloque unico (todos el mismo dia)
-  const handleBlockSelect = (start: Date, intervals: any[]) => {
-    onChange({ startTime: start, intervals });
+  const handleBlockSelect = (start: Date, intervals: any[], startStr?: string) => {
+    onChange({ startTime: start, intervals, startTimeStr: startStr });
     setShowBlockPicker(false);
   };
 
@@ -452,6 +457,10 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                       const durationMin =
                         typeof svc?.duration === "number" ? svc.duration : null;
 
+                      // 🔧 FIX: Usar strings originales si existen, sino usar Date
+                      const startTime = i.startStr || dayjs(i.from).format("h:mm A");
+                      const endTime = i.endStr || dayjs(i.to).format("h:mm A");
+
                       return (
                         <Stack key={`${i.serviceId}-${idx}`} gap={2}>
                           <Text size="sm" fw={700} lineClamp={1}>
@@ -459,8 +468,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                           </Text>
                           <Text size="xs" c="dimmed">
                             {durationMin != null && `${durationMin} min · `}
-                            {dayjs(i.from).format("h:mm A")} -{" "}
-                            {dayjs(i.to).format("h:mm A")}
+                            {startTime} - {endTime}
                           </Text>
                         </Stack>
                       );
@@ -492,7 +500,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                             label={block.rangeLabel}
                             active={isSelected}
                             tone="green"
-                            onClick={() => handleBlockSelect(block.start, block.intervals)}
+                            onClick={() => handleBlockSelect(block.start, block.intervals, (block as any).startStr)}
                           />
                         );
                       })}

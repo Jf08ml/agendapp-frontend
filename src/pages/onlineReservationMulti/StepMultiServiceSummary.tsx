@@ -150,11 +150,26 @@ export default function StepMultiServiceSummary({
             const displayDate = dates[0]?.date
               ? capitalize(safeFormat(dates[0].date, "dddd, D MMM YYYY", "-"))
               : "-";
-            const startText = block.startTime
-              ? safeFormat(block.startTime, "h:mm A", "-")
-              : block.intervals?.[0]
-              ? safeFormat(block.intervals[0].from, "h:mm A", "-")
-              : "-";
+            
+            // 🔧 FIX: Usar el string original si existe para evitar conversiones de timezone
+            let startText = "-";
+            if ((block as any).startTimeStr) {
+              // Tenemos el string original del backend (ej: "2026-01-03T10:00:00")
+              // Extraer solo la hora
+              const isoStr = (block as any).startTimeStr;
+              const match = isoStr.match(/T(\d{2}):(\d{2})/);
+              if (match) {
+                const hour = parseInt(match[1]);
+                const min = match[2];
+                const period = hour >= 12 ? "PM" : "AM";
+                const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                startText = `${hour12}:${min} ${period}`;
+              }
+            } else if (block.startTime) {
+              startText = safeFormat(block.startTime, "h:mm A", "-");
+            } else if (block.intervals?.[0]) {
+              startText = safeFormat(block.intervals[0].from, "h:mm A", "-");
+            }
 
             // total del bloque
             const blockTotal = block.intervals.reduce((acc, iv) => {
@@ -219,8 +234,9 @@ export default function StepMultiServiceSummary({
                               </Text>
                             </Group>
                             <Text c="dimmed" size="sm">
-                              {safeFormat(iv.from, "h:mm A", "-")} -{" "}
-                              {safeFormat(iv.to, "h:mm A", "-")}
+                              {/* 🔧 FIX: Usar strings originales si existen */}
+                              {(iv as any).startStr || safeFormat(iv.from, "h:mm A", "-")} -{" "}
+                              {(iv as any).endStr || safeFormat(iv.to, "h:mm A", "-")}
                               {emp ? ` · ${emp.names}` : " · Sin preferencia"}
                             </Text>
                           </Stack>
