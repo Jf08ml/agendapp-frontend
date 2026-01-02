@@ -189,6 +189,17 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
             return dayjs(`${dateStr} ${timeStr}`, "YYYY-MM-DD HH:mm").toDate();
           };
 
+          // Helper para formatear hora desde ISO string sin conversión de timezone
+          const formatTimeFromISO = (isoStr: string): string => {
+            const match = isoStr.match(/T(\d{2}):(\d{2})/);
+            if (!match) return isoStr;
+            const hour = parseInt(match[1]);
+            const min = match[2];
+            const period = hour >= 12 ? "PM" : "AM";
+            const hour12 = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+            return `${hour12}:${min} ${period}`;
+          };
+
           // Mapear respuesta del backend
           const mapped = response.blocks.map((block) => ({
             intervals: block.intervals.map((interval: { serviceId: string; employeeId: string | null; start: string; end: string }) => ({
@@ -204,7 +215,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
             end: new Date(block.end),
             // 🔧 FIX: Guardar el string original del bloque para enviarlo al backend
             startStr: block.start,
-            rangeLabel: `${dayjs(block.start).format("h:mm A")} - ${dayjs(block.end).format("h:mm A")}`,
+            // 🔧 FIX: Formatear desde el string original sin conversión de timezone
+            rangeLabel: `${formatTimeFromISO(block.start)} - ${formatTimeFromISO(block.end)}`,
           }));
 
           setBlockOptions(mapped);
