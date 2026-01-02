@@ -28,7 +28,6 @@ import {
   BiTimeFive,
   BiExpand,
 } from "react-icons/bi";
-import { format } from "date-fns";
 import {
   Appointment,
   updateAppointment,
@@ -37,7 +36,7 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import localizedFormat from "dayjs/plugin/localizedFormat";
-import { formatInTimezone, formatRangeInTimezone, formatFullDateInTimezone } from "../../../utils/timezoneUtils";
+import { formatInTimezone, formatFullDateInTimezone } from "../../../utils/timezoneUtils";
 import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
