@@ -9,7 +9,7 @@ import {
   Anchor,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css";
 import Header from "./layouts/Header";
@@ -19,7 +19,7 @@ import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useSelector } from "react-redux";
 import { RootState } from "./app/store";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 
@@ -27,7 +27,9 @@ import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
 import { getCurrentMembership, Membership } from "./services/membershipService";
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
-function App() {
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { userId, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
@@ -40,6 +42,7 @@ function App() {
   const [currentMembership, setCurrentMembership] = useState<Membership | null>(
     null
   );
+  const hasRedirected = useRef(false);
 
   // Branding dinámico
   const color = organization?.branding?.primaryColor || "#DE739E";
@@ -47,6 +50,14 @@ function App() {
 
   // Inicializa autenticación en el cliente
   useAuthInitializer();
+
+  // Redirigir a agenda en carga inicial si está autenticado
+  useEffect(() => {
+    if (isAuthenticated && location.pathname === "/" && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate("/gestionar-agenda", { replace: true });
+    }
+  }, [isAuthenticated, location.pathname, navigate]);
 
   // Cargar membresía actual
   useEffect(() => {
@@ -168,7 +179,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <>
       <Analytics />
 
       <AppShell
@@ -258,6 +269,14 @@ function App() {
         onClose={() => setPaymentModalOpened(false)}
         membership={currentMembership}
       />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
