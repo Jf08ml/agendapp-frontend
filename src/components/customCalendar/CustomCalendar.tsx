@@ -19,6 +19,7 @@ interface CustomCalendarProps {
   fetchAppointmentsForMonth: (currentDate: Date) => void;
   loadingMonth: boolean;
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
+  timezone?: string; // 🌍 Timezone de la organización (ej: "America/Mexico_City")
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -34,6 +35,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   fetchAppointmentsForMonth,
   loadingMonth,
   fetchAppointmentsForDay,
+  timezone = 'America/Bogota', // 🌍 Default a Colombia si no se proporciona
 }) => {
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -110,6 +112,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         onConfirmAppointment={onConfirmAppointment}
         setAppointments={setAppointments}
         fetchAppointmentsForDay={fetchAppointmentsForDay}
+        timezone={timezone}
       />
     </div>
   );

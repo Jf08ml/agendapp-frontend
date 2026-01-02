@@ -14,6 +14,7 @@ interface DraggableAppointmentCardProps {
   onConfirmAppointment: (appointmentId: string) => void;
   isExpanded: (appointment: Appointment) => boolean;
   handleToggleExpand: (appointmentId: string) => void;
+  timezone?: string; // 🌍 Timezone de la organización
 }
 
 const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
@@ -25,6 +26,7 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
   onConfirmAppointment,
   isExpanded,
   handleToggleExpand,
+  timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -92,6 +94,7 @@ const DraggableAppointmentCard: React.FC<DraggableAppointmentCardProps> = ({
         onConfirmAppointment={onConfirmAppointment}
         isExpanded={isExpanded}
         handleToggleExpand={handleToggleExpand}
+        timezone={timezone}
       />
     </Paper>
   );

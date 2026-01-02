@@ -86,6 +86,7 @@ const ScheduleView: React.FC = () => {
     (state: RootState) => state.organization.organization
   );
   const organizationId = organization?._id;
+  const organizationTimezone = organization?.timezone || 'America/Bogota'; // 🌍 Timezone de la org
 
   const initialClientId = useMemo(
     () => organization?.clientIdWhatsapp || organization?._id || "",
@@ -738,6 +739,7 @@ const ScheduleView: React.FC = () => {
       fetchAppointmentsForMonth={fetchAppointmentsForMonth}
       loadingMonth={loadingMonth}
       fetchAppointmentsForDay={fetchAppointmentsForDay}
+      timezone={organizationTimezone}
     />
       
       {/* 🚀 Modales con Suspense para lazy loading */}

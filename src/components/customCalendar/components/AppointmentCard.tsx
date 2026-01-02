@@ -37,6 +37,7 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import localizedFormat from "dayjs/plugin/localizedFormat";
+import { formatInTimezone, formatRangeInTimezone, formatFullDateInTimezone } from "../../../utils/timezoneUtils";
 import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -56,6 +57,7 @@ interface AppointmentCardProps {
   onConfirmAppointment: (appointmentId: string) => void;
   isExpanded?: (appointment: Appointment) => boolean;
   handleToggleExpand?: (appointmentId: string) => void;
+  timezone?: string; // 🌍 Timezone de la organización
 }
 
 // Función para calcular el contraste del color
@@ -90,6 +92,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onConfirmAppointment,
   isExpanded,
   handleToggleExpand,
+  timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   // const { borderColor } = getStatusStyles(appointment.status);
   const { hasPermission } = usePermissions();
@@ -197,9 +200,11 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
     return `*DETALLES DE LA CITA*
 👩‍🦰 *Cliente:* ${appointment.client.name}
-📅 *Horario:* ${dayjs(appointment.startDate).format(
+📅 *Horario:* ${formatFullDateInTimezone(
+      appointment.startDate,
+      timezone,
       "dddd, D MMMM YYYY, h:mm A"
-    )} - ${dayjs(appointment.endDate).format("h:mm A")}
+    )} - ${formatInTimezone(appointment.endDate, timezone, "h:mm A")}
 💵 *Abono:* ${appointment.advancePayment}
 
 ${clientServices}`;
@@ -291,10 +296,12 @@ ${clientServices}`;
                   <Flex direction="column" gap={4}>
                     <Text size="sm">
                       <strong>Horario:</strong>{" "}
-                      {dayjs(appointment.startDate).format(
+                      {formatFullDateInTimezone(
+                        appointment.startDate,
+                        timezone,
                         "dddd, D MMMM YYYY, h:mm A"
-                      )}{" "}
-                      - {dayjs(appointment.endDate).format("h:mm A")}
+                      )}
+                      - {formatInTimezone(appointment.endDate, timezone, "h:mm A")}
                     </Text>
 
                     <Text size="sm">
@@ -738,9 +745,9 @@ ${clientServices}`;
 
         {/* Horario */}
         <Text fw={700} style={{ fontSize: 10, marginTop: 6}}>
-          {format(appointment.startDate, "h:mm")}
+          {formatInTimezone(appointment.startDate, timezone, "h:mm")}
           {" - "}
-          {format(appointment.endDate, "h:mm a")}
+          {formatInTimezone(appointment.endDate, timezone, "h:mm a")}
         </Text>
 
         {/* Cliente */}

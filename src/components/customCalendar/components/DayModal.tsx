@@ -39,6 +39,7 @@ interface DayModalProps {
   onConfirmAppointment: (appointmentId: string) => void;
   employees: Employee[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
+  timezone?: string; // 🌍 Timezone de la organización
 }
 
 const DayModal: FC<DayModalProps> = ({
@@ -47,12 +48,13 @@ const DayModal: FC<DayModalProps> = ({
   onClose,
   onOpenModal,
   getAppointmentsForDay,
-  fetchAppointmentsForDay, // Usa el prop nuevo
+  fetchAppointmentsForDay,
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
   employees,
   setAppointments,
+  timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
@@ -271,6 +273,7 @@ const DayModal: FC<DayModalProps> = ({
           <DayModalCompactView
             appointments={appointments}
             onEditAppointment={onEditAppointment}
+            timezone={timezone}
           />
         ) : (
           /* Vista de calendario */
@@ -360,6 +363,7 @@ const DayModal: FC<DayModalProps> = ({
                       onConfirmAppointment={onConfirmAppointment}
                       hasPermission={hasPermission}
                       onOpenModal={onOpenModal}
+                      timezone={timezone}
                     />
                   ))}
                 </Box>

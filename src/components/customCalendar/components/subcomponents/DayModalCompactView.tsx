@@ -2,11 +2,12 @@ import { FC, useMemo } from "react";
 import { Box, Text, Stack, Group } from "@mantine/core";
 import { Appointment } from "../../../../services/appointmentService";
 import { Employee } from "../../../../services/employeeService";
-import { format } from "date-fns";
+import { formatInTimezone } from "../../../../utils/timezoneUtils";
 
 interface DayModalCompactViewProps {
   appointments: Appointment[];
   onEditAppointment: (appointment: Appointment) => void;
+  timezone?: string; // 🌍 Timezone de la organización
 }
 
 const HOUR_PX = 48; // más legible que 30
@@ -26,6 +27,7 @@ const toDayMinutes = (d: Date) => d.getHours() * 60 + d.getMinutes();
 const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   appointments,
   onEditAppointment,
+  timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   const getEmployeeName = (employee: Employee) => employee?.names || "Sin asignar";
 
@@ -280,7 +282,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                     {getEmployeeName(appointment.employee)}
                   </Text>
                   <Text size="xs" fw={600} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
-                    {format(startTime, "HH:mm")} - {format(endTime, "HH:mm")}
+                    {formatInTimezone(startTime, timezone, "HH:mm")} - {formatInTimezone(endTime, timezone, "HH:mm")}
                   </Text>
                 </Box>
               );

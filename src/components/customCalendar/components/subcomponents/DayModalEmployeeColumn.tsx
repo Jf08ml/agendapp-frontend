@@ -23,6 +23,7 @@ interface EmployeeColumnProps {
   onConfirmAppointment: (appointmentId: string) => void;
   hasPermission: (permission: string) => boolean;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
+  timezone?: string; // 🌍 Timezone de la organización
 }
 
 interface DraggedItem {
@@ -51,6 +52,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   onConfirmAppointment,
   hasPermission,
   onOpenModal,
+  timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   const columnRef = useRef<HTMLDivElement | null>(null);
 
@@ -160,6 +162,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             onConfirmAppointment={onConfirmAppointment}
             isExpanded={isExpanded}
             handleToggleExpand={handleToggleExpand}
+            timezone={timezone}
           />
         </Box>
       );
