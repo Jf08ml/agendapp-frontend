@@ -60,7 +60,7 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
             handleTimeChange(
               parseInt(value || "0"),
               date?.getMinutes() || 0,
-              "AM"
+              (date?.getHours() ?? 0) >= 12 ? "PM" : "AM"
             )
           }
           searchable

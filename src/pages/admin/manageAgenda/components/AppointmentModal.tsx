@@ -25,7 +25,13 @@ import { Client, searchClients } from "../../../../services/clientService";
 import { Appointment } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import { formatCurrency } from "../../../../utils/formatCurrency";
+import { formatInTimezone, formatFullDateInTimezone } from "../../../../utils/timezoneUtils";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
@@ -77,6 +83,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const today = dayjs();
   const organization = useSelector((state: RootState) => state.organization.organization);
   const organizationId = organization?._id;
+  const timezone = organization?.timezone || 'America/Bogota'; // 🌍 Timezone de la organización
 
   // 🚀 Búsqueda asíncrona de clientes con debounce
   useEffect(() => {
@@ -115,10 +122,31 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   useEffect(() => {
     if (appointment) {
+      // Parse dates in organization timezone and create local Date with same hour values
+      // This prevents TimeSelector from showing wrong time due to browser timezone conversion
+      const startParsed = dayjs.tz(appointment.startDate, timezone);
+      const endParsed = dayjs.tz(appointment.endDate, timezone);
+      
+      const startDate = new Date(
+        startParsed.year(),
+        startParsed.month(),
+        startParsed.date(),
+        startParsed.hour(),
+        startParsed.minute()
+      );
+      
+      const endDate = new Date(
+        endParsed.year(),
+        endParsed.month(),
+        endParsed.date(),
+        endParsed.hour(),
+        endParsed.minute()
+      );
+      
       setNewAppointment({
         ...appointment,
-        startDate: new Date(appointment.startDate),
-        endDate: new Date(appointment.endDate),
+        startDate,
+        endDate,
         employee: appointment?.employee || newAppointment.employee,
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
@@ -684,11 +712,24 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       Horario:
                     </Text>
                     <Text size="sm" fw={600}>
-                      {dayjs(newAppointment.startDate).format("DD/MM/YYYY")}
+                      {formatFullDateInTimezone(
+                        appointment ? appointment.startDate : newAppointment.startDate!, 
+                        timezone, 
+                        "DD/MM/YYYY"
+                      )}
                     </Text>
                     <Text size="sm" c="dimmed">
-                      {dayjs(newAppointment.startDate).format("h:mm A")} -{" "}
-                      {dayjs(newAppointment.endDate).format("h:mm A")}
+                      {formatInTimezone(
+                        appointment ? appointment.startDate : newAppointment.startDate!, 
+                        timezone, 
+                        "h:mm A"
+                      )}{" "}
+                      -{" "}
+                      {formatInTimezone(
+                        appointment ? appointment.endDate : newAppointment.endDate!, 
+                        timezone, 
+                        "h:mm A"
+                      )}
                     </Text>
                   </Box>
                 )}
