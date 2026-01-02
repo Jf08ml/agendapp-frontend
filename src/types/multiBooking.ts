@@ -27,28 +27,8 @@ export interface ServiceWithDate extends SelectedService {
   date: Date | null;
 }
 
-export interface MultiServiceBlockSelection {
-  startTime: Date | null;
-  intervals: {
-    serviceId: string;
-    employeeId: string | null;
-    from: Date;
-    to: Date;
-  }[];
-}
-
 export interface ServiceTimeSelection extends ServiceWithDate {
   time: string | null;
-}
-
-
-export interface SelectedService {
-  serviceId: string;
-  employeeId: string | null;
-}
-
-export interface ServiceWithDate extends SelectedService {
-  date: Date | null;
 }
 
 /** Cuando todos los servicios van el mismo día, encadenados */
