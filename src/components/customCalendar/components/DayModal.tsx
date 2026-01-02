@@ -3,6 +3,12 @@ import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl } from 
 import { useMediaQuery } from "@mantine/hooks";
 import { format, getHours, addDays } from "date-fns";
 import { es } from "date-fns/locale";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment } from "../../../services/appointmentService";
@@ -158,19 +164,19 @@ const DayModal: FC<DayModalProps> = ({
 
     const earliestAppointment = appointments.length
       ? Math.min(
-          ...appointments.map((app) => getHours(new Date(app.startDate)))
+          ...appointments.map((app) => dayjs.tz(app.startDate, timezone).hour())
         )
       : orgStartHour;
 
     const latestAppointment = appointments.length
-      ? Math.max(...appointments.map((app) => getHours(new Date(app.endDate))))
+      ? Math.max(...appointments.map((app) => dayjs.tz(app.endDate, timezone).hour()))
       : orgEndHour;
 
     return {
       startHour: Math.min(earliestAppointment, orgStartHour),
       endHour: Math.max(orgEndHour, latestAppointment),
     };
-  }, [appointments, organization]);
+  }, [appointments, organization, timezone]);
 
   const timeIntervals = useMemo(
     () => generateTimeIntervals(startHour, endHour, currentDay),

@@ -137,7 +137,8 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         appointment,
         startHour,
         selectedDay,
-        MINUTE_HEIGHT
+        MINUTE_HEIGHT,
+        timezone
       );
       return (
         <Box
