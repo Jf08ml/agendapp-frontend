@@ -1,4 +1,4 @@
-import { addHours, differenceInMinutes, startOfDay } from 'date-fns';
+import { addHours, startOfDay } from 'date-fns';
 import { Appointment } from '../../../services/appointmentService';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

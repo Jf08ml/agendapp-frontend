@@ -1,7 +1,7 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
 import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { format, getHours, addDays } from "date-fns";
+import { format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
