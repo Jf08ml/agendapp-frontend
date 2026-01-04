@@ -3,6 +3,7 @@ const DEFAULT_LOCALE_BY_CURRENCY: Record<string, string> = {
   MXN: "es-MX",
   USD: "en-US",
   EUR: "es-ES",
+  CLP: "es-CL",
 };
 
 export const formatCurrency = (

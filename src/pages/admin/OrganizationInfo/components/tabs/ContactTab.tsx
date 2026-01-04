@@ -88,6 +88,7 @@ export default function ContactTab({
               { value: "MXN", label: "MXN - Peso mexicano" },
               { value: "USD", label: "USD - Dólar americano" },
               { value: "EUR", label: "EUR - Euro" },
+              { value: "CLP", label: "CLP - Peso chileno" },
             ]}
           />
           <TextInput
