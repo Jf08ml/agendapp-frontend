@@ -136,7 +136,7 @@ export function detectUserCountry(): CountryCode {
 }
 
 function isValidCountryCode(code: string): code is CountryCode {
-  const validCodes = ['CO', 'MX', 'PE', 'EC', 'VE', 'PA', 'CL', 'AR', 'BR', 'US', 'CA'];
+  const validCodes = ['CO', 'MX', 'PE', 'EC', 'VE', 'PA', 'CL', 'AR', 'BR', 'US', 'CA', 'SV'];
   return validCodes.includes(code);
 }
 
@@ -153,6 +153,7 @@ function getCountryFromTimezone(timezone: string): CountryCode | null {
     'America/Sao_Paulo': 'BR',
     'America/New_York': 'US',
     'America/Toronto': 'CA',
+    'America/El_Salvador': 'SV',
   };
   
   return timezoneMap[timezone] || null;

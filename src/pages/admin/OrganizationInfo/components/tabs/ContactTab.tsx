@@ -62,12 +62,13 @@ export default function ContactTab({
               { value: "BR", label: "🇧🇷 Brasil" },
               { value: "US", label: "🇺🇸 Estados Unidos" },
               { value: "CA", label: "🇨🇦 Canadá" },
+              { value: "SV", label: "🇸🇻 El Salvador" },
             ]}
           />
           <Select
             label="Zona horaria"
             description={selectedCountry 
-              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : 'España'}` 
+              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : 'el país seleccionado'}` 
               : "Selecciona un país primero"}
             {...form.getInputProps("timezone")}
             disabled={!isEditing || !selectedCountry}

@@ -27,6 +27,7 @@ const COUNTRIES: Country[] = [
   { value: "BR", label: "Brasil", code: "+55", flag: "🇧🇷" },
   { value: "US", label: "Estados Unidos", code: "+1", flag: "🇺🇸" },
   { value: "CA", label: "Canadá", code: "+1", flag: "🇨🇦" },
+  { value: "SV", label: "El Salvador", code: "+503", flag: "🇸🇻" },
 ];
 
 interface InternationalPhoneInputProps {
