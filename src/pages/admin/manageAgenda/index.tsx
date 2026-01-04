@@ -699,7 +699,7 @@ const ScheduleView: React.FC = () => {
       {/* Derecha: contador + quick actions */}
       <Group gap="sm" align="center">
         <Badge size="sm" radius="xl" variant="light">
-          Citas este mes: {appointments.length}
+          Citas este mes: {appointments.filter(apt => !apt.status.includes('cancelled')).length}
         </Badge>
 
         <SchedulerQuickActionsMenu

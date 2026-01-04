@@ -103,6 +103,9 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   // 👇 esto debe seguir funcionando: citas pasadas cambian color
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
+  
+  // 🚫 Detectar si está cancelada
+  const isCancelled = appointment.status.includes('cancelled');
 
   const { role } = useSelector((state: RootState) => state.auth);
   const organization = useSelector((state: RootState) => state.organization.organization);
@@ -641,17 +644,20 @@ ${clientServices}`;
         radius="md"
         withBorder
         style={{
-          backgroundColor: isPastAppointment ? "#ffffff" : employeeColor,
-          color: textColor,
+          backgroundColor: isCancelled ? "#f1f3f5" : (isPastAppointment ? "#ffffff" : employeeColor), // ❌ Gris si cancelada
+          color: isCancelled ? "#868e96" : textColor, // ❌ Texto gris si cancelada
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "6px 8px 6px 8px",
           height: "100%",
           position: "relative",
-          cursor: "pointer",
+          cursor: isCancelled ? "default" : "pointer",
           fontSize: 10,
-          border: "1px solid gray"
+          border: isCancelled ? "1px solid #ced4da" : "1px solid gray", // ❌ Borde gris si cancelada
+          opacity: isCancelled ? 0.5 : 1, // ❌ Opacidad reducida si cancelada
+          textDecoration: isCancelled ? 'line-through' : 'none', // ❌ Tachado si cancelada
+          pointerEvents: isCancelled ? 'none' : 'auto', // ❌ Permitir click a través de citas canceladas
         }}
         onClick={(e) => {
           // clave para que NO se propague al onClick de la columna
@@ -695,6 +701,7 @@ ${clientServices}`;
                   top: -4,
                   left: -4,
                   zIndex: 10,
+                  pointerEvents: "auto", // ✅ Menú siempre clickeable, incluso en citas canceladas
                 }}
               >
                 <IoSettings size={10} />
@@ -741,6 +748,22 @@ ${clientServices}`;
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>
+
+        {/* Badge de cancelada */}
+        {isCancelled && (
+          <Badge
+            color="red"
+            size="xs"
+            radius="sm"
+            style={{
+              fontSize: 8,
+              marginTop: 4,
+              marginBottom: 2,
+            }}
+          >
+            ❌ CANCELADA
+          </Badge>
+        )}
 
         {/* Horario */}
         <Text fw={700} style={{ fontSize: 10, marginTop: 6}}>

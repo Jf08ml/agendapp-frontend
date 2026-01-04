@@ -88,6 +88,12 @@ const ReservationsList: React.FC = () => {
     string | null
   >(null);
 
+  // Modal de detalle de reserva
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [selectedGroupReservations, setSelectedGroupReservations] = useState<Reservation[]>([]);
+  const [detailModalLoading, setDetailModalLoading] = useState(false);
+
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
@@ -145,6 +151,19 @@ const ReservationsList: React.FC = () => {
   const hasEmployeeAssigned = (reservation: Reservation) =>
     Boolean((reservation as any)?.employee?._id || reservation.employeeId);
 
+  // ------- MODAL DETALLE -------
+  const handleOpenDetail = (reservation: Reservation, groupReservations?: Reservation[]) => {
+    setSelectedReservation(reservation);
+    setSelectedGroupReservations(groupReservations || [reservation]);
+    setDetailModalOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setDetailModalOpen(false);
+    setSelectedReservation(null);
+    setSelectedGroupReservations([]);
+  };
+
   // ------- FETCH DATA -------
   useEffect(() => {
     if (organization?._id) {
@@ -182,7 +201,7 @@ const ReservationsList: React.FC = () => {
 
   // ------- HELPERS UI -------
   const translateStatus = (
-    status: "pending" | "approved" | "rejected" | "auto_approved"
+    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
   ) => {
     switch (status) {
       case "pending":
@@ -193,13 +212,17 @@ const ReservationsList: React.FC = () => {
         return "Rechazada";
       case "auto_approved":
         return "Auto-Aprobada";
+      case "cancelled_by_customer":
+        return "Cancelada por Cliente";
+      case "cancelled_by_admin":
+        return "Cancelada por Admin";
       default:
         return "Desconocido";
     }
   };
 
   const getBadgeColor = (
-    status: "pending" | "approved" | "rejected" | "auto_approved"
+    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
   ): string => {
     switch (status) {
       case "pending":
@@ -208,11 +231,25 @@ const ReservationsList: React.FC = () => {
         return "green";
       case "rejected":
         return "red";
+      case "cancelled_by_customer":
+        return "orange";
+      case "cancelled_by_admin":
+        return "gray";
       case "auto_approved":
         return "teal";
       default:
         return "gray";
     }
+  };
+
+  const getStatusBadge = (
+    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
+  ) => {
+    return (
+      <Badge color={getBadgeColor(status)} variant="light">
+        {translateStatus(status)}
+      </Badge>
+    );
   };
 
   const employeesSelectData = useMemo(
@@ -322,6 +359,20 @@ const ReservationsList: React.FC = () => {
     searchTerm,
   ]);
 
+  // 👥 Crear un mapa de groupId para identificar grupos rápidamente
+  const groupsMap = useMemo(() => {
+    const map = new Map<string, Reservation[]>();
+    filteredReservations.forEach(reservation => {
+      if (reservation.groupId) {
+        if (!map.has(reservation.groupId)) {
+          map.set(reservation.groupId, []);
+        }
+        map.get(reservation.groupId)!.push(reservation);
+      }
+    });
+    return map;
+  }, [filteredReservations]);
+
   const hasReservations = reservations.length > 0;
 
   // ------- ACTIONS -------
@@ -412,32 +463,140 @@ const ReservationsList: React.FC = () => {
   };
 
   const handleDelete = async (reservationId: string) => {
+    // Buscar si la reserva pertenece a un grupo
+    const reservation = reservations.find(r => r._id === reservationId);
+    const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
+    
     setDeletingReservationId(reservationId);
     setDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!deletingReservationId) return;
+    
+    // Buscar si es un grupo para mostrar el mensaje correcto
+    const reservation = reservations.find(r => r._id === deletingReservationId);
+    const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
+    const groupSize = isGroup ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+    
     try {
       setRowBusy(deletingReservationId, "delete");
-      await deleteReservation(deletingReservationId);
+      const result = await deleteReservation(deletingReservationId);
+      
       showNotification({
         title: "Eliminada",
-        message: "La reserva fue eliminada",
+        message: isGroup 
+          ? `Grupo de ${groupSize} reservas eliminado correctamente`
+          : "Reserva eliminada correctamente",
         color: "green",
+        position: "top-right",
+        autoClose: 3000,
       });
+      setDeleteConfirmOpen(false);
+      setDeletingReservationId(null);
       if (organization?._id) await loadPage(organization._id);
     } catch (err) {
-      console.error("Error al eliminar la reserva:", err);
+      console.error(err);
       showNotification({
         title: "Error",
-        message: "No se pudo eliminar la reserva",
+        message: "Error al eliminar la reserva",
         color: "red",
+        position: "top-right",
+        autoClose: 3000,
       });
     } finally {
-      setRowBusy(deletingReservationId, null);
-      setDeletingReservationId(null);
-      setDeleteConfirmOpen(false);
+      if (deletingReservationId) setRowBusy(deletingReservationId, null);
+    }
+  };
+
+  // 👥 ACCIONES GRUPALES
+  const handleApproveGroup = async (groupId: string) => {
+    const group = groupsMap.get(groupId);
+    if (!group) return;
+
+    try {
+      for (const reservation of group) {
+        if (reservation._id) {
+          setRowBusy(reservation._id, "approve");
+        }
+      }
+
+      const pendingReservations = group.filter(r => r._id && r.status === "pending");
+      
+      // Aprobar todas menos la última con skipNotification: true
+      for (let i = 0; i < pendingReservations.length; i++) {
+        const r = pendingReservations[i];
+        const isLast = i === pendingReservations.length - 1;
+        await updateReservation(r._id!, { 
+          status: "approved",
+          skipNotification: !isLast  // Solo la última envía WhatsApp
+        });
+      }
+
+      showNotification({
+        title: "Grupo Aprobado",
+        message: `${pendingReservations.length} reserva(s) aprobada(s) exitosamente`,
+        color: "green",
+        position: "top-right",
+        autoClose: 3000,
+      });
+
+      if (organization?._id) await loadPage(organization._id);
+    } catch (err) {
+      console.error(err);
+      showNotification({
+        title: "Error",
+        message: "Error al aprobar el grupo de reservas",
+        color: "red",
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      group.forEach(r => {
+        if (r._id) setRowBusy(r._id, null);
+      });
+    }
+  };
+
+  const handleRejectGroup = async (groupId: string) => {
+    const group = groupsMap.get(groupId);
+    if (!group) return;
+
+    try {
+      for (const reservation of group) {
+        if (reservation._id) {
+          setRowBusy(reservation._id, "reject");
+        }
+      }
+
+      const promises = group
+        .filter(r => r._id && r.status === "pending")
+        .map(r => updateReservation(r._id!, { status: "rejected" }));
+
+      await Promise.all(promises);
+
+      showNotification({
+        title: "Grupo Rechazado",
+        message: `${promises.length} reserva(s) rechazada(s)`,
+        color: "orange",
+        position: "top-right",
+        autoClose: 3000,
+      });
+
+      if (organization?._id) await loadPage(organization._id);
+    } catch (err) {
+      console.error(err);
+      showNotification({
+        title: "Error",
+        message: "Error al rechazar el grupo de reservas",
+        color: "red",
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      group.forEach(r => {
+        if (r._id) setRowBusy(r._id, null);
+      });
     }
   };
 
@@ -482,29 +641,16 @@ const ReservationsList: React.FC = () => {
           <Skeleton height={12} radius="sm" />
         </Table.Td>
         <Table.Td>
-          <Skeleton height={12} radius="sm" />
-        </Table.Td>
-        <Table.Td>
           <Skeleton height={24} radius="xl" />
-        </Table.Td>
-        <Table.Td>
-          <Group justify="center">
-            <Skeleton height={28} width={28} radius="md" />
-          </Group>
         </Table.Td>
       </Table.Tr>
     ));
 
-  const renderMobileReservationCard = (reservation: Reservation) => {
-    const busy = isRowBusy(reservation._id!);
-    const isExpanded = expandedRows[reservation._id!];
+  const renderMobileReservationCard = (reservation: Reservation, groupReservations?: Reservation[]) => {
     const serviceObj =
       typeof reservation.serviceId === "object" ? reservation.serviceId : null;
-    const servicePrice = serviceObj?.price || 0;
     const serviceName = serviceObj?.name || "Sin especificar";
-
-    const empName = getEmployeeName(reservation);
-    const hasEmp = hasEmployeeAssigned(reservation);
+    const isGroup = groupReservations && groupReservations.length > 1;
 
     return (
       <Card
@@ -514,176 +660,51 @@ const ReservationsList: React.FC = () => {
         shadow="xs"
         mb="sm"
         p="md"
+        style={{ cursor: 'pointer' }}
+        onClick={() => handleOpenDetail(reservation, groupReservations)}
       >
-        <Group justify="space-between" align="flex-start" mb="xs">
-          <Stack gap={4} style={{ flex: 1 }}>
-            <Group gap={6} align="center" wrap="wrap">
-              <Badge size="xs" variant="outline" radius="lg">
-                {dayjs(reservation.startDate).format("DD/MM HH:mm")}
+        <Stack gap={8}>
+          <Group gap={6} align="center" wrap="wrap">
+            <Badge size="xs" variant="outline" radius="lg">
+              {dayjs(reservation.startDate).format("DD/MM HH:mm")}
+            </Badge>
+
+            <Badge
+              size="xs"
+              color={getBadgeColor(reservation.status)}
+              variant="light"
+              radius="lg"
+            >
+              {translateStatus(reservation.status)}
+            </Badge>
+
+            {isGroup && (
+              <Badge size="xs" variant="dot" color="blue" radius="lg">
+                Grupo
               </Badge>
+            )}
+          </Group>
 
-              <Badge
-                size="xs"
-                color={getBadgeColor(reservation.status)}
-                variant="light"
-                radius="lg"
-              >
-                {translateStatus(reservation.status)}
-              </Badge>
+          <Text fw={600} size="sm">
+            {isGroup ? `${groupReservations.length} servicios` : serviceName}
+          </Text>
 
-              {/* ✅ Requiere empleado (manual + pending + sin empleado) */}
-              {orgPolicy === "manual" &&
-                reservation.status === "pending" &&
-                !hasEmp && (
-                  <Badge size="xs" color="orange" variant="light" radius="lg">
-                    Requiere empleado
-                  </Badge>
-                )}
-            </Group>
-
-            <Text fw={600} size="sm">
-              {serviceName}
-            </Text>
-
+          {isGroup && (
             <Text size="xs" c="dimmed">
-              Cliente:{" "}
-              <Text span fw={500} c="dark">
-                {reservation.customerDetails?.name ?? "—"}
-              </Text>
+              {groupReservations.map(r => {
+                const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
+                return sObj?.name || "—";
+              }).join(", ")}
             </Text>
-
-            {/* ✅ Empleado visible en la card */}
-            <Text size="xs" c="dimmed">
-              Empleado:{" "}
-              {hasEmp ? (
-                <Text span fw={500} c="dark">
-                  {empName ?? "Asignado"}
-                </Text>
-              ) : (
-                <Badge
-                  size="xs"
-                  color="red"
-                  variant="light"
-                  radius="lg"
-                  style={{ verticalAlign: "middle" }}
-                >
-                  Sin asignar
-                </Badge>
-              )}
-            </Text>
-          </Stack>
-
-          <Menu withArrow position="bottom-end" shadow="sm" disabled={busy}>
-            <Menu.Target>
-              <ActionIcon
-                variant="subtle"
-                radius="xl"
-                loading={busy}
-                aria-label="Acciones"
-              >
-                <BiDotsVertical />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              {orgPolicy === "manual" && reservation.status === "pending" && (
-                <>
-                  <Menu.Item
-                    leftSection={
-                      rowLoading[reservation._id!] === "approve" ? (
-                        <Skeleton height={12} width={12} circle />
-                      ) : (
-                        <BiCheck size={16} />
-                      )
-                    }
-                    onClick={() =>
-                      handleUpdateStatus(reservation._id!, "approved")
-                    }
-                    disabled={busy}
-                  >
-                    Aprobar
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={
-                      rowLoading[reservation._id!] === "reject" ? (
-                        <Skeleton height={12} width={12} circle />
-                      ) : (
-                        <BiXCircle size={16} />
-                      )
-                    }
-                    color="red"
-                    onClick={() =>
-                      handleUpdateStatus(reservation._id!, "rejected")
-                    }
-                    disabled={busy}
-                  >
-                    Rechazar
-                  </Menu.Item>
-                </>
-              )}
-
-              <Menu.Item
-                leftSection={<BiUser size={16} />}
-                onClick={() => handleOpenAssignModal(reservation._id!)}
-                disabled={busy}
-              >
-                Cambiar empleado
-              </Menu.Item>
-
-              <Menu.Item
-                leftSection={
-                  rowLoading[reservation._id!] === "delete" ? (
-                    <Skeleton height={12} width={12} circle />
-                  ) : (
-                    <BiTrash size={16} />
-                  )
-                }
-                color="gray"
-                onClick={() => handleDelete(reservation._id!)}
-                disabled={busy}
-              >
-                Eliminar
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-        </Group>
-
-        {reservation.status === "pending" &&
-          organization?.requireReservationDeposit && (
-            <>
-              <Button
-                variant="subtle"
-                size="xs"
-                leftSection={isExpanded ? <BiChevronUp /> : <BiChevronDown />}
-                onClick={() =>
-                  setExpandedRows((prev) => ({
-                    ...prev,
-                    [reservation._id!]: !prev[reservation._id!],
-                  }))
-                }
-              >
-                {isExpanded
-                  ? "Ocultar info de depósito"
-                  : "Ver info de depósito"}
-              </Button>
-
-              <Collapse in={isExpanded}>
-                <Box mt="xs">
-                  <ReservationDepositAlert
-                    reservationId={reservation._id}
-                    clientName={reservation.customerDetails?.name}
-                    serviceName={serviceName}
-                    servicePrice={servicePrice}
-                    appointmentDate={dayjs(reservation.startDate).format(
-                      "DD/MM/YYYY"
-                    )}
-                    appointmentTime={dayjs(reservation.startDate).format(
-                      "HH:mm"
-                    )}
-                  />
-                </Box>
-              </Collapse>
-            </>
           )}
+
+          <Text size="xs" c="dimmed">
+            Cliente:{" "}
+            <Text span fw={500} c="dark">
+              {reservation.customerDetails?.name ?? "—"}
+            </Text>
+          </Text>
+        </Stack>
       </Card>
     );
   };
@@ -743,10 +764,26 @@ const ReservationsList: React.FC = () => {
         title="Confirmar eliminación"
         centered
       >
-        <Text size="sm">
-          ¿Seguro que deseas eliminar esta reserva? Esta acción no se puede
-          deshacer.
-        </Text>
+        {(() => {
+          const reservation = reservations.find(r => r._id === deletingReservationId);
+          const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
+          const groupSize = isGroup ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+          
+          return (
+            <Text size="sm">
+              {isGroup ? (
+                <>
+                  ¿Seguro que deseas eliminar este <strong>grupo de {groupSize} reservas</strong>? 
+                  Se eliminarán todas las reservas asociadas. Esta acción no se puede deshacer.
+                </>
+              ) : (
+                <>
+                  ¿Seguro que deseas eliminar esta reserva? Esta acción no se puede deshacer.
+                </>
+              )}
+            </Text>
+          );
+        })()}
         <Group mt="md" justify="flex-end">
           <Button
             variant="default"
@@ -772,7 +809,240 @@ const ReservationsList: React.FC = () => {
         </Group>
       </Modal>
 
+      {/* Modal Detalle de Reserva */}
+      <Modal
+        opened={detailModalOpen}
+        onClose={handleCloseDetail}
+        title={
+          selectedGroupReservations.length > 1
+            ? `Grupo de ${selectedGroupReservations.length} Reservas`
+            : "Detalle de Reserva"
+        }
+        size="lg"
+        centered
+      >
+        <div style={{ position: "relative" }}>
+          <LoadingOverlay visible={detailModalLoading} zIndex={1000} />
+          {selectedReservation && (
+          <Stack gap="md">
+            {/* Información del Cliente */}
+            <Box>
+              <Text size="sm" fw={600} c="dimmed" mb={4}>
+                Cliente
+              </Text>
+              <Text size="lg" fw={500}>
+                {selectedReservation.customerDetails?.name ?? "—"}
+              </Text>
+              {selectedReservation.customerDetails?.phone && (
+                <Text size="sm" c="dimmed">
+                  {selectedReservation.customerDetails.phone}
+                </Text>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Servicios */}
+            <Box>
+              <Text size="sm" fw={600} c="dimmed" mb={8}>
+                {selectedGroupReservations.length > 1 ? "Servicios" : "Servicio"}
+              </Text>
+              <Stack gap="xs">
+                {selectedGroupReservations.map((res, idx) => {
+                  const serviceObj = typeof res.serviceId === "object" ? res.serviceId : null;
+                  const serviceName = serviceObj?.name || "Sin especificar";
+                  const servicePrice = serviceObj?.price || 0;
+                  const empName = getEmployeeName(res);
+                  const hasEmp = hasEmployeeAssigned(res);
+
+                  return (
+                    <Card key={res._id || idx} withBorder p="sm" radius="md">
+                      <Group justify="space-between" wrap="nowrap">
+                        <Stack gap={4} style={{ flex: 1 }}>
+                          <Group gap="xs">
+                            <Text fw={500}>{serviceName}</Text>
+                            <Badge size="sm" color={getBadgeColor(res.status)}>
+                              {translateStatus(res.status)}
+                            </Badge>
+                          </Group>
+                          <Text size="sm" c="dimmed">
+                            {dayjs(res.startDate).format("DD/MM/YYYY HH:mm")}
+                          </Text>
+                          <Group gap="xs">
+                            <Text size="sm" c="dimmed">
+                              Empleado:
+                            </Text>
+                            {hasEmp ? (
+                              <Badge variant="light" color="grape" size="sm">
+                                {empName ?? "Asignado"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="light" color="red" size="sm">
+                                Sin asignar
+                              </Badge>
+                            )}
+                          </Group>
+                        </Stack>
+                        <Text fw={600} size="lg">
+                          ${servicePrice}
+                        </Text>
+                      </Group>
+
+                      {/* Acciones Individuales */}
+                      {res.status === "pending" && (
+                        <Group mt="sm" gap="xs">
+                          {orgPolicy === "manual" && (
+                            <>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                color="green"
+                                leftSection={<BiCheck />}
+                                onClick={() => {
+                                  handleUpdateStatus(res._id!, "approved");
+                                  handleCloseDetail();
+                                }}
+                                loading={isRowBusy(res._id!)}
+                              >
+                                Aprobar
+                              </Button>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                color="red"
+                                leftSection={<BiXCircle />}
+                                onClick={() => {
+                                  handleUpdateStatus(res._id!, "rejected");
+                                  handleCloseDetail();
+                                }}
+                                loading={isRowBusy(res._id!)}
+                              >
+                                Rechazar
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            size="xs"
+                            variant="light"
+                            leftSection={<BiUser />}
+                            onClick={() => {
+                              handleOpenAssignModal(res._id!);
+                              handleCloseDetail();
+                            }}
+                            loading={isRowBusy(res._id!)}
+                          >
+                            Empleado
+                          </Button>
+                        </Group>
+                      )}
+                    </Card>
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            {/* Información de Abono si aplica */}
+            {selectedReservation.status === "pending" &&
+              organization?.requireReservationDeposit && (
+                <>
+                  <Divider />
+                  <Alert color="blue" icon={<BiInfoCircle />}>
+                    {organization?.reservationDepositPercentage && organization.reservationDepositPercentage > 0 ? (
+                      <Group gap="xs">
+                        <Text size="sm" fw={500}>
+                          Abono requerido:
+                        </Text>
+                        <Text size="sm" c="blue" fw={700}>
+                          ${(() => {
+                            const totalPrice = selectedGroupReservations.reduce((sum, r) => {
+                              const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
+                              const price = sObj?.price || 0;
+                              return sum + price;
+                            }, 0);
+                            const deposit = (totalPrice * organization.reservationDepositPercentage) / 100;
+                            return deposit.toLocaleString('es-CL');
+                          })()}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          ({organization.reservationDepositPercentage}% del total de ${selectedGroupReservations.reduce((sum, r) => {
+                            const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
+                            return sum + (sObj?.price || 0);
+                          }, 0).toLocaleString('es-CL')})
+                        </Text>
+                      </Group>
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        ⚠️ El porcentaje de depósito no está configurado. Ve a Configuración → Organización para establecerlo.
+                      </Text>
+                    )}
+                  </Alert>
+                </>
+              )}
+
+            <Divider />
+
+            {/* Acciones Grupales */}
+            {selectedGroupReservations.length > 1 &&
+              selectedGroupReservations.every(r => r.status === "pending") && (
+                <Group gap="xs" grow>
+                  {orgPolicy === "manual" && (
+                    <>
+                      <Button
+                        color="green"
+                        leftSection={<BiCheck />}
+                        onClick={async () => {
+                          if (selectedReservation.groupId) {
+                            setDetailModalLoading(true);
+                            await handleApproveGroup(selectedReservation.groupId);
+                            setDetailModalLoading(false);
+                            handleCloseDetail();
+                          }
+                        }}
+                        loading={detailModalLoading}
+                        disabled={detailModalLoading}
+                      >
+                        Aprobar Todas
+                      </Button>
+                      <Button
+                        color="red"
+                        leftSection={<BiXCircle />}
+                        onClick={async () => {
+                          if (selectedReservation.groupId) {
+                            setDetailModalLoading(true);
+                            await handleRejectGroup(selectedReservation.groupId);
+                            setDetailModalLoading(false);
+                            handleCloseDetail();
+                          }
+                        }}
+                        loading={detailModalLoading}
+                        disabled={detailModalLoading}
+                      >
+                        Rechazar Todas
+                      </Button>
+                    </>
+                  )}
+                </Group>
+              )}
+
+            {/* Botón de Eliminar */}
+            <Button
+              variant="subtle"
+              color="gray"
+              leftSection={<BiTrash />}
+              onClick={() => {
+                handleDelete(selectedReservation._id!);
+                handleCloseDetail();
+              }}
+            >
+              Eliminar Reserva
+            </Button>
+          </Stack>
+        )}
+        </div>
+      </Modal>
+
       <Card shadow="sm" radius="lg" withBorder style={{ position: "relative" }}>
+
         {/* Header */}
         <Group justify="space-between" align="flex-start" mb="sm">
           <Stack gap={2}>
@@ -1002,13 +1272,9 @@ const ReservationsList: React.FC = () => {
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
-                    <Table.Th>Servicio</Table.Th>
+                    <Table.Th>Servicios</Table.Th>
                     <Table.Th>Cliente</Table.Th>
-                    <Table.Th>Empleado</Table.Th>
                     <Table.Th>Estado</Table.Th>
-                    <Table.Th style={{ width: 80, textAlign: "center" }}>
-                      Acciones
-                    </Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>{renderSkeletonRows()}</Table.Tbody>
@@ -1033,9 +1299,20 @@ const ReservationsList: React.FC = () => {
           </Center>
         ) : isMobile ? (
           <Stack>
-            {filteredReservations.map((reservation) =>
-              renderMobileReservationCard(reservation)
-            )}
+            {filteredReservations.map((reservation) => {
+              // Filtrar para mostrar solo la primera del grupo
+              const groupId = reservation.groupId;
+              const groupReservations = groupId ? groupsMap.get(groupId) : null;
+              const isPartOfGroup = !!groupReservations && groupReservations.length > 1;
+              const groupIndex = groupReservations ? groupReservations.findIndex(r => r._id === reservation._id) : -1;
+              const isFirstInGroup = groupIndex === 0;
+              
+              if (isPartOfGroup && !isFirstInGroup) {
+                return null;
+              }
+              
+              return renderMobileReservationCard(reservation, groupReservations || undefined);
+            })}
           </Stack>
         ) : (
           <Table.ScrollContainer minWidth={760} type="native" mah={520}>
@@ -1049,18 +1326,26 @@ const ReservationsList: React.FC = () => {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Fecha</Table.Th>
-                  <Table.Th>Servicio</Table.Th>
+                  <Table.Th>Servicios</Table.Th>
                   <Table.Th>Cliente</Table.Th>
-                  <Table.Th>Empleado</Table.Th>
                   <Table.Th>Estado</Table.Th>
-                  <Table.Th style={{ width: 80, textAlign: "center" }}>
-                    Acciones
-                  </Table.Th>
                 </Table.Tr>
               </Table.Thead>
 
               <Table.Tbody>
                 {filteredReservations.map((reservation) => {
+                  // 👥 Verificar si es parte de un grupo
+                  const groupId = reservation.groupId;
+                  const groupReservations = groupId ? groupsMap.get(groupId) : null;
+                  const isPartOfGroup = !!groupReservations && groupReservations.length > 1;
+                  const groupIndex = groupReservations ? groupReservations.findIndex(r => r._id === reservation._id) : -1;
+                  const isFirstInGroup = groupIndex === 0;
+                  
+                  // Si es parte de un grupo y NO es la primera, no renderizar (ya se mostrará en la fila del grupo)
+                  if (isPartOfGroup && !isFirstInGroup) {
+                    return null;
+                  }
+
                   const busy = isRowBusy(reservation._id!);
                   const isExpanded = expandedRows[reservation._id!];
 
@@ -1073,60 +1358,47 @@ const ReservationsList: React.FC = () => {
 
                   const empName = getEmployeeName(reservation);
                   const hasEmp = hasEmployeeAssigned(reservation);
+                  const allGroupPending = groupReservations?.every(r => r.status === "pending");
 
                   return (
                     <React.Fragment key={reservation._id}>
-                      <Table.Tr>
+                      <Table.Tr 
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleOpenDetail(reservation, groupReservations || undefined)}
+                      >
                         <Table.Td>
-                          {reservation.status === "pending" &&
-                            organization?.requireReservationDeposit && (
-                              <ActionIcon
-                                variant="subtle"
-                                size="sm"
-                                onClick={() =>
-                                  setExpandedRows((prev) => ({
-                                    ...prev,
-                                    [reservation._id!]: !prev[reservation._id!],
-                                  }))
-                                }
-                                mr="xs"
-                              >
-                                {isExpanded ? (
-                                  <BiChevronUp />
-                                ) : (
-                                  <BiChevronDown />
-                                )}
-                              </ActionIcon>
-                            )}
                           {dayjs(reservation.startDate).format(
                             "DD/MM/YYYY HH:mm"
                           )}
+                          {isPartOfGroup && (
+                            <Tooltip label={`Grupo de ${groupReservations.length} reservas`}>
+                              <Badge size="xs" variant="dot" color="blue" ml={8}>
+                                Grupo
+                              </Badge>
+                            </Tooltip>
+                          )}
                         </Table.Td>
 
-                        <Table.Td>{serviceName}</Table.Td>
+                        <Table.Td>
+                          {isPartOfGroup ? (
+                            <div>
+                              <Text size="sm" fw={500}>
+                                {groupReservations.length} servicios
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                {groupReservations.map(r => {
+                                  const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
+                                  return sObj?.name || "—";
+                                }).join(", ")}
+                              </Text>
+                            </div>
+                          ) : (
+                            serviceName
+                          )}
+                        </Table.Td>
 
                         <Table.Td>
                           {reservation.customerDetails?.name ?? "—"}
-                        </Table.Td>
-
-                        {/* ✅ NUEVO: Empleado */}
-                        <Table.Td>
-                          {hasEmp ? (
-                            <Badge variant="light" color="grape">
-                              {empName ?? "Asignado"}
-                            </Badge>
-                          ) : (
-                            <Badge variant="light" color="red">
-                              Sin asignar
-                            </Badge>
-                          )}
-                          {orgPolicy === "manual" &&
-                            reservation.status === "pending" &&
-                            !hasEmp && (
-                              <Badge ml={6} variant="light" color="orange">
-                                Requiere empleado
-                              </Badge>
-                            )}
                         </Table.Td>
 
                         <Table.Td>
@@ -1137,133 +1409,7 @@ const ReservationsList: React.FC = () => {
                             {translateStatus(reservation.status)}
                           </Badge>
                         </Table.Td>
-
-                        <Table.Td style={{ textAlign: "center" }}>
-                          <Menu
-                            withArrow
-                            position="bottom-end"
-                            shadow="sm"
-                            disabled={busy}
-                          >
-                            <Menu.Target>
-                              <ActionIcon
-                                variant="light"
-                                radius="md"
-                                loading={busy}
-                                aria-label="Acciones"
-                              >
-                                <BiDotsVertical />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              {orgPolicy === "manual" &&
-                                reservation.status === "pending" && (
-                                  <>
-                                    <Menu.Item
-                                      leftSection={
-                                        rowLoading[reservation._id!] ===
-                                        "approve" ? (
-                                          <Skeleton
-                                            height={12}
-                                            width={12}
-                                            circle
-                                          />
-                                        ) : (
-                                          <BiCheck size={16} />
-                                        )
-                                      }
-                                      onClick={() =>
-                                        handleUpdateStatus(
-                                          reservation._id!,
-                                          "approved"
-                                        )
-                                      }
-                                      disabled={busy}
-                                    >
-                                      Aprobar
-                                    </Menu.Item>
-                                    <Menu.Item
-                                      leftSection={
-                                        rowLoading[reservation._id!] ===
-                                        "reject" ? (
-                                          <Skeleton
-                                            height={12}
-                                            width={12}
-                                            circle
-                                          />
-                                        ) : (
-                                          <BiXCircle size={16} />
-                                        )
-                                      }
-                                      color="red"
-                                      onClick={() =>
-                                        handleUpdateStatus(
-                                          reservation._id!,
-                                          "rejected"
-                                        )
-                                      }
-                                      disabled={busy}
-                                    >
-                                      Rechazar
-                                    </Menu.Item>
-                                  </>
-                                )}
-
-                              <Menu.Item
-                                leftSection={<BiUser size={16} />}
-                                onClick={() =>
-                                  handleOpenAssignModal(reservation._id!)
-                                }
-                                disabled={busy}
-                              >
-                                Cambiar empleado
-                              </Menu.Item>
-
-                              <Menu.Item
-                                leftSection={
-                                  rowLoading[reservation._id!] === "delete" ? (
-                                    <Skeleton height={12} width={12} circle />
-                                  ) : (
-                                    <BiTrash size={16} />
-                                  )
-                                }
-                                color="gray"
-                                onClick={() => handleDelete(reservation._id!)}
-                                disabled={busy}
-                              >
-                                Eliminar
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Table.Td>
                       </Table.Tr>
-
-                      {reservation.status === "pending" &&
-                        organization?.requireReservationDeposit && (
-                          <Table.Tr>
-                            {/* ✅ colSpan actualizado por la nueva columna */}
-                            <Table.Td colSpan={6} p={0}>
-                              <Collapse in={isExpanded}>
-                                <Box p="md">
-                                  <ReservationDepositAlert
-                                    reservationId={reservation._id}
-                                    clientName={
-                                      reservation.customerDetails?.name
-                                    }
-                                    serviceName={serviceName}
-                                    servicePrice={servicePrice}
-                                    appointmentDate={dayjs(
-                                      reservation.startDate
-                                    ).format("DD/MM/YYYY")}
-                                    appointmentTime={dayjs(
-                                      reservation.startDate
-                                    ).format("HH:mm")}
-                                  />
-                                </Box>
-                              </Collapse>
-                            </Table.Td>
-                          </Table.Tr>
-                        )}
                     </React.Fragment>
                   );
                 })}

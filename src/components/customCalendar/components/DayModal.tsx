@@ -1,5 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl } from "@mantine/core";
+import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,6 +20,7 @@ import {
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { BiCalendar, BiListUl } from "react-icons/bi";
+import { formatInTimezone } from "../../../utils/timezoneUtils";
 
 /* Subcomponentes */
 import Header from "./subcomponents/DayModalHeader";
@@ -79,6 +80,7 @@ const DayModal: FC<DayModalProps> = ({
     null
   );
   const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<string[]>([]);
+  const [showCancelled, setShowCancelled] = useState(false);
 
   // Actualizar el día cuando cambian las props
   useEffect(() => {
@@ -116,6 +118,17 @@ const DayModal: FC<DayModalProps> = ({
 
   // Lo que va a mostrar
   const appointments = localDayAppointments ?? appointmentsFromMonth;
+  
+  // Separar citas activas y canceladas
+  const cancelledAppointments = useMemo(
+    () => appointments.filter(apt => apt.status.includes('cancelled')),
+    [appointments]
+  );
+  
+  const activeAppointments = useMemo(
+    () => appointments.filter(apt => !apt.status.includes('cancelled')),
+    [appointments]
+  );
 
   // Resto de cálculos igual
   const appointmentsByEmployee = useMemo(
@@ -148,11 +161,11 @@ const DayModal: FC<DayModalProps> = ({
   }, [employeesSorted, hiddenEmployeeIds]);
 
   const totalUniqueClients = useMemo(() => {
-    const clientIds = appointments
+    const clientIds = activeAppointments
       .map((app) => app.client?._id)
       .filter(Boolean);
     return new Set(clientIds).size;
-  }, [appointments]);
+  }, [activeAppointments]);
 
   const { startHour, endHour } = useMemo(() => {
     const orgStartHour = organization?.openingHours?.start
@@ -162,21 +175,21 @@ const DayModal: FC<DayModalProps> = ({
       ? parseInt(organization.openingHours.end.split(":")[0], 10)
       : 22;
 
-    const earliestAppointment = appointments.length
+    const earliestAppointment = activeAppointments.length
       ? Math.min(
-          ...appointments.map((app) => dayjs.tz(app.startDate, timezone).hour())
+          ...activeAppointments.map((app) => dayjs.tz(app.startDate, timezone).hour())
         )
       : orgStartHour;
 
-    const latestAppointment = appointments.length
-      ? Math.max(...appointments.map((app) => dayjs.tz(app.endDate, timezone).hour()))
+    const latestAppointment = activeAppointments.length
+      ? Math.max(...activeAppointments.map((app) => dayjs.tz(app.endDate, timezone).hour()))
       : orgEndHour;
 
     return {
       startHour: Math.min(earliestAppointment, orgStartHour),
       endHour: Math.max(orgEndHour, latestAppointment),
     };
-  }, [appointments, organization, timezone]);
+  }, [activeAppointments, organization, timezone]);
 
   const timeIntervals = useMemo(
     () => generateTimeIntervals(startHour, endHour, currentDay),
@@ -410,14 +423,73 @@ const DayModal: FC<DayModalProps> = ({
           <Group gap={8}>
             <Flex direction={isSmallScreen ? "column" : "row"} gap={8}>
               <Badge size="sm" radius="xl" variant="light">
-                Citas: {appointments.length}
+                Citas: {activeAppointments.length}
               </Badge>
               <Badge size="sm" radius="xl" variant="outline">
                 Clientes: {totalUniqueClients}
               </Badge>
+              {cancelledAppointments.length > 0 && (
+                <Badge 
+                  size="sm" 
+                  radius="xl" 
+                  variant="filled" 
+                  color="red"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setShowCancelled(!showCancelled)}
+                >
+                  ❌ Canceladas: {cancelledAppointments.length}
+                </Badge>
+              )}
             </Flex>
           </Group>
         </Group>
+        
+        {/* Sección de citas canceladas */}
+        <Collapse in={showCancelled && cancelledAppointments.length > 0}>
+          <Divider my="xs" />
+          <Text size="sm" fw={600} mb="xs">Citas canceladas del día:</Text>
+          <Box style={{ maxHeight: 200, overflowY: 'auto' }}>
+            {cancelledAppointments.map((apt) => (
+              <Paper
+                key={apt._id}
+                p="xs"
+                mb="xs"
+                withBorder
+                style={{
+                  backgroundColor: '#f8f9fa',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onClick={() => onEditAppointment(apt)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#e9ecef';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                }}
+              >
+                <Flex justify="space-between" align="center">
+                  <Box>
+                    <Text size="sm" fw={600} style={{ textDecoration: 'line-through' }}>
+                      {formatInTimezone(apt.startDate, timezone, 'HH:mm')} - {formatInTimezone(apt.endDate, timezone, 'HH:mm')}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {apt.client.name} • {apt.employee.names}
+                    </Text>
+                    {apt.service && (
+                      <Text size="xs" c="dimmed">
+                        {apt.service.name}
+                      </Text>
+                    )}
+                  </Box>
+                  <Badge size="xs" color="red" variant="light">
+                    {apt.status === 'cancelled_by_customer' ? 'Cliente' : 'Admin'}
+                  </Badge>
+                </Flex>
+              </Paper>
+            ))}
+          </Box>
+        </Collapse>
       </Paper>
     </Modal>
   );

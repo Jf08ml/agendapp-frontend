@@ -23,6 +23,7 @@ import MyMembership from "../pages/admin/MyMembership";
 import ServiceSuspended from "../pages/ServiceSuspended";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
+import PublicCancelPage from "../pages/public/PublicCancelPage";
 
 const generalRoutes = [
   {
@@ -31,6 +32,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Inicio",
       description: "Inicio de página.",
+    },
+  },
+  {
+    path: "/cancel",
+    component: PublicCancelPage,
+    MediaMetadata: {
+      title: "Cancelar Reserva",
+      description: "Cancelación de reserva o cita.",
     },
   },
   {

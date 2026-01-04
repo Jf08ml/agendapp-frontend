@@ -132,7 +132,9 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   };
 
   const renderAppointments = () => {
-    return appointmentsByEmployee[employee._id]?.map((appointment) => {
+    return appointmentsByEmployee[employee._id]
+      ?.filter(appointment => !appointment.status.includes('cancelled')) // ❌ No mostrar citas canceladas en el calendario
+      ?.map((appointment) => {
       const { top, height } = calculateAppointmentPosition(
         appointment,
         startHour,

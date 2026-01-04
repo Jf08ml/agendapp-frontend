@@ -55,7 +55,21 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
     // Si no, solo filtras local
   }, []);
 
+  // 📊 Para el contador del día (excluye canceladas)
   const getAppointmentsForDay = useCallback((day: Date) => {
+    return appointments
+      .filter((event) => 
+        isSameDay(new Date(event.startDate), day) &&
+        !event.status.includes('cancelled') // ❌ Excluir citas canceladas del contador
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      );
+  }, [appointments]);
+
+  // 📋 Para el DayModal (incluye TODAS las citas, incluso canceladas)
+  const getAllAppointmentsForDay = useCallback((day: Date) => {
     return appointments
       .filter((event) => isSameDay(new Date(event.startDate), day))
       .sort(
@@ -106,7 +120,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         onClose={() => setModalOpened(false)}
         onOpenModal={onOpenModal}
         employees={employees}
-        getAppointmentsForDay={getAppointmentsForDay}
+        getAppointmentsForDay={getAllAppointmentsForDay}
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}

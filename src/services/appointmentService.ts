@@ -18,7 +18,7 @@ export interface Appointment {
   employeeRequestedByClient: boolean;
   startDate: Date;
   endDate: Date;
-  status: string; // Puede ser "pending", "confirmed", o "cancelled"
+  status: string; // Puede ser "pending", "confirmed", "cancelled", "cancelled_by_customer", "cancelled_by_admin"
   organizationId: string;
   advancePayment: number;
   customPrice?: number | null; // Precio personalizado definido por el usuario
@@ -35,7 +35,7 @@ export interface CreateAppointmentPayload {
   employee: Employee | string; // ID del empleado
   startDate: Date;
   endDate: Date;
-  status: string; // Puede ser "pending", "confirmed", o "cancelled"
+  status: string; // Puede ser "pending", "confirmed", "cancelled", "cancelled_by_customer", "cancelled_by_admin"
   organizationId: string;
   advancePayment: number | undefined;
   customPrice?: number; // Precio personalizado (opcional)
@@ -107,6 +107,9 @@ export const getAppointmentsByOrganizationId = async (
     const queryParams = new URLSearchParams();
     if (startDate) queryParams.append("startDate", startDate);
     if (endDate) queryParams.append("endDate", endDate);
+    
+    // Agregar timestamp para evitar caché
+    queryParams.append("_t", Date.now().toString());
 
     // Construir la URL con los parámetros de consulta
     const url = `/organization/${organizationId}/dates${

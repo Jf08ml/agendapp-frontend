@@ -30,10 +30,13 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
   const getEmployeeName = (employee: Employee) => employee?.names || "Sin asignar";
+  
+  // ❌ Filtrar citas canceladas para no mostrarlas en el calendario
+  const activeAppointments = appointments.filter(apt => !apt.status.includes('cancelled'));
 
   // Rango vertical real del día (recortado)
   const { startMin, endMin } = useMemo(() => {
-    if (appointments.length === 0) {
+    if (activeAppointments.length === 0) {
       // 08:00 a 20:00 por defecto
       return { startMin: 8 * 60, endMin: 20 * 60 };
     }
@@ -41,7 +44,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
     let min = Infinity;
     let max = -Infinity;
 
-    for (const apt of appointments) {
+    for (const apt of activeAppointments) {
       const s = toDayMinutes(new Date(apt.startDate));
       const e = toDayMinutes(new Date(apt.endDate));
       min = Math.min(min, s);
@@ -55,7 +58,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
     // por seguridad, mínimo 1h de alto visual
     const minHeight = 60;
     return { startMin: start, endMin: Math.max(end, start + minHeight) };
-  }, [appointments]);
+  }, [activeAppointments]);
 
   // Labels por hora (pero la vista puede empezar en :15 o :30)
   const hourTicks = useMemo(() => {
@@ -70,9 +73,9 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
 
   // Layout: agrupar solapes + asignar columnas greedy
   const appointmentsWithLayout = useMemo(() => {
-    if (appointments.length === 0) return [];
+    if (activeAppointments.length === 0) return [];
 
-    const sorted = [...appointments].sort(
+    const sorted = [...activeAppointments].sort(
       (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
     );
 
@@ -165,11 +168,11 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
     }
 
     return out;
-  }, [appointments, startMin]);
+  }, [activeAppointments, startMin]);
 
   return (
     <Box p="sm">
-      {appointments.length === 0 ? (
+      {activeAppointments.length === 0 ? (
         <Text c="dimmed" ta="center" py="xl">
           No hay citas programadas para este día
         </Text>
@@ -226,6 +229,9 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
               const endTime = new Date(appointment.endDate);
 
               const employeeColor = appointment.employee?.color || "#228be6";
+              
+              // 🚫 Detectar si está cancelada
+              const isCancelled = appointment.status.includes('cancelled');
 
               const hexToRgba = (hex: string, alpha: number) => {
                 const r = parseInt(hex.slice(1, 3), 16);
@@ -265,6 +271,8 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                     transition: "transform 0.12s ease, box-shadow 0.12s ease",
                     overflow: "hidden",
                     zIndex: 1,
+                    opacity: isCancelled ? 0.4 : 1, // ❌ Citas canceladas con opacidad reducida
+                    textDecoration: isCancelled ? 'line-through' : 'none', // ❌ Texto tachado si cancelada
                   }}
                   onClick={() => onEditAppointment(appointment)}
                   onMouseEnter={(e) => {
