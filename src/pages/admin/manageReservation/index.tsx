@@ -6,8 +6,6 @@ import {
   Text,
   Badge,
   Stack,
-  Menu,
-  ActionIcon,
   Modal,
   Select,
   Button,
@@ -43,7 +41,6 @@ import type { ReservationPolicy } from "../../../services/organizationService";
 import { showNotification } from "@mantine/notifications";
 import dayjs from "dayjs";
 import {
-  BiDotsVertical,
   BiTrash,
   BiXCircle,
   BiUser,
@@ -54,7 +51,6 @@ import {
   BiFilter,
 } from "react-icons/bi";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
-import { ReservationDepositAlert } from "../../../components/ReservationDepositAlert";
 import {
   selectReservationPolicy,
   selectSavingPolicy,
@@ -69,7 +65,6 @@ const ReservationsList: React.FC = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const [initialLoading, setInitialLoading] = useState(false);
   const [rowLoading, setRowLoading] = useState<
@@ -135,9 +130,9 @@ const ReservationsList: React.FC = () => {
   const getEmployeeName = (reservation: Reservation): string | null => {
     // 1) Si el backend lo trae poblado como "employee"
     const populated = (reservation as any)?.employeeId?.names;
-    if (typeof populated === "string" && populated.trim())
+    if (typeof populated === "string" && populated.trim()) {
       return populated.trim();
-    console.log(populated);
+    }
     // 2) Si solo viene employeeId
     if (
       typeof reservation.employeeId === "string" &&
@@ -240,16 +235,6 @@ const ReservationsList: React.FC = () => {
       default:
         return "gray";
     }
-  };
-
-  const getStatusBadge = (
-    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
-  ) => {
-    return (
-      <Badge color={getBadgeColor(status)} variant="light">
-        {translateStatus(status)}
-      </Badge>
-    );
   };
 
   const employeesSelectData = useMemo(
@@ -463,10 +448,6 @@ const ReservationsList: React.FC = () => {
   };
 
   const handleDelete = async (reservationId: string) => {
-    // Buscar si la reserva pertenece a un grupo
-    const reservation = reservations.find(r => r._id === reservationId);
-    const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
-    
     setDeletingReservationId(reservationId);
     setDeleteConfirmOpen(true);
   };
@@ -476,12 +457,12 @@ const ReservationsList: React.FC = () => {
     
     // Buscar si es un grupo para mostrar el mensaje correcto
     const reservation = reservations.find(r => r._id === deletingReservationId);
-    const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
-    const groupSize = isGroup ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+    const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
+    const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
     
     try {
       setRowBusy(deletingReservationId, "delete");
-      const result = await deleteReservation(deletingReservationId);
+      await deleteReservation(deletingReservationId);
       
       showNotification({
         title: "Eliminada",
@@ -530,7 +511,7 @@ const ReservationsList: React.FC = () => {
         await updateReservation(r._id!, { 
           status: "approved",
           skipNotification: !isLast  // Solo la última envía WhatsApp
-        });
+        } as any);
       }
 
       showNotification({
@@ -766,8 +747,8 @@ const ReservationsList: React.FC = () => {
       >
         {(() => {
           const reservation = reservations.find(r => r._id === deletingReservationId);
-          const isGroup = reservation?.groupId && groupsMap.has(reservation.groupId);
-          const groupSize = isGroup ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+          const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
+          const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
           
           return (
             <Text size="sm">
@@ -823,7 +804,7 @@ const ReservationsList: React.FC = () => {
       >
         <div style={{ position: "relative" }}>
           <LoadingOverlay visible={detailModalLoading} zIndex={1000} />
-          {selectedReservation && (
+          {selectedReservation ? (
           <Stack gap="md">
             {/* Información del Cliente */}
             <Box>
@@ -1037,7 +1018,9 @@ const ReservationsList: React.FC = () => {
               Eliminar Reserva
             </Button>
           </Stack>
-        )}
+          ) : (
+            <Text c="dimmed" ta="center">No hay información disponible</Text>
+          )}
         </div>
       </Modal>
 
@@ -1346,19 +1329,11 @@ const ReservationsList: React.FC = () => {
                     return null;
                   }
 
-                  const busy = isRowBusy(reservation._id!);
-                  const isExpanded = expandedRows[reservation._id!];
-
                   const serviceObj =
                     typeof reservation.serviceId === "object"
                       ? reservation.serviceId
                       : null;
-                  const servicePrice = serviceObj?.price || 0;
                   const serviceName = serviceObj?.name || "Sin especificar";
-
-                  const empName = getEmployeeName(reservation);
-                  const hasEmp = hasEmployeeAssigned(reservation);
-                  const allGroupPending = groupReservations?.every(r => r.status === "pending");
 
                   return (
                     <React.Fragment key={reservation._id}>
