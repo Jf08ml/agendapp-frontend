@@ -23,7 +23,7 @@ import {
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt } from "react-icons/fa";
-import { MdCardMembership } from "react-icons/md";
+import { MdCardMembership, MdCancel } from "react-icons/md";
 import NotificationToggle from "./NotificationToggle";
 
 type NotificationsMenuProps = {
@@ -124,6 +124,8 @@ export default function NotificationsMenu({
         return <FaCalendarAlt color="#00b894" />;
       case "membership":
         return <MdCardMembership color="#ff6b6b" />;
+      case "cancellation":
+        return <MdCancel color="#e74c3c" />;
       default:
         return <FaBell color="#0984e3" />;
     }

@@ -759,6 +759,7 @@ const ScheduleView: React.FC = () => {
             onSave={addOrUpdateAppointment}
             fetchClients={fetchClients}
             creatingAppointment={creatingAppointment}
+            fetchAppointmentsForMonth={fetchAppointmentsForMonth}
           />
         )}
       </Suspense>

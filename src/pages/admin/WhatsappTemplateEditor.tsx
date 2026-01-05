@@ -66,6 +66,18 @@ const templateInfo = {
       { name: "{{cancellationLink}}", desc: "Enlace para cancelar las citas" },
     ],
   },
+  recurringAppointmentSeries: {
+    title: "Serie de Citas Recurrentes",
+    description: "Mensaje enviado cuando se crea una serie de citas recurrentes (semanal, quincenal, etc.)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{address}}", desc: "Dirección del negocio" },
+      { name: "{{employee}}", desc: "Nombre del empleado" },
+      { name: "{{appointmentsList}}", desc: "Lista completa de citas con fechas y horarios" },
+      { name: "{{cancellationLink}}", desc: "Enlace para cancelar todas o algunas citas" },
+    ],
+  },
   reminder: {
     title: "Recordatorio de Cita",
     description: "Mensaje de recordatorio enviado antes de la cita (soporta singular y plural)",

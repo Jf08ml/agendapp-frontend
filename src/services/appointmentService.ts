@@ -27,6 +27,64 @@ export interface Appointment {
   reminderSent?: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // 🔁 Campos para citas recurrentes
+  seriesId?: string;
+  occurrenceNumber?: number;
+  recurrencePattern?: RecurrencePattern;
+}
+
+// 🔁 Tipos para citas recurrentes
+export interface RecurrencePattern {
+  type: 'weekly' | 'none';
+  intervalWeeks: number; // 1 = cada semana, 2 = cada 2 semanas, etc.
+  weekdays: number[]; // [0=Dom, 1=Lun, 2=Mar, ..., 6=Sáb]
+  endType: 'date' | 'count';
+  endDate?: string; // ISO date string
+  count?: number; // número de ocurrencias
+}
+
+export interface AppointmentOccurrence {
+  startDate: string; // ISO string
+  endDate?: string; // ISO string
+  status: 'available' | 'no_work' | 'conflict' | 'error';
+  reason?: string;
+}
+
+export interface SeriesPreview {
+  totalOccurrences: number;
+  availableCount: number;
+  occurrences: AppointmentOccurrence[];
+}
+
+export interface CreateSeriesOptions {
+  previewOnly?: boolean;
+  allowOverbooking?: boolean;
+  omitIfNoWork?: boolean;
+  omitIfConflict?: boolean;
+  skipNotification?: boolean;
+  notifyAllAppointments?: boolean; // 📨 Si es true, envía mensaje con todas las citas; si es false, solo la primera
+}
+
+export interface CreateSeriesResponse {
+  seriesId: string;
+  totalOccurrences: number;
+  createdCount: number;
+  created: Array<{
+    _id: string;
+    startDate: string;
+    endDate: string;
+    occurrenceNumber: number;
+  }>;
+  skipped: Array<{
+    date: string;
+    reason: string;
+    status: string;
+  }>;
+  summary: {
+    total: number;
+    created: number;
+    skipped: number;
+  };
 }
 
 export interface CreateAppointmentPayload {
@@ -268,5 +326,38 @@ export const deleteAppointment = async (
     await apiAppointment.delete<Response<void>>(`/${appointmentId}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar la cita");
+  }
+};
+
+// 🔁 Crear/previsualizar serie de citas recurrentes
+export const createAppointmentSeries = async (
+  baseAppointment: Partial<CreateAppointmentsBatchPayload>,
+  recurrencePattern: RecurrencePattern,
+  options: CreateSeriesOptions = {}
+): Promise<CreateSeriesResponse | { preview: SeriesPreview } | undefined> => {
+  try {
+    const payload = {
+      employee: asId(baseAppointment.employee),
+      client: asId(baseAppointment.client),
+      services: baseAppointment.services?.map(s => asId(s)) || [],
+      startDate: baseAppointment.startDate ? asISO(baseAppointment.startDate) : asISO(new Date()),
+      organizationId: baseAppointment.organizationId,
+      advancePayment: baseAppointment.advancePayment || 0,
+      customPrices: baseAppointment.customPrices,
+      additionalItemsByService: baseAppointment.additionalItemsByService,
+      employeeRequestedByClient: baseAppointment.employeeRequestedByClient || false,
+      recurrencePattern,
+      previewOnly: options.previewOnly || false,
+      notifyAllAppointments: options.notifyAllAppointments ?? true // 📨 Por defecto todas
+    };
+
+    const response = await apiAppointment.post<Response<CreateSeriesResponse | { preview: SeriesPreview }>>(
+      "/series",
+      payload
+    );
+    
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al crear la serie de citas");
   }
 };

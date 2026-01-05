@@ -9,6 +9,7 @@ export interface WhatsappTemplate {
 export interface WhatsappTemplates {
   scheduleAppointment: WhatsappTemplate;
   scheduleAppointmentBatch: WhatsappTemplate;
+  recurringAppointmentSeries: WhatsappTemplate;
   reminder: WhatsappTemplate;
   statusReservationApproved: WhatsappTemplate;
   statusReservationRejected: WhatsappTemplate;
@@ -19,6 +20,7 @@ export interface TemplatesResponse {
   defaultTemplates: {
     scheduleAppointment: string;
     scheduleAppointmentBatch: string;
+    recurringAppointmentSeries: string;
     reminder: string;
     statusReservationApproved: string;
     statusReservationRejected: string;

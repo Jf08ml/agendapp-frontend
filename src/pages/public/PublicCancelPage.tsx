@@ -288,6 +288,9 @@ export const PublicCancelPage: React.FC = () => {
                         <Stack gap={4}>
                           <Text fw={600}>{apt.serviceName}</Text>
                           <Text size="sm" c="dimmed">
+                            {format(new Date(apt.startDate), "EEE, d 'de' MMM yyyy", { locale: es })}
+                          </Text>
+                          <Text size="sm" c="dimmed">
                             {format(new Date(apt.startDate), "HH:mm", { locale: es })} - {format(new Date(apt.endDate), "HH:mm", { locale: es })}
                           </Text>
                         </Stack>

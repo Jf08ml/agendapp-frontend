@@ -36,6 +36,16 @@ import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 
+// 🔁 Imports para citas recurrentes
+import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
+import SeriesPreview from "../../../../components/customCalendar/components/SeriesPreview";
+import { 
+  RecurrencePattern, 
+  SeriesPreview as SeriesPreviewType,
+  createAppointmentSeries 
+} from "../../../../services/appointmentService";
+import { notifications } from "@mantine/notifications";
+
 interface AppointmentModalProps {
   opened: boolean;
   onClose: () => void;
@@ -53,6 +63,7 @@ interface AppointmentModalProps {
   onSave: () => void;
   fetchClients: () => void;
   creatingAppointment: boolean;
+  fetchAppointmentsForMonth?: (date: Date) => Promise<void>;
 }
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -69,6 +80,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   onSave,
   fetchClients,
   creatingAppointment,
+  fetchAppointmentsForMonth,
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
@@ -79,6 +91,19 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [debouncedSearch] = useDebouncedValue(clientSearchQuery, 300);
   const [searchedClients, setSearchedClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(false);
+
+  // 🔁 Estados para citas recurrentes
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>({
+    type: 'none',
+    intervalWeeks: 1,
+    weekdays: [],
+    endType: 'count',
+    count: 4
+  });
+  const [seriesPreview, setSeriesPreview] = useState<SeriesPreviewType | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [creatingSeries, setCreatingSeries] = useState(false);
+  const [notifyAllAppointments, setNotifyAllAppointments] = useState(false); // 📨 Por defecto solo primera cita
 
   const today = dayjs();
   const organization = useSelector((state: RootState) => state.organization.organization);
@@ -209,6 +234,98 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       </Group>
     );
   };
+
+  // 🔁 Función para generar preview de citas recurrentes
+  const handleGeneratePreview = async () => {
+    if (!newAppointment.employee || !newAppointment.client || !newAppointment.startDate || !newAppointment.services || newAppointment.services.length === 0) {
+      notifications.show({
+        title: '⚠️ Campos requeridos',
+        message: 'Por favor completa empleado, cliente, servicios y fecha',
+        color: 'yellow'
+      });
+      return;
+    }
+
+    if (!organizationId) {
+      notifications.show({
+        title: '⚠️ Error',
+        message: 'No se encontró la organización',
+        color: 'red'
+      });
+      return;
+    }
+
+    setLoadingPreview(true);
+    try {
+      // Extraer IDs de objetos
+      const employeeId = typeof newAppointment.employee === 'string' 
+        ? newAppointment.employee 
+        : newAppointment.employee?._id;
+      const clientId = typeof newAppointment.client === 'string' 
+        ? newAppointment.client 
+        : newAppointment.client?._id;
+      const serviceIds = newAppointment.services
+        ?.filter(s => s && (s._id || typeof s === 'string'))
+        .map(s => typeof s === 'string' ? s : s._id) || [];
+
+      if (!employeeId || !clientId || serviceIds.length === 0) {
+        const missing = [];
+        if (!employeeId) missing.push('empleado');
+        if (!clientId) missing.push('cliente');
+        if (serviceIds.length === 0) missing.push('servicios');
+        
+        notifications.show({
+          title: '⚠️ Campos faltantes',
+          message: `Por favor selecciona: ${missing.join(', ')}`,
+          color: 'yellow'
+        });
+        return;
+      }
+
+      const result = await createAppointmentSeries(
+        {
+          employee: employeeId,
+          client: clientId,
+          services: serviceIds,
+          startDate: newAppointment.startDate,
+          organizationId,
+          advancePayment: newAppointment.advancePayment
+        },
+        recurrencePattern,
+        { previewOnly: true }
+      );
+
+      // El backend devuelve el preview directamente: { totalOccurrences, availableCount, occurrences }
+      if (result && 'totalOccurrences' in result && 'availableCount' in result && 'occurrences' in result) {
+        setSeriesPreview(result as SeriesPreviewType);
+        notifications.show({
+          title: '✅ Preview generado',
+          message: `Se generaron ${result.totalOccurrences} citas (${result.availableCount} disponibles)`,
+          color: 'green'
+        });
+      } else {
+        notifications.show({
+          title: '⚠️ Sin preview',
+          message: 'No se pudo generar el preview',
+          color: 'yellow'
+        });
+      }
+    } catch (error: unknown) {
+      notifications.show({
+        title: '❌ Error al generar preview',
+        message: error instanceof Error ? error.message : 'Ocurrió un error',
+        color: 'red'
+      });
+      setSeriesPreview(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  // 🔁 Resetear preview cuando cambian los parámetros de recurrencia
+  useEffect(() => {
+    setSeriesPreview(null);
+  }, [recurrencePattern, newAppointment.employee, newAppointment.client, newAppointment.startDate, newAppointment.services]);
 
   return (
     <>
@@ -534,6 +651,92 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </Grid>
           </Box>
 
+          {/* 🔁 Sección: Citas Recurrentes (solo para nuevas citas) */}
+          {!appointment && (
+            <Box
+              mb="xl"
+              p="md"
+              style={{
+                backgroundColor: "#f0f8ff",
+                borderRadius: 8,
+                border: "1px solid #b0d4f1",
+              }}
+            >
+              <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
+                🔁 Citas Recurrentes
+              </Text>
+
+              <RecurrenceSelector
+                value={recurrencePattern}
+                onChange={setRecurrencePattern}
+                startDate={newAppointment.startDate}
+              />
+
+              {recurrencePattern.type === 'weekly' && (
+                <>
+                  <Button
+                    mt="md"
+                    variant="light"
+                    color="blue"
+                    loading={loadingPreview}
+                    onClick={handleGeneratePreview}
+                    leftSection={<Text>🔍</Text>}
+                  >
+                    Generar Vista Previa
+                  </Button>
+
+                  {/* 📨 Checkbox para controlar notificación */}
+                  <Box
+                    mt="md"
+                    p="md"
+                    style={{
+                      backgroundColor: "#e7f5ff",
+                      borderRadius: 8,
+                      border: "1px solid #339af0",
+                    }}
+                  >
+                    <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs">
+                      📨 Notificación por WhatsApp
+                    </Text>
+                    
+                    <Checkbox
+                      label={
+                        <Text size="sm" fw={500}>
+                          Enviar mensaje con todas las citas de la serie
+                        </Text>
+                      }
+                      checked={notifyAllAppointments}
+                      onChange={(event) => setNotifyAllAppointments(event.currentTarget.checked)}
+                      color="blue"
+                    />
+                    
+                    <Box
+                      mt="xs"
+                      p="xs"
+                      style={{
+                        backgroundColor: notifyAllAppointments ? "#d0ebff" : "#fff3bf",
+                        borderRadius: 6,
+                        borderLeft: `3px solid ${notifyAllAppointments ? "#339af0" : "#fab005"}`,
+                      }}
+                    >
+                      <Text size="xs" c={notifyAllAppointments ? "blue.7" : "yellow.9"} fw={600}>
+                        {notifyAllAppointments 
+                          ? "✅ Se enviará un mensaje con TODAS las citas programadas"
+                          : "📅 Se enviará mensaje solo de LA PRIMERA cita"}
+                      </Text>
+                    </Box>
+                  </Box>
+                </>
+              )}
+
+              {seriesPreview && (
+                <Box mt="lg">
+                  <SeriesPreview preview={seriesPreview} />
+                </Box>
+              )}
+            </Box>
+          )}
+
           {/* Sección: Pago */}
           <Box
             mb="xl"
@@ -755,19 +958,104 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               Cancelar
             </Button>
             <Button
-              onClick={onSave}
-              disabled={creatingAppointment}
-              loading={creatingAppointment}
+              onClick={async () => {
+                // 🔁 Si es cita recurrente, crearla como serie
+                if (!appointment && recurrencePattern.type === 'weekly') {
+                  if (!organizationId) {
+                    notifications.show({
+                      title: '⚠️ Error',
+                      message: 'No se encontró la organización',
+                      color: 'red'
+                    });
+                    return;
+                  }
+
+                  try {
+                    // Extraer IDs de objetos si es necesario
+                    const employeeId = typeof newAppointment.employee === 'string' 
+                      ? newAppointment.employee 
+                      : newAppointment.employee?._id;
+                    const clientId = typeof newAppointment.client === 'string' 
+                      ? newAppointment.client 
+                      : newAppointment.client?._id;
+                    const serviceIds = newAppointment.services
+                      ?.filter(s => s && (s._id || typeof s === 'string'))
+                      .map(s => typeof s === 'string' ? s : s._id) || [];
+
+                    if (serviceIds.length === 0) {
+                      notifications.show({
+                        title: '⚠️ Error',
+                        message: 'No se pudieron procesar los servicios seleccionados',
+                        color: 'yellow'
+                      });
+                      return;
+                    }
+
+                    setCreatingSeries(true);
+                    
+                    const result = await createAppointmentSeries(
+                      {
+                        employee: employeeId,
+                        client: clientId,
+                        services: serviceIds,
+                        startDate: newAppointment.startDate,
+                        organizationId,
+                        advancePayment: newAppointment.advancePayment
+                      },
+                      recurrencePattern,
+                      { 
+                        previewOnly: false,
+                        notifyAllAppointments // 📨 Enviar a backend la opción seleccionada
+                      }
+                    );
+
+                    if (result && 'createdCount' in result) {
+                      notifications.show({
+                        title: '✅ Serie creada exitosamente',
+                        message: `Se crearon ${result.createdCount} de ${result.totalOccurrences} citas recurrentes`,
+                        color: 'green',
+                        autoClose: 4000
+                      });
+                    }
+                    
+                    // Cerrar modal
+                    onClose();
+                    
+                    // Refrescar citas del mes actual sin recargar toda la página
+                    if (fetchAppointmentsForMonth) {
+                      await fetchAppointmentsForMonth(newAppointment.startDate || new Date());
+                    }
+                  } catch (error: unknown) {
+                    notifications.show({
+                      title: '❌ Error al crear serie',
+                      message: error instanceof Error ? error.message : 'Error al crear las citas recurrentes',
+                      color: 'red',
+                      autoClose: 5000
+                    });
+                  } finally {
+                    setCreatingSeries(false);
+                  }
+                } else {
+                  // 📅 Cita normal o edición
+                  onSave();
+                }
+              }}
+              disabled={creatingAppointment || creatingSeries}
+              loading={creatingAppointment || creatingSeries}
               size="xs"
               radius="md"
-              leftSection={appointment ? "✏️" : "➕"}
+              leftSection={appointment ? "✏️" : recurrencePattern.type === 'weekly' ? "🔁" : "➕"}
               styles={{
                 root: {
                   minWidth: 160,
                 },
               }}
             >
-              {appointment ? "Actualizar Cita" : "Crear Cita"}
+              {appointment 
+                ? "Actualizar Cita" 
+                : recurrencePattern.type === 'weekly' 
+                  ? "Crear Serie Recurrente" 
+                  : "Crear Cita"}
             </Button>
           </Group>
         </Box>

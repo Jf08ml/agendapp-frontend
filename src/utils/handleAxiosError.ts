@@ -5,6 +5,10 @@ export const handleAxiosError = (error: unknown, defaultMessage: string) => {
     const errorResponse = error.response?.data;
     throw new Error(errorResponse?.message || defaultMessage);
   } else {
-    throw new Error("Error desconocido");
+    console.error("Error no es AxiosError:", error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Error desconocido: ${JSON.stringify(error)}`);
   }
 };
