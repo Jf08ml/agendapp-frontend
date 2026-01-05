@@ -523,15 +523,22 @@ const ReservationsList: React.FC = () => {
       });
 
       if (organization?._id) await loadPage(organization._id);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      
+      // Extraer mensaje de error específico
+      const errorMessage = err?.response?.data?.message || err?.message || "Error al aprobar el grupo de reservas";
+      
       showNotification({
-        title: "Error",
-        message: "Error al aprobar el grupo de reservas",
+        title: "Error al Aprobar",
+        message: errorMessage,
         color: "red",
         position: "top-right",
-        autoClose: 3000,
+        autoClose: 5000,
       });
+      
+      // Recargar para mostrar el estado revertido
+      if (organization?._id) await loadPage(organization._id);
     } finally {
       group.forEach(r => {
         if (r._id) setRowBusy(r._id, null);
@@ -872,36 +879,32 @@ const ReservationsList: React.FC = () => {
                       {/* Acciones Individuales */}
                       {res.status === "pending" && (
                         <Group mt="sm" gap="xs">
-                          {orgPolicy === "manual" && (
-                            <>
-                              <Button
-                                size="xs"
-                                variant="light"
-                                color="green"
-                                leftSection={<BiCheck />}
-                                onClick={() => {
-                                  handleUpdateStatus(res._id!, "approved");
-                                  handleCloseDetail();
-                                }}
-                                loading={isRowBusy(res._id!)}
-                              >
-                                Aprobar
-                              </Button>
-                              <Button
-                                size="xs"
-                                variant="light"
-                                color="red"
-                                leftSection={<BiXCircle />}
-                                onClick={() => {
-                                  handleUpdateStatus(res._id!, "rejected");
-                                  handleCloseDetail();
-                                }}
-                                loading={isRowBusy(res._id!)}
-                              >
-                                Rechazar
-                              </Button>
-                            </>
-                          )}
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="green"
+                            leftSection={<BiCheck />}
+                            onClick={() => {
+                              handleUpdateStatus(res._id!, "approved");
+                              handleCloseDetail();
+                            }}
+                            loading={isRowBusy(res._id!)}
+                          >
+                            Aprobar
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="red"
+                            leftSection={<BiXCircle />}
+                            onClick={() => {
+                              handleUpdateStatus(res._id!, "rejected");
+                              handleCloseDetail();
+                            }}
+                            loading={isRowBusy(res._id!)}
+                          >
+                            Rechazar
+                          </Button>
                           <Button
                             size="xs"
                             variant="light"
@@ -921,6 +924,22 @@ const ReservationsList: React.FC = () => {
                 })}
               </Stack>
             </Box>
+
+            {/* ⚠️ Mostrar error si existe */}
+            {selectedReservation.errorMessage && (
+              <>
+                <Divider />
+                <Alert color="red" icon={<BiInfoCircle />} title="Error al crear cita automáticamente">
+                  <Text size="sm">
+                    {selectedReservation.errorMessage}
+                  </Text>
+                  <Text size="xs" c="dimmed" mt="xs">
+                    Esta reserva quedó pendiente porque no se pudo crear la cita automáticamente. 
+                    Puedes intentar aprobarla manualmente.
+                  </Text>
+                </Alert>
+              </>
+            )}
 
             {/* Información de Abono si aplica */}
             {selectedReservation.status === "pending" &&
@@ -966,42 +985,38 @@ const ReservationsList: React.FC = () => {
             {selectedGroupReservations.length > 1 &&
               selectedGroupReservations.every(r => r.status === "pending") && (
                 <Group gap="xs" grow>
-                  {orgPolicy === "manual" && (
-                    <>
-                      <Button
-                        color="green"
-                        leftSection={<BiCheck />}
-                        onClick={async () => {
-                          if (selectedReservation.groupId) {
-                            setDetailModalLoading(true);
-                            await handleApproveGroup(selectedReservation.groupId);
-                            setDetailModalLoading(false);
-                            handleCloseDetail();
-                          }
-                        }}
-                        loading={detailModalLoading}
-                        disabled={detailModalLoading}
-                      >
-                        Aprobar Todas
-                      </Button>
-                      <Button
-                        color="red"
-                        leftSection={<BiXCircle />}
-                        onClick={async () => {
-                          if (selectedReservation.groupId) {
-                            setDetailModalLoading(true);
-                            await handleRejectGroup(selectedReservation.groupId);
-                            setDetailModalLoading(false);
-                            handleCloseDetail();
-                          }
-                        }}
-                        loading={detailModalLoading}
-                        disabled={detailModalLoading}
-                      >
-                        Rechazar Todas
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    color="green"
+                    leftSection={<BiCheck />}
+                    onClick={async () => {
+                      if (selectedReservation.groupId) {
+                        setDetailModalLoading(true);
+                        await handleApproveGroup(selectedReservation.groupId);
+                        setDetailModalLoading(false);
+                        handleCloseDetail();
+                      }
+                    }}
+                    loading={detailModalLoading}
+                    disabled={detailModalLoading}
+                  >
+                    Aprobar Todas
+                  </Button>
+                  <Button
+                    color="red"
+                    leftSection={<BiXCircle />}
+                    onClick={async () => {
+                      if (selectedReservation.groupId) {
+                        setDetailModalLoading(true);
+                        await handleRejectGroup(selectedReservation.groupId);
+                        setDetailModalLoading(false);
+                        handleCloseDetail();
+                      }
+                    }}
+                    loading={detailModalLoading}
+                    disabled={detailModalLoading}
+                  >
+                    Rechazar Todas
+                  </Button>
                 </Group>
               )}
 
@@ -1210,7 +1225,8 @@ const ReservationsList: React.FC = () => {
               Al crear una <strong>reserva</strong>, si existe cupo inmediato
               según el servicio, empleado (si aplica) y horario, se{" "}
               <strong>confirma</strong> y se crea la <strong>cita</strong>{" "}
-              automáticamente. Si no, la reserva quedará <em>pendiente</em>.
+              automáticamente. Si no hay disponibilidad (por conflictos de horario), 
+              la reserva quedará <em>pendiente</em> y deberás aprobarla manualmente.
             </Text>
           ) : (
             <Text size="sm">

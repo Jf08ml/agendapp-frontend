@@ -19,6 +19,7 @@ export interface Reservation {
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected";
   groupId?: string; // 👥 ID de grupo para reservas múltiples
+  errorMessage?: string; // ⚠️ Mensaje de error cuando falla la creación automática
 }
 
 export interface CreateReservationPayload {
