@@ -6,9 +6,16 @@ import {
   Textarea,
   Table,
   ActionIcon,
-  Divider,
   Text,
+  Group,
+  Stack,
+  Paper,
+  Badge,
+  Box,
+  Loader,
 } from "@mantine/core";
+import { DateInput } from "@mantine/dates";
+import "dayjs/locale/es";
 import { useEffect, useState } from "react";
 import {
   createAdvance,
@@ -35,7 +42,9 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
   const org = useSelector(selectOrganization);
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [advanceDescription, setAdvanceDescription] = useState<string>("");
+  const [advanceDate, setAdvanceDate] = useState<Date | null>(new Date());
   const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (employee) {
@@ -47,10 +56,17 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
     if (!employee) return;
 
     try {
+      setLoading(true);
       const employeeAdvances = await getAdvancesByEmployee(employee._id);
-      setAdvances(employeeAdvances);
+      // Ordenar descendente por fecha
+      const sorted = [...employeeAdvances].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      setAdvances(sorted);
     } catch (error) {
       console.error("Error al cargar los adelantos", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -73,6 +89,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
             ...editingAdvance,
             amount: advanceAmount,
             description: advanceDescription,
+            date: advanceDate || new Date(),
           });
         }
         showNotification({
@@ -85,7 +102,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
           employee: employee._id,
           amount: advanceAmount,
           description: advanceDescription,
-          date: new Date(),
+          date: advanceDate || new Date(),
         });
         showNotification({
           title: "Adelanto creado",
@@ -95,6 +112,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
       }
       setAdvanceAmount(0);
       setAdvanceDescription("");
+      setAdvanceDate(new Date());
       setEditingAdvance(null);
       fetchAdvances();
     } catch (error) {
@@ -110,6 +128,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
   const handleEditAdvance = (advance: Advance) => {
     setAdvanceAmount(advance.amount);
     setAdvanceDescription(advance.description);
+    setAdvanceDate(new Date(advance.date));
     setEditingAdvance(advance);
   };
 
@@ -135,6 +154,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
   const clearForm = () => {
     setAdvanceAmount(0);
     setAdvanceDescription("");
+    setAdvanceDate(new Date());
     setEditingAdvance(null);
   };
 
@@ -147,77 +167,121 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
       }}
       title="Gestionar Adelantos"
     >
-      <NumberInput
-        label="Monto del Adelanto"
-        prefix="$ "
-        thousandSeparator
-        value={advanceAmount}
-        onChange={(value) => setAdvanceAmount(Number(value) || 0)}
-        min={0}
-        mb="sm"
-      />
-      <Textarea
-        label="Descripción"
-        placeholder="Motivo del adelanto"
-        value={advanceDescription}
-        onChange={(e) => setAdvanceDescription(e.currentTarget.value)}
-        mb="sm"
-      />
-      <Button onClick={handleCreateOrUpdateAdvance} mt="sm">
-        {editingAdvance ? "Actualizar Adelanto" : "Crear Adelanto"}
-      </Button>
+      <Stack gap="md">
+        <Paper withBorder radius="md" p="md">
+          <Group justify="space-between" align="center" mb="sm">
+            <Text fw={700}>Nuevo adelanto</Text>
+            {editingAdvance && <Badge color="blue">Editando</Badge>}
+          </Group>
 
-      <Divider my="sm" label="Historial de Adelantos" />
+          <Stack gap="sm">
+            <NumberInput
+              label="Monto del adelanto"
+              prefix="$ "
+              thousandSeparator
+              value={advanceAmount}
+              onChange={(value) => setAdvanceAmount(Number(value) || 0)}
+              min={0}
+            />
 
-      <Table highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Fecha</Table.Th>
-            <Table.Th>Monto</Table.Th>
-            <Table.Th>Descripción</Table.Th>
-            <Table.Th>Acciones</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {advances.length > 0 ? (
-            advances.map((advance) => (
-              <Table.Tr key={advance._id}>
-                <Table.Td>
-                  {new Date(advance.date).toLocaleDateString()}
-                </Table.Td>
-                <Table.Td>{formatCurrency(advance.amount, org?.currency || "COP")}</Table.Td>
-                <Table.Td>{advance.description}</Table.Td>
-                <Table.Td>
-                  <ActionIcon
-                    radius="lg"
-                    color="blue"
-                    onClick={() => handleEditAdvance(advance)}
-                  >
-                    <FaEdit />
-                  </ActionIcon>
-                  <ActionIcon
-                    radius="lg"
-                    color="red"
-                    onClick={() =>
-                      advance._id && handleDeleteAdvance(advance._id)
-                    }
-                  >
-                    <FaTrash />
-                  </ActionIcon>
-                </Table.Td>
-              </Table.Tr>
-            ))
+            <DateInput
+              label="Fecha"
+              value={advanceDate}
+              onChange={setAdvanceDate}
+              locale="es"
+            />
+
+            <Textarea
+              label="Descripción"
+              placeholder="Motivo del adelanto"
+              value={advanceDescription}
+              onChange={(e) => setAdvanceDescription(e.currentTarget.value)}
+            />
+
+            <Group justify="flex-end" gap="sm" mt="sm">
+              {editingAdvance && (
+                <Button variant="subtle" onClick={clearForm}>
+                  Cancelar edición
+                </Button>
+              )}
+              <Button onClick={handleCreateOrUpdateAdvance}>
+                {editingAdvance ? "Actualizar adelanto" : "Crear adelanto"}
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
+
+        <Paper withBorder radius="md" p="md">
+          <Group justify="space-between" align="center" mb="sm">
+            <Text fw={700}>Historial de adelantos</Text>
+            <Text c="dimmed" size="sm">
+              Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0), org?.currency || "COP")}
+            </Text>
+          </Group>
+
+          {loading ? (
+            <Box ta="center" py="lg">
+              <Loader size="sm" />
+            </Box>
           ) : (
-            <Table.Tr ta={"center"}>
-              <Table.Td colSpan={4}>No hay adelantos registrados</Table.Td>
-            </Table.Tr>
+            <Table highlightOnHover striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Fecha</Table.Th>
+                  <Table.Th>Monto</Table.Th>
+                  <Table.Th>Descripción</Table.Th>
+                  <Table.Th>Acciones</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {advances.length > 0 ? (
+                  advances.map((advance) => (
+                    <Table.Tr key={advance._id}>
+                      <Table.Td>
+                        {new Date(advance.date).toLocaleDateString()}
+                      </Table.Td>
+                      <Table.Td>{formatCurrency(advance.amount, org?.currency || "COP")}</Table.Td>
+                      <Table.Td>{advance.description || "Sin descripción"}</Table.Td>
+                      <Table.Td>
+                        <Group gap={4}>
+                          <ActionIcon
+                            radius="lg"
+                            color="blue"
+                            onClick={() => handleEditAdvance(advance)}
+                            aria-label="Editar adelanto"
+                          >
+                            <FaEdit />
+                          </ActionIcon>
+                          <ActionIcon
+                            radius="lg"
+                            color="red"
+                            onClick={() =>
+                              advance._id &&
+                              window.confirm("¿Eliminar adelanto?") &&
+                              handleDeleteAdvance(advance._id)
+                            }
+                            aria-label="Eliminar adelanto"
+                          >
+                            <FaTrash />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+                ) : (
+                  <Table.Tr>
+                    <Table.Td colSpan={4}>
+                      <Text c="dimmed" ta="center">
+                        No hay adelantos registrados
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
           )}
-        </Table.Tbody>
-      </Table>
-      <Divider my="sm" />
-      <Text fw={600} ta="right">
-        Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0), org?.currency || "COP")}
-      </Text>
+        </Paper>
+      </Stack>
     </Modal>
   );
 };

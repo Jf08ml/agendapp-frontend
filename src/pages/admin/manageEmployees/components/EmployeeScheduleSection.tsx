@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Componente para configurar horarios de disponibilidad de empleados
  * Adaptado para Mantine UI
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Text,
@@ -115,8 +116,56 @@ export default function EmployeeScheduleSection({
     }
   };
 
+  // Validar horarios
+  const validateSchedule = (): { valid: boolean; message?: string } => {
+    for (const day of schedule.schedule) {
+      if (!day.isAvailable) continue;
+
+      // Validar que la hora de inicio sea anterior a la hora de fin
+      if (day.start >= day.end) {
+        const dayLabel = DAY_LABELS.find((d) => d.value === day.day)?.label;
+        return {
+          valid: false,
+          message: `${dayLabel}: La hora de inicio debe ser anterior a la hora de fin`,
+        };
+      }
+
+      // Validar breaks
+      for (const brk of day.breaks) {
+        if (brk.start >= brk.end) {
+          const dayLabel = DAY_LABELS.find((d) => d.value === day.day)?.label;
+          return {
+            valid: false,
+            message: `${dayLabel}: Los descansos deben tener hora de inicio anterior a la de fin`,
+          };
+        }
+
+        if (brk.start < day.start || brk.end > day.end) {
+          const dayLabel = DAY_LABELS.find((d) => d.value === day.day)?.label;
+          return {
+            valid: false,
+            message: `${dayLabel}: Los descansos deben estar dentro del horario laboral`,
+          };
+        }
+      }
+    }
+
+    return { valid: true };
+  };
+
   // Guardar horario
   const saveSchedule = async () => {
+    // Validar antes de guardar
+    const validation = validateSchedule();
+    if (!validation.valid) {
+      showNotification({
+        title: "Validación",
+        message: validation.message || "Revisa los horarios configurados",
+        color: "orange",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       await updateEmployeeSchedule(employeeId, schedule);
@@ -129,7 +178,7 @@ export default function EmployeeScheduleSection({
       console.error("Error al guardar horario:", error);
       showNotification({
         title: "Error",
-        message: "No se pudo guardar el horario",
+        message: error.response?.data?.message || "No se pudo guardar el horario",
         color: "red",
       });
     } finally {
@@ -137,10 +186,12 @@ export default function EmployeeScheduleSection({
     }
   };
 
-  // Cargar automáticamente si no se ha cargado
-  if (!hasLoaded && !loading) {
-    loadSchedule();
-  }
+  // Cargar automáticamente cuando el componente se monta
+  useEffect(() => {
+    if (!hasLoaded && !loading) {
+      loadSchedule();
+    }
+  }, [employeeId, hasLoaded, loading]);
 
   const toggleDay = (dayIndex: number) => {
     const newExpanded = new Set(expandedDays);

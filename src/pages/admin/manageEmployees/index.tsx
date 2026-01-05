@@ -10,7 +10,6 @@ import {
   TextInput,
   Container,
   Card,
-  Select,
   SegmentedControl,
   Skeleton,
   Center,
@@ -51,10 +50,6 @@ const AdminEmployees: React.FC = () => {
   const [debouncedSearch] = useDebouncedValue(search, 250);
 
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
-  const [serviceFilter, setServiceFilter] = useState<string | null>("__all__");
-  const [sortBy, setSortBy] = useState<"alpha" | "position" | "recent">(
-    "alpha"
-  );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -72,7 +67,7 @@ const AdminEmployees: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | null>("employees");
 
   const organizationId = useSelector(
-    (state: RootState) => state.auth.organizationId
+    (state: RootState) => (state.auth as any)?.organizationId
   );
 
   useEffect(() => {
@@ -106,15 +101,6 @@ const AdminEmployees: React.FC = () => {
     }
   };
 
-  // Filtros
-  const serviceOptions = useMemo(
-    () => [
-      { value: "__all__", label: "Todos" },
-      ...services.map((s) => ({ value: s._id, label: s.name })),
-    ],
-    [services]
-  );
-
   const filtered = useMemo(() => {
     let data = [...employees];
 
@@ -137,31 +123,60 @@ const AdminEmployees: React.FC = () => {
       );
     }
 
-    // Servicio
-    if (serviceFilter && serviceFilter !== "__all__") {
-      data = data.filter((e) =>
-        (e.services || []).some((s) => (s as any)._id === serviceFilter)
-      );
-    }
-
-    // Orden
-    // Orden
-    if (sortBy === "alpha")
-      data.sort((a, b) => a.names.localeCompare(b.names, "es"));
-    if (sortBy === "position")
-      data.sort((a, b) => a.position.localeCompare(b.position, "es"));
+    // Orden simple: por nombre para consistencia
+    data.sort((a, b) => a.names.localeCompare(b.names, "es"));
 
     // Activos primero siempre
     data.sort((a, b) => Number(b.isActive) - Number(a.isActive));
 
     return data;
-  }, [employees, debouncedSearch, status, serviceFilter, sortBy]);
+  }, [employees, debouncedSearch, status]);
 
   // Acciones CRUD
   const handleSaveEmployee = async (employee: Employee) => {
+    const commission = employee.commissionPercentage ?? 0;
+
+    // Validation: check for duplicate email or phone (excluding current employee)
+    const duplicateEmail = employees.find(
+      (e) => e._id !== employee._id && e.email === employee.email.trim()
+    );
+    if (duplicateEmail) {
+      showNotification({
+        title: "Validación",
+        message: "Ya existe un empleado con ese correo electrónico",
+        color: "orange",
+      });
+      throw new Error("Duplicate email");
+    }
+
+    const duplicatePhone = employees.find(
+      (e) => e._id !== employee._id && e.phoneNumber === employee.phoneNumber.trim()
+    );
+    if (duplicatePhone) {
+      showNotification({
+        title: "Validación",
+        message: "Ya existe un empleado con ese número de teléfono",
+        color: "orange",
+      });
+      throw new Error("Duplicate phone");
+    }
+
+    // Validation: at least one service selected
+    if (!employee.services || employee.services.length === 0) {
+      showNotification({
+        title: "Validación",
+        message: "Debes seleccionar al menos un servicio para el empleado",
+        color: "orange",
+      });
+      throw new Error("No services selected");
+    }
+
     try {
       if (employee._id) {
-        await updateEmployee(employee._id, employee);
+        await updateEmployee(employee._id, {
+          ...employee,
+          commissionPercentage: commission,
+        });
       } else {
         if (!organizationId) {
           showNotification({
@@ -169,12 +184,13 @@ const AdminEmployees: React.FC = () => {
             message: "Organización no definida",
             color: "red",
           });
-          return;
+          throw new Error("Organization not defined");
         }
         await createEmployee({
           ...employee,
           organizationId,
           password: employee.password || "",
+          commissionPercentage: commission,
         } as any);
       }
       await loadAll();
@@ -185,13 +201,15 @@ const AdminEmployees: React.FC = () => {
         message: "Guardado correctamente",
         color: "green",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const message = error.response?.data?.message || error.message || "No se pudo guardar el empleado";
       showNotification({
         title: "Error",
-        message: "No se pudo guardar el empleado",
+        message,
         color: "red",
       });
+      throw error; // Re-throw to keep modal open
     }
   };
 
@@ -284,7 +302,7 @@ const AdminEmployees: React.FC = () => {
   return (
     <Container fluid>
       {/* Header */}
-      <Card withBorder radius="md" p="md" mb="md">
+      <Card mb="md">
         <Group justify="space-between" align="center" mb="md">
           <Title order={isMobile ? 3 : 2}>Administrar Empleados</Title>
         </Group>
@@ -300,52 +318,45 @@ const AdminEmployees: React.FC = () => {
           </Tabs.List>
 
           <Tabs.Panel value="employees" pt="md">
-            {/* Toolbar de filtros */}
-            <Group justify="flex-end" wrap="wrap" gap="sm" mb="md">
-              <TextInput
-                leftSection={<BsSearch />}
-                placeholder="Buscar por nombre, cargo, correo o teléfono…"
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-                w={isMobile ? "100%" : 300}
-              />
-              <Select
-                label="Servicio"
-                data={serviceOptions}
-                value={serviceFilter}
-                onChange={(v) => setServiceFilter(v ?? "__all__")}
-                w={isMobile ? "48%" : 200}
-              />
-              <SegmentedControl
-                value={status}
-                onChange={(v: any) => setStatus(v)}
-                data={[
-                  { label: "Todos", value: "all" },
-                  { label: "Activos", value: "active" },
-                  { label: "Inactivos", value: "inactive" },
-                ]}
-                size={isMobile ? "xs" : "sm"}
-              />
-              <Select
-                label="Ordenar por"
-                data={[
-                  { value: "alpha", label: "Nombre (A–Z)" },
-                  { value: "position", label: "Cargo (A–Z)" },
-                  { value: "recent", label: "Más recientes" },
-                ]}
-                value={sortBy}
-                onChange={(v) => setSortBy((v as any) ?? "alpha")}
-                w={isMobile ? "48%" : 180}
-              />
-              <Button
-                onClick={() => {
-                  setIsModalOpen(true);
-                  setEditingEmployee(null);
-                }}
-              >
-                Agregar empleado
-              </Button>
-            </Group>
+            {/* Toolbar de filtros simplificada */}
+            <Card withBorder radius="md" p="md" mb="md">
+              <Stack gap="sm">
+                <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
+                  <TextInput
+                    leftSection={<BsSearch />}
+                    placeholder="Buscar por nombre, cargo, correo o teléfono…"
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                    w={isMobile ? "100%" : 340}
+                  />
+
+                  <SegmentedControl
+                    value={status}
+                    onChange={(v: any) => setStatus(v)}
+                    data={[
+                      { label: "Todos", value: "all" },
+                      { label: "Activos", value: "active" },
+                      { label: "Inactivos", value: "inactive" },
+                    ]}
+                    size={isMobile ? "xs" : "sm"}
+                  />
+
+                  <Group gap="sm">
+                    <Button variant="subtle" onClick={() => { setSearch(""); setStatus("all"); }}>
+                      Limpiar filtros
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setIsModalOpen(true);
+                        setEditingEmployee(null);
+                      }}
+                    >
+                      Agregar empleado
+                    </Button>
+                  </Group>
+                </Group>
+              </Stack>
+            </Card>
 
             <Divider my="sm" />
 
@@ -373,7 +384,6 @@ const AdminEmployees: React.FC = () => {
                     variant="light"
                     onClick={() => {
                       setSearch("");
-                      setServiceFilter("__all__");
                       setStatus("all");
                     }}
                   >
@@ -403,10 +413,12 @@ const AdminEmployees: React.FC = () => {
           </Tabs.Panel>
 
           <Tabs.Panel value="schedules" pt="md">
-            <ScheduleOverview
-              organizationId={organizationId!}
-              employees={employees.filter((e) => e.isActive)}
-            />
+            {activeTab === "schedules" && (
+              <ScheduleOverview
+                organizationId={organizationId!}
+                employees={employees.filter((e) => e.isActive)}
+              />
+            )}
           </Tabs.Panel>
         </Tabs>
       </Card>

@@ -5,15 +5,19 @@ import {
   Card,
   Text,
   Title,
-  Flex,
   Table,
   ScrollArea,
   Loader,
   Select,
-  Divider,
   Group,
   Modal,
   Tabs,
+  Badge,
+  NumberInput,
+  Stack,
+  Grid,
+  Paper,
+  ThemeIcon,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import {
@@ -30,6 +34,7 @@ import dayjs from "dayjs";
 import { useSelector } from "react-redux";
 import { selectOrganization } from "../../../../features/organization/sliceOrganization";
 import { formatCurrency as formatCurrencyUtil } from "../../../../utils/formatCurrency";
+import { BiDollar, BiReceipt, BiMoney, BiTrendingUp } from "react-icons/bi";
 
 interface EmployeeDetailsModalProps {
   isOpen: boolean;
@@ -39,9 +44,11 @@ interface EmployeeDetailsModalProps {
 
 interface PayrollSummary {
   totalAppointments: number;
-  totalEarnings: number;
+  totalRevenue: number; // Total facturado
+  commissionPercentage: number; // % de comisión
+  commissionAmount: number; // Monto de comisión calculado
   totalAdvances: number;
-  finalEarnings: number;
+  finalEarnings: number; // Comisión - Avances
 }
 
 const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
@@ -57,6 +64,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   const [interval, setInterval] = useState<string>("daily");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [customCommission, setCustomCommission] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (employee && isOpen) {
@@ -70,6 +78,12 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       fetchAdvances();
     }
   }, [employee, startDate, endDate]);
+
+  useEffect(() => {
+    if (appointments.length > 0 || advances.length > 0) {
+      calculatePayroll(appointments, advances);
+    }
+  }, [customCommission, appointments, advances]);
 
   const calculateDates = (interval: string) => {
     const now = new Date();
@@ -165,19 +179,25 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     appointments: Appointment[],
     advances: Advance[]
   ) => {
-    const totalEarnings = appointments.reduce(
-      (total, appointment) => total + (appointment.service?.price || 0),
-      0
-    );
+    const totalRevenue = appointments
+      .filter((a) => a.status === "confirmed") // Solo confirmadas cuentan para comisión
+      .reduce((total, appointment) => total + (appointment.service?.price || 0), 0);
+
+    const commissionPercentage = customCommission ?? employee?.commissionPercentage ?? 0;
+    const commissionAmount = (totalRevenue * commissionPercentage) / 100;
+
     const totalAdvances = advances.reduce(
       (total, advance) => total + advance.amount,
       0
     );
+
     setPayroll({
       totalAppointments: appointments.length,
-      totalEarnings,
+      totalRevenue,
+      commissionPercentage,
+      commissionAmount,
       totalAdvances,
-      finalEarnings: totalEarnings - totalAdvances,
+      finalEarnings: commissionAmount - totalAdvances,
     });
   };
 
@@ -185,16 +205,16 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   const formatCurrency = (value: number) =>
     formatCurrencyUtil(value, org?.currency || "COP");
 
-  const getStatusStyles = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "confirmed":
-        return { label: "Confirmado", color: "#28a745", bg: "#d4edda" };
+        return <Badge color="green" variant="light">Confirmado</Badge>;
       case "pending":
-        return { label: "Pendiente", color: "#ffc107", bg: "#fff3cd" };
+        return <Badge color="yellow" variant="light">Pendiente</Badge>;
       case "cancelled":
-        return { label: "Cancelado", color: "#dc3545", bg: "#f8d7da" };
+        return <Badge color="red" variant="light">Cancelado</Badge>;
       default:
-        return { label: "Sin estado", color: "#007bff", bg: "#e2e3e5" };
+        return <Badge color="gray" variant="light">Sin estado</Badge>;
     }
   };
 
@@ -214,169 +234,236 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
           </Tabs.List>
 
           <Tabs.Panel value="payroll" pt="md">
-        <Card shadow="lg" radius="md" p="md" withBorder>
-          <Flex justify="space-between" align="center">
-            <Box>
-              <Title order={3}>{employee?.names}</Title>
-              <Text c="dimmed">{employee?.position}</Text>
-            </Box>
-            <Select
-              label="Intervalo de pago"
-              placeholder="Selecciona intervalo"
-              data={[
-                { value: "daily", label: "Diario" },
-                { value: "weekly", label: "Semanal" },
-                { value: "biweekly", label: "Quincenal" },
-                { value: "monthly", label: "Mensual" },
-                { value: "custom", label: "Personalizado" },
-              ]}
-              value={interval}
-              onChange={(value) => setInterval(value || "daily")}
-            />
-          </Flex>
-          {interval === "custom" && (
-            <Group mt="md">
-              <DatePickerInput
-                label="Fecha de inicio"
-                value={startDate}
-                onChange={setStartDate}
-              />
-              <DatePickerInput
-                label="Fecha de fin"
-                value={endDate}
-                onChange={setEndDate}
-              />
-            </Group>
-          )}
-          {interval !== "custom" && (
-            <Group p="sm" justify="center">
-              <Text>
-                <strong>Fecha de inicio:</strong>{" "}
-                {startDate?.toLocaleDateString() || "N/A"}
-              </Text>
-              <Text>
-                <strong>Fecha de fin:</strong>{" "}
-                {endDate?.toLocaleDateString() || "N/A"}
-              </Text>
-            </Group>
-          )}
-        </Card>
+            <Stack gap="md">
+              {/* Filtros y período */}
+              <Card shadow="sm" radius="md" p="md" withBorder>
+                <Grid>
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <Select
+                      label="Intervalo de pago"
+                      placeholder="Selecciona intervalo"
+                      data={[
+                        { value: "daily", label: "Diario" },
+                        { value: "weekly", label: "Semanal" },
+                        { value: "biweekly", label: "Quincenal" },
+                        { value: "monthly", label: "Mensual" },
+                        { value: "custom", label: "Personalizado" },
+                      ]}
+                      value={interval}
+                      onChange={(value) => setInterval(value || "daily")}
+                    />
+                  </Grid.Col>
 
-        <Divider my="lg" />
+                  <Grid.Col span={{ base: 12, md: 6 }}>
+                    <NumberInput
+                      label="% Comisión personalizado"
+                      description="Deja vacío para usar el del empleado"
+                      placeholder={`Por defecto: ${employee?.commissionPercentage ?? 0}%`}
+                      min={0}
+                      max={100}
+                      value={customCommission}
+                      onChange={(val) => setCustomCommission(val as number | undefined)}
+                      rightSection={<Text size="xs" c="dimmed">%</Text>}
+                    />
+                  </Grid.Col>
+                </Grid>
 
-        <Card shadow="lg" radius="md" p="md" withBorder>
-          <Title order={4}>Resumen de Nómina</Title>
-            <Text>
-              Total Ganado: {formatCurrency(payroll?.totalEarnings || 0)}
-            </Text>
-            <Text>
-              Total Restado (Avances):{" "}
-              {formatCurrency(payroll?.totalAdvances || 0)}
-            </Text>
-            <Text c="blue" fw={500}>
-              Total a Recibir: {formatCurrency(payroll?.finalEarnings || 0)}
-            </Text>
-        </Card>
+                {interval === "custom" ? (
+                  <Group mt="md">
+                    <DatePickerInput
+                      label="Fecha de inicio"
+                      value={startDate}
+                      onChange={setStartDate}
+                    />
+                    <DatePickerInput
+                      label="Fecha de fin"
+                      value={endDate}
+                      onChange={setEndDate}
+                    />
+                  </Group>
+                ) : (
+                  <Group mt="sm" justify="center">
+                    <Text size="sm" c="dimmed">
+                      <strong>Período:</strong> {startDate?.toLocaleDateString() || "N/A"} -{" "}
+                      {endDate?.toLocaleDateString() || "N/A"}
+                    </Text>
+                  </Group>
+                )}
+              </Card>
 
-        <Divider my="lg" />
+              {/* Resumen de nómina con métricas */}
+              <Grid>
+                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                  <Paper withBorder p="md" radius="md">
+                    <Group gap="xs" mb="xs">
+                      <ThemeIcon color="blue" variant="light" size="lg">
+                        <BiReceipt size={20} />
+                      </ThemeIcon>
+                      <div>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                          Total Facturado
+                        </Text>
+                        <Text size="xl" fw={700}>
+                          {formatCurrency(payroll?.totalRevenue || 0)}
+                        </Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {payroll?.totalAppointments || 0} citas confirmadas
+                    </Text>
+                  </Paper>
+                </Grid.Col>
 
-        <Card shadow="lg" radius="md" p="md" withBorder>
-          <Flex justify="space-between" align="center" wrap="wrap" gap="sm">
-            <Title order={4} style={{ flexShrink: 0 }}>
-              Citas Agendadas
-            </Title>
-            <Group
-              mb="xs"
-              style={{ flexWrap: "wrap", justifyContent: "flex-start" }}
-            >
-              {["confirmed", "pending", "cancelled"].map((status) => (
-                <Box
-                  key={status}
-                  style={{
-                    backgroundColor: getStatusStyles(status).bg,
-                    paddingInline: "2px",
-                    borderRadius: "8px",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Text c={getStatusStyles(status).color}>
-                    {getStatusStyles(status).label}
-                  </Text>
-                </Box>
-              ))}
-            </Group>
-          </Flex>
-          <ScrollArea style={{ height: "200px" }} scrollbarSize={10}>
-            {loadingAppointments ? (
-              <Loader />
-            ) : (
-              <Table stickyHeader stickyHeaderOffset={0}>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Fecha</Table.Th>
-                    <Table.Th>Cliente</Table.Th>
-                    <Table.Th>Servicio</Table.Th>
-                    <Table.Th>Precio</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {appointments.map((appointment) => (
-                    <Table.Tr
-                      key={appointment._id}
-                      style={{
-                        backgroundColor: getStatusStyles(appointment.status).bg,
-                        color: getStatusStyles(appointment.status).color,
-                      }}
-                    >
-                      <Table.Td>
-                        {new Date(appointment.startDate).toLocaleDateString()}
-                      </Table.Td>
-                      <Table.Td>{appointment.client?.name}</Table.Td>
-                      <Table.Td>{appointment.service?.name}</Table.Td>
-                      <Table.Td>
-                        {formatCurrency(appointment.service?.price || 0)}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            )}
-          </ScrollArea>
-        </Card>
+                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                  <Paper withBorder p="md" radius="md">
+                    <Group gap="xs" mb="xs">
+                      <ThemeIcon color="teal" variant="light" size="lg">
+                        <BiTrendingUp size={20} />
+                      </ThemeIcon>
+                      <div>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                          Comisión ({payroll?.commissionPercentage || 0}%)
+                        </Text>
+                        <Text size="xl" fw={700} c="teal">
+                          {formatCurrency(payroll?.commissionAmount || 0)}
+                        </Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      Ganancia base
+                    </Text>
+                  </Paper>
+                </Grid.Col>
 
-        <Divider my="lg" />
+                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                  <Paper withBorder p="md" radius="md">
+                    <Group gap="xs" mb="xs">
+                      <ThemeIcon color="orange" variant="light" size="lg">
+                        <BiMoney size={20} />
+                      </ThemeIcon>
+                      <div>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                          Avances
+                        </Text>
+                        <Text size="xl" fw={700} c="orange">
+                          -{formatCurrency(payroll?.totalAdvances || 0)}
+                        </Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      Adelantos solicitados
+                    </Text>
+                  </Paper>
+                </Grid.Col>
 
-        <Card shadow="lg" radius="md" p="md" withBorder>
-          <Title order={4}>Avances</Title>
-          <ScrollArea style={{ height: "150px" }} scrollbarSize={10}>
-            {loadingAdvances ? (
-              <Loader />
-            ) : (
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Fecha</Table.Th>
-                    <Table.Th>Monto</Table.Th>
-                    <Table.Th>Descripción</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {advances.map((advance) => (
-                    <Table.Tr key={advance._id}>
-                      <Table.Td>
-                        {new Date(advance.date).toLocaleDateString()}
-                      </Table.Td>
-                      <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
-                      <Table.Td>
-                        {advance.description || "Sin descripción"}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            )}
-          </ScrollArea>
-        </Card>
+                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+                  <Paper withBorder p="md" radius="md" bg="blue.0">
+                    <Group gap="xs" mb="xs">
+                      <ThemeIcon color="blue" size="lg">
+                        <BiDollar size={20} />
+                      </ThemeIcon>
+                      <div>
+                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+                          Total a Pagar
+                        </Text>
+                        <Text size="xl" fw={700} c="blue">
+                          {formatCurrency(payroll?.finalEarnings || 0)}
+                        </Text>
+                      </div>
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      Neto después de avances
+                    </Text>
+                  </Paper>
+                </Grid.Col>
+              </Grid>
+
+              {/* Tabla de citas */}
+              <Card shadow="sm" radius="md" p="md" withBorder>
+                <Title order={4} mb="md">
+                  Citas del Período
+                </Title>
+                <ScrollArea style={{ height: "300px" }}>
+                  {loadingAppointments ? (
+                    <Box ta="center" py="xl">
+                      <Loader />
+                    </Box>
+                  ) : appointments.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="xl">
+                      No hay citas en este período
+                    </Text>
+                  ) : (
+                    <Table striped highlightOnHover>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Fecha</Table.Th>
+                          <Table.Th>Cliente</Table.Th>
+                          <Table.Th>Servicio</Table.Th>
+                          <Table.Th>Estado</Table.Th>
+                          <Table.Th>Precio</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {appointments.map((appointment) => (
+                          <Table.Tr key={appointment._id}>
+                            <Table.Td>
+                              {new Date(appointment.startDate).toLocaleDateString()}
+                            </Table.Td>
+                            <Table.Td>{appointment.client?.name || "N/A"}</Table.Td>
+                            <Table.Td>{appointment.service?.name || "N/A"}</Table.Td>
+                            <Table.Td>{getStatusBadge(appointment.status)}</Table.Td>
+                            <Table.Td>
+                              {formatCurrency(appointment.service?.price || 0)}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  )}
+                </ScrollArea>
+              </Card>
+
+              {/* Tabla de avances */}
+              <Card shadow="sm" radius="md" p="md" withBorder>
+                <Title order={4} mb="md">
+                  Avances del Período
+                </Title>
+                <ScrollArea style={{ height: "200px" }}>
+                  {loadingAdvances ? (
+                    <Box ta="center" py="xl">
+                      <Loader />
+                    </Box>
+                  ) : advances.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="xl">
+                      No hay avances en este período
+                    </Text>
+                  ) : (
+                    <Table striped highlightOnHover>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Fecha</Table.Th>
+                          <Table.Th>Monto</Table.Th>
+                          <Table.Th>Descripción</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {advances.map((advance) => (
+                          <Table.Tr key={advance._id}>
+                            <Table.Td>
+                              {new Date(advance.date).toLocaleDateString()}
+                            </Table.Td>
+                            <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
+                            <Table.Td>
+                              {advance.description || "Sin descripción"}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  )}
+                </ScrollArea>
+              </Card>
+            </Stack>
           </Tabs.Panel>
 
           <Tabs.Panel value="schedule" pt="md">

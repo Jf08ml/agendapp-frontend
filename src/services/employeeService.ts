@@ -23,6 +23,7 @@ export interface Employee {
   profileImage: string;
   color: string;
   order?: number;
+  commissionPercentage?: number; // % de comisión sobre las ventas
 }
 
 interface CreateEmployeePayload {
@@ -35,6 +36,7 @@ interface CreateEmployeePayload {
   password: string;
   isActive: boolean;
   profileImage: string;
+  commissionPercentage?: number;
 }
 
 interface Response<T> {
