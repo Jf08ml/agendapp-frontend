@@ -1,7 +1,6 @@
 import { FC, useMemo } from "react";
 import { Box, Text, Stack, Group } from "@mantine/core";
 import { Appointment } from "../../../../services/appointmentService";
-import { Employee } from "../../../../services/employeeService";
 import { formatInTimezone } from "../../../../utils/timezoneUtils";
 
 interface DayModalCompactViewProps {
@@ -29,7 +28,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   onEditAppointment,
   timezone = 'America/Bogota', // 🌍 Default timezone
 }) => {
-  const getEmployeeName = (employee: Employee) => employee?.names || "Sin asignar";
+  const getClientName = (appointment: Appointment) => appointment.client?.name || "Sin cliente";
   
   // ❌ Filtrar citas canceladas para no mostrarlas en el calendario
   const activeAppointments = appointments.filter(apt => !apt.status.includes('cancelled'));
@@ -287,7 +286,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                   }}
                 >
                   <Text size="xs" fw={800} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
-                    {getEmployeeName(appointment.employee)}
+                    {getClientName(appointment)}
                   </Text>
                   <Text size="xs" fw={600} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
                     {formatInTimezone(startTime, timezone, "HH:mm")} - {formatInTimezone(endTime, timezone, "HH:mm")}
