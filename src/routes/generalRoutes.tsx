@@ -24,6 +24,7 @@ import ServiceSuspended from "../pages/ServiceSuspended";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 import PublicCancelPage from "../pages/public/PublicCancelPage";
+import WhatsappTemplateEditor from "../pages/admin/WhatsappTemplateEditor";
 
 const generalRoutes = [
   {
@@ -193,6 +194,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
+    },
+  },
+  {
+    path: "/mensajes-whatsapp",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <WhatsappTemplateEditor {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Mensajes de WhatsApp",
+      description: "Personaliza los mensajes automáticos de WhatsApp.",
     },
   },
     {
