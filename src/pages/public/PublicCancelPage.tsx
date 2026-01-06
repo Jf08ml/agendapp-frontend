@@ -20,6 +20,7 @@ import {
 } from '@mantine/core';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatInTimezone, formatFullDateInTimezone } from '../../utils/timezoneUtils';
 import cancellationService from '../../services/cancellationService';
 import { 
   MdEventBusy, 
@@ -130,10 +131,10 @@ export const PublicCancelPage: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string, tz?: string) => {
     try {
-      const date = new Date(dateString);
-      return format(date, "EEEE, d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es });
+      const timezone = tz || info?.data?.timezone || 'America/Bogota';
+      return formatFullDateInTimezone(dateString, timezone, "dddd, D [de] MMMM [de] YYYY [a las] HH:mm");
     } catch {
       return dateString;
     }
@@ -288,10 +289,10 @@ export const PublicCancelPage: React.FC = () => {
                         <Stack gap={4}>
                           <Text fw={600}>{apt.serviceName}</Text>
                           <Text size="sm" c="dimmed">
-                            {format(new Date(apt.startDate), "EEE, d 'de' MMM yyyy", { locale: es })}
+                            {formatFullDateInTimezone(apt.startDate, info?.data?.timezone || 'America/Bogota', "ddd, D [de] MMM YYYY")}
                           </Text>
                           <Text size="sm" c="dimmed">
-                            {format(new Date(apt.startDate), "HH:mm", { locale: es })} - {format(new Date(apt.endDate), "HH:mm", { locale: es })}
+                            {formatInTimezone(apt.startDate, info?.data?.timezone || 'America/Bogota', "HH:mm")} - {formatInTimezone(apt.endDate, info?.data?.timezone || 'America/Bogota', "HH:mm")}
                           </Text>
                         </Stack>
                       </Group>

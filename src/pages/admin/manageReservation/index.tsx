@@ -40,6 +40,11 @@ import {
 import type { ReservationPolicy } from "../../../services/organizationService";
 import { showNotification } from "@mantine/notifications";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 import {
   BiTrash,
   BiXCircle,
@@ -654,7 +659,7 @@ const ReservationsList: React.FC = () => {
         <Stack gap={8}>
           <Group gap={6} align="center" wrap="wrap">
             <Badge size="xs" variant="outline" radius="lg">
-              {dayjs(reservation.startDate).format("DD/MM HH:mm")}
+              {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format("DD/MM HH:mm")}
             </Badge>
 
             <Badge
@@ -854,7 +859,7 @@ const ReservationsList: React.FC = () => {
                             </Badge>
                           </Group>
                           <Text size="sm" c="dimmed">
-                            {dayjs(res.startDate).format("DD/MM/YYYY HH:mm")}
+                            {dayjs(res.startDate).tz(organization?.timezone || 'America/Bogota').format("DD/MM/YYYY HH:mm")}
                           </Text>
                           <Group gap="xs">
                             <Text size="sm" c="dimmed">
@@ -1358,7 +1363,7 @@ const ReservationsList: React.FC = () => {
                         onClick={() => handleOpenDetail(reservation, groupReservations || undefined)}
                       >
                         <Table.Td>
-                          {dayjs(reservation.startDate).format(
+                          {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format(
                             "DD/MM/YYYY HH:mm"
                           )}
                           {isPartOfGroup && (
