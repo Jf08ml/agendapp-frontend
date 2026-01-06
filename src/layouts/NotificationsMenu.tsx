@@ -8,6 +8,7 @@ import {
   getNotificationsByUserOrOrganization,
   markAsRead,
   markAllNotificationsAsRead,
+  deleteNotification,
   Notification,
 } from "../services/notificationService";
 import {
@@ -20,9 +21,12 @@ import {
   Button,
   Divider,
   Box,
+  Loader,
+  Checkbox,
+  Tooltip,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import { FaBell, FaCalendarAlt } from "react-icons/fa";
+import { FaBell, FaCalendarAlt, FaTrash, FaCheckSquare } from "react-icons/fa";
 import { MdCardMembership, MdCancel } from "react-icons/md";
 import NotificationToggle from "./NotificationToggle";
 
@@ -42,6 +46,9 @@ export default function NotificationsMenu({
   dropdownWidth = 450,
 }: NotificationsMenuProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const auth = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
 
@@ -49,6 +56,7 @@ export default function NotificationsMenu({
 
   const fetchNotifications = async () => {
     try {
+      setLoading(true);
       if (!auth.userId) return;
       const response = await getNotificationsByUserOrOrganization(
         auth.userId,
@@ -57,6 +65,8 @@ export default function NotificationsMenu({
       setNotifications(response);
     } catch (error) {
       console.error("Error al obtener notificaciones:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,10 +116,127 @@ export default function NotificationsMenu({
   const handleMarkAllAsRead = async () => {
     try {
       if (!auth.userId) return;
+      setLoading(true);
       await markAllNotificationsAsRead(auth.userId, type);
       setNotifications((prev) => prev.map((n) => ({ ...n, status: "read" })));
+      showNotification({
+        title: "✅ Éxito",
+        message: "Todas las notificaciones marcadas como leídas",
+        color: "green",
+      });
     } catch (error) {
       console.error("Error al marcar todas como leídas:", error);
+      showNotification({
+        title: "❌ Error",
+        message: "No se pudieron marcar las notificaciones",
+        color: "red",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    try {
+      setLoading(true);
+      await deleteNotification(notificationId);
+      setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
+      showNotification({
+        title: "🗑️ Eliminada",
+        message: "Notificación eliminada exitosamente",
+        color: "blue",
+      });
+    } catch (error) {
+      console.error("Error al eliminar notificación:", error);
+      showNotification({
+        title: "❌ Error",
+        message: "No se pudo eliminar la notificación",
+        color: "red",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    
+    try {
+      setLoading(true);
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        deleteNotification(id)
+      );
+      await Promise.all(deletePromises);
+      
+      setNotifications((prev) =>
+        prev.filter((n) => !selectedIds.has(n._id))
+      );
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      
+      showNotification({
+        title: "🗑️ Eliminadas",
+        message: `${selectedIds.size} notificaciones eliminadas`,
+        color: "blue",
+      });
+    } catch (error) {
+      console.error("Error al eliminar notificaciones:", error);
+      showNotification({
+        title: "❌ Error",
+        message: "No se pudieron eliminar algunas notificaciones",
+        color: "red",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (notifications.length === 0) return;
+    
+    try {
+      setLoading(true);
+      const deletePromises = notifications.map((n) => deleteNotification(n._id));
+      await Promise.all(deletePromises);
+      
+      setNotifications([]);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      
+      showNotification({
+        title: "🗑️ Todas eliminadas",
+        message: "Todas las notificaciones han sido eliminadas",
+        color: "blue",
+      });
+    } catch (error) {
+      console.error("Error al eliminar todas las notificaciones:", error);
+      showNotification({
+        title: "❌ Error",
+        message: "No se pudieron eliminar todas las notificaciones",
+        color: "red",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSelection = (notificationId: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(notificationId)) {
+        newSet.delete(notificationId);
+      } else {
+        newSet.add(notificationId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === notifications.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(notifications.map((n) => n._id)));
     }
   };
 
@@ -146,7 +273,20 @@ export default function NotificationsMenu({
               withBorder
               processing={unreadCount > 0}
             >
-              {target}
+              <Box style={{ position: "relative" }}>
+                {loading && (
+                  <Loader
+                    size="xs"
+                    style={{
+                      position: "absolute",
+                      top: -2,
+                      right: -2,
+                      zIndex: 10,
+                    }}
+                  />
+                )}
+                {target}
+              </Box>
             </Indicator>
           ) : (
             <>{target}</>
@@ -162,28 +302,87 @@ export default function NotificationsMenu({
             disabled={unreadCount === 0}
           >
             <ActionIcon radius="xl" size="md" variant="filled" color="yellow">
-              <FaBell />
+              {loading ? <Loader size="xs" color="white" /> : <FaBell />}
             </ActionIcon>
           </Indicator>
         )}
       </Menu.Target>
 
       <Menu.Dropdown>
-        <Flex justify="space-between" align="center">
-          {/* Si usas un toggle de permisos/push, déjalo */}
+        <Flex justify="space-between" align="center" mb="xs">
           <NotificationToggle userId={auth.userId ?? ""} />
-          <Button
-            variant="subtle"
-            size="xs"
-            onClick={handleMarkAllAsRead}
-            disabled={unreadCount === 0}
-          >
-            Marcar todas como leídas
-          </Button>
+          <Flex gap="xs">
+            <Tooltip label="Seleccionar múltiples">
+              <ActionIcon
+                variant={selectionMode ? "filled" : "subtle"}
+                size="sm"
+                onClick={() => {
+                  setSelectionMode(!selectionMode);
+                  setSelectedIds(new Set());
+                }}
+                color={selectionMode ? "blue" : "gray"}
+              >
+                <FaCheckSquare />
+              </ActionIcon>
+            </Tooltip>
+            
+            {!selectionMode && (
+              <Button
+                variant="subtle"
+                size="xs"
+                onClick={handleMarkAllAsRead}
+                disabled={unreadCount === 0 || loading}
+              >
+                Marcar como leídas
+              </Button>
+            )}
+          </Flex>
         </Flex>
 
+        {selectionMode && (
+          <>
+            <Flex justify="space-between" align="center" mb="xs" px="xs">
+              <Checkbox
+                label={`Seleccionar todas (${selectedIds.size}/${notifications.length})`}
+                checked={selectedIds.size === notifications.length && notifications.length > 0}
+                indeterminate={selectedIds.size > 0 && selectedIds.size < notifications.length}
+                onChange={toggleSelectAll}
+                size="xs"
+              />
+              <Flex gap="xs">
+                <Button
+                  variant="light"
+                  size="xs"
+                  color="red"
+                  leftSection={<FaTrash />}
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.size === 0 || loading}
+                >
+                  Eliminar ({selectedIds.size})
+                </Button>
+                <Button
+                  variant="light"
+                  size="xs"
+                  color="red"
+                  onClick={handleDeleteAll}
+                  disabled={notifications.length === 0 || loading}
+                >
+                  Todas
+                </Button>
+              </Flex>
+            </Flex>
+            <Divider />
+          </>
+        )}
+
         <Divider my="xs" />
-        <Box style={{ maxHeight: 320, overflowY: "auto" }}>
+        <Box style={{ maxHeight: 320, overflowY: "auto", position: "relative" }}>
+          {loading && notifications.length === 0 && (
+            <Flex justify="center" align="center" py="xl">
+              <Loader size="sm" />
+            </Flex>
+          )}
+          
           {[...notifications]
             .sort(
               (a, b) =>
@@ -193,7 +392,7 @@ export default function NotificationsMenu({
             .map((notification, index) => (
               <Menu.Item
                 key={index}
-                onClick={() => handleNotificationClick(notification)}
+                onClick={() => !selectionMode && handleNotificationClick(notification)}
                 style={{
                   position: "relative",
                   backgroundColor:
@@ -203,12 +402,23 @@ export default function NotificationsMenu({
                       ? "4px solid #00b894"
                       : "4px solid transparent",
                   padding: "8px 12px",
+                  cursor: selectionMode ? "default" : "pointer",
                 }}
               >
                 <Flex direction="row" gap="xs" align="center">
+                  {selectionMode && (
+                    <Checkbox
+                      checked={selectedIds.has(notification._id)}
+                      onChange={() => toggleSelection(notification._id)}
+                      size="xs"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
+                  
                   <Avatar radius="xl" size="sm">
                     {getNotificationIcon(notification.type)}
                   </Avatar>
+                  
                   <div style={{ flex: 1 }}>
                     <Text
                       fw={notification.status === "unread" ? 700 : 500}
@@ -223,12 +433,29 @@ export default function NotificationsMenu({
                       {notification.message}
                     </Text>
                   </div>
+
+                  {!selectionMode && (
+                    <Tooltip label="Eliminar">
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteNotification(notification._id);
+                        }}
+                        disabled={loading}
+                      >
+                        <FaTrash size={12} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
                 </Flex>
               </Menu.Item>
             ))}
         </Box>
 
-        {notifications.length === 0 && (
+        {notifications.length === 0 && !loading && (
           <Menu.Item>
             <Text size="sm" c="dimmed" ta="center">
               No tienes notificaciones
