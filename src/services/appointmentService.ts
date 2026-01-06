@@ -318,6 +318,30 @@ export const updateAppointment = async (
   }
 };
 
+// Confirmar múltiples citas en batch
+export const batchConfirmAppointments = async (
+  appointmentIds: string[],
+  organizationId: string
+): Promise<{
+  confirmed: { appointmentId: string; clientId: string }[];
+  failed: { appointmentId: string; reason: string }[];
+  alreadyConfirmed: { appointmentId: string; clientId: string }[];
+} | undefined> => {
+  try {
+    const response = await apiAppointment.put<Response<{
+      confirmed: { appointmentId: string; clientId: string }[];
+      failed: { appointmentId: string; reason: string }[];
+      alreadyConfirmed: { appointmentId: string; clientId: string }[];
+    }>>("/batch/confirm", {
+      appointmentIds,
+      organizationId,
+    });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al confirmar las citas");
+  }
+};
+
 // Eliminar una cita
 export const deleteAppointment = async (
   appointmentId: string
