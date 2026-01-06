@@ -5,10 +5,15 @@ import { CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { clientsClaim } from 'workbox-core';
 
+// Version del SW basada en el build
+const SW_VERSION = self.__WB_MANIFEST?.[0]?.revision || new Date().getTime();
+
 self.skipWaiting();
 clientsClaim();
 
 cleanupOutdatedCaches();
+
+console.log('[SW] Service Worker Version:', SW_VERSION);
 
 // Inyección de manifiesto
 precacheAndRoute(self.__WB_MANIFEST);
@@ -62,4 +67,14 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(clients.openWindow("/"));
+});
+
+// Comunicación con el cliente
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'GET_VERSION') {
+    event.ports[0].postMessage({ version: SW_VERSION });
+  }
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

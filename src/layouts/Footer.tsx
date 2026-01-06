@@ -23,9 +23,16 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+interface Version {
+  version: string;
+  timestamp: number;
+  buildDate: string;
+}
+
 export default function Footer() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [appVersion, setAppVersion] = useState<Version | null>(null);
 
   const theme = useMantineTheme();
   const navigate = useNavigate();
@@ -41,6 +48,20 @@ export default function Footer() {
     branding?.primaryColor || branding?.themeColor || "#DE739E";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
+
+  // Obtener versión de la app
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const response = await fetch('/version.json?_=' + Date.now());
+        const version: Version = await response.json();
+        setAppVersion(version);
+      } catch (error) {
+        console.error('Error fetching version:', error);
+      }
+    };
+    void fetchVersion();
+  }, []);
 
   // Captura del evento PWA
   useEffect(() => {
@@ -82,7 +103,7 @@ export default function Footer() {
       }}
     >
       <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
-        {/* IZQUIERDA: marca */}
+        {/* IZQUIERDA: marca y versión */}
         <Group gap="xs" wrap="nowrap" pl="xs">
           {logoUrl && (
             <Avatar
@@ -101,9 +122,16 @@ export default function Footer() {
               }}
             />
           )}
-          <Text size="xs" fw={600} style={{ color: textColor }}>
-            © {name || "Organización"}
-          </Text>
+          <Box>
+            <Text size="xs" fw={600} style={{ color: textColor, lineHeight: 1.2 }}>
+              © {name || "Organización"}
+            </Text>
+            {appVersion && (
+              <Text size="9px" opacity={0.7} style={{ color: textColor, lineHeight: 1 }}>
+                v{appVersion.buildDate}
+              </Text>
+            )}
+          </Box>
         </Group>
 
         {/* CENTRO: CTA PWA (sólo si hay prompt) */}

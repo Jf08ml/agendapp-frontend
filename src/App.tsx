@@ -17,6 +17,7 @@ import Footer from "./layouts/Footer";
 import NavbarLinks from "./layouts/NavbarLinks";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
+import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector } from "react-redux";
 import { RootState } from "./app/store";
 import { useEffect, useState, useRef } from "react";
@@ -50,6 +51,16 @@ function AppContent() {
 
   // Inicializa autenticación en el cliente
   useAuthInitializer();
+
+  // Sistema de actualización automática del Service Worker
+  const { currentVersion } = useServiceWorkerUpdate();
+
+  // Log de versión para debugging
+  useEffect(() => {
+    if (currentVersion) {
+      console.log(`📦 Versión de la app: ${currentVersion.buildDate}`);
+    }
+  }, [currentVersion]);
 
   // Redirigir a agenda en carga inicial si está autenticado
   useEffect(() => {
@@ -135,38 +146,6 @@ function AppContent() {
 
     void requestNotificationPermission();
   }, [isAuthenticated, userId]);
-
-  // 🔄 Actualización automática de Service Worker (evitando in-app browsers)
-  useEffect(() => {
-    const ua = navigator.userAgent || "";
-    const isInAppBrowser = /Instagram|Telegram|FBAN|FBAV|FB_IAB/i.test(ua);
-
-    if (!("serviceWorker" in navigator) || isInAppBrowser) {
-      return;
-    }
-
-    navigator.serviceWorker
-      .register("/custom-sw.js")
-      .then((registration) => {
-        registration.onupdatefound = () => {
-          const installingWorker = registration.installing;
-          if (installingWorker) {
-            installingWorker.onstatechange = () => {
-              if (
-                installingWorker.state === "installed" &&
-                navigator.serviceWorker.controller
-              ) {
-                console.log("Nueva versión disponible. Actualizando...");
-                window.location.reload();
-              }
-            };
-          }
-        };
-      })
-      .catch((err) => {
-        console.error("Error registrando el service worker:", err);
-      });
-  }, []);
 
   // Loader mientras carga la organización/branding
   if (loading || !organization) {
