@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Container,
   Paper,
@@ -17,16 +17,13 @@ import {
   Checkbox,
   Card,
   Badge,
-} from '@mantine/core';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { formatInTimezone, formatFullDateInTimezone } from '../../utils/timezoneUtils';
-import cancellationService from '../../services/cancellationService';
-import { 
-  MdEventBusy, 
-  MdCheckCircle, 
-  MdError 
-} from 'react-icons/md';
+} from "@mantine/core";
+import {
+  formatInTimezone,
+  formatFullDateInTimezone,
+} from "../../utils/timezoneUtils";
+import cancellationService from "../../services/cancellationService";
+import { MdEventBusy, MdCheckCircle, MdError } from "react-icons/md";
 
 interface AppointmentInfo {
   id: string;
@@ -49,26 +46,28 @@ interface CancellationInfo {
 export const PublicCancelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
 
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<CancellationInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const [cancelled, setCancelled] = useState(false);
-  const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
+  const [selectedAppointments, setSelectedAppointments] = useState<string[]>(
+    []
+  );
 
   const loadCancellationInfo = useCallback(async () => {
     if (!token) return;
-    
+
     try {
       setLoading(true);
       const response = await cancellationService.getCancellationInfo(token);
-      
-      if (response.status === 'success') {
+
+      if (response.status === "success") {
         setInfo(response.data);
-        
+
         // Pre-seleccionar citas que se pueden cancelar (no canceladas y futuras)
         if (response.data.appointments) {
           const cancellableIds = response.data.appointments
@@ -76,14 +75,16 @@ export const PublicCancelPage: React.FC = () => {
             .map((apt: AppointmentInfo) => apt.id);
           setSelectedAppointments(cancellableIds);
         }
-        
+
         setError(null);
       } else {
-        setError(response.message || 'No se pudo cargar la información');
+        setError(response.message || "No se pudo cargar la información");
       }
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
-      const errorMsg = error.response?.data?.message || 'Error al cargar la información de cancelación';
+      const errorMsg =
+        error.response?.data?.message ||
+        "Error al cargar la información de cancelación";
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -92,7 +93,7 @@ export const PublicCancelPage: React.FC = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Token de cancelación no válido');
+      setError("Token de cancelación no válido");
       setLoading(false);
       return;
     }
@@ -102,29 +103,29 @@ export const PublicCancelPage: React.FC = () => {
 
   const handleCancel = async () => {
     if (!token) return;
-    
+
     if (selectedAppointments.length === 0) {
-      setError('Debes seleccionar al menos una cita para cancelar');
+      setError("Debes seleccionar al menos una cita para cancelar");
       return;
     }
 
     setCancelling(true);
     try {
       const response = await cancellationService.cancelByToken(
-        token, 
+        token,
         reason || undefined,
         info?.isGroup ? selectedAppointments : undefined
       );
-      
-      if (response.status === 'success') {
+
+      if (response.status === "success") {
         setCancelled(true);
         setError(null);
       } else {
-        setError(response.message || 'No se pudo cancelar');
+        setError(response.message || "No se pudo cancelar");
       }
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
-      const errorMsg = error.response?.data?.message || 'Error al cancelar';
+      const errorMsg = error.response?.data?.message || "Error al cancelar";
       setError(errorMsg);
     } finally {
       setCancelling(false);
@@ -133,8 +134,12 @@ export const PublicCancelPage: React.FC = () => {
 
   const formatDate = (dateString: string, tz?: string) => {
     try {
-      const timezone = tz || info?.data?.timezone || 'America/Bogota';
-      return formatFullDateInTimezone(dateString, timezone, "dddd, D [de] MMMM [de] YYYY [a las] HH:mm");
+      const timezone = tz || info?.timezone || "America/Bogota";
+      return formatFullDateInTimezone(
+        dateString,
+        timezone,
+        "dddd, D [de] MMMM [de] YYYY [a las] HH:mm"
+      );
     } catch {
       return dateString;
     }
@@ -159,11 +164,13 @@ export const PublicCancelPage: React.FC = () => {
         <Paper shadow="md" p="xl" radius="md" withBorder>
           <Stack align="center" gap="md">
             <MdError size={64} color="red" />
-            <Title order={2} c="red">Error</Title>
+            <Title order={2} c="red">
+              Error
+            </Title>
             <Text size="lg" c="dimmed" ta="center">
               {error}
             </Text>
-            <Button variant="outline" onClick={() => navigate('/')} mt="md">
+            <Button variant="outline" onClick={() => navigate("/")} mt="md">
               Volver al inicio
             </Button>
           </Stack>
@@ -178,17 +185,18 @@ export const PublicCancelPage: React.FC = () => {
         <Paper shadow="md" p="xl" radius="md" withBorder>
           <Stack align="center" gap="md">
             <MdCheckCircle size={64} color="green" />
-            <Title order={2} c="green">Cancelación exitosa</Title>
+            <Title order={2} c="green">
+              Cancelación exitosa
+            </Title>
             <Text size="lg" c="dimmed" ta="center">
-              {info?.isGroup 
+              {info?.isGroup
                 ? `Se cancelaron ${selectedAppointments.length} cita(s) correctamente.`
-                : 'Tu cita ha sido cancelada correctamente.'
-              }
+                : "Tu cita ha sido cancelada correctamente."}
             </Text>
             <Alert color="blue" icon={<MdError />} mt="md">
               Recibirás una confirmación por WhatsApp o correo electrónico.
             </Alert>
-            <Button variant="outline" onClick={() => navigate('/')} mt="md">
+            <Button variant="outline" onClick={() => navigate("/")} mt="md">
               Volver al inicio
             </Button>
           </Stack>
@@ -198,18 +206,16 @@ export const PublicCancelPage: React.FC = () => {
   }
 
   const toggleAppointment = (id: string) => {
-    setSelectedAppointments(prev => 
-      prev.includes(id) 
-        ? prev.filter(aptId => aptId !== id)
-        : [...prev, id]
+    setSelectedAppointments((prev) =>
+      prev.includes(id) ? prev.filter((aptId) => aptId !== id) : [...prev, id]
     );
   };
 
   const toggleAll = () => {
     const cancellableIds = (info?.appointments || [])
-      .filter(apt => !apt.isCancelled && !apt.isPast)
-      .map(apt => apt.id);
-      
+      .filter((apt) => !apt.isCancelled && !apt.isPast)
+      .map((apt) => apt.id);
+
     if (selectedAppointments.length === cancellableIds.length) {
       setSelectedAppointments([]);
     } else {
@@ -225,7 +231,7 @@ export const PublicCancelPage: React.FC = () => {
           <Stack align="center" gap="md">
             <MdEventBusy size={64} color="orange" />
             <Title order={2} ta="center">
-              Cancelar {info?.isGroup ? 'Citas' : 'Cita'}
+              Cancelar {info?.isGroup ? "Citas" : "Cita"}
             </Title>
           </Stack>
 
@@ -234,12 +240,16 @@ export const PublicCancelPage: React.FC = () => {
           {/* Información del cliente */}
           <Stack gap="sm">
             <Box>
-              <Text size="sm" c="dimmed" fw={500}>Organización</Text>
+              <Text size="sm" c="dimmed" fw={500}>
+                Organización
+              </Text>
               <Title order={4}>{info?.organizationName}</Title>
             </Box>
 
             <Box>
-              <Text size="sm" c="dimmed" fw={500}>Cliente</Text>
+              <Text size="sm" c="dimmed" fw={500}>
+                Cliente
+              </Text>
               <Text size="md">{info?.customerName}</Text>
             </Box>
           </Stack>
@@ -247,31 +257,34 @@ export const PublicCancelPage: React.FC = () => {
           <Divider />
 
           {/* Lista de citas (si es grupo) */}
-          {info?.isGroup && info?.appointments && info.appointments.length > 1 ? (
+          {info?.isGroup &&
+          info?.appointments &&
+          info.appointments.length > 1 ? (
             <Stack gap="md">
               <Group justify="space-between">
                 <Text fw={600}>Selecciona las citas a cancelar:</Text>
-                <Button 
-                  size="xs" 
-                  variant="subtle"
-                  onClick={toggleAll}
-                >
-                  {selectedAppointments.length === info.appointments.filter(apt => !apt.isCancelled && !apt.isPast).length
-                    ? 'Deseleccionar todas'
-                    : 'Seleccionar todas'
-                  }
+                <Button size="xs" variant="subtle" onClick={toggleAll}>
+                  {selectedAppointments.length ===
+                  info.appointments.filter(
+                    (apt) => !apt.isCancelled && !apt.isPast
+                  ).length
+                    ? "Deseleccionar todas"
+                    : "Seleccionar todas"}
                 </Button>
               </Group>
 
               <Stack gap="xs">
                 {info.appointments.map((apt) => (
-                  <Card 
-                    key={apt.id} 
-                    padding="md" 
+                  <Card
+                    key={apt.id}
+                    padding="md"
                     withBorder
                     style={{
                       opacity: apt.isCancelled || apt.isPast ? 0.5 : 1,
-                      cursor: apt.isCancelled || apt.isPast ? 'not-allowed' : 'pointer',
+                      cursor:
+                        apt.isCancelled || apt.isPast
+                          ? "not-allowed"
+                          : "pointer",
                     }}
                     onClick={() => {
                       if (!apt.isCancelled && !apt.isPast) {
@@ -289,18 +302,36 @@ export const PublicCancelPage: React.FC = () => {
                         <Stack gap={4}>
                           <Text fw={600}>{apt.serviceName}</Text>
                           <Text size="sm" c="dimmed">
-                            {formatFullDateInTimezone(apt.startDate, info?.data?.timezone || 'America/Bogota', "ddd, D [de] MMM YYYY")}
+                            {formatFullDateInTimezone(
+                              apt.startDate,
+                              info?.timezone || "America/Bogota",
+                              "ddd, D [de] MMM YYYY"
+                            )}
                           </Text>
                           <Text size="sm" c="dimmed">
-                            {formatInTimezone(apt.startDate, info?.data?.timezone || 'America/Bogota', "HH:mm")} - {formatInTimezone(apt.endDate, info?.data?.timezone || 'America/Bogota', "HH:mm")}
+                            {formatInTimezone(
+                              apt.startDate,
+                              info?.timezone || "America/Bogota",
+                              "HH:mm"
+                            )}{" "}
+                            -{" "}
+                            {formatInTimezone(
+                              apt.endDate,
+                              info?.timezone || "America/Bogota",
+                              "HH:mm"
+                            )}
                           </Text>
                         </Stack>
                       </Group>
                       {apt.isCancelled && (
-                        <Badge color="red" size="sm">Cancelada</Badge>
+                        <Badge color="red" size="sm">
+                          Cancelada
+                        </Badge>
                       )}
                       {apt.isPast && !apt.isCancelled && (
-                        <Badge color="gray" size="sm">Pasada</Badge>
+                        <Badge color="gray" size="sm">
+                          Pasada
+                        </Badge>
                       )}
                     </Group>
                   </Card>
@@ -311,14 +342,19 @@ export const PublicCancelPage: React.FC = () => {
             /* Info de cita única */
             <Stack gap="sm">
               <Box>
-                <Text size="sm" c="dimmed" fw={500}>Servicio</Text>
+                <Text size="sm" c="dimmed" fw={500}>
+                  Servicio
+                </Text>
                 <Text size="md">{info?.appointments?.[0]?.serviceName}</Text>
               </Box>
 
               <Box>
-                <Text size="sm" c="dimmed" fw={500}>Fecha y hora</Text>
+                <Text size="sm" c="dimmed" fw={500}>
+                  Fecha y hora
+                </Text>
                 <Text size="md">
-                  {info?.appointments?.[0]?.startDate && formatDate(info.appointments[0].startDate)}
+                  {info?.appointments?.[0]?.startDate &&
+                    formatDate(info.appointments[0].startDate)}
                 </Text>
               </Box>
             </Stack>
@@ -328,7 +364,8 @@ export const PublicCancelPage: React.FC = () => {
 
           {/* Advertencia */}
           <Alert color="orange" icon={<MdError />}>
-            ¿Estás seguro de que deseas cancelar {selectedAppointments.length > 1 ? 'estas citas' : 'esta cita'}? 
+            ¿Estás seguro de que deseas cancelar{" "}
+            {selectedAppointments.length > 1 ? "estas citas" : "esta cita"}?
             Esta acción no se puede deshacer.
           </Alert>
 
@@ -344,7 +381,9 @@ export const PublicCancelPage: React.FC = () => {
             label="Motivo de cancelación (opcional)"
             placeholder="Puedes indicarnos el motivo de la cancelación..."
             value={reason}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              setReason(e.target.value)
+            }
             minRows={3}
             autosize
           />
@@ -354,7 +393,7 @@ export const PublicCancelPage: React.FC = () => {
             <Button
               variant="outline"
               size="lg"
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               disabled={cancelling}
             >
               Volver
@@ -364,9 +403,15 @@ export const PublicCancelPage: React.FC = () => {
               size="lg"
               onClick={handleCancel}
               disabled={cancelling}
-              leftSection={cancelling ? <Loader size="xs" color="white" /> : <MdEventBusy size={20} />}
+              leftSection={
+                cancelling ? (
+                  <Loader size="xs" color="white" />
+                ) : (
+                  <MdEventBusy size={20} />
+                )
+              }
             >
-              {cancelling ? 'Cancelando...' : 'Confirmar Cancelación'}
+              {cancelling ? "Cancelando..." : "Confirmar Cancelación"}
             </Button>
           </Group>
         </Stack>
