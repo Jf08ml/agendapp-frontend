@@ -5,8 +5,8 @@ import { CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { clientsClaim } from 'workbox-core';
 
-// Version del SW basada en el build
-const SW_VERSION = self.__WB_MANIFEST?.[0]?.revision || new Date().getTime();
+// Version del SW basada en timestamp
+const SW_VERSION = new Date().getTime();
 
 self.skipWaiting();
 clientsClaim();
@@ -15,7 +15,7 @@ cleanupOutdatedCaches();
 
 console.log('[SW] Service Worker Version:', SW_VERSION);
 
-// Inyección de manifiesto
+// Inyección de manifiesto (SOLO UNA REFERENCIA A self.__WB_MANIFEST)
 precacheAndRoute(self.__WB_MANIFEST);
 
 // Manejo de navegación para SPA
