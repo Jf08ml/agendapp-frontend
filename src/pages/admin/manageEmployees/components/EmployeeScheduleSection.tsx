@@ -309,7 +309,6 @@ export default function EmployeeScheduleSection({
           leftSection={<BiSave size={16} />}
           onClick={saveSchedule}
           loading={saving}
-          disabled={!schedule.enabled}
         >
           Guardar Horario
         </Button>

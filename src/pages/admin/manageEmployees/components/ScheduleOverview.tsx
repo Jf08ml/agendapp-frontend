@@ -130,12 +130,17 @@ function getOrgDaySchedule(orgData: OrgScheduleData, dayOfWeek: number): DaySche
   if (orgData.openingHours) {
     const isOpen = orgData.openingHours.businessDays?.includes(dayOfWeek);
     if (isOpen) {
+      // Filtrar breaks solo para este día específico
+      const dayBreaks = (orgData.openingHours.breaks || []).filter(
+        (brk: any) => brk.day === dayOfWeek
+      );
+      
       return {
         day: dayOfWeek,
         isAvailable: true,
         start: orgData.openingHours.start,
         end: orgData.openingHours.end,
-        breaks: orgData.openingHours.breaks || [],
+        breaks: dayBreaks,
       };
     }
   }
@@ -392,6 +397,9 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
     const normalizeBreaks = (breaks?: { start: string; end: string; note?: string }[]) =>
       (breaks ?? []).map(({ start, end }) => ({ start, end }));
 
+    const normalizeBreaksWithDay = (breaks?: { start: string; end: string; note?: string; day?: number }[]) =>
+      (breaks ?? []).map(({ start, end, day }) => ({ start, end, day }));
+
     let weeklySchedule: WeeklySchedule | undefined = undefined;
     if (organization.weeklySchedule) {
       weeklySchedule = {
@@ -413,7 +421,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
         businessDays: organization.openingHours.businessDays ?? [],
         start: organization.openingHours.start ?? "00:00",
         end: organization.openingHours.end ?? "23:59",
-        breaks: normalizeBreaks(organization.openingHours.breaks),
+        breaks: normalizeBreaksWithDay(organization.openingHours.breaks) as any,
         stepMinutes: organization.openingHours.stepMinutes ?? 30,
       };
     }
