@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { RootState } from "../app/store";
 import {
   getNotificationsByUserOrOrganization,
+  getAdminNotifications,
   markAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
@@ -58,10 +59,10 @@ export default function NotificationsMenu({
     try {
       setLoading(true);
       if (!auth.userId) return;
-      const response = await getNotificationsByUserOrOrganization(
-        auth.userId,
-        type
-      );
+      const response =
+        type === "organization"
+          ? await getAdminNotifications(auth.userId)
+          : await getNotificationsByUserOrOrganization(auth.userId, type);
       setNotifications(response);
     } catch (error) {
       console.error("Error al obtener notificaciones:", error);

@@ -59,6 +59,24 @@ export const getNotificationsByUserOrOrganization = async (
   }
 };
 
+// Obtener solo notificaciones del admin (employeeId = null)
+export const getAdminNotifications = async (
+  organizationId: string
+): Promise<Notification[]> => {
+  try {
+    const response = await apiNotification.get<Response<Notification[]>>(
+      `/admin/${organizationId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(
+      error,
+      "Error al obtener las notificaciones del administrador"
+    );
+    return [];
+  }
+};
+
 // Obtener una notificación por ID
 export const getNotificationById = async (
   notificationId: string
