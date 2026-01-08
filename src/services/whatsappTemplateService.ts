@@ -27,6 +27,15 @@ export interface TemplatesResponse {
   };
 }
 
+export interface WhatsappTemplateSettings {
+  scheduleAppointment?: boolean;
+  scheduleAppointmentBatch?: boolean;
+  recurringAppointmentSeries?: boolean;
+  reminder?: boolean;
+  statusReservationApproved?: boolean;
+  statusReservationRejected?: boolean;
+}
+
 const whatsappTemplateService = {
   /**
    * Obtiene todas las plantillas de WhatsApp de una organización
@@ -100,6 +109,32 @@ const whatsappTemplateService = {
       content,
     });
     return response.data.data.preview;
+  },
+
+  /**
+   * 🆕 Obtiene la configuración de envíos (qué mensajes enviar)
+   */
+  getTemplateSettings: async (
+    organizationId: string
+  ): Promise<WhatsappTemplateSettings> => {
+    const response = await apiGeneral.get(
+      `/whatsapp-templates/${organizationId}/settings`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 🆕 Actualiza la configuración de envíos
+   */
+  updateTemplateSettings: async (
+    organizationId: string,
+    settings: WhatsappTemplateSettings
+  ): Promise<WhatsappTemplateSettings> => {
+    const response = await apiGeneral.put(
+      `/whatsapp-templates/${organizationId}/settings`,
+      { enabledTypes: settings }
+    );
+    return response.data.data;
   },
 };
 

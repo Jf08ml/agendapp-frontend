@@ -20,6 +20,7 @@ import {
   Box,
   rem,
   Modal,
+  Switch,
 } from "@mantine/core";
 import {
   IconDeviceFloppy,
@@ -31,11 +32,13 @@ import {
   IconDotsVertical,
   IconPhone,
   IconVideo,
+  IconAlertCircle,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import whatsappTemplateService, {
   WhatsappTemplates,
+  WhatsappTemplateSettings,
 } from "../../services/whatsappTemplateService";
 import { handleAxiosError } from "../../utils/handleAxiosError";
 
@@ -159,6 +162,16 @@ export default function WhatsappTemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  
+  // 🆕 Estado para configuración de envíos
+  const [templateSettings, setTemplateSettings] = useState<WhatsappTemplateSettings>({
+    scheduleAppointment: true,
+    scheduleAppointmentBatch: true,
+    recurringAppointmentSeries: true,
+    reminder: true,
+    statusReservationApproved: false,
+    statusReservationRejected: false,
+  });
 
   const loadTemplates = useCallback(async () => {
     if (!organization?._id) return;
@@ -168,6 +181,10 @@ export default function WhatsappTemplateEditor() {
       const data = await whatsappTemplateService.getTemplates(organization._id);
       setTemplates(data.templates);
       setDefaultTemplates(data.defaultTemplates);
+      
+      // 🆕 Cargar configuración de envíos
+      const settings = await whatsappTemplateService.getTemplateSettings(organization._id);
+      setTemplateSettings(settings);
       
       // Inicializar templates editados con los actuales
       const edited: Record<string, string> = {};
@@ -261,6 +278,40 @@ export default function WhatsappTemplateEditor() {
     }
   };
 
+  // 🆕 Guardar configuración de envíos
+  const handleSaveSettings = async () => {
+    if (!organization?._id) return;
+
+    try {
+      setSaving(true);
+      
+      // Filtrar solo los campos válidos (sin _id, __v, etc.)
+      const validSettings: WhatsappTemplateSettings = {
+        scheduleAppointment: templateSettings.scheduleAppointment,
+        scheduleAppointmentBatch: templateSettings.scheduleAppointmentBatch,
+        recurringAppointmentSeries: templateSettings.recurringAppointmentSeries,
+        reminder: templateSettings.reminder,
+        statusReservationApproved: templateSettings.statusReservationApproved,
+        statusReservationRejected: templateSettings.statusReservationRejected,
+      };
+      
+      await whatsappTemplateService.updateTemplateSettings(
+        organization._id,
+        validSettings
+      );
+      
+      setMessage({ type: "success", text: "Configuración de envíos actualizada correctamente" });
+    } catch (error) {
+      try {
+        handleAxiosError(error, "Error al guardar configuración");
+      } catch (err) {
+        setMessage({ type: "error", text: (err as Error).message });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleCopyDefault = (templateKey: string) => {
     setEditedTemplates((prev) => ({
       ...prev,
@@ -348,6 +399,21 @@ export default function WhatsappTemplateEditor() {
                   </Tabs.Tab>
                 );
               })}
+              {/* 🆕 Nueva pestaña de configuración */}
+              <Tabs.Tab 
+                value="settings"
+                style={{ whiteSpace: 'nowrap' }}
+                styles={{
+                  tab: {
+                    '@media (max-width: 768px)': {
+                      padding: `${rem(12)} ${rem(16)}`,
+                      fontSize: rem(15),
+                    },
+                  },
+                }}
+              >
+                <Text size="sm" fw={500}>⚙️ Configuración</Text>
+              </Tabs.Tab>
             </Tabs.List>
 
             {templateKeys.map((key) => (
@@ -528,6 +594,116 @@ export default function WhatsappTemplateEditor() {
                 </Stack>
               </Tabs.Panel>
             ))}
+
+            {/* 🆕 Panel de Configuración de Envíos */}
+            <Tabs.Panel value="settings" p="md">
+              <Stack gap="lg">
+                <Alert icon={<IconInfoCircle size={20} />} color="blue" variant="light" radius="md">
+                  <Text size="sm" fw={500}>
+                    Aquí puedes habilitar o deshabilitar el envío automático de confirmación 
+                    para cada tipo de cita. Los recordatorios siempre se enviarán.
+                  </Text>
+                </Alert>
+
+                <Stack gap="md">
+                  {/* Confirmación Única */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Confirmación de Cita Única</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando se crea una cita individual
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.scheduleAppointment ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            scheduleAppointment: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Confirmación Múltiple */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Confirmación de Citas Múltiples</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando se crean varias citas juntas
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.scheduleAppointmentBatch ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            scheduleAppointmentBatch: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Confirmación Recurrente */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Confirmación de Citas Recurrentes</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando se crea una serie de citas recurrentes
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.recurringAppointmentSeries ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            recurringAppointmentSeries: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Recordatorio (Siempre activo) */}
+                  <Alert icon={<IconAlertCircle size={20} />} color="green" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Recordatorio de Citas</Text>
+                        <Text size="sm" c="dimmed">
+                          Siempre activo - se envía automáticamente 24h antes de cada cita
+                        </Text>
+                      </Box>
+                      <Badge color="green" variant="filled">
+                        Siempre Activo
+                      </Badge>
+                    </Group>
+                  </Alert>
+
+                  {/* Botón de guardar */}
+                  <Group gap="xs" mt="md">
+                    <Button
+                      size="md"
+                      leftSection={<IconDeviceFloppy size={20} />}
+                      onClick={handleSaveSettings}
+                      loading={saving}
+                    >
+                      💾 Guardar Configuración
+                    </Button>
+                  </Group>
+                </Stack>
+              </Stack>
+            </Tabs.Panel>
           </Tabs>
         </Paper>
       </Stack>
