@@ -77,6 +77,9 @@ const apiReservation: AxiosInstance = createAxiosInstance(
 const apiNotification: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/notifications`
 );
+const apiPayments: AxiosInstance = createAxiosInstance(
+  `${API_BASE_URL}/payments`
+);
 
 export {
   apiGeneral,
@@ -92,4 +95,5 @@ export {
   apiCron,
   apiReservation,
   apiNotification,
+  apiPayments,
 };
