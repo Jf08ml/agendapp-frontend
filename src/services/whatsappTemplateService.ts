@@ -13,6 +13,8 @@ export interface WhatsappTemplates {
   reminder: WhatsappTemplate;
   statusReservationApproved: WhatsappTemplate;
   statusReservationRejected: WhatsappTemplate;
+  clientConfirmationAck: WhatsappTemplate;
+  clientCancellationAck: WhatsappTemplate;
 }
 
 export interface TemplatesResponse {
@@ -24,6 +26,8 @@ export interface TemplatesResponse {
     reminder: string;
     statusReservationApproved: string;
     statusReservationRejected: string;
+    clientConfirmationAck: string;
+    clientCancellationAck: string;
   };
 }
 
@@ -34,6 +38,8 @@ export interface WhatsappTemplateSettings {
   reminder?: boolean;
   statusReservationApproved?: boolean;
   statusReservationRejected?: boolean;
+  clientConfirmationAck?: boolean;
+  clientCancellationAck?: boolean;
 }
 
 const whatsappTemplateService = {

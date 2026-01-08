@@ -24,6 +24,7 @@ import {
 } from "../../utils/timezoneUtils";
 import cancellationService from "../../services/cancellationService";
 import { MdEventBusy, MdCheckCircle, MdError } from "react-icons/md";
+import "./PublicCancelPage.css";
 
 interface AppointmentInfo {
   id: string;
@@ -31,6 +32,7 @@ interface AppointmentInfo {
   startDate: string;
   endDate: string;
   status: string;
+  clientConfirmed?: boolean;
   isCancelled: boolean;
   isPast: boolean;
 }
@@ -47,16 +49,20 @@ export const PublicCancelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token");
+  const source = searchParams.get("source") || "confirmation"; // 'confirmation' o 'reminder'
 
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<CancellationInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [selectedAppointments, setSelectedAppointments] = useState<string[]>(
     []
   );
+  const [action, setAction] = useState<"cancel" | "confirm" | null>(null);
 
   const loadCancellationInfo = useCallback(async () => {
     if (!token) return;
@@ -104,6 +110,14 @@ export const PublicCancelPage: React.FC = () => {
   const handleCancel = async () => {
     if (!token) return;
 
+    // Si no se ha seleccionado acción, solo establecer la acción
+    if (action !== "cancel") {
+      setAction("cancel");
+      setError(null);
+      return;
+    }
+
+    // Ejecutar cancelación si ya está confirmada la acción
     if (selectedAppointments.length === 0) {
       setError("Debes seleccionar al menos una cita para cancelar");
       return;
@@ -129,6 +143,44 @@ export const PublicCancelPage: React.FC = () => {
       setError(errorMsg);
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!token) return;
+
+    // Si no se ha seleccionado acción, solo establecer la acción
+    if (action !== "confirm") {
+      setAction("confirm");
+      setError(null);
+      return;
+    }
+
+    // Ejecutar confirmación si ya está confirmada la acción
+    if (selectedAppointments.length === 0) {
+      setError("Debes seleccionar al menos una cita para confirmar");
+      return;
+    }
+
+    setConfirming(true);
+    try {
+      const response = await cancellationService.confirmByToken(
+        token,
+        info?.isGroup ? selectedAppointments : undefined
+      );
+
+      if (response.status === "success") {
+        setConfirmed(true);
+        setError(null);
+      } else {
+        setError(response.message || "No se pudo confirmar");
+      }
+    } catch (err) {
+      const error = err as { response?: { data?: { message?: string } } };
+      const errorMsg = error.response?.data?.message || "Error al confirmar";
+      setError(errorMsg);
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -160,14 +212,14 @@ export const PublicCancelPage: React.FC = () => {
 
   if (error && !info) {
     return (
-      <Container size="sm" mt={80}>
-        <Paper shadow="md" p="xl" radius="md" withBorder>
+      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
+        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
           <Stack align="center" gap="md">
-            <MdError size={64} color="red" />
-            <Title order={2} c="red">
+            <MdError size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
+            <Title order={2} c="red" size={{ base: "h3", sm: "h2" }}>
               Error
             </Title>
-            <Text size="lg" c="dimmed" ta="center">
+            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
               {error}
             </Text>
             <Button variant="outline" onClick={() => navigate("/")} mt="md">
@@ -181,20 +233,52 @@ export const PublicCancelPage: React.FC = () => {
 
   if (cancelled) {
     return (
-      <Container size="sm" mt={80}>
-        <Paper shadow="md" p="xl" radius="md" withBorder>
+      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
+        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
           <Stack align="center" gap="md">
-            <MdCheckCircle size={64} color="green" />
-            <Title order={2} c="green">
+            <MdCheckCircle size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
+            <Title order={2} c="red" size={{ base: "h3", sm: "h2" }}>
               Cancelación exitosa
             </Title>
-            <Text size="lg" c="dimmed" ta="center">
+            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
               {info?.isGroup
                 ? `Se cancelaron ${selectedAppointments.length} cita(s) correctamente.`
                 : "Tu cita ha sido cancelada correctamente."}
             </Text>
             <Alert color="blue" icon={<MdError />} mt="md">
               Recibirás una confirmación por WhatsApp o correo electrónico.
+            </Alert>
+            <Button variant="outline" onClick={() => navigate("/")} mt="md">
+              Volver al inicio
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (confirmed) {
+    return (
+      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
+        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
+          <Stack align="center" gap="md">
+            <MdCheckCircle size={48} color="green" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
+            <Title order={2} c="green" size={{ base: "h3", sm: "h2" }}>
+              ¡Asistencia Confirmada!
+            </Title>
+            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
+              {info?.isGroup
+                ? `Has confirmado ${selectedAppointments.length} cita(s).`
+                : "Has confirmado tu asistencia a la cita."}
+            </Text>
+            <Alert color="blue" icon={<MdCheckCircle />} mt="md">
+              <Stack gap="xs">
+                <Text fw={500}>Tu confirmación ha sido registrada exitosamente.</Text>
+                <Text size="sm">
+                  El establecimiento recibirá una notificación de tu confirmación.
+                  Recuerda que el administrador debe aprobar finalmente tu asistencia.
+                </Text>
+              </Stack>
             </Alert>
             <Button variant="outline" onClick={() => navigate("/")} mt="md">
               Volver al inicio
@@ -224,14 +308,14 @@ export const PublicCancelPage: React.FC = () => {
   };
 
   return (
-    <Container size="sm" mt={80} mb={40}>
-      <Paper shadow="md" p="xl" radius="md" withBorder>
+    <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} mb={40} px={{ base: "xs", sm: "md" }}>
+      <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
         <Stack gap="lg">
           {/* Header */}
-          <Stack align="center" gap="md">
-            <MdEventBusy size={64} color="orange" />
-            <Title order={2} ta="center">
-              Cancelar {info?.isGroup ? "Citas" : "Cita"}
+          <Stack align="center" gap={{ base: "xs", sm: "md" }}>
+            <MdEventBusy size={48} color="orange" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
+            <Title order={2} ta="center" size={{ base: "h3", sm: "h2" }}>
+              Gestionar {info?.isGroup ? "Citas" : "Cita"}
             </Title>
           </Stack>
 
@@ -323,16 +407,23 @@ export const PublicCancelPage: React.FC = () => {
                           </Text>
                         </Stack>
                       </Group>
-                      {apt.isCancelled && (
-                        <Badge color="red" size="sm">
-                          Cancelada
-                        </Badge>
-                      )}
-                      {apt.isPast && !apt.isCancelled && (
-                        <Badge color="gray" size="sm">
-                          Pasada
-                        </Badge>
-                      )}
+                      <Stack gap={4} align="flex-end">
+                        {apt.clientConfirmed && !apt.isCancelled && (
+                          <Badge color="green" size="sm" variant="light">
+                            Confirmado por ti
+                          </Badge>
+                        )}
+                        {apt.isCancelled && (
+                          <Badge color="red" size="sm">
+                            Cancelada
+                          </Badge>
+                        )}
+                        {apt.isPast && !apt.isCancelled && (
+                          <Badge color="gray" size="sm">
+                            Pasada
+                          </Badge>
+                        )}
+                      </Stack>
                     </Group>
                   </Card>
                 ))}
@@ -357,17 +448,16 @@ export const PublicCancelPage: React.FC = () => {
                     formatDate(info.appointments[0].startDate)}
                 </Text>
               </Box>
+
+              {info?.appointments?.[0]?.clientConfirmed && (
+                <Alert color="green" variant="light" icon={<MdCheckCircle />}>
+                  Ya has confirmado tu asistencia a esta cita
+                </Alert>
+              )}
             </Stack>
           )}
 
           <Divider />
-
-          {/* Advertencia */}
-          <Alert color="orange" icon={<MdError />}>
-            ¿Estás seguro de que deseas cancelar{" "}
-            {selectedAppointments.length > 1 ? "estas citas" : "esta cita"}?
-            Esta acción no se puede deshacer.
-          </Alert>
 
           {/* Error message */}
           {error && (
@@ -376,44 +466,166 @@ export const PublicCancelPage: React.FC = () => {
             </Alert>
           )}
 
-          {/* Motivo de cancelación */}
-          <Textarea
-            label="Motivo de cancelación (opcional)"
-            placeholder="Puedes indicarnos el motivo de la cancelación..."
-            value={reason}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              setReason(e.target.value)
-            }
-            minRows={3}
-            autosize
-          />
+          {/* Acciones principales - antes de cualquier advertencia */}
+          {!action && (
+            <Stack gap="md">
+              <Text size="lg" fw={600} ta="center" c="dimmed">
+                ¿Qué deseas hacer con {selectedAppointments.length > 1 ? "estas citas" : "esta cita"}?
+              </Text>
 
-          {/* Botones */}
-          <Group justify="center" mt="md">
+              <Stack gap="md" style={{ 
+                display: "grid",
+                gridTemplateColumns: source === "reminder" ? "repeat(auto-fit, minmax(min(100%, 250px), 1fr))" : "1fr",
+                gap: "1rem"
+              }}>
+                {/* Botón de confirmar solo visible en recordatorios */}
+                {source === "reminder" && (
+                  <Card
+                    padding={{ base: "md", sm: "lg" }}
+                    radius="md"
+                    withBorder
+                    style={{
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      border: "2px solid var(--mantine-color-green-3)",
+                      backgroundColor: "var(--mantine-color-green-0)",
+                    }}
+                    onClick={handleConfirm}
+                    className="hover-lift"
+                  >
+                    <Stack align="center" gap={{ base: "sm", sm: "md" }}>
+                      <MdCheckCircle size={40} color="var(--mantine-color-green-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
+                      <Stack gap={4} align="center">
+                        <Title order={4} ta="center" size={{ base: "h5", sm: "h4" }}>
+                          Confirmar mi Asistencia
+                        </Title>
+                        <Text size={{ base: "xs", sm: "sm" }} c="dimmed" ta="center">
+                          Avísale al establecimiento que sí asistirás
+                        </Text>
+                      </Stack>
+                    </Stack>
+                  </Card>
+                )}
+
+                <Card
+                  padding={{ base: "md", sm: "lg" }}
+                  radius="md"
+                  withBorder
+                  style={{
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    border: "2px solid var(--mantine-color-red-3)",
+                    backgroundColor: "var(--mantine-color-red-0)",
+                  }}
+                  onClick={handleCancel}
+                  className="hover-lift"
+                >
+                  <Stack align="center" gap={{ base: "sm", sm: "md" }}>
+                    <MdEventBusy size={40} color="var(--mantine-color-red-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
+                    <Stack gap={4} align="center">
+                      <Title order={4} ta="center" size={{ base: "h5", sm: "h4" }}>
+                        No Podré Asistir
+                      </Title>
+                      <Text size={{ base: "xs", sm: "sm" }} c="dimmed" ta="center">
+                        Cancela si no puedes ir
+                      </Text>
+                    </Stack>
+                  </Stack>
+                </Card>
+              </Stack>
+            </Stack>
+          )}
+
+          {/* Advertencia condicional */}
+          {action && (
+            <Alert color={action === "confirm" ? "blue" : "orange"} icon={<MdError />}>
+              {action === "confirm"
+                ? `¿Estás seguro de que deseas confirmar ${
+                    selectedAppointments.length > 1 ? "estas citas" : "esta cita"
+                  }? Esto no se puede deshacer.`
+                : `¿Estás seguro de que deseas cancelar ${
+                    selectedAppointments.length > 1 ? "estas citas" : "esta cita"
+                  }? Esta acción no se puede deshacer.`}
+            </Alert>
+          )}
+
+          {/* Motivo de cancelación (solo si es cancelación) */}
+          {action === "cancel" && (
+            <Textarea
+              label="Motivo de cancelación (opcional)"
+              placeholder="Puedes indicarnos el motivo de la cancelación..."
+              value={reason}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                setReason(e.target.value)
+              }
+              minRows={3}
+              autosize
+            />
+          )}
+
+          {/* Botones de acción */}
+          {action ? (
+            <Group justify="center" mt="md" gap={{ base: "xs", sm: "md" }} style={{ flexDirection: window.innerWidth < 600 ? "column" : "row", width: "100%" }}>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => {
+                  setAction(null);
+                  setError(null);
+                }}
+                disabled={cancelling || confirming}
+                fullWidth={window.innerWidth < 600}
+              >
+                Volver
+              </Button>
+              {action === "confirm" && (
+                <Button
+                  color="green"
+                  size="md"
+                  onClick={handleConfirm}
+                  disabled={cancelling || confirming}
+                  fullWidth={window.innerWidth < 600}
+                  leftSection={
+                    confirming ? (
+                      <Loader size="xs" color="white" />
+                    ) : (
+                      <MdCheckCircle size={20} />
+                    )
+                  }
+                >
+                  {confirming ? "Confirmando..." : "Confirmar"}
+                </Button>
+              )}
+              {action === "cancel" && (
+                <Button
+                  color="red"
+                  size="md"
+                  onClick={handleCancel}
+                  disabled={cancelling || confirming}
+                  fullWidth={window.innerWidth < 600}
+                  leftSection={
+                    cancelling ? (
+                      <Loader size="xs" color="white" />
+                    ) : (
+                      <MdEventBusy size={20} />
+                    )
+                  }
+                >
+                  {cancelling ? "Cancelando..." : "Cancelar"}
+                </Button>
+              )}
+            </Group>
+          ) : (
             <Button
               variant="outline"
-              size="lg"
+              size="md"
               onClick={() => navigate("/")}
-              disabled={cancelling}
+              disabled={cancelling || confirming}
+              fullWidth={window.innerWidth < 600}
             >
-              Volver
+              Volver al inicio
             </Button>
-            <Button
-              color="red"
-              size="lg"
-              onClick={handleCancel}
-              disabled={cancelling}
-              leftSection={
-                cancelling ? (
-                  <Loader size="xs" color="white" />
-                ) : (
-                  <MdEventBusy size={20} />
-                )
-              }
-            >
-              {cancelling ? "Cancelando..." : "Confirmar Cancelación"}
-            </Button>
-          </Group>
+          )}
         </Stack>
       </Paper>
     </Container>

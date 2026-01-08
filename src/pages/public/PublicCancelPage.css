@@ -1,0 +1,23 @@
+.hover-lift {
+  transition: all 0.2s ease;
+  min-height: 120px;
+}
+
+@media (hover: hover) {
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Mejoras de touch para móvil */
+.hover-lift:active {
+  transform: scale(0.98);
+}
+
+/* Asegurar que los botones sean fáciles de tocar en móvil */
+@media (max-width: 600px) {
+  .hover-lift {
+    min-height: 140px;
+  }
+}

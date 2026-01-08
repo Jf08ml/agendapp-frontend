@@ -94,6 +94,7 @@ const templateInfo = {
       { name: "{{address}}", desc: "Dirección del negocio" },
       { name: "{{services_list}}", desc: "Lista de servicios" },
       { name: "{{employee}}", desc: "Nombre del empleado o empleados" },
+      { name: "{{manage_block}}", desc: "Enlace para confirmar o cancelar la cita" },
     ],
   },
   statusReservationApproved: {
@@ -115,6 +116,22 @@ const templateInfo = {
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{date}}", desc: "Fecha de la reserva" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
+    ],
+  },
+  clientConfirmationAck: {
+    title: "Agradecimiento por Confirmación",
+    description: "Mensaje enviado al cliente cuando confirma su asistencia",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{appointments_list}}", desc: "Lista de citas con fecha/hora" },
+    ],
+  },
+  clientCancellationAck: {
+    title: "Aviso de Cancelación al Cliente",
+    description: "Mensaje enviado al cliente cuando cancela su(s) cita(s)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{appointments_list}}", desc: "Lista de citas con fecha/hora" },
     ],
   },
 };
@@ -171,6 +188,8 @@ export default function WhatsappTemplateEditor() {
     reminder: true,
     statusReservationApproved: false,
     statusReservationRejected: false,
+    clientConfirmationAck: true,
+    clientCancellationAck: true,
   });
 
   const loadTemplates = useCallback(async () => {
@@ -293,6 +312,8 @@ export default function WhatsappTemplateEditor() {
         reminder: templateSettings.reminder,
         statusReservationApproved: templateSettings.statusReservationApproved,
         statusReservationRejected: templateSettings.statusReservationRejected,
+        clientConfirmationAck: templateSettings.clientConfirmationAck,
+        clientCancellationAck: templateSettings.clientCancellationAck,
       };
       
       await whatsappTemplateService.updateTemplateSettings(
@@ -689,6 +710,52 @@ export default function WhatsappTemplateEditor() {
                       </Badge>
                     </Group>
                   </Alert>
+
+                  {/* Agradecimiento por Confirmación */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Agradecimiento por Confirmación</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando el cliente confirma su asistencia
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.clientConfirmationAck ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            clientConfirmationAck: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Aviso de Cancelación al Cliente */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Aviso de Cancelación al Cliente</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando el cliente cancela su(s) cita(s)
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.clientCancellationAck ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            clientCancellationAck: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
 
                   {/* Botón de guardar */}
                   <Group gap="xs" mt="md">

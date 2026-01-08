@@ -19,6 +19,8 @@ export interface Appointment {
   startDate: Date;
   endDate: Date;
   status: string; // Puede ser "pending", "confirmed", "cancelled", "cancelled_by_customer", "cancelled_by_admin"
+  clientConfirmed?: boolean; // ✅ Confirmación del cliente (independiente del status administrativo)
+  clientConfirmedAt?: Date;
   organizationId: string;
   advancePayment: number;
   customPrice?: number | null; // Precio personalizado definido por el usuario

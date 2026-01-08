@@ -31,13 +31,15 @@ interface CancellationResponse {
     reservationId?: string;
     appointmentId?: string;
     results?: any[];
+    successCount?: number;
+    alreadyConfirmed?: number;
   };
   message: string;
 }
 
 export const cancellationService = {
   /**
-   * Obtiene información sobre lo que se puede cancelar con el token
+   * Obtiene información sobre lo que se puede cancelar/confirmar con el token
    */
   getCancellationInfo: async (token: string): Promise<CancellationInfoResponse> => {
     const response = await apiGeneral.get(`/public/cancel/info?token=${token}`);
@@ -56,6 +58,20 @@ export const cancellationService = {
       token, 
       reason,
       appointmentIds 
+    });
+    return response.data;
+  },
+
+  /**
+   * Confirma una o varias citas usando el token público
+   */
+  confirmByToken: async (
+    token: string,
+    appointmentIds?: string[]
+  ): Promise<CancellationResponse> => {
+    const response = await apiGeneral.post('/public/cancel/confirm', {
+      token,
+      appointmentIds
     });
     return response.data;
   },

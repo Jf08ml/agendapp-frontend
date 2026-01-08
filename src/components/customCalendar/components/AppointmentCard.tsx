@@ -687,6 +687,25 @@ ${clientServices}`;
           </Badge>
         )}
 
+        {/* Badge "confirmado por cliente" */}
+        {appointment.clientConfirmed && !isCancelled && (
+          <Badge
+            color="green"
+            size="xxs"
+            radius="sm"
+            style={{
+              position: "absolute",
+              top: appointment.employeeRequestedByClient ? 35 : 0,
+              right: 0,
+              fontSize: 7,
+              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
+              backgroundColor: "rgba(37, 134, 87, 0.9)",
+            }}
+          >
+            ✓ Cliente
+          </Badge>
+        )}
+
         {/* Menú opciones */}
         <Menu position="top-start" withArrow>
           <Menu.Target>
