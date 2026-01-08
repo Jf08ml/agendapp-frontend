@@ -63,6 +63,19 @@ export const PublicCancelPage: React.FC = () => {
     []
   );
   const [action, setAction] = useState<"cancel" | "confirm" | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detectar si es mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 600);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const loadCancellationInfo = useCallback(async () => {
     if (!token) return;
@@ -216,10 +229,10 @@ export const PublicCancelPage: React.FC = () => {
         <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
           <Stack align="center" gap="md">
             <MdError size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="red" size={{ base: "h3", sm: "h2" }}>
+            <Title order={2} c="red">
               Error
             </Title>
-            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
+            <Text size="md" c="dimmed" ta="center">
               {error}
             </Text>
             <Button variant="outline" onClick={() => navigate("/")} mt="md">
@@ -237,10 +250,10 @@ export const PublicCancelPage: React.FC = () => {
         <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
           <Stack align="center" gap="md">
             <MdCheckCircle size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="red" size={{ base: "h3", sm: "h2" }}>
+            <Title order={2} c="red">
               Cancelación exitosa
             </Title>
-            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
+            <Text size="md" c="dimmed" ta="center">
               {info?.isGroup
                 ? `Se cancelaron ${selectedAppointments.length} cita(s) correctamente.`
                 : "Tu cita ha sido cancelada correctamente."}
@@ -263,10 +276,10 @@ export const PublicCancelPage: React.FC = () => {
         <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
           <Stack align="center" gap="md">
             <MdCheckCircle size={48} color="green" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="green" size={{ base: "h3", sm: "h2" }}>
+            <Title order={2} c="green">
               ¡Asistencia Confirmada!
             </Title>
-            <Text size={{ base: "md", sm: "lg" }} c="dimmed" ta="center">
+            <Text size="md" c="dimmed" ta="center">
               {info?.isGroup
                 ? `Has confirmado ${selectedAppointments.length} cita(s).`
                 : "Has confirmado tu asistencia a la cita."}
@@ -312,9 +325,9 @@ export const PublicCancelPage: React.FC = () => {
       <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
         <Stack gap="lg">
           {/* Header */}
-          <Stack align="center" gap={{ base: "xs", sm: "md" }}>
+          <Stack align="center" gap="md">
             <MdEventBusy size={48} color="orange" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} ta="center" size={{ base: "h3", sm: "h2" }}>
+            <Title order={2} ta="center">
               Gestionar {info?.isGroup ? "Citas" : "Cita"}
             </Title>
           </Stack>
@@ -481,7 +494,7 @@ export const PublicCancelPage: React.FC = () => {
                 {/* Botón de confirmar solo visible en recordatorios */}
                 {source === "reminder" && (
                   <Card
-                    padding={{ base: "md", sm: "lg" }}
+                    padding="lg"
                     radius="md"
                     withBorder
                     style={{
@@ -493,13 +506,13 @@ export const PublicCancelPage: React.FC = () => {
                     onClick={handleConfirm}
                     className="hover-lift"
                   >
-                    <Stack align="center" gap={{ base: "sm", sm: "md" }}>
+                    <Stack align="center" gap="md">
                       <MdCheckCircle size={40} color="var(--mantine-color-green-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
                       <Stack gap={4} align="center">
-                        <Title order={4} ta="center" size={{ base: "h5", sm: "h4" }}>
-                          Confirmar mi Asistencia
-                        </Title>
-                        <Text size={{ base: "xs", sm: "sm" }} c="dimmed" ta="center">
+                        <Title order={4} ta="center">
+                            Confirmar mi Asistencia
+                          </Title>
+                        <Text size="sm" c="dimmed" ta="center">
                           Avísale al establecimiento que sí asistirás
                         </Text>
                       </Stack>
@@ -508,7 +521,7 @@ export const PublicCancelPage: React.FC = () => {
                 )}
 
                 <Card
-                  padding={{ base: "md", sm: "lg" }}
+                  padding="lg"
                   radius="md"
                   withBorder
                   style={{
@@ -520,13 +533,13 @@ export const PublicCancelPage: React.FC = () => {
                   onClick={handleCancel}
                   className="hover-lift"
                 >
-                  <Stack align="center" gap={{ base: "sm", sm: "md" }}>
+                  <Stack align="center" gap="md">
                     <MdEventBusy size={40} color="var(--mantine-color-red-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
                     <Stack gap={4} align="center">
-                      <Title order={4} ta="center" size={{ base: "h5", sm: "h4" }}>
+                      <Title order={4} ta="center">
                         No Podré Asistir
                       </Title>
-                      <Text size={{ base: "xs", sm: "sm" }} c="dimmed" ta="center">
+                      <Text size="sm" c="dimmed" ta="center">
                         Cancela si no puedes ir
                       </Text>
                     </Stack>
@@ -565,7 +578,7 @@ export const PublicCancelPage: React.FC = () => {
 
           {/* Botones de acción */}
           {action ? (
-            <Group justify="center" mt="md" gap={{ base: "xs", sm: "md" }} style={{ flexDirection: window.innerWidth < 600 ? "column" : "row", width: "100%" }}>
+            <Group justify="center" mt="md" gap="md" style={{ flexDirection: isMobile ? "column" : "row", width: "100%" }}>
               <Button
                 variant="outline"
                 size="md"
@@ -574,7 +587,7 @@ export const PublicCancelPage: React.FC = () => {
                   setError(null);
                 }}
                 disabled={cancelling || confirming}
-                fullWidth={window.innerWidth < 600}
+                fullWidth={isMobile}
               >
                 Volver
               </Button>
@@ -584,7 +597,7 @@ export const PublicCancelPage: React.FC = () => {
                   size="md"
                   onClick={handleConfirm}
                   disabled={cancelling || confirming}
-                  fullWidth={window.innerWidth < 600}
+                  fullWidth={isMobile}
                   leftSection={
                     confirming ? (
                       <Loader size="xs" color="white" />
@@ -602,7 +615,7 @@ export const PublicCancelPage: React.FC = () => {
                   size="md"
                   onClick={handleCancel}
                   disabled={cancelling || confirming}
-                  fullWidth={window.innerWidth < 600}
+                  fullWidth={isMobile}
                   leftSection={
                     cancelling ? (
                       <Loader size="xs" color="white" />
@@ -621,7 +634,7 @@ export const PublicCancelPage: React.FC = () => {
               size="md"
               onClick={() => navigate("/")}
               disabled={cancelling || confirming}
-              fullWidth={window.innerWidth < 600}
+              fullWidth={isMobile}
             >
               Volver al inicio
             </Button>
