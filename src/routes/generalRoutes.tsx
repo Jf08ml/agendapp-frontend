@@ -16,11 +16,9 @@ import ReservationsList from "../pages/admin/manageReservation";
 import Home from "../pages/Home";
 import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
-import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
-import MembershipManagement from "../pages/superadmin/MembershipManagement";
+import SuperadminManagement from "../pages/superadmin/SuperadminManagement";
 
 import MyMembership from "../pages/admin/MyMembership";
-import ServiceSuspended from "../pages/ServiceSuspended";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 import PublicCancelPage from "../pages/public/PublicCancelPage";
@@ -263,38 +261,16 @@ const generalRoutes = [
       description: "Eventos recientes del proveedor de pagos",
     },
   },
-  {
-    path: "/service-suspended",
-    component: ServiceSuspended,
-    MediaMetadata: {
-      title: "Servicio Suspendido",
-      description: "Tu servicio ha sido suspendido",
-    },
-  },
 
   // Superadmin routes
   {
-    path: "/superadmin-organizations",
+    path: "/superadmin",
     component: (props: JSX.IntrinsicAttributes) => (
-
-        <SuperadminOrganizations {...props} />
-
+      <SuperadminManagement {...props} />
     ),
     MediaMetadata: {
-      title: "Superadmin Organizaciones",
-      description: "Administra todas las organizaciones.",
-    },
-  },
-  {
-    path: "/superadmin-memberships",
-    component: (props: JSX.IntrinsicAttributes) => (
-
-        <MembershipManagement {...props} />
-
-    ),
-    MediaMetadata: {
-      title: "Gestión de Membresías",
-      description: "Administra las membresías de todas las organizaciones.",
+      title: "Panel de Superadmin",
+      description: "Administra organizaciones y membresías.",
     },
   },
 ];

@@ -27,11 +27,16 @@ import {
   IconRocket,
 } from "@tabler/icons-react";
 
-const POLLING_DURATION = 15000; // 15 segundos
+const POLLING_DURATION = 60000; // 60 segundos (Polar -> backend suele tardar ~1 min)
 const POLLING_INTERVAL = 2000; // cada 2 segundos
 const MAX_PROCESSING_TIME = 60; // 60 segundos estimados
+const MIN_LOADING_SECONDS = 30; // mantener loading al menos 30s antes de mostrar re-consulta
+import { useDispatch } from "react-redux";
+import { fetchOrganizationConfig } from "../../features/organization/sliceOrganization";
+import type { AppDispatch } from "../../app/store";
 
 export default function PaymentSuccess() {
+  const dispatch = useDispatch<AppDispatch>();
   const [params] = useSearchParams();
   const org = params.get("org") || "";
   const plan = params.get("plan") || "";
@@ -39,10 +44,14 @@ export default function PaymentSuccess() {
   const sessionId = params.get("sessionId") || "";
 
   const [loading, setLoading] = useState(true);
+  const [manualChecking, setManualChecking] = useState(false);
   const [membershipOk, setMembershipOk] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [checkoutVerified, setCheckoutVerified] = useState(false);
   const [pollingComplete, setPollingComplete] = useState(false);
+
+  const canManualRetry = !membershipOk && elapsedTime >= MIN_LOADING_SECONDS;
+  const isBusy = loading || manualChecking;
 
   // Contador de tiempo transcurrido
   useEffect(() => {
@@ -52,6 +61,13 @@ export default function PaymentSuccess() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Mantener loading mínimo 30s, luego permitir re-consulta manual
+  useEffect(() => {
+    if (!membershipOk && loading && elapsedTime >= MIN_LOADING_SECONDS) {
+      setLoading(false);
+    }
+  }, [elapsedTime, membershipOk, loading]);
 
   // Lógica de verificación y polling
   useEffect(() => {
@@ -103,8 +119,45 @@ export default function PaymentSuccess() {
     };
   }, [org, sessionId]);
 
-  const handleRefresh = () => {
-    window.location.reload();
+  useEffect(() => {
+    if (!membershipOk) return;
+    // Actualiza el slice de organización (hasAccessBlocked, branding, etc.)
+    // para que el resto del panel no dependa de un refresh manual.
+    void dispatch(fetchOrganizationConfig());
+  }, [dispatch, membershipOk]);
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const handleRetry = async () => {
+    if (!org || manualChecking || membershipOk) return;
+    setManualChecking(true);
+    setPollingComplete(false);
+
+    try {
+      if (sessionId) {
+        try {
+          await verifyCheckout(sessionId);
+          setCheckoutVerified(true);
+        } catch (e) {
+          console.error("Error verificando checkout:", e);
+        }
+      }
+
+      const start = Date.now();
+      const manualDuration = 15000; // 15s de re-consulta rápida
+      while (Date.now() - start < manualDuration) {
+        const membership = await getCurrentMembership(org);
+        if (membership && membership.status === "active") {
+          setMembershipOk(true);
+          return;
+        }
+        await sleep(POLLING_INTERVAL);
+      }
+
+      setPollingComplete(true);
+    } finally {
+      setManualChecking(false);
+    }
   };
 
   const progressValue = Math.min((elapsedTime / MAX_PROCESSING_TIME) * 100, 100);
@@ -119,11 +172,11 @@ export default function PaymentSuccess() {
               size={80}
               radius="xl"
               variant="light"
-              color={membershipOk ? "green" : loading ? "blue" : "yellow"}
+              color={membershipOk ? "green" : isBusy ? "blue" : "yellow"}
             >
               {membershipOk ? (
                 <IconCheck size={50} />
-              ) : loading ? (
+              ) : isBusy ? (
                 <Loader size={50} />
               ) : (
                 <IconClock size={50} />
@@ -133,7 +186,7 @@ export default function PaymentSuccess() {
             <Title order={1} ta="center">
               {membershipOk
                 ? "¡Pago Confirmado!"
-                : loading
+                : isBusy
                 ? "Procesando tu Pago"
                 : "Pago Recibido"}
             </Title>
@@ -141,7 +194,7 @@ export default function PaymentSuccess() {
             <Text size="lg" c="dimmed" ta="center">
               {membershipOk
                 ? "Tu membresía ha sido activada exitosamente"
-                : loading
+                : isBusy
                 ? "Estamos verificando tu pago y activando tu cuenta"
                 : "Tu pago ha sido recibido correctamente"}
             </Text>
@@ -245,6 +298,9 @@ export default function PaymentSuccess() {
                     El proceso de activación normalmente toma entre{" "}
                     <strong>30-60 segundos</strong>. Estamos verificando
                     automáticamente el estado de tu cuenta.
+                    {canManualRetry ? (
+                      <> Si ya esperaste 30s, puedes volver a consultar.</>
+                    ) : null}
                   </>
                 )}
               </Text>
@@ -258,15 +314,15 @@ export default function PaymentSuccess() {
                 </Box>
               )}
 
-              {pollingComplete && (
+              {canManualRetry && !isBusy && (
                 <Button
                   leftSection={<IconRefresh size={16} />}
-                  onClick={handleRefresh}
+                  onClick={handleRetry}
                   variant="light"
                   fullWidth
                   mt="sm"
                 >
-                  Recargar página para verificar
+                  Volver a consultar
                 </Button>
               )}
             </Stack>
@@ -281,7 +337,7 @@ export default function PaymentSuccess() {
             variant="filled"
             size="lg"
             fullWidth
-            disabled={!membershipOk && loading}
+            disabled={!membershipOk && isBusy}
           >
             {membershipOk ? "Ver Mi Membresía" : "Ir a Mi Membresía"}
           </Button>
@@ -292,15 +348,15 @@ export default function PaymentSuccess() {
             </Button>
           )}
 
-          {!membershipOk && !loading && (
+          {!membershipOk && !isBusy && (
             <Button
-              onClick={handleRefresh}
+              onClick={handleRetry}
               variant="outline"
               size="lg"
               fullWidth
               leftSection={<IconRefresh size={16} />}
             >
-              Verificar estado nuevamente
+              Volver a consultar
             </Button>
           )}
         </Stack>

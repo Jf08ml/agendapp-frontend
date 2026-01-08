@@ -12,22 +12,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const organization = useSelector((state: RootState) => state.organization.organization);
   const location = useLocation();
 
-  // Rutas permitidas incluso si el servicio está suspendido
-  const allowedRoutesWhenSuspended = [
-    "/my-membership",
-    "/service-suspended",
-  ];
-
   if (!isAuthenticated) {
     return <Navigate to="/login-admin" />;
   }
 
-  // Verificar si la organización tiene el acceso bloqueado
-  if (organization?.hasAccessBlocked) {
-    // Permitir acceso solo a rutas específicas cuando está suspendido
-    if (!allowedRoutesWhenSuspended.includes(location.pathname)) {
-      return <Navigate to="/service-suspended" />;
-    }
+  // Redirigir a my-membership si el servicio está bloqueado
+  if (organization?.hasAccessBlocked && location.pathname !== "/my-membership") {
+    return <Navigate to="/my-membership" />;
   }
 
   return <>{children}</>;
