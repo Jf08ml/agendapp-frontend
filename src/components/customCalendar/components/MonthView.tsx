@@ -102,37 +102,6 @@ const MonthView: React.FC<MonthViewProps> = ({
     return map;
   }, [daysInMonth, getAppointmentsForDay]);
 
-  // 👥 Calcular el máximo de citas simultáneas por día (solo activas)
-  const maxOverlapByKey = useMemo(() => {
-    const map = new Map<string, number>();
-    const calcMaxOverlap = (appointments: Appointment[]) => {
-      if (!appointments || appointments.length === 0) return 0;
-      const events = appointments
-        .filter((a) => !a.status.includes('cancelled'))
-        .map((a) => ({ start: new Date(a.startDate).getTime(), end: new Date(a.endDate).getTime() }))
-        .sort((a, b) => a.start - b.start);
-      let max = 0;
-      let current = 0;
-      const points: Array<{ t: number; type: 1 | -1 }> = [];
-      events.forEach(e => {
-        points.push({ t: e.start, type: 1 });
-        points.push({ t: e.end, type: -1 });
-      });
-      points.sort((a, b) => a.t === b.t ? a.type - b.type : a.t - b.t);
-      points.forEach(p => {
-        current += p.type;
-        if (current > max) max = current;
-      });
-      return max;
-    };
-
-    for (const d of daysInMonth) {
-      const key = d.toISOString().slice(0, 10);
-      map.set(key, calcMaxOverlap(getAppointmentsForDay(d) || []));
-    }
-    return map;
-  }, [daysInMonth, getAppointmentsForDay]);
-
   // Desktop: llenamos viewport. Mobile: dejamos que la altura sea natural.
   const calendarHeight = "calc(100vh - 180px)";
   const weekdayLabels = isMobile ? daysOfWeekShort : daysOfWeekFull;
@@ -235,8 +204,6 @@ const MonthView: React.FC<MonthViewProps> = ({
         {daysInMonth.map((day) => {
           const key = day.toISOString().slice(0, 10);
           const count = apptCountByKey.get(key) ?? 0;
-          const maxOverlap = maxOverlapByKey.get(key) ?? 0;
-          const hasSimultaneous = maxOverlap > 1;
 
           const selected = isSameDay(day, currentDate);
           const holiday = isHoliday(day);
@@ -348,19 +315,6 @@ const MonthView: React.FC<MonthViewProps> = ({
                           }}
                         >
                           {citasText}
-                        </Text>
-                      </Box>
-                    )}
-                    {hasSimultaneous && (
-                      <Box
-                        style={{
-                          display: "flex",
-                          justifyContent: "center",
-                          marginTop: 2,
-                        }}
-                      >
-                        <Text size="xxxs" c="#dc2626" style={{ lineHeight: 1 }}>
-                          {maxOverlap} simultáneas
                         </Text>
                       </Box>
                     )}
