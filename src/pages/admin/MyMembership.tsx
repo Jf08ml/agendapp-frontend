@@ -13,7 +13,6 @@ import {
   Button,
   Grid,
   Card,
-  Timeline,
   Divider,
   Alert,
   Loader,
@@ -83,6 +82,7 @@ export default function MyMembership() {
         const res = await apiGeneral.get("/plans/public");
         setPublicPlans(res.data?.data || []);
       } catch (e) {
+        console.error(e)
         // noop
       }
     })();
