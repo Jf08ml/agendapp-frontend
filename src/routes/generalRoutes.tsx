@@ -25,6 +25,9 @@ import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 import PublicCancelPage from "../pages/public/PublicCancelPage";
 import WhatsappTemplateEditor from "../pages/admin/WhatsappTemplateEditor";
+import PaymentSuccess from "../pages/public/PaymentSuccess";
+import MembershipPlans from "../pages/public/MembershipPlans";
+import PaymentHistory from "../pages/admin/PaymentHistory";
 
 const generalRoutes = [
   {
@@ -33,6 +36,22 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Inicio",
       description: "Inicio de página.",
+    },
+  },
+  {
+    path: "/plans",
+    component: MembershipPlans,
+    MediaMetadata: {
+      title: "Planes",
+      description: "Elige y paga tu plan de membresía",
+    },
+  },
+  {
+    path: "/payment/success",
+    component: PaymentSuccess,
+    MediaMetadata: {
+      title: "Pago exitoso",
+      description: "Verificación de pago de membresía",
     },
   },
   {
@@ -230,6 +249,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Mi Membresía",
       description: "Ver detalles de tu membresía y plan",
+    },
+  },
+  {
+    path: "/payment-history",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <PaymentHistory {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Historial de Pagos",
+      description: "Eventos recientes del proveedor de pagos",
     },
   },
   {

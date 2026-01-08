@@ -8,6 +8,7 @@ export interface Plan {
   slug: string;
   displayName: string;
   price: number;
+  currency: "USD" | "COP";
   billingCycle: "monthly" | "yearly" | "lifetime";
   characteristics: string[];
   domainType: "subdomain" | "custom_domain";
@@ -20,9 +21,15 @@ export interface Plan {
     whatsappIntegration: boolean;
     analyticsAdvanced: boolean;
     prioritySupport: boolean;
+    autoReminders: boolean;
+    autoConfirmations: boolean;
   };
   description: string;
   isActive: boolean;
+  payment?: {
+    provider: string;
+    productId: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -88,7 +95,8 @@ export const getCurrentMembership = async (
 ): Promise<Membership | null> => {
   try {
     const response = await apiGeneral.get(
-      `/memberships/${organizationId}/current`
+      `/memberships/${organizationId}/current`,
+      { params: { t: Date.now() } } // bust cache when polling
     );
     return response.data.data;
   } catch (error: any) {
