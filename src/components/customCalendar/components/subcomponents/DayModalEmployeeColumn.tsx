@@ -4,7 +4,7 @@ import { useDrop, DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "./ItemTypes";
 import { Appointment } from "../../../../services/appointmentService";
 import { Employee } from "../../../../services/employeeService";
-import { calculateAppointmentPosition } from "../../utils/scheduleUtils";
+import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../../utils/scheduleUtils";
 import DraggableAppointmentCard from "../DraggableAppointmentCard";
 import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 
@@ -13,6 +13,7 @@ interface EmployeeColumnProps {
   appoinments: Appointment[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   appointmentsByEmployee: Record<string, Appointment[]>;
+  columnWidth?: number;
   startHour: number;
   endHour: number;
   selectedDay: Date;
@@ -42,6 +43,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   appoinments,
   setAppointments,
   appointmentsByEmployee,
+  columnWidth,
   startHour,
   endHour,
   selectedDay,
@@ -132,9 +134,14 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   };
 
   const renderAppointments = () => {
-    return appointmentsByEmployee[employee._id]
-      ?.filter(appointment => !appointment.status.includes('cancelled')) // ❌ No mostrar citas canceladas en el calendario
-      ?.map((appointment) => {
+    const activeAppointments = appointmentsByEmployee[employee._id]
+      ?.filter((appointment) => !appointment.status.includes('cancelled'))
+      ?.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) || [];
+
+    // 👥 Organizar en capas para evitar que se monten cuando hay superposición
+    const layers = organizeAppointmentsInLayers(activeAppointments);
+
+    return activeAppointments.map((appointment) => {
       const { top, height } = calculateAppointmentPosition(
         appointment,
         startHour,
@@ -142,16 +149,24 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         MINUTE_HEIGHT,
         timezone
       );
+
+      // Buscar en qué capa quedó esta cita
+      const layerIndex = layers.findIndex((layer) => layer.some((appt) => appt._id === appointment._id));
+      const totalLayers = Math.max(layers.length, 1);
+      const gapPx = 4;
+      const widthPercent = 100 / totalLayers;
+      const leftPercent = widthPercent * layerIndex;
+
       return (
         <Box
           key={appointment._id}
           style={{
             position: "absolute",
             top: `${top}px`,
-            left: 0,
-            width: "100%",
+            left: `calc(${leftPercent}% + ${gapPx / 2}px)`,
+            width: `calc(${widthPercent}% - ${gapPx}px)`,
             height: isExpanded(appointment) ? "auto" : `${height}px`,
-            zIndex: isExpanded(appointment) ? 1 : 0,
+            zIndex: isExpanded(appointment) ? 2 : 1,
             overflow: "hidden",
             cursor: "move",
           }}
@@ -230,7 +245,7 @@ const renderGuides = () => {
         columnRef.current = node;
       }}
       style={{
-        width: `${CARD_WIDTH}px`,
+        width: `${columnWidth ?? CARD_WIDTH}px`,
         marginLeft: 2,
         borderRight: "1px solid #e0e0e0",
         position: "relative",

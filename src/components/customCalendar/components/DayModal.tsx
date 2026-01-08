@@ -16,6 +16,7 @@ import { Employee } from "../../../services/employeeService";
 import {
   generateTimeIntervals,
   organizeAppointmentsByEmployee,
+  organizeAppointmentsInLayers,
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
@@ -160,6 +161,26 @@ const DayModal: FC<DayModalProps> = ({
     );
   }, [employeesSorted, hiddenEmployeeIds]);
 
+  // 📏 Ancho dinámico por empleado según capas simultáneas
+  const columnWidthMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const baseWidth = CARD_WIDTH;
+    const extraPerLayer = 40; // píxeles extra por capa de solapamiento
+    const maxWidth = 360;
+
+    employeesSorted.forEach((emp) => {
+      const appts = (appointmentsByEmployee[emp._id] || []).filter(
+        (a) => !a.status.includes("cancelled")
+      );
+      const layers = organizeAppointmentsInLayers(appts);
+      const layersCount = Math.max(layers.length, 1);
+      const width = Math.min(maxWidth, baseWidth + (layersCount - 1) * extraPerLayer);
+      map.set(emp._id, width);
+    });
+
+    return map;
+  }, [employeesSorted, appointmentsByEmployee]);
+
   const totalUniqueClients = useMemo(() => {
     const clientIds = activeAppointments
       .map((app) => app.client?._id)
@@ -228,8 +249,20 @@ const DayModal: FC<DayModalProps> = ({
       onClose={onClose}
       fullScreen
       title={
-        <Group gap="md" align="center">
-          <span>{`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}</span>
+        <Text size="sm">{`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}</Text>
+      }
+      size="xl"
+      styles={{ body: { padding: 0 } }}
+    >
+      {/* Tabs y badges encima de la tabla */}
+      <Paper
+        radius={0}
+        style={{
+          borderBottom: "1px solid rgba(0,0,0,0.06)",
+          backgroundColor: "white",
+        }}
+      >
+        <Group gap="md" align="center" justify="space-between" style={{ flexWrap: "wrap"}}>
           <SegmentedControl
             size="xs"
             value={viewMode}
@@ -255,11 +288,16 @@ const DayModal: FC<DayModalProps> = ({
               },
             ]}
           />
+          <Group gap={8} align="center" mr="xs">
+            <Badge size={isSmallScreen ? "xs" : "sm"} radius="xl" variant="light" style={{ whiteSpace: "nowrap" }}>
+              {activeAppointments.length} citas
+            </Badge>
+            <Badge size={isSmallScreen ? "xs" : "sm"} radius="xl" variant="outline" style={{ whiteSpace: "nowrap" }}>
+              {totalUniqueClients} clientes
+            </Badge>
+          </Group>
         </Group>
-      }
-      size="xl"
-      styles={{ body: { padding: 0 } }}
-    >
+      </Paper>
       <div
         style={{
           width: "100%",
@@ -310,6 +348,7 @@ const DayModal: FC<DayModalProps> = ({
                 employees={employeesSorted}
                 hiddenEmployeeIds={hiddenEmployeeIds}
                 onToggleEmployeeHidden={handleToggleEmployeeHidden}
+                columnWidthMap={columnWidthMap}
               />
             </Box>
             <Box style={{ display: "flex", position: "relative" }}>
@@ -372,6 +411,7 @@ const DayModal: FC<DayModalProps> = ({
                       appoinments={appointments}
                       setAppointments={setAppointments}
                       appointmentsByEmployee={appointmentsByEmployee}
+                      columnWidth={columnWidthMap.get(employee._id)}
                       startHour={startHour}
                       endHour={endHour}
                       selectedDay={currentDay}
@@ -392,7 +432,6 @@ const DayModal: FC<DayModalProps> = ({
         )}
       </div>
       <Paper
-        p="xs"
         radius={0}
         withBorder
         style={{
@@ -404,44 +443,35 @@ const DayModal: FC<DayModalProps> = ({
           justify="space-between"
           align="center"
           gap="xs"
+          px="xs"
           style={{
-            flexDirection: "row",
-            gap: isSmallScreen ? 8 : 2,
+            flexWrap: "wrap",
+            paddingBlock: "4px"
           }}
         >
           {/* Navegación de días */}
-          <Group gap={8}>
-            <Button size="xs" variant="subtle" onClick={goToPreviousDay}>
+          <Group gap={5}>
+            <Button size="xxs" variant="light" onClick={goToPreviousDay}>
               Día anterior
             </Button>
-            <Button size="xs" variant="filled" onClick={goToNextDay}>
+            <Button size="xxs" variant="light" onClick={goToNextDay}>
               Día siguiente
             </Button>
           </Group>
 
-          {/* Resumen de stats */}
-          <Group gap={8}>
-            <Flex direction={isSmallScreen ? "column" : "row"} gap={8}>
-              <Badge size="sm" radius="xl" variant="light">
-                Citas: {activeAppointments.length}
-              </Badge>
-              <Badge size="sm" radius="xl" variant="outline">
-                Clientes: {totalUniqueClients}
-              </Badge>
-              {cancelledAppointments.length > 0 && (
-                <Badge 
-                  size="sm" 
-                  radius="xl" 
-                  variant="filled" 
-                  color="red"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => setShowCancelled(!showCancelled)}
-                >
-                  ❌ Canceladas: {cancelledAppointments.length}
-                </Badge>
-              )}
-            </Flex>
-          </Group>
+          {/* Badge de canceladas */}
+          {cancelledAppointments.length > 0 && (
+            <Badge 
+              size="sm" 
+              radius="xl" 
+              variant="filled" 
+              color="red"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setShowCancelled(!showCancelled)}
+            >
+              Canceladas: {cancelledAppointments.length}
+            </Badge>
+          )}
         </Group>
         
         {/* Sección de citas canceladas */}

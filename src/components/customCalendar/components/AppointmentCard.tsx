@@ -12,11 +12,11 @@ import {
   CopyButton,
   Tooltip,
   Group,
-  Divider,
   TextInput,
   Table,
   NumberInput,
   Tabs,
+  ScrollArea,
 } from "@mantine/core";
 import {
   BiEdit,
@@ -27,6 +27,7 @@ import {
   BiPlus,
   BiTimeFive,
   BiExpand,
+  BiX,
 } from "react-icons/bi";
 import {
   Appointment,
@@ -36,7 +37,10 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import localizedFormat from "dayjs/plugin/localizedFormat";
-import { formatInTimezone, formatFullDateInTimezone } from "../../../utils/timezoneUtils";
+import {
+  formatInTimezone,
+  formatFullDateInTimezone,
+} from "../../../utils/timezoneUtils";
 import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -91,7 +95,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onConfirmAppointment,
   isExpanded,
   handleToggleExpand,
-  timezone = 'America/Bogota', // 🌍 Default timezone
+  timezone = "America/Bogota", // 🌍 Default timezone
 }) => {
   // const { borderColor } = getStatusStyles(appointment.status);
   const { hasPermission } = usePermissions();
@@ -103,12 +107,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   // 👇 esto debe seguir funcionando: citas pasadas cambian color
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
-  
+
   // 🚫 Detectar si está cancelada
-  const isCancelled = appointment.status.includes('cancelled');
+  const isCancelled = appointment.status.includes("cancelled");
 
   const { role } = useSelector((state: RootState) => state.auth);
-  const organization = useSelector((state: RootState) => state.organization.organization);
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
 
   const [customPrice, setCustomPrice] = useState<number | null>(
     appointment.customPrice || 0
@@ -224,409 +230,536 @@ ${clientServices}`;
         withCloseButton={false}
         size="lg"
         centered
-        radius="md"
+        radius="lg"
+        padding={0}
         onClick={(e) => e.stopPropagation()}
       >
-        <Flex direction="column" gap="md" onClick={(e) => e.stopPropagation()}>
-          <Tabs defaultValue="details" keepMounted={false}>
-            <Tabs.List mb="sm">
-              <Tabs.Tab value="details">Detalle</Tabs.Tab>
-              <Tabs.Tab value="modify">Precio y adicionales</Tabs.Tab>
-              <Tabs.Tab value="invoice">Facturar</Tabs.Tab>
-            </Tabs.List>
+        <Box onClick={(e) => e.stopPropagation()}>
+          {/* HEADER */}
+          <Flex
+            align="center"
+            justify="space-between"
+            px="md"
+            py="sm"
+            style={{
+              borderBottom: "1px solid var(--mantine-color-gray-3)",
+              position: "sticky",
+              top: 0,
+              background: "var(--mantine-color-body)",
+              zIndex: 2,
+            }}
+          >
+            <Box>
+              <Text fw={800} size="md">
+                Detalle de la cita
+              </Text>
+              <Text size="xs" c="dimmed">
+                {appointment.client.name} •{" "}
+                {formatFullDateInTimezone(
+                  appointment.startDate,
+                  timezone,
+                  "ddd, D MMM • h:mm A"
+                )}
+                {" - "}
+                {formatInTimezone(appointment.endDate, timezone, "h:mm A")}
+              </Text>
+            </Box>
 
-            {/* -------- PANEL: Detalle -------- */}
-            <Tabs.Panel value="details">
-              <Flex direction="column" gap="md">
-                <Box mt="xs">
-                  <Text fw={600} size="sm" mb={4}>
-                    Historial de citas del cliente
-                  </Text>
-                  {appoinments
-                    .filter(
-                      (appt) => appt.client._id === appointment.client._id
-                    )
-                    .map((appt, index) => {
-                      const isCurrentAppointment = appt._id === appointment._id;
-                      return (
-                        <Flex
-                          key={index}
-                          direction="row"
-                          gap="xs"
-                          align="center"
-                          py={5}
-                          px={8}
-                          style={{
-                            borderRadius: 6,
-                            border: isCurrentAppointment
-                              ? "1px solid #1971c2"
-                              : "1px solid #e0e0e0",
-                            backgroundColor: isCurrentAppointment
-                              ? "#e7f5ff"
-                              : "#f8f9fa",
-                          }}
-                        >
-                          <Text size="sm" fw={500}>
-                            {appt.service ? (
-                              appt.service.name
-                            ) : (
-                              <Text component="span" c="red" fw={700} size="sm">
-                                Sin Servicio
-                              </Text>
-                            )}
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            (Empleado:{" "}
-                            {appt.employeeRequestedByClient ? (
-                              <strong style={{ color: "purple" }}>
-                                {appt.employee.names} (solicitado)
-                              </strong>
-                            ) : (
-                              appt.employee.names
-                            )}
-                            )
-                          </Text>
-                        </Flex>
-                      );
-                    })}
-                </Box>
+            <ActionIcon
+              variant="subtle"
+              size="lg"
+              onClick={() => setModalOpened(false)}
+              aria-label="Cerrar"
+            >
+              {/* usa el icono que prefieras */}
+              <BiX size={18} />
+            </ActionIcon>
+          </Flex>
 
-                <Box>
-                  <Text fw={600} size="sm" mb={4}>
-                    Resumen
-                  </Text>
-                  <Flex direction="column" gap={4}>
-                    <Text size="sm">
-                      <strong>Horario:</strong>{" "}
-                      {formatFullDateInTimezone(
-                        appointment.startDate,
-                        timezone,
-                        "dddd, D MMMM YYYY, h:mm A"
-                      )}
-                      - {formatInTimezone(appointment.endDate, timezone, "h:mm A")}
-                    </Text>
-
-                    <Text size="sm">
-                      <strong>Abono:</strong>{" "}
-                      {formatCurrency(appointment.advancePayment, organization?.currency || "COP")}
-                    </Text>
-
-                    <Text size="sm">
-                      <strong>Cliente: </strong> {appointment.client.name}
-                    </Text>
-
-                    {role === "admin" && (
-                      <Flex align="center" gap={4}>
-                        <Text size="sm">
-                          <strong>Teléfono:</strong>{" "}
-                          {appointment.client.phoneNumber}
-                        </Text>
-                        <CopyButton
-                          value={appointment.client.phoneNumber}
-                          timeout={2000}
-                        >
-                          {({ copied, copy }) => (
-                            <Tooltip
-                              label={copied ? "Copiado" : "Copiar número"}
-                              withArrow
-                            >
-                              <ActionIcon
-                                color={copied ? "green" : "blue"}
-                                onClick={copy}
-                                size="sm"
-                                variant="subtle"
-                              >
-                                {copied ? (
-                                  <BiCheckCircle size={14} />
-                                ) : (
-                                  <BiCopy size={14} />
-                                )}
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                        </CopyButton>
-                      </Flex>
-                    )}
-
-                    {isBirthday && (
-                      <Text size="sm" c="orange">
-                        🎉 Hoy es el cumpleaños de {appointment.client.name} 🎉
-                      </Text>
-                    )}
-                  </Flex>
-                </Box>
-
-                <Divider />
-
-                <Group gap="lg">
-                  <Flex direction="column" align="center" gap={4}>
-                    <Tooltip label="Copiar detalle de la cita" withArrow>
-                      <ActionIcon
-                        color="blue"
-                        size="lg"
-                        variant="filled"
-                        onClick={() =>
-                          navigator.clipboard.writeText(
-                            generateAppointmentDetails(
-                              appointment,
-                              appoinments
-                            )
-                          )
-                        }
-                      >
-                        <BiCopy size={18} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Text size="xs">Copiar detalle</Text>
-                  </Flex>
-
-                  {role === "admin" && (
-                    <Flex direction="column" align="center" gap={4}>
-                      <Tooltip label="Abrir chat de WhatsApp" withArrow>
-                        <ActionIcon
-                          color="green"
-                          size="lg"
-                          variant="filled"
-                          onClick={() => {
-                            window.open(whatsappURL, "_blank");
-                          }}
-                        >
-                          <FaWhatsapp size={18} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Text size="xs">Enviar WhatsApp</Text>
-                    </Flex>
-                  )}
-                </Group>
-
-                <Divider />
-              </Flex>
-            </Tabs.Panel>
-
-            {/* -------- PANEL: Modificar precio -------- */}
-            <Tabs.Panel value="modify">
-              <Flex direction="column" gap="sm" mt="sm">
-                <NumberInput
-                  label="Cambiar precio del servicio"
-                  prefix="$ "
-                  thousandSeparator=","
-                  value={customPrice || ""}
-                  onChange={(value) => setCustomPrice(Number(value) || null)}
-                />
+          {/* BODY */}
+          <Box px="md" py="sm">
+            {/* ACCIONES RÁPIDAS */}
+            <Flex
+              justify="space-between"
+              align="center"
+              mb="sm"
+              style={{
+                padding: "10px 12px",
+                borderRadius: 12,
+                background: "var(--mantine-color-gray-0)",
+                border: "1px solid var(--mantine-color-gray-2)",
+              }}
+            >
+              <Flex direction="column" gap={2}>
+                <Text size="xs" c="dimmed">
+                  Acciones rápidas
+                </Text>
+                <Text size="sm" fw={600}>
+                  Copiar / WhatsApp
+                </Text>
               </Flex>
 
-              <Divider my="sm" />
-
-              <Flex direction="column" gap="xs">
-                <Text fw={500}>Añadir adicionales</Text>
-                <Flex align="flex-end" gap="xs">
-                  <TextInput
-                    label="Nombre"
-                    value={newItem.name}
-                    onChange={(e) =>
-                      setNewItem({ ...newItem, name: e.target.value })
-                    }
-                    style={{ flex: 2 }}
-                  />
-                  <NumberInput
-                    label="Precio"
-                    prefix="$ "
-                    thousandSeparator=","
-                    value={newItem.price}
-                    onChange={(value) =>
-                      setNewItem({
-                        ...newItem,
-                        price: (value as number) || 0,
-                      })
-                    }
-                    style={{ flex: 1 }}
-                  />
+              <Group gap="xs">
+                <Tooltip label="Copiar detalle de la cita" withArrow>
                   <ActionIcon
-                    color="green"
-                    onClick={handleAddItem}
-                    mt="lg"
+                    color="blue"
+                    size="lg"
                     variant="filled"
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        generateAppointmentDetails(appointment, appoinments)
+                      )
+                    }
                   >
-                    <BiPlus size={18} />
+                    <BiCopy size={18} />
                   </ActionIcon>
-                </Flex>
-              </Flex>
+                </Tooltip>
 
-              <Box mt="md">
-                <Text fw={700} mb="sm">
-                  Elementos adicionales
-                </Text>
-                <Table
-                  striped
-                  highlightOnHover
-                  withTableBorder
-                  withColumnBorders
-                  verticalSpacing="xs"
-                >
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Nombre</Table.Th>
-                      <Table.Th>Precio</Table.Th>
-                      <Table.Th>Acciones</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {additionalItems.map((item, index) => (
-                      <Table.Tr key={index}>
-                        <Table.Td>{item.name}</Table.Td>
-                        <Table.Td>
-                          {formatCurrency(item.price, organization?.currency || "COP")}
-                        </Table.Td>
-                        <Table.Td>
-                          <ActionIcon
-                            color="red"
-                            onClick={() => handleRemoveItem(index)}
-                            variant="subtle"
-                          >
-                            <BiTrash size={16} />
-                          </ActionIcon>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Box>
+                {role === "admin" && (
+                  <Tooltip label="Abrir chat de WhatsApp" withArrow>
+                    <ActionIcon
+                      color="green"
+                      size="lg"
+                      variant="filled"
+                      onClick={() => window.open(whatsappURL, "_blank")}
+                    >
+                      <FaWhatsapp size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </Group>
+            </Flex>
 
-              <Button fullWidth my="md" onClick={handleSaveChanges}>
-                Guardar cambios
-              </Button>
-            </Tabs.Panel>
+            <Tabs
+              defaultValue="invoice"
+              keepMounted={false}
+              variant="pills"
+              radius="xl"
+            >
+              <Tabs.List mb="sm">
+                <Tabs.Tab value="details">Detalle</Tabs.Tab>
+                <Tabs.Tab value="modify">Precio</Tabs.Tab>
+                <Tabs.Tab value="invoice">Facturar</Tabs.Tab>
+              </Tabs.List>
 
-            {/* -------- PANEL: Facturar -------- */}
-            <Tabs.Panel value="invoice">
-              <Flex direction="column" gap="sm" mt="sm">
-                <Text fw={700} size="lg" mb="md">
-                  Resumen de facturación
-                </Text>
-
-                <Table.ScrollContainer minWidth={500}>
-                  <Table
-                    striped
-                    highlightOnHover
-                    withTableBorder
-                    withColumnBorders
-                    verticalSpacing="xs"
+              {/* -------- PANEL: Detalle -------- */}
+              <Tabs.Panel value="details">
+                <Flex direction="column" gap="md">
+                  {/* RESUMEN */}
+                  <Box
+                    style={{
+                      border: "1px solid var(--mantine-color-gray-2)",
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
                   >
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Servicio</Table.Th>
-                        <Table.Th>Precio base</Table.Th>
-                        <Table.Th>Precio usado</Table.Th>
-                        <Table.Th>Adicionales</Table.Th>
-                        <Table.Th>Total</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {appoinments
-                        .filter(
-                          (appt) => appt.client._id === appointment.client._id
-                        )
-                        .map((appt, index) => {
-                          const additionalTotal =
-                            appt.additionalItems?.reduce(
-                              (sum, item) => sum + (item.price || 0),
-                              0
-                            ) || 0;
+                    <Group justify="space-between" mb={6}>
+                      <Text fw={700} size="sm">
+                        Resumen
+                      </Text>
+                      {isBirthday && (
+                        <Text size="xs" c="orange" fw={700}>
+                          🎉 Cumpleaños hoy
+                        </Text>
+                      )}
+                    </Group>
 
-                          const usedPrice =
-                            appt.customPrice || appt.totalPrice || 0;
-                          const total = usedPrice + additionalTotal;
+                    <Flex direction="column" gap={6}>
+                      <Text size="sm">
+                        <strong>Abono:</strong>{" "}
+                        {formatCurrency(
+                          appointment.advancePayment,
+                          organization?.currency || "COP"
+                        )}
+                      </Text>
 
-                          return (
+                      {role === "admin" && (
+                        <Flex align="center" gap={6} wrap="wrap">
+                          <Text size="sm">
+                            <strong>Tel:</strong>{" "}
+                            {appointment.client.phoneNumber}
+                          </Text>
+
+                          <CopyButton
+                            value={appointment.client.phoneNumber}
+                            timeout={2000}
+                          >
+                            {({ copied, copy }) => (
+                              <Tooltip
+                                label={copied ? "Copiado" : "Copiar"}
+                                withArrow
+                              >
+                                <ActionIcon
+                                  color={copied ? "green" : "blue"}
+                                  onClick={copy}
+                                  size="sm"
+                                  variant="subtle"
+                                >
+                                  {copied ? (
+                                    <BiCheckCircle size={14} />
+                                  ) : (
+                                    <BiCopy size={14} />
+                                  )}
+                                </ActionIcon>
+                              </Tooltip>
+                            )}
+                          </CopyButton>
+                        </Flex>
+                      )}
+                    </Flex>
+                  </Box>
+
+                  {/* HISTORIAL */}
+                  <Box>
+                    <Group justify="space-between" mb={6}>
+                      <Text fw={700} size="sm">
+                        Historial de citas
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Mismo cliente
+                      </Text>
+                    </Group>
+
+                    <ScrollArea h={220} offsetScrollbars>
+                      <Flex direction="column" gap="xs">
+                        {appoinments
+                          .filter(
+                            (appt) => appt.client._id === appointment.client._id
+                          )
+                          .map((appt, index) => {
+                            const isCurrentAppointment =
+                              appt._id === appointment._id;
+
+                            return (
+                              <Flex
+                                key={index}
+                                justify="space-between"
+                                align="center"
+                                py={8}
+                                px={10}
+                                style={{
+                                  borderRadius: 10,
+                                  border: isCurrentAppointment
+                                    ? "1px solid var(--mantine-color-blue-6)"
+                                    : "1px solid var(--mantine-color-gray-2)",
+                                  background: isCurrentAppointment
+                                    ? "var(--mantine-color-blue-0)"
+                                    : "var(--mantine-color-gray-0)",
+                                }}
+                              >
+                                <Box>
+                                  <Text size="sm" fw={600}>
+                                    {appt.service ? (
+                                      appt.service.name
+                                    ) : (
+                                      <Text
+                                        component="span"
+                                        c="red"
+                                        fw={800}
+                                        size="sm"
+                                      >
+                                        Sin servicio
+                                      </Text>
+                                    )}
+                                  </Text>
+
+                                  <Text size="xs" c="dimmed">
+                                    Empleado:{" "}
+                                    {appt.employeeRequestedByClient ? (
+                                      <strong style={{ color: "purple" }}>
+                                        {appt.employee.names} (solicitado)
+                                      </strong>
+                                    ) : (
+                                      appt.employee.names
+                                    )}
+                                  </Text>
+                                </Box>
+
+                                {isCurrentAppointment && (
+                                  <Text size="xs" fw={800} c="blue">
+                                    ACTUAL
+                                  </Text>
+                                )}
+                              </Flex>
+                            );
+                          })}
+                      </Flex>
+                    </ScrollArea>
+                  </Box>
+                </Flex>
+              </Tabs.Panel>
+
+              {/* -------- PANEL: Modificar precio -------- */}
+              <Tabs.Panel value="modify">
+                <Flex direction="column" gap="md" mt="sm">
+                  <Box
+                    style={{
+                      border: "1px solid var(--mantine-color-gray-2)",
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                  >
+                    <Text fw={700} size="sm" mb={8}>
+                      Precio del servicio
+                    </Text>
+
+                    <NumberInput
+                      label="Cambiar precio"
+                      prefix="$ "
+                      thousandSeparator=","
+                      value={customPrice || ""}
+                      onChange={(value) =>
+                        setCustomPrice(Number(value) || null)
+                      }
+                    />
+                  </Box>
+
+                  <Box
+                    style={{
+                      border: "1px solid var(--mantine-color-gray-2)",
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                  >
+                    <Text fw={700} size="sm" mb={8}>
+                      Adicionales
+                    </Text>
+
+                    <Flex align="flex-end" gap="xs">
+                      <TextInput
+                        label="Nombre"
+                        value={newItem.name}
+                        onChange={(e) =>
+                          setNewItem({ ...newItem, name: e.target.value })
+                        }
+                        style={{ flex: 2 }}
+                      />
+                      <NumberInput
+                        label="Precio"
+                        prefix="$ "
+                        thousandSeparator=","
+                        value={newItem.price}
+                        onChange={(value) =>
+                          setNewItem({
+                            ...newItem,
+                            price: (value as number) || 0,
+                          })
+                        }
+                        style={{ flex: 1 }}
+                      />
+                      <ActionIcon
+                        color="green"
+                        onClick={handleAddItem}
+                        mt="lg"
+                        variant="filled"
+                      >
+                        <BiPlus size={18} />
+                      </ActionIcon>
+                    </Flex>
+
+                    <Box mt="md">
+                      <Table
+                        striped
+                        highlightOnHover
+                        withTableBorder
+                        withColumnBorders
+                        verticalSpacing="xs"
+                      >
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Nombre</Table.Th>
+                            <Table.Th>Precio</Table.Th>
+                            <Table.Th style={{ width: 70 }}>Acción</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {additionalItems.map((item, index) => (
                             <Table.Tr key={index}>
+                              <Table.Td>{item.name}</Table.Td>
                               <Table.Td>
-                                {appt.service ? (
-                                  appt.service.name
-                                ) : (
-                                  <Text c="red" fw={700} size="sm">
-                                    Sin Servicio
-                                  </Text>
+                                {formatCurrency(
+                                  item.price,
+                                  organization?.currency || "COP"
                                 )}
                               </Table.Td>
-
                               <Table.Td>
-                                <Text>
-                                  {formatCurrency(appt.totalPrice || 0, organization?.currency || "COP")}
-                                </Text>
-                                {appt.customPrice && (
-                                  <Text size="xs" c="red">
-                                    (No se usa para facturar)
-                                  </Text>
-                                )}
-                              </Table.Td>
-
-                              <Table.Td>
-                                <Text fw={700}>
-                                  {formatCurrency(usedPrice, organization?.currency || "COP")}
-                                </Text>
-                                {appt.customPrice && (
-                                  <Text size="xs" c="green">
-                                    (Precio personalizado)
-                                  </Text>
-                                )}
-                              </Table.Td>
-
-                              <Table.Td>
-                                {formatCurrency(additionalTotal, organization?.currency || "COP")}
-                              </Table.Td>
-
-                              <Table.Td>
-                                {formatCurrency(total, organization?.currency || "COP")}
+                                <ActionIcon
+                                  color="red"
+                                  onClick={() => handleRemoveItem(index)}
+                                  variant="subtle"
+                                >
+                                  <BiTrash size={16} />
+                                </ActionIcon>
                               </Table.Td>
                             </Table.Tr>
-                          );
-                        })}
-                    </Table.Tbody>
-                  </Table>
-                </Table.ScrollContainer>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Box>
 
-                <Flex
-                  justify="space-between"
-                  align="center"
-                  mt="xs"
-                  style={{
-                    backgroundColor: "#e7f5ff",
-                    borderRadius: 8,
-                    padding: "10px 14px",
-                    border: "1px solid #1971c2",
-                  }}
-                >
-                  <Text fw={800} size="sm" c="blue">
-                    Total general:
-                  </Text>
-                  <Text fw={900} size="lg" c="green">
-                    {formatCurrency(
-                      appoinments
-                        .filter(
-                          (appt) => appt.client._id === appointment.client._id
-                        )
-                        .reduce((acc, appt) => {
-                          const additionalTotal =
-                            appt.additionalItems?.reduce(
-                              (sum, item) => sum + (item.price || 0),
-                              0
-                            ) || 0;
-
-                          const total = appt.customPrice
-                            ? appt.customPrice + additionalTotal
-                            : (appt.totalPrice || 0) + additionalTotal;
-
-                          return acc + total;
-                        }, 0),
-                      organization?.currency || "COP"
-                    )}
-                  </Text>
+                    <Button fullWidth mt="md" onClick={handleSaveChanges}>
+                      Guardar cambios
+                    </Button>
+                  </Box>
                 </Flex>
-              </Flex>
-            </Tabs.Panel>
-          </Tabs>
+              </Tabs.Panel>
 
-          <Group justify="flex-end">
+              {/* -------- PANEL: Facturar -------- */}
+              <Tabs.Panel value="invoice">
+                <Flex direction="column" gap="sm" mt="sm">
+                  <Text fw={800} size="md">
+                    Resumen de facturación
+                  </Text>
+
+                  <Table.ScrollContainer minWidth={520}>
+                    <Table
+                      striped
+                      highlightOnHover
+                      withTableBorder
+                      withColumnBorders
+                      verticalSpacing="xs"
+                    >
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Servicio</Table.Th>
+                          <Table.Th>Base</Table.Th>
+                          <Table.Th>Usado</Table.Th>
+                          <Table.Th>Adic.</Table.Th>
+                          <Table.Th>Total</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+
+                      <Table.Tbody>
+                        {appoinments
+                          .filter(
+                            (appt) => appt.client._id === appointment.client._id
+                          )
+                          .map((appt, index) => {
+                            const additionalTotal =
+                              appt.additionalItems?.reduce(
+                                (sum, item) => sum + (item.price || 0),
+                                0
+                              ) || 0;
+
+                            const usedPrice =
+                              appt.customPrice || appt.totalPrice || 0;
+                            const total = usedPrice + additionalTotal;
+
+                            return (
+                              <Table.Tr key={index}>
+                                <Table.Td>
+                                  {appt.service ? (
+                                    appt.service.name
+                                  ) : (
+                                    <Text c="red" fw={800} size="sm">
+                                      Sin servicio
+                                    </Text>
+                                  )}
+                                </Table.Td>
+
+                                <Table.Td>
+                                  <Text>
+                                    {formatCurrency(
+                                      appt.totalPrice || 0,
+                                      organization?.currency || "COP"
+                                    )}
+                                  </Text>
+                                  {appt.customPrice && (
+                                    <Text size="xs" c="dimmed">
+                                      No usado
+                                    </Text>
+                                  )}
+                                </Table.Td>
+
+                                <Table.Td>
+                                  <Text fw={800}>
+                                    {formatCurrency(
+                                      usedPrice,
+                                      organization?.currency || "COP"
+                                    )}
+                                  </Text>
+                                  {appt.customPrice && (
+                                    <Text size="xs" c="green">
+                                      Personalizado
+                                    </Text>
+                                  )}
+                                </Table.Td>
+
+                                <Table.Td>
+                                  {formatCurrency(
+                                    additionalTotal,
+                                    organization?.currency || "COP"
+                                  )}
+                                </Table.Td>
+
+                                <Table.Td>
+                                  <Text fw={800}>
+                                    {formatCurrency(
+                                      total,
+                                      organization?.currency || "COP"
+                                    )}
+                                  </Text>
+                                </Table.Td>
+                              </Table.Tr>
+                            );
+                          })}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+
+                  {/* TOTAL */}
+                  <Flex
+                    justify="space-between"
+                    align="center"
+                    mt="xs"
+                    style={{
+                      background: "var(--mantine-color-blue-0)",
+                      borderRadius: 12,
+                      padding: "12px 14px",
+                      border: "1px solid var(--mantine-color-blue-2)",
+                    }}
+                  >
+                    <Text fw={900} size="sm">
+                      Total general
+                    </Text>
+
+                    <Text fw={900} size="lg">
+                      {formatCurrency(
+                        appoinments
+                          .filter(
+                            (appt) => appt.client._id === appointment.client._id
+                          )
+                          .reduce((acc, appt) => {
+                            const additionalTotal =
+                              appt.additionalItems?.reduce(
+                                (sum, item) => sum + (item.price || 0),
+                                0
+                              ) || 0;
+
+                            const total =
+                              (appt.customPrice ?? appt.totalPrice ?? 0) +
+                              additionalTotal;
+                            return acc + total;
+                          }, 0),
+                        organization?.currency || "COP"
+                      )}
+                    </Text>
+                  </Flex>
+                </Flex>
+              </Tabs.Panel>
+            </Tabs>
+          </Box>
+
+          {/* FOOTER */}
+          <Flex
+            justify="flex-end"
+            px="md"
+            py="sm"
+            style={{
+              borderTop: "1px solid var(--mantine-color-gray-3)",
+              background: "var(--mantine-color-body)",
+            }}
+          >
             <Button
               variant="outline"
               size="sm"
@@ -634,8 +767,8 @@ ${clientServices}`;
             >
               Cerrar
             </Button>
-          </Group>
-        </Flex>
+          </Flex>
+        </Box>
       </Modal>
 
       {/* -------- CARD EN LA COLUMNA -------- */}
@@ -644,7 +777,11 @@ ${clientServices}`;
         radius="md"
         withBorder
         style={{
-          backgroundColor: isCancelled ? "#f1f3f5" : (isPastAppointment ? "#ffffff" : employeeColor), // ❌ Gris si cancelada
+          backgroundColor: isCancelled
+            ? "#f1f3f5"
+            : isPastAppointment
+            ? "#ffffff"
+            : employeeColor, // ❌ Gris si cancelada
           color: isCancelled ? "#868e96" : textColor, // ❌ Texto gris si cancelada
           display: "flex",
           flexDirection: "column",
@@ -656,13 +793,15 @@ ${clientServices}`;
           fontSize: 10,
           border: isCancelled ? "1px solid #ced4da" : "1px solid gray", // ❌ Borde gris si cancelada
           opacity: isCancelled ? 0.5 : 1, // ❌ Opacidad reducida si cancelada
-          textDecoration: isCancelled ? 'line-through' : 'none', // ❌ Tachado si cancelada
-          pointerEvents: isCancelled ? 'none' : 'auto', // ❌ Permitir click a través de citas canceladas
+          textDecoration: isCancelled ? "line-through" : "none", // ❌ Tachado si cancelada
+          pointerEvents: isCancelled ? "none" : "auto", // ❌ Permitir click a través de citas canceladas
         }}
         onClick={(e) => {
           // clave para que NO se propague al onClick de la columna
           e.stopPropagation();
-          const isIconClick = (e.target as HTMLElement).closest(".ignore-modal");
+          const isIconClick = (e.target as HTMLElement).closest(
+            ".ignore-modal"
+          );
           if (!isIconClick) {
             setModalOpened(true);
           }
@@ -785,7 +924,7 @@ ${clientServices}`;
         )}
 
         {/* Horario */}
-        <Text fw={700} style={{ fontSize: 10, marginTop: 6}}>
+        <Text fw={700} style={{ fontSize: 10, marginTop: 6 }}>
           {formatInTimezone(appointment.startDate, timezone, "h:mm")}
           {" - "}
           {formatInTimezone(appointment.endDate, timezone, "h:mm a")}
@@ -819,7 +958,7 @@ ${clientServices}`;
             style={{
               position: "absolute",
               bottom: -2,
-              right: -2, 
+              right: -2,
               pointerEvents: "auto",
             }}
           >

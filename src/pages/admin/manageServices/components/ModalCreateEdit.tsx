@@ -53,6 +53,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     duration: 0,
     images: [],
     hidePrice: false,
+    maxConcurrentAppointments: 1,
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
@@ -71,6 +72,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         duration: 0,
         images: [],
         hidePrice: false,
+        maxConcurrentAppointments: 1,
       });
       setImageFiles([]);
     }
@@ -220,6 +222,30 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 checked={editingService.hidePrice ?? false}
                 onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
               />
+                <Box>
+                  <NumberInput
+                    label="👥 Citas simultáneas que puede atender"
+                    description="Número de clientes que el empleado puede atender en el mismo horario (ej: doctor con 2 pacientes)"
+                    value={editingService.maxConcurrentAppointments ?? 1}
+                    onChange={(value) => setEditingService({ ...editingService, maxConcurrentAppointments: typeof value === "number" ? value : 1 })}
+                    min={1}
+                    max={10}
+                    disabled={false}
+                  />
+                  <Group gap="xs" mt={8} wrap="wrap">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Chip
+                        key={n}
+                        size="sm"
+                        checked={(editingService.maxConcurrentAppointments ?? 1) === n}
+                        onChange={() => setEditingService({ ...editingService, maxConcurrentAppointments: n })}
+                        variant="filled"
+                      >
+                        {n} {n === 1 ? "cliente" : "clientes"}
+                      </Chip>
+                    ))}
+                  </Group>
+                </Box>
             </Stack>
           </Paper>
 

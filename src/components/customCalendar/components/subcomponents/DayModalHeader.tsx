@@ -8,6 +8,7 @@ interface HeaderProps {
   employees: Employee[];
   hiddenEmployeeIds: string[];
   onToggleEmployeeHidden: (employeeId: string) => void;
+  columnWidthMap?: Map<string, number>;
 }
 
 // Contraste de texto con color de fondo
@@ -25,6 +26,7 @@ const DayModalHeader: FC<HeaderProps> = ({
   employees,
   hiddenEmployeeIds,
   onToggleEmployeeHidden,
+  columnWidthMap,
 }) => {
   return (
     <Box
@@ -43,12 +45,13 @@ const DayModalHeader: FC<HeaderProps> = ({
         const textColor = getTextColor(color);
         const isHidden = hiddenEmployeeIds.includes(employee._id);
 
+        const width = columnWidthMap?.get(employee._id) ?? CARD_WIDTH;
         return (
           <Box
             key={employee._id}
             style={{
-              width: `${CARD_WIDTH}px`,
-              minWidth: `${CARD_WIDTH}px`,
+              width: `${width}px`,
+              minWidth: `${width}px`,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",

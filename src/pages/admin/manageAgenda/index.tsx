@@ -1,7 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useMemo, useState, useCallback, Suspense, lazy } from "react";
-import { Badge, Box, Group, Paper, Text } from "@mantine/core";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  Suspense,
+  lazy,
+} from "react";
+import { Badge, Box, Button, Group, Paper, Text } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -37,8 +44,12 @@ import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 
 // 🚀 Lazy loading de modales para mejorar carga inicial
 const AppointmentModal = lazy(() => import("./components/AppointmentModal"));
-const SearchAppointmentsModal = lazy(() => import("./components/SearchAppointmentsModal"));
-const ReorderEmployeesModal = lazy(() => import("./components/ReorderEmployeesModal"));
+const SearchAppointmentsModal = lazy(
+  () => import("./components/SearchAppointmentsModal")
+);
+const ReorderEmployeesModal = lazy(
+  () => import("./components/ReorderEmployeesModal")
+);
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -86,7 +97,7 @@ const ScheduleView: React.FC = () => {
     (state: RootState) => state.organization.organization
   );
   const organizationId = organization?._id;
-  const organizationTimezone = organization?.timezone || 'America/Bogota'; // 🌍 Timezone de la org
+  const organizationTimezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la org
 
   const initialClientId = useMemo(
     () => organization?.clientIdWhatsapp || organization?._id || "",
@@ -261,55 +272,59 @@ const ScheduleView: React.FC = () => {
     }
   }, [readyForScopedFetch, organizationId, canViewAll, userId]);
 
-  const fetchAppointmentsForMonth = useCallback(async (date: Date) => {
-    if (!readyForScopedFetch) return;
-    setLoadingMonth(true);
-    try {
-      const start = startOfMonth(date).toISOString();
-      const end = endOfMonth(date).toISOString();
-      const response = await getAppointmentsByOrganizationId(
-        organizationId as string,
-        start,
-        end
-      );
+  const fetchAppointmentsForMonth = useCallback(
+    async (date: Date) => {
+      if (!readyForScopedFetch) return;
+      setLoadingMonth(true);
+      try {
+        const start = startOfMonth(date).toISOString();
+        const end = endOfMonth(date).toISOString();
+        const response = await getAppointmentsByOrganizationId(
+          organizationId as string,
+          start,
+          end
+        );
 
-      const scoped = canViewAll
-        ? response
-        : userId
-        ? response.filter((a) => a.employee._id === userId)
-        : [];
+        const scoped = canViewAll
+          ? response
+          : userId
+          ? response.filter((a) => a.employee._id === userId)
+          : [];
 
-      setAppointments(normalizeAppointmentDates(scoped));
-    } finally {
-      setLoadingMonth(false);
-    }
-  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
+        setAppointments(normalizeAppointmentDates(scoped));
+      } finally {
+        setLoadingMonth(false);
+      }
+    },
+    [readyForScopedFetch, organizationId, canViewAll, userId]
+  );
 
-  const fetchAppointmentsForDay = useCallback(async (
-    date: Date
-  ): Promise<Appointment[]> => {
-    if (!readyForScopedFetch) return [];
-    try {
-      const start = startOfDay(date).toISOString();
-      const end = endOfDay(date).toISOString();
-      const response = await getAppointmentsByOrganizationId(
-        organizationId as string,
-        start,
-        end
-      );
+  const fetchAppointmentsForDay = useCallback(
+    async (date: Date): Promise<Appointment[]> => {
+      if (!readyForScopedFetch) return [];
+      try {
+        const start = startOfDay(date).toISOString();
+        const end = endOfDay(date).toISOString();
+        const response = await getAppointmentsByOrganizationId(
+          organizationId as string,
+          start,
+          end
+        );
 
-      const scoped = canViewAll
-        ? response
-        : userId
-        ? response.filter((a) => a.employee._id === userId)
-        : [];
+        const scoped = canViewAll
+          ? response
+          : userId
+          ? response.filter((a) => a.employee._id === userId)
+          : [];
 
-      return normalizeAppointmentDates(scoped);
-    } catch {
-      console.error("Error al obtener citas del día");
-      return [];
-    }
-  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
+        return normalizeAppointmentDates(scoped);
+      } catch {
+        console.error("Error al obtener citas del día");
+        return [];
+      }
+    },
+    [readyForScopedFetch, organizationId, canViewAll, userId]
+  );
   /**
    * MANEJO DE SERVICIO
    */
@@ -323,72 +338,78 @@ const ScheduleView: React.FC = () => {
   /**
    * MANEJO DE EMPLEADO
    */
-  const handleEmployeeChange = useCallback((value: string | null) => {
-    const selectedEmployee = employees.find((emp) => emp._id === value);
-    if (selectedEmployee) {
-      setNewAppointment((prev) => ({ ...prev, employee: selectedEmployee }));
-      setFilteredServices(selectedEmployee.services as unknown as Service[]);
-    } else {
-      setNewAppointment((prev) => ({ ...prev, employee: undefined }));
-      setFilteredServices([]);
-    }
-  }, [employees]);
+  const handleEmployeeChange = useCallback(
+    (value: string | null) => {
+      const selectedEmployee = employees.find((emp) => emp._id === value);
+      if (selectedEmployee) {
+        setNewAppointment((prev) => ({ ...prev, employee: selectedEmployee }));
+        setFilteredServices(selectedEmployee.services as unknown as Service[]);
+      } else {
+        setNewAppointment((prev) => ({ ...prev, employee: undefined }));
+        setFilteredServices([]);
+      }
+    },
+    [employees]
+  );
 
   /**
    * MANEJO DE CLIENTE
    */
-  const handleClientChange = useCallback((clientId: string | null) => {
-    const selectedClient = clients.find((client) => client._id === clientId);
-    setNewAppointment((prev) => ({ ...prev, client: selectedClient }));
-  }, [clients]);
+  const handleClientChange = useCallback(
+    (clientId: string | null) => {
+      const selectedClient = clients.find((client) => client._id === clientId);
+      setNewAppointment((prev) => ({ ...prev, client: selectedClient }));
+    },
+    [clients]
+  );
 
   /**
    * COMBINAR FECHA + HORA
    */
-  const combineDateAndTime = useCallback((
-    dateDay: Date | null,
-    dateHour: Date
-  ): Date | null => {
-    if (!dateDay) return null;
-    const combinedDate = new Date(dateDay);
-    combinedDate.setHours(dateHour.getHours());
-    combinedDate.setMinutes(dateHour.getMinutes());
-    combinedDate.setSeconds(dateHour.getSeconds());
-    combinedDate.setMilliseconds(dateHour.getMilliseconds());
-    return combinedDate;
-  }, []);
+  const combineDateAndTime = useCallback(
+    (dateDay: Date | null, dateHour: Date): Date | null => {
+      if (!dateDay) return null;
+      const combinedDate = new Date(dateDay);
+      combinedDate.setHours(dateHour.getHours());
+      combinedDate.setMinutes(dateHour.getMinutes());
+      combinedDate.setSeconds(dateHour.getSeconds());
+      combinedDate.setMilliseconds(dateHour.getMilliseconds());
+      return combinedDate;
+    },
+    []
+  );
 
   /**
    * ABRIR MODAL NUEVA CITA
    */
-  const openModal = useCallback((
-    selectedDay: Date | null,
-    interval?: Date,
-    employeeId?: string
-  ) => {
-    const startDate =
-      combineDateAndTime(selectedDay, interval || new Date()) || new Date();
+  const openModal = useCallback(
+    (selectedDay: Date | null, interval?: Date, employeeId?: string) => {
+      const startDate =
+        combineDateAndTime(selectedDay, interval || new Date()) || new Date();
 
-    if (employees.length > 0) {
-      setNewAppointment((prev) => ({
-        ...prev,
-        startDate: prev.startDate || startDate,
-        employee: employeeId
-          ? employees.find((employee) => employee._id === employeeId) ||
-            prev.employee
-          : prev.employee,
-      }));
-      setModalOpenedAppointment(true);
-    } else {
-      showNotification({
-        title: "Error",
-        message: "Debes tener al menos un empleado activo para agendar citas.",
-        color: "red",
-        autoClose: 3000,
-        position: "top-right",
-      });
-    }
-  }, [employees, combineDateAndTime]);
+      if (employees.length > 0) {
+        setNewAppointment((prev) => ({
+          ...prev,
+          startDate: prev.startDate || startDate,
+          employee: employeeId
+            ? employees.find((employee) => employee._id === employeeId) ||
+              prev.employee
+            : prev.employee,
+        }));
+        setModalOpenedAppointment(true);
+      } else {
+        showNotification({
+          title: "Error",
+          message:
+            "Debes tener al menos un empleado activo para agendar citas.",
+          color: "red",
+          autoClose: 3000,
+          position: "top-right",
+        });
+      }
+    },
+    [employees, combineDateAndTime]
+  );
 
   /**
    * CERRAR MODAL
@@ -422,110 +443,116 @@ const ScheduleView: React.FC = () => {
   /**
    * CANCELAR CITA
    */
-  const handleCancelAppointment = useCallback((appointmentId: string) => {
-    openConfirmModal({
-      title: "Cancelar cita",
-      children: (
-        <p>
-          Al cancelar se <strong>elimina</strong> el registro de la cita. ¿Estás
-          seguro de que deseas cancelar esta cita?
-        </p>
-      ),
-      centered: true,
-      labels: { confirm: "Cancelar y eliminar", cancel: "Volver" },
-      confirmProps: { color: "red" },
-      onConfirm: async () => {
-        try {
-          await deleteAppointment(appointmentId);
-          showNotification({
-            title: "Éxito",
-            message: "La cita ha sido cancelada y eliminada.",
-            color: "green",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          fetchAppointmentsForMonth(currentDate);
-        } catch (error) {
-          showNotification({
-            title: "Error",
-            message: "No se pudo cancelar la cita.",
-            color: "red",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          console.error(error);
-        }
-      },
-    });
-  }, [currentDate, fetchAppointmentsForMonth]);
+  const handleCancelAppointment = useCallback(
+    (appointmentId: string) => {
+      openConfirmModal({
+        title: "Cancelar cita",
+        children: (
+          <p>
+            Al cancelar se <strong>elimina</strong> el registro de la cita.
+            ¿Estás seguro de que deseas cancelar esta cita?
+          </p>
+        ),
+        centered: true,
+        labels: { confirm: "Cancelar y eliminar", cancel: "Volver" },
+        confirmProps: { color: "red" },
+        onConfirm: async () => {
+          try {
+            await deleteAppointment(appointmentId);
+            showNotification({
+              title: "Éxito",
+              message: "La cita ha sido cancelada y eliminada.",
+              color: "green",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            fetchAppointmentsForMonth(currentDate);
+          } catch (error) {
+            showNotification({
+              title: "Error",
+              message: "No se pudo cancelar la cita.",
+              color: "red",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            console.error(error);
+          }
+        },
+      });
+    },
+    [currentDate, fetchAppointmentsForMonth]
+  );
 
   /**
    * CONFIRMAR CITA
    */
-  const handleConfirmAppointment = useCallback((appointmentId: string) => {
-    const appointment = appointments.find((a) => a._id === appointmentId);
-    if (!appointment) {
-      showNotification({
-        title: "Error",
-        message: "No se encontró la cita seleccionada.",
-        color: "red",
-        autoClose: 3000,
-        position: "top-right",
-      });
-      return;
-    }
+  const handleConfirmAppointment = useCallback(
+    (appointmentId: string) => {
+      const appointment = appointments.find((a) => a._id === appointmentId);
+      if (!appointment) {
+        showNotification({
+          title: "Error",
+          message: "No se encontró la cita seleccionada.",
+          color: "red",
+          autoClose: 3000,
+          position: "top-right",
+        });
+        return;
+      }
 
-    openConfirmModal({
-      title: "Confirmar cita",
-      children: (
-        <div>
-          <p>¿Estás seguro de que deseas confirmar esta cita?</p>
-          <Box mt="md">
-            <Text size="sm" fw={500}>
-              Resumen de la cita:
-            </Text>
-            <Text size="sm">Cliente: {appointment.client?.name}</Text>
-            <Text size="sm">Servicio: {appointment.service?.name}</Text>
-            <Text size="sm">
-              Fecha y hora:{" "}
-              {new Date(appointment.startDate).toLocaleString("es-CO")}
-            </Text>
-            <Text size="sm">
-              Empleado: {appointment.employee?.names || "No asignado"}
-            </Text>
-            <Text size="sm">
-              Abono: ${appointment.advancePayment?.toLocaleString("es-CO")}
-            </Text>
-          </Box>
-        </div>
-      ),
-      centered: true,
-      labels: { confirm: "Confirmar", cancel: "Cancelar" },
-      confirmProps: { color: "green" },
-      onConfirm: async () => {
-        try {
-          await updateAppointment(appointmentId, { status: "confirmed" });
-          showNotification({
-            title: "Éxito",
-            message: "La cita ha sido confirmada.",
-            color: "green",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          fetchAppointmentsForMonth(currentDate);
-        } catch (error) {
-          showNotification({
-            title: "Error",
-            message: "No se pudo confirmar la cita.",
-            color: "red",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          console.error(error);
-        }
-      },
-    });
-  }, [appointments, fetchAppointmentsForMonth, currentDate]);
+      openConfirmModal({
+        title: "Confirmar cita",
+        children: (
+          <div>
+            <p>¿Estás seguro de que deseas confirmar esta cita?</p>
+            <Box mt="md">
+              <Text size="sm" fw={500}>
+                Resumen de la cita:
+              </Text>
+              <Text size="sm">Cliente: {appointment.client?.name}</Text>
+              <Text size="sm">Servicio: {appointment.service?.name}</Text>
+              <Text size="sm">
+                Fecha y hora:{" "}
+                {new Date(appointment.startDate).toLocaleString("es-CO")}
+              </Text>
+              <Text size="sm">
+                Empleado: {appointment.employee?.names || "No asignado"}
+              </Text>
+              <Text size="sm">
+                Abono: ${appointment.advancePayment?.toLocaleString("es-CO")}
+              </Text>
+            </Box>
+          </div>
+        ),
+        centered: true,
+        labels: { confirm: "Confirmar", cancel: "Cancelar" },
+        confirmProps: { color: "green" },
+        onConfirm: async () => {
+          try {
+            await updateAppointment(appointmentId, { status: "confirmed" });
+            showNotification({
+              title: "Éxito",
+              message: "La cita ha sido confirmada.",
+              color: "green",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            fetchAppointmentsForMonth(currentDate);
+          } catch (error) {
+            showNotification({
+              title: "Error",
+              message: "No se pudo confirmar la cita.",
+              color: "red",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            console.error(error);
+          }
+        },
+      });
+    },
+    [appointments, fetchAppointmentsForMonth, currentDate]
+  );
 
   /**
    * CREAR O ACTUALIZAR CITA
@@ -623,36 +650,39 @@ const ScheduleView: React.FC = () => {
   /**
    * ACTUALIZAR ORDEN DE EMPLEADOS
    */
-  const handleSaveReorderedEmployees = useCallback(async (updatedEmployees: Employee[]) => {
-    try {
-      const updates = updatedEmployees.map((employee, index) => ({
-        ...employee,
-        order: index + 1,
-      }));
+  const handleSaveReorderedEmployees = useCallback(
+    async (updatedEmployees: Employee[]) => {
+      try {
+        const updates = updatedEmployees.map((employee, index) => ({
+          ...employee,
+          order: index + 1,
+        }));
 
-      await Promise.all(
-        updates.map((employee) => updateEmployee(employee._id, employee))
-      );
+        await Promise.all(
+          updates.map((employee) => updateEmployee(employee._id, employee))
+        );
 
-      setEmployees(updates);
-      showNotification({
-        title: "Éxito",
-        message: "Empleados reordenados correctamente.",
-        color: "green",
-        autoClose: 3000,
-        position: "top-right",
-      });
-    } catch (error) {
-      console.error(error);
-      showNotification({
-        title: "Error",
-        message: "No se pudo guardar el nuevo orden de los empleados.",
-        color: "red",
-        autoClose: 3000,
-        position: "top-right",
-      });
-    }
-  }, []);
+        setEmployees(updates);
+        showNotification({
+          title: "Éxito",
+          message: "Empleados reordenados correctamente.",
+          color: "green",
+          autoClose: 3000,
+          position: "top-right",
+        });
+      } catch (error) {
+        console.error(error);
+        showNotification({
+          title: "Error",
+          message: "No se pudo guardar el nuevo orden de los empleados.",
+          color: "red",
+          autoClose: 3000,
+          position: "top-right",
+        });
+      }
+    },
+    []
+  );
 
   // Loader inicial
   if (loadingAgenda) {
@@ -660,25 +690,24 @@ const ScheduleView: React.FC = () => {
   }
 
   return (
-   <Box pos="relative" p="md">
-    {sendingReminders && (
-      <CustomLoader loadingText="Enviando recordatorios.." overlay />
-    )}
+    <Box pos="relative" p="md">
+      {sendingReminders && (
+        <CustomLoader loadingText="Enviando recordatorios.." overlay />
+      )}
 
-    {/* Barra superior tipo toolbar */}
-    <Paper
-      withBorder
-      radius="md"
-      p="xs"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 8,
-      }}
-    >
-      {/* Izquierda: estado WhatsApp */}
-      <Group gap={8}>
+      {/* Barra superior tipo toolbar */}
+      <Paper
+        withBorder
+        radius="md"
+        p="xs"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        {/* Izquierda: estado WhatsApp */}
         <WhatsappStatusIcon
           code={code}
           reason={reason}
@@ -688,60 +717,58 @@ const ScheduleView: React.FC = () => {
           size="xs"
         />
 
-        <Text size="xs" c="dimmed">
-          Agenda de{" "}
-          <Text component="span" fw={600}>
-            {organization?.name ?? "tu negocio"}
-          </Text>
-        </Text>
-      </Group>
+        {/* Derecha: contador + quick actions */}
+        <Group gap="sm" align="center">
+          <Badge size="xs" radius="xl" variant="light">
+            Citas este mes:{" "}
+            {
+              appointments.filter((apt) => !apt.status.includes("cancelled"))
+                .length
+            }
+          </Badge>
 
-      {/* Derecha: contador + quick actions */}
-      <Group gap="sm" align="center">
-        <Badge size="sm" radius="xl" variant="light">
-          Citas este mes: {appointments.filter(apt => !apt.status.includes('cancelled')).length}
-        </Badge>
+          <Button size="xs" onClick={() => openModal(new Date(), new Date())}>
+            Crear cita
+          </Button>
 
-        <SchedulerQuickActionsMenu
-          onOpenSearch={() => setShowSearchModal(true)}
-          onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
-          onAddAppointment={() => openModal(new Date(), new Date())}
-          onReorderEmployees={() => setReorderModalOpened(true)}
-          onSendReminders={handleSendDailyReminders}
-          isWhatsappReady={isWhatsAppReady}
-          sendingReminders={sendingReminders}
-          reasonForDisabled={reason}
-          canSearchAppointments={hasPermission(
-            "appointments:search_schedule"
-          )}
-          canCreate={hasPermission("appointments:create")}
-          canSendReminders={hasPermission("appointments:send_reminders")}
-          canReorderEmployees={hasPermission(
-            "appointments:reorderemployees"
-          )}
-          reminderDate={reminderDate}
-          onChangeReminderDate={setReminderDate}
-        />
-      </Group>
-    </Paper>
+          <SchedulerQuickActionsMenu
+            onOpenSearch={() => setShowSearchModal(true)}
+            onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
+            onAddAppointment={() => openModal(new Date(), new Date())}
+            onReorderEmployees={() => setReorderModalOpened(true)}
+            onSendReminders={handleSendDailyReminders}
+            isWhatsappReady={isWhatsAppReady}
+            sendingReminders={sendingReminders}
+            reasonForDisabled={reason}
+            canSearchAppointments={hasPermission(
+              "appointments:search_schedule"
+            )}
+            canCreate={hasPermission("appointments:create")}
+            canSendReminders={hasPermission("appointments:send_reminders")}
+            canReorderEmployees={hasPermission("appointments:reorderemployees")}
+            reminderDate={reminderDate}
+            onChangeReminderDate={setReminderDate}
+          />
+        </Group>
+      </Paper>
 
-    {/* Calendario principal */}
-    <CustomCalendar
-      employees={employees}
-      appointments={appointments}
-      currentDate={currentDate}
-      setCurrentDate={setCurrentDate}
-      setAppointments={setAppointments}
-      onOpenModal={openModal}
-      onEditAppointment={handleEditAppointment}
-      onCancelAppointment={handleCancelAppointment}
-      onConfirmAppointment={handleConfirmAppointment}
-      fetchAppointmentsForMonth={fetchAppointmentsForMonth}
-      loadingMonth={loadingMonth}
-      fetchAppointmentsForDay={fetchAppointmentsForDay}
-      timezone={organizationTimezone}
-    />
-      
+      {/* Calendario principal */}
+      <CustomCalendar
+        employees={employees}
+        appointments={appointments}
+        currentDate={currentDate}
+        setCurrentDate={setCurrentDate}
+        setAppointments={setAppointments}
+        onOpenModal={openModal}
+        onEditAppointment={handleEditAppointment}
+        onCancelAppointment={handleCancelAppointment}
+        onConfirmAppointment={handleConfirmAppointment}
+        fetchAppointmentsForMonth={fetchAppointmentsForMonth}
+        loadingMonth={loadingMonth}
+        fetchAppointmentsForDay={fetchAppointmentsForDay}
+        timezone={organizationTimezone}
+      />
+
       {/* 🚀 Modales con Suspense para lazy loading */}
       <Suspense fallback={<CustomLoader overlay />}>
         {modalOpenedAppointment && (
