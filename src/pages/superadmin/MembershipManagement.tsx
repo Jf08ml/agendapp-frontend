@@ -431,13 +431,9 @@ export default function MembershipManagement() {
             label="Monto del Pago"
             placeholder="Ingresa el monto"
             value={paymentAmount}
-            parser={(value) => value?.replace(/[^0-9.-]/g, "") || ""}
             onChange={(value) => {
-              const numeric =
-                typeof value === "number"
-                  ? value
-                  : Number(String(value).replace(/[^0-9.-]/g, ""));
-              setPaymentAmount(Number.isFinite(numeric) ? numeric : 0);
+              const numValue = typeof value === "string" ? parseFloat(value) : value;
+              setPaymentAmount(Number.isFinite(numValue) ? numValue : 0);
             }}
             prefix="$"
             thousandSeparator=","
