@@ -1,8 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/campaigns/CampaignWizard.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box,
   Button,
   Container,
   Paper,
@@ -13,21 +13,23 @@ import {
 } from "@mantine/core";
 import { useAppSelector } from "../../../app/store";
 import campaignService from "../../../services/campaignService";
-import type {
-  CampaignRecipient,
-  CampaignWizardState,
-  PhoneValidation,
-} from "../../../types/campaign";
+import type { CampaignWizardState } from "../../../types/campaign";
 import AudienceSelector from "./components/AudienceSelector";
 import MessageComposer from "./components/MessageComposer";
 import CampaignSummary from "./components/CampaignSummary";
 import { validateCampaignData } from "../../../utils/campaignValidations";
 
-const steps = ["Seleccionar Audiencia", "Componer Mensaje", "Confirmar y Enviar"];
+const steps = [
+  "Seleccionar Audiencia",
+  "Componer Mensaje",
+  "Confirmar y Enviar",
+];
 
 export default function CampaignWizard() {
   const navigate = useNavigate();
-  const organization = useAppSelector((state) => state.organization.organization);
+  const organization = useAppSelector(
+    (state) => state.organization.organization
+  );
   const orgId = organization?._id || "";
 
   const [wizardState, setWizardState] = useState<CampaignWizardState>({
@@ -137,14 +139,19 @@ export default function CampaignWizard() {
           📢 Nueva Campaña de WhatsApp
         </Title>
 
-        <Stepper active={wizardState.step - 1} breakpoint="sm" mb="xl" mt="lg">
+        <Stepper active={wizardState.step - 1} mb="xl" mt="lg">
           {steps.map((label, index) => (
             <Stepper.Step key={index} label={label} />
           ))}
         </Stepper>
 
         {error && (
-          <Alert color="red" mb="md" withCloseButton onClose={() => setError(null)}>
+          <Alert
+            color="red"
+            mb="md"
+            withCloseButton
+            onClose={() => setError(null)}
+          >
             {error}
           </Alert>
         )}
@@ -196,21 +203,13 @@ export default function CampaignWizard() {
 
           <Group>
             {wizardState.step > 1 && (
-              <Button
-                variant="default"
-                onClick={handleBack}
-                disabled={loading}
-              >
+              <Button variant="default" onClick={handleBack} disabled={loading}>
                 ← Atrás
               </Button>
             )}
 
             {wizardState.step < 3 && (
-              <Button
-                onClick={handleNext}
-                disabled={loading}
-                loading={loading}
-              >
+              <Button onClick={handleNext} disabled={loading} loading={loading}>
                 Siguiente →
               </Button>
             )}
