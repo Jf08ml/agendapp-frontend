@@ -475,9 +475,10 @@ const AdminServices: React.FC = () => {
       )}
 
       <ModalCreateEdit
-        open={isModalOpen}
+        isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setEditingService(null); }}
-        onSubmit={handleSaveService}
+        onSave={handleSaveService}
+        allTypes={allTypes}
         service={editingService}
       />
 
