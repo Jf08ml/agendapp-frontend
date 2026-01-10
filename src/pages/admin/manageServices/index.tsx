@@ -33,6 +33,7 @@ import {
   BsCheckCircle,
   BsXCircle,
 } from "react-icons/bs";
+import { IconFileUpload } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
 import {
   createService,
@@ -42,6 +43,7 @@ import {
   Service,
 } from "../../../services/serviceService";
 import ModalCreateEdit from "./components/ModalCreateEdit";
+import BulkUploadModal from "./components/BulkUploadModal";
 import { uploadImage } from "../../../services/imageService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -57,6 +59,7 @@ const AdminServices: React.FC = () => {
   const [sortBy, setSortBy] = useState<"alpha" | "price" | "duration">("alpha");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [, setLoading] = useState(false);
@@ -222,13 +225,26 @@ const AdminServices: React.FC = () => {
       <Stack gap="md">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
-          <Button 
-            leftSection={<BsPlusCircle size={18} />}
-            onClick={() => { setIsModalOpen(true); setEditingService(null); }}
-            size={isMobile ? "sm" : "md"}
-          >
-            Nuevo servicio
-          </Button>
+          <Group gap="xs">
+            <Tooltip label="Carga masiva desde Excel">
+              <Button
+                leftSection={<IconFileUpload size={18} />}
+                onClick={() => setIsBulkUploadModalOpen(true)}
+                variant="light"
+                color="blue"
+                size={isMobile ? "sm" : "md"}
+              >
+                {isMobile ? "Excel" : "Carga masiva"}
+              </Button>
+            </Tooltip>
+            <Button 
+              leftSection={<BsPlusCircle size={18} />}
+              onClick={() => { setIsModalOpen(true); setEditingService(null); }}
+              size={isMobile ? "sm" : "md"}
+            >
+              {isMobile ? "Nuevo" : "Nuevo servicio"}
+            </Button>
+          </Group>
         </Group>
 
         <Group wrap="wrap" gap="sm" align="end">
@@ -457,6 +473,19 @@ const AdminServices: React.FC = () => {
           ))}
         </Grid>
       )}
+
+      <ModalCreateEdit
+        open={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setEditingService(null); }}
+        onSubmit={handleSaveService}
+        service={editingService}
+      />
+
+      <BulkUploadModal
+        opened={isBulkUploadModalOpen}
+        onClose={() => setIsBulkUploadModalOpen(false)}
+        onUploadComplete={loadServices}
+      />
     </Box>
   );
 };

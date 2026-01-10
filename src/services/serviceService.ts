@@ -106,3 +106,40 @@ export const deleteService = async (serviceId: string): Promise<void> => {
     handleAxiosError(error, "Error al eliminar el servicio");
   }
 };
+
+// Carga masiva de servicios desde Excel
+export const bulkUploadServices = async (
+  services: Array<{
+    name: string;
+    type?: string;
+    description?: string;
+    price: number;
+    duration: number;
+    hidePrice?: boolean;
+    maxConcurrentAppointments?: number;
+  }>,
+  organizationId: string
+): Promise<{
+  success: Array<{ row: number; name: string; price: number; duration: number }>;
+  errors: Array<{ row: number; name: string; error: string }>;
+  totalProcessed: number;
+  totalSuccess: number;
+  totalErrors: number;
+}> => {
+  try {
+    const response = await apiService.post<
+      Response<{
+        success: Array<{ row: number; name: string; price: number; duration: number }>;
+        errors: Array<{ row: number; name: string; error: string }>;
+        totalProcessed: number;
+        totalSuccess: number;
+        totalErrors: number;
+      }>
+    >("/bulk-upload", { services, organizationId });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al cargar los servicios");
+    throw error;
+  }
+};
+

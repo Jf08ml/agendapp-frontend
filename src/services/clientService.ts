@@ -155,3 +155,37 @@ export const registerReferral = async (clientId: string): Promise<void> => {
     handleAxiosError(error, "Error al registrar el referido");
   }
 };
+
+// Carga masiva de clientes desde Excel
+export const bulkUploadClients = async (
+  clients: Array<{
+    name: string;
+    phoneNumber: string;
+    email?: string;
+    birthDate?: Date | null;
+  }>,
+  organizationId: string
+): Promise<{
+  success: Array<{ row: number; name: string; phoneNumber: string }>;
+  errors: Array<{ row: number; name: string; phoneNumber: string; error: string }>;
+  totalProcessed: number;
+  totalSuccess: number;
+  totalErrors: number;
+}> => {
+  try {
+    const response = await apiClient.post<
+      Response<{
+        success: Array<{ row: number; name: string; phoneNumber: string }>;
+        errors: Array<{ row: number; name: string; phoneNumber: string; error: string }>;
+        totalProcessed: number;
+        totalSuccess: number;
+        totalErrors: number;
+      }>
+    >("/bulk-upload", { clients, organizationId });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al cargar los clientes");
+    throw error;
+  }
+};
+

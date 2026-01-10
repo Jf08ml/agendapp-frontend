@@ -13,9 +13,11 @@ import {
 } from "@mantine/core";
 import { useState, useEffect, useMemo } from "react";
 import ClientFormModal from "./ClientFormModal";
+import BulkUploadModal from "./BulkUploadModal";
 import ClientTable from "./ClientTable";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
+import { IconFileUpload } from "@tabler/icons-react";
 import {
   deleteClient,
   registerReferral,
@@ -30,6 +32,7 @@ import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 
 const ClientsDashboard = () => {
   const [openModal, setOpenModal] = useState(false);
+  const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debounced] = useDebouncedValue(searchTerm, 250);
@@ -193,12 +196,22 @@ const ClientsDashboard = () => {
               w={isMobile ? "100%" : 320}
               radius="md"
             />
+            <Tooltip label="Carga masiva desde Excel">
+              <Button
+                leftSection={<IconFileUpload size={18} />}
+                onClick={() => setOpenBulkUploadModal(true)}
+                variant="light"
+                color="blue"
+              >
+                {isMobile ? "Excel" : "Carga masiva"}
+              </Button>
+            </Tooltip>
             <Tooltip label="Crear nuevo cliente">
               <Button
                 leftSection={<IoAddCircleOutline />}
                 onClick={() => handleOpenModal(null)}
               >
-                Crear cliente
+                {isMobile ? "Crear" : "Crear cliente"}
               </Button>
             </Tooltip>
           </Group>
@@ -230,6 +243,12 @@ const ClientsDashboard = () => {
         fetchClients={fetchClients}
         client={editCLient}
         setClient={setEditClient}
+      />
+
+      <BulkUploadModal
+        opened={openBulkUploadModal}
+        onClose={() => setOpenBulkUploadModal(false)}
+        onUploadComplete={fetchClients}
       />
     </Box>
   );

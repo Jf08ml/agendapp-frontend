@@ -21,8 +21,10 @@ type Props = { organization: Organization | null };
 export default function Header({ organization }: Props) {
   const isXS = useMediaQuery("(max-width: 428px)");
 
-  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl } =
+  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding } =
     organization || {};
+  
+  const textColor = branding?.footerTextColor || "white";
 
   // Links del centro (solo desktop). Agrega/edita a tu gusto:
   const navLinks = useMemo(
@@ -76,7 +78,7 @@ export default function Header({ organization }: Props) {
               component={Link}
               to="/"
               underline="never"
-              c="white"
+              c={textColor}
               style={{ display: "inline-block", maxWidth: rem(280) }}
             >
               {/* Truncado elegante del nombre */}
@@ -98,7 +100,7 @@ export default function Header({ organization }: Props) {
               key={l.to}
               component={Link}
               to={l.to}
-              c="white"
+              c={textColor}
               fw={600}
               underline="never"
               style={{ textShadow: "0 1px 2px rgba(0,0,0,.25)" }}
@@ -119,7 +121,7 @@ export default function Header({ organization }: Props) {
                   style={{ width: 36, height: 36 }}
                 >
                   {socials.slice(0, 4).map(({ key, Icon }) => (
-                    <Icon key={key} size={18} color="#fff" />
+                    <Icon key={key} size={18} color={textColor} />
                   ))}
                 </SimpleGrid>
               </Box>
@@ -154,7 +156,7 @@ export default function Header({ organization }: Props) {
                   // Monocromo para verse pro sobre el header de color
                   styles={{
                     root: {
-                      color: "white",
+                      color: textColor,
                       background: "transparent",
                     },
                   }}

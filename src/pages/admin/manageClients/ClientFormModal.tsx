@@ -79,7 +79,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       if (client) {
         await updateClient(client._id, {
           name: name.trim(),
-          phoneNumber: phoneE164, // Enviar E.164 al backend
+          phoneNumber: phoneNumber.trim(), // Enviar el número como lo ingresa el usuario
           email: email.trim(),
           birthDate: birthDate || null,
         });
@@ -93,7 +93,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       } else {
         await createClient({
           name: name.trim(),
-          phoneNumber: phoneE164, // Enviar E.164 al backend
+          phoneNumber: phoneNumber.trim(), // Enviar el número como lo ingresa el usuario
           email: email.trim(),
           organizationId,
           birthDate: birthDate || null,
