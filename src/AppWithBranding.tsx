@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 import { AppDispatch, RootState } from "./app/store";
@@ -10,6 +10,12 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
+
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 // Función para crear paleta de 10 colores iguales con HEX
 function createCustomPalette(
@@ -50,6 +56,7 @@ export default function AppWithBranding() {
     (state: RootState) => state.organization.organization
   );
   const loading = useSelector((state: RootState) => state.organization.loading);
+  const hasSentInitialPageView = useRef(false);
 
   useEffect(() => {
     if (!organization) {
@@ -59,7 +66,18 @@ export default function AppWithBranding() {
 
   // Cambia el <title>
   useEffect(() => {
-    if (organization?.name) document.title = organization.name;
+    if (!organization?.name) return;
+
+    document.title = organization.name;
+
+    if (!hasSentInitialPageView.current && window.gtag) {
+      window.gtag("event", "page_view", {
+        page_title: organization.name,
+        page_location: window.location.href,
+        page_path: window.location.pathname,
+      });
+      hasSentInitialPageView.current = true;
+    }
   }, [organization?.name]);
 
   useEffect(() => {
