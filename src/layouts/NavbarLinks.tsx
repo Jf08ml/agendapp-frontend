@@ -17,6 +17,7 @@ import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText } from "react-icons/bs";
+import { MdCampaign } from "react-icons/md";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -166,6 +167,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Mensajes de WhatsApp",
           to: "/mensajes-whatsapp",
           icon: <BsChatText size={18} />,
+          canShow: can.whatsappRead,
+        },
+        {
+          label: "Campañas WhatsApp",
+          to: "/admin/campaigns",
+          icon: <MdCampaign size={18} />,
           canShow: can.whatsappRead,
         },
         {

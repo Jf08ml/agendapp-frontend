@@ -26,6 +26,9 @@ import WhatsappTemplateEditor from "../pages/admin/WhatsappTemplateEditor";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import MembershipPlans from "../pages/public/MembershipPlans";
 import PaymentHistory from "../pages/admin/PaymentHistory";
+import CampaignList from "../pages/admin/campaigns/CampaignList";
+import CampaignWizard from "../pages/admin/campaigns/CampaignWizard";
+import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
 
 const generalRoutes = [
   {
@@ -259,6 +262,44 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Historial de Pagos",
       description: "Eventos recientes del proveedor de pagos",
+    },
+  },
+
+  // Campaign routes
+  {
+    path: "/admin/campaigns",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <CampaignList {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Campañas de WhatsApp",
+      description: "Gestiona tus campañas masivas de WhatsApp",
+    },
+  },
+  {
+    path: "/admin/campaigns/new",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <CampaignWizard {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Nueva Campaña",
+      description: "Crea una nueva campaña de WhatsApp",
+    },
+  },
+  {
+    path: "/admin/campaigns/:campaignId",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <CampaignDetail {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Detalle de Campaña",
+      description: "Ver detalles y métricas de campaña",
     },
   },
 
