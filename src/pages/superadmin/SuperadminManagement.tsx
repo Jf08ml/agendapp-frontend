@@ -539,14 +539,10 @@ export default function SuperadminManagement() {
                 label="Monto del pago"
                 placeholder="0"
                 value={membershipForm.paymentAmount}
-                parser={(value) => value?.replace(/[^0-9.-]/g, "") || ""}
                 onChange={(value) =>
                   setMembershipForm({
                     ...membershipForm,
-                    paymentAmount:
-                      typeof value === "number"
-                        ? value
-                        : Number(String(value).replace(/[^0-9.-]/g, "")),
+                    paymentAmount: typeof value === "number" ? value : 0,
                   })
                 }
                 min={1}
