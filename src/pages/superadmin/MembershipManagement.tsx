@@ -82,10 +82,18 @@ export default function MembershipManagement() {
   };
 
   const handleRenew = async () => {
-    if (!selectedMembership || !paymentAmount) return;
+    const amount = Number(paymentAmount);
+    if (!selectedMembership || !Number.isFinite(amount) || amount <= 0) {
+      notifications.show({
+        title: "Monto inválido",
+        message: "Ingresa un monto mayor a 0",
+        color: "red",
+      });
+      return;
+    }
 
     try {
-      await renewMembership(selectedMembership._id, paymentAmount);
+      await renewMembership(selectedMembership._id, amount);
       notifications.show({
         title: "Éxito",
         message: "Membresía renovada correctamente",
@@ -423,9 +431,17 @@ export default function MembershipManagement() {
             label="Monto del Pago"
             placeholder="Ingresa el monto"
             value={paymentAmount}
-            onChange={(value) => setPaymentAmount(Number(value))}
+            parser={(value) => value?.replace(/[^0-9.-]/g, "") || ""}
+            onChange={(value) => {
+              const numeric =
+                typeof value === "number"
+                  ? value
+                  : Number(String(value).replace(/[^0-9.-]/g, ""));
+              setPaymentAmount(Number.isFinite(numeric) ? numeric : 0);
+            }}
             prefix="$"
             thousandSeparator=","
+            min={1}
             required
           />
 

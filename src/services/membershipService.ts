@@ -191,10 +191,15 @@ export const renewMembership = async (
   membershipId: string,
   paymentAmount: number
 ) => {
+  const amount = Number(paymentAmount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Monto de pago inválido");
+  }
+
   const response = await apiGeneral.post(
     `/memberships/${membershipId}/renew`,
     {
-      paymentAmount,
+      paymentAmount: amount,
     }
   );
   return response.data.data;

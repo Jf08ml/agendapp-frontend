@@ -274,6 +274,16 @@ export default function SuperadminManagement() {
   const handleSaveMembership = async () => {
     if (!selectedOrg?._id) return;
 
+    const amount = Number(membershipForm.paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      notifications.show({
+        title: "Monto inválido",
+        message: "Ingresa un monto mayor a 0",
+        color: "red",
+      });
+      return;
+    }
+
     setSavingMembership(true);
     try {
       const currentMembership = memberships.get(selectedOrg._id);
@@ -285,8 +295,7 @@ export default function SuperadminManagement() {
         const renewResponse = await apiGeneral.post(
           `/memberships/${currentMembership._id}/renew`,
           {
-            planId: membershipForm.planId,
-            skipPayment: true, // No crear checkout de Polar
+            paymentAmount: amount,
           }
         );
         membershipId = renewResponse.data.data._id;
@@ -304,7 +313,7 @@ export default function SuperadminManagement() {
         organizationId: selectedOrg._id,
         membershipId,
         planId: membershipForm.planId,
-        amount: membershipForm.paymentAmount,
+        amount,
         currency: "USD",
         paymentMethod: membershipForm.paymentMethod,
         adminNotes: membershipForm.adminNotes,
@@ -530,13 +539,17 @@ export default function SuperadminManagement() {
                 label="Monto del pago"
                 placeholder="0"
                 value={membershipForm.paymentAmount}
+                parser={(value) => value?.replace(/[^0-9.-]/g, "") || ""}
                 onChange={(value) =>
                   setMembershipForm({
                     ...membershipForm,
-                    paymentAmount: Number(value),
+                    paymentAmount:
+                      typeof value === "number"
+                        ? value
+                        : Number(String(value).replace(/[^0-9.-]/g, "")),
                   })
                 }
-                min={0}
+                min={1}
                 required
               />
 
