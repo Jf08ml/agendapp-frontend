@@ -66,8 +66,6 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   }, [client, opened]);
 
   const handleSubmit = async (): Promise<void> => {
-    console.log('[ClientFormModal] handleSubmit - phoneNumber:', phoneNumber, 'phoneE164:', phoneE164, 'phoneValid:', phoneValid);
-    
     // Validación del nombre
     if (!name.trim()) {
       showNotification({
@@ -145,7 +143,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
     (event: ChangeEvent<HTMLInputElement>) => setter(event.target.value);
 
-  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean, nationalNumber: string = "") => {
+  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean) => {
     setPhoneE164(phone_e164);
     setPhoneCountry(phone_country);
     setPhoneValid(isValid);
