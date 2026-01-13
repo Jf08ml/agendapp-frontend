@@ -66,7 +66,25 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   }, [client, opened]);
 
   const handleSubmit = async (): Promise<void> => {
+    console.log('[ClientFormModal] handleSubmit - phoneNumber:', phoneNumber, 'phoneE164:', phoneE164, 'phoneValid:', phoneValid);
+    
+    // Validación del nombre
+    if (!name.trim()) {
+      showNotification({
+        title: "Error",
+        message: "El nombre es requerido",
+        color: "red",
+        autoClose: 2000,
+      });
+      return;
+    }
+    
     // Validación del teléfono antes de enviar
+    if (!phoneNumber.trim()) {
+      setPhoneError("El teléfono es requerido");
+      return;
+    }
+
     if (!phoneValid || !phoneE164) {
       setPhoneError("Por favor ingresa un número de teléfono válido");
       return;
@@ -127,11 +145,17 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
     (event: ChangeEvent<HTMLInputElement>) => setter(event.target.value);
 
-  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean) => {
+  const handlePhoneChange = (phone_e164: string | null, phone_country: CountryCode | null, isValid: boolean, nationalNumber: string = "") => {
     setPhoneE164(phone_e164);
     setPhoneCountry(phone_country);
     setPhoneValid(isValid);
+    // Actualizar el phoneNumber con el valor que viene de InternationalPhoneInput
+    if (phone_e164) {
+      setPhoneNumber(phone_e164);
+    }
     
+    // No mostrar error mientras el usuario está escribiendo (campo vacío es normal)
+    // Solo mostrar error si escribió algo pero es inválido
     if (!isValid && phone_e164) {
       setPhoneError("Número de teléfono inválido");
     } else {
