@@ -169,6 +169,7 @@ const NotificationToggle = ({ userId }: NotificationToggleProps) => {
         onClose={() => setShowInstructions(false)}
         title="Cómo habilitar las notificaciones"
         size="lg"
+        zIndex={10000}
       >
         <InstructionsContent />
       </Modal>
