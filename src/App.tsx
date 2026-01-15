@@ -28,6 +28,22 @@ import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
 import { getCurrentMembership, Membership } from "./services/membershipService";
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
+// Función para convertir la clave VAPID de base64url a Uint8Array
+const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
+
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -129,9 +145,19 @@ function AppContent() {
       if (permission !== "granted") return;
 
       const registration = await navigator.serviceWorker.ready;
+      
+      // Convertir la clave VAPID a Uint8Array
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!vapidKey) {
+        console.error("La clave VAPID no está configurada");
+        return;
+      }
+
+      const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY,
+        applicationServerKey,
       });
 
       await createSubscription({
