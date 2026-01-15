@@ -123,6 +123,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     appointment.additionalItems || []
   );
   const [newItem, setNewItem] = useState({ name: "", price: 0 });
+  const [updatingReminder, setUpdatingReminder] = useState(false);
 
   const handleAddItem = () => {
     if (newItem.name && newItem.price > 0) {
@@ -942,11 +943,13 @@ ${clientServices}`;
             : appointment.client.name}
         </Text>
 
-        {/* Ícono de recordatorio (esquina fija, informativo) */}
+        {/* Ícono de recordatorio (esquina fija, clickeable) */}
         <Tooltip
           label={
-            appointment.reminderSent
-              ? "Recordatorio enviado"
+            updatingReminder
+              ? "Actualizando..."
+              : appointment.reminderSent
+              ? "Recordatorio enviado - Click para marcar como pendiente"
               : "Recordatorio pendiente"
           }
           withArrow
@@ -955,12 +958,59 @@ ${clientServices}`;
             className="ignore-modal"
             size="xs"
             variant="transparent"
+            loading={updatingReminder}
+            disabled={updatingReminder}
             style={{
               position: "absolute",
               bottom: -2,
               right: -2,
               pointerEvents: "auto",
+              cursor: appointment.reminderSent && !updatingReminder ? "pointer" : "default",
             }}
+            onClick={
+              appointment.reminderSent && !updatingReminder
+                ? async (e) => {
+                    e.stopPropagation();
+                    setUpdatingReminder(true);
+                    try {
+                      const updatedAppointment = await updateAppointment(
+                        appointment._id,
+                        { reminderSent: false }
+                      );
+
+                      if (updatedAppointment) {
+                        showNotification({
+                          title: "Recordatorio actualizado",
+                          message: "El recordatorio se marcó como pendiente",
+                          color: "blue",
+                          autoClose: 3000,
+                          position: "top-right",
+                        });
+
+                        // Actualizar solo este appointment en el estado local
+                        setAppointments((prevAppointments) =>
+                          prevAppointments.map((appt) =>
+                            appt._id === appointment._id
+                              ? { ...appt, reminderSent: false }
+                              : appt
+                          )
+                        );
+                      }
+                    } catch (error) {
+                      console.error(error);
+                      showNotification({
+                        title: "Error",
+                        message: "No se pudo actualizar el recordatorio",
+                        color: "red",
+                        autoClose: 3000,
+                        position: "top-right",
+                      });
+                    } finally {
+                      setUpdatingReminder(false);
+                    }
+                  }
+                : undefined
+            }
           >
             {appointment.reminderSent ? (
               <BiCheckCircle size={12} color="teal" />
