@@ -185,16 +185,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   }, [appointment, setNewAppointment]);
 
   useEffect(() => {
-    if (appointment) {
-      // MODO EDICIÓN
-      // Recalcular endDate con base en un solo servicio
-      const service = newAppointment.services?.[0];
-      if (newAppointment.startDate && service) {
-        // Asumiendo que 'service.duration' es minutos
-        const end = addMinutes(newAppointment.startDate, service.duration);
-        setNewAppointment((prev) => ({ ...prev, endDate: end }));
-      }
-    } else {
+    // SOLO en modo CREACIÓN: recalcular endDate automáticamente
+    // En modo EDICIÓN: respetar el endDate de la BD (permite duraciones personalizadas)
+    if (!appointment) {
       // MODO CREACIÓN
       // Sumar la duración de todos los servicios
       if (newAppointment.startDate && newAppointment.services) {
