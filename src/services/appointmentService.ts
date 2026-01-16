@@ -108,6 +108,7 @@ export interface CreateAppointmentsBatchPayload {
   employee: Employee | string;
   client: Client | string;
   startDate: Date | string; // inicio de la primera cita
+  endDate?: Date | string; // 🕐 fin personalizado (opcional)
   organizationId: string;
   advancePayment?: number;
   employeeRequestedByClient?: boolean;
@@ -279,6 +280,7 @@ export const createAppointmentsBatch = async (
       employee: asId(data.employee),
       client: asId(data.client),
       startDate: asISO(data.startDate),
+      ...(data.endDate && { endDate: asISO(data.endDate) }), // 🕐 Incluir endDate si está presente
       organizationId: data.organizationId,
       advancePayment: data.advancePayment,
       employeeRequestedByClient: data.employeeRequestedByClient ?? false,

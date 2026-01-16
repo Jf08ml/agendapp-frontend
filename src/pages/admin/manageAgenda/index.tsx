@@ -608,6 +608,7 @@ const ScheduleView: React.FC = () => {
             client,
             employeeRequestedByClient: employeeRequestedByClient ?? false,
             startDate,
+            endDate, // 🕐 Enviar endDate para permitir duraciones personalizadas
             organizationId: organizationId as string,
             advancePayment,
             // si manejas precios personalizados o adicionales, aquí también:
