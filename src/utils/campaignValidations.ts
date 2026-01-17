@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // utils/campaignValidations.ts
 
 /**
@@ -114,7 +115,7 @@ export function formatPhoneDisplay(phone: string): string {
   }
 
   // Formato genérico: añadir '+' al inicio
-  return `+${phone}`;
+  return `${phone}`;
 }
 
 /**

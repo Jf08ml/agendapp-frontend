@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/admin/campaigns/components/AudienceSelector.tsx
 import { useState, useEffect } from "react";
 import {
