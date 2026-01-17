@@ -96,6 +96,7 @@ export interface AudienceSuggestion {
   id: string;
   name: string;
   phone: string;
+  country?: string; // ISO2 código de país (CO, MX, PE, etc.)
 }
 
 export interface AudienceSuggestionsResponse {

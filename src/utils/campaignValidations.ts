@@ -2,33 +2,39 @@
 // utils/campaignValidations.ts
 
 /**
- * Normaliza un número de teléfono al formato E.164 sin el símbolo '+'
+ * Normaliza un número de teléfono al formato E.164 con '+'
+ * Acepta números con código de país y números locales
  * Retorna null si el número es inválido
  */
-export function normalizePhone(
-  phone: string,
-  defaultCountryCode = "57"
-): string | null {
+export function normalizePhone(phone: string): string | null {
   if (!phone) return null;
 
   // 1. Remover espacios, guiones, paréntesis y otros caracteres especiales
   let cleaned = phone.replace(/[\s\-\(\)\.]/g, "");
 
-  // 2. Si empieza con '+', removerlo
-  cleaned = cleaned.replace(/^\+/, "");
-
-  // 3. Si no tiene código de país y tiene 10 dígitos, agregar default
-  if (cleaned.length === 10 && /^\d{10}$/.test(cleaned)) {
-    cleaned = defaultCountryCode + cleaned;
+  // 2. Si empieza con '+', mantenerlo
+  const hasPlus = cleaned.startsWith("+");
+  if (hasPlus) {
+    cleaned = cleaned.slice(1);
   }
 
-  // 4. Validar formato E.164 (solo dígitos, longitud entre 10 y 15)
-  if (!/^\d{10,15}$/.test(cleaned)) {
+  // 3. Si empieza con '00', convertir a '+'
+  if (cleaned.startsWith("00")) {
+    cleaned = cleaned.slice(2);
+  }
+
+  // 4. Validar que solo contenga dígitos
+  if (!/^\d+$/.test(cleaned)) {
     return null; // ❌ Inválido
   }
 
-  // 5. Retornar sin el símbolo '+'
-  return cleaned; // ✅ Ejemplo: "573001234567"
+  // 5. Validar longitud E.164 (10-15 dígitos sin el +)
+  if (cleaned.length < 10 || cleaned.length > 15) {
+    return null; // ❌ Inválido
+  }
+
+  // 6. Retornar con el símbolo '+' (formato E.164 completo)
+  return `+${cleaned}`; // ✅ Ejemplo: "+573001234567"
 }
 
 /**
@@ -57,10 +63,7 @@ export function deduplicatePhones(phones: string[]): {
 /**
  * Valida una lista de teléfonos y retorna detalles de validación
  */
-export function validatePhoneList(
-  phones: string[],
-  defaultCountryCode = "57"
-): {
+export function validatePhoneList(phones: string[]): {
   normalized: string[];
   invalid: string[];
   duplicates: string[];
@@ -69,7 +72,7 @@ export function validatePhoneList(
   const invalid: string[] = [];
 
   for (const phone of phones) {
-    const clean = normalizePhone(phone, defaultCountryCode);
+    const clean = normalizePhone(phone);
 
     if (!clean) {
       invalid.push(phone);
@@ -104,18 +107,31 @@ export function parsePhoneText(text: string): string[] {
 
 /**
  * Formatea un número para mostrar (añade espacios o guiones para legibilidad)
- * Ejemplo: 573001234567 → +57 300 123 4567
+ * Ejemplo: +573001234567 → +57 300 123 4567
  */
 export function formatPhoneDisplay(phone: string): string {
   if (!phone) return "";
 
-  // Si tiene código de país de Colombia (57)
-  if (phone.startsWith("57") && phone.length === 12) {
-    return `+57 ${phone.slice(2, 5)} ${phone.slice(5, 8)} ${phone.slice(8)}`;
+  // Asegurar que tiene el '+'
+  const formatted = phone.startsWith("+") ? phone : `+${phone}`;
+
+  // Si es un número colombiano (+57XXXXXXXXXX)
+  if (formatted.startsWith("+57") && formatted.length === 13) {
+    return `+57 ${formatted.slice(3, 6)} ${formatted.slice(6, 9)} ${formatted.slice(9)}`;
   }
 
-  // Formato genérico: añadir '+' al inicio
-  return `${phone}`;
+  // Si es un número mexicano (+521XXXXXXXXXX)
+  if (formatted.startsWith("+521") && formatted.length === 14) {
+    return `+52 1 ${formatted.slice(4, 7)} ${formatted.slice(7, 10)} ${formatted.slice(10)}`;
+  }
+
+  // Si es un número mexicano sin el 1 (+52XXXXXXXXXX)
+  if (formatted.startsWith("+52") && formatted.length === 13) {
+    return `+52 ${formatted.slice(3, 6)} ${formatted.slice(6, 9)} ${formatted.slice(9)}`;
+  }
+
+  // Formato genérico: mostrar tal cual está
+  return formatted;
 }
 
 /**
