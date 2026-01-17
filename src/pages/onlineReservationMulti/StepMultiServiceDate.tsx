@@ -43,7 +43,12 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     1, 2, 3, 4, 5,
   ];
 
-  const isDisabledDay = (d: Date) => !businessDays.includes(dayjs(d).day());
+  const isDisabledDay = (d: Date) => {
+    // Deshabilitar días anteriores a hoy
+    if (dayjs(d).isBefore(dayjs(), 'day')) return true;
+    // Deshabilitar días que no son laborables
+    return !businessDays.includes(dayjs(d).day());
+  };
 
   // Mantener value sincronizado con servicios seleccionados
   useEffect(() => {
