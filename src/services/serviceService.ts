@@ -1,4 +1,4 @@
-import { apiService } from "./axiosConfig";
+import { apiService, apiServicePublic } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 
 // Definir la estructura de un servicio
@@ -48,7 +48,7 @@ export const getServicesByOrganizationId = async (
   organizationId: string
 ): Promise<Service[]> => {
   try {
-    const response = await apiService.get<Response<Service[]>>(
+    const response = await apiServicePublic.get<Response<Service[]>>(
       `/organization/${organizationId}`
     );
     return response.data.data;

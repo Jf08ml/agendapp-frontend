@@ -21,6 +21,15 @@ const addTenantHeader = (api: AxiosInstance) => {
   return api;
 };
 
+const addTenantHeaderWithoutAuth = (api: AxiosInstance) => {
+  api.interceptors.request.use((config) => {
+    // Solo agregar el header del tenant, NO el token de autenticación
+    config.headers["X-Tenant-Domain"] = window.location.hostname;
+    return config;
+  });
+  return api;
+};
+
 const addMembershipInterceptor = (api: AxiosInstance) => {
   api.interceptors.response.use(
     (response) => response,
@@ -55,8 +64,18 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         const isPublicPath = publicPaths.some(path => currentPath === path || currentPath.startsWith(path));
         
         if (!isPublicPath && !currentPath.includes('/login')) {
-          console.log('Sesión expirada o inválida, redirigiendo a login...');
-          window.location.href = '/login-admin';
+          // Dispatch evento para mostrar notificación
+          const event = new CustomEvent("session-expired", {
+            detail: {
+              message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+            },
+          });
+          window.dispatchEvent(event);
+          
+          // Redirigir después de un breve delay para que se vea la notificación
+          setTimeout(() => {
+            window.location.href = '/login-admin';
+          }, 1500);
         }
       }
       
@@ -73,6 +92,13 @@ const createAxiosInstance = (baseURL: string): AxiosInstance => {
   return api;
 };
 
+const createPublicAxiosInstance = (baseURL: string): AxiosInstance => {
+  const api = axios.create({ baseURL });
+  addTenantHeaderWithoutAuth(api);
+  // No agregamos el interceptor de membresía para rutas públicas
+  return api;
+};
+
 // Crear instancias de Axios para diferentes partes de la API
 const apiGeneral: AxiosInstance = createAxiosInstance(API_BASE_URL);
 
@@ -84,8 +110,14 @@ const apiAppointment: AxiosInstance = createAxiosInstance(
 const apiService: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/services`
 );
-const apiImage: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/image`);
+const apiServicePublic: AxiosInstance = createPublicAxiosInstance(
+  `${API_BASE_URL}/services`
+);
+const apiImage: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/images`);
 const apiEmployee: AxiosInstance = createAxiosInstance(
+  `${API_BASE_URL}/employees`
+);
+const apiEmployeePublic: AxiosInstance = createPublicAxiosInstance(
   `${API_BASE_URL}/employees`
 );
 const apiAdvance: AxiosInstance = createAxiosInstance(
@@ -114,8 +146,10 @@ export {
   apiClient,
   apiAppointment,
   apiService,
+  apiServicePublic,
   apiImage,
   apiEmployee,
+  apiEmployeePublic,
   apiAdvance,
   apiAuth,
   apiOrganization,

@@ -19,7 +19,7 @@ const campaignService = {
     phones: string[]
   ): Promise<PhoneValidation> {
     const response = await apiGeneral.post<{ data: { validation: PhoneValidation } }>(
-      `/organizations/${orgId}/campaigns/validate-phones`,
+      `/campaigns/organizations/${orgId}/validate-phones`,
       { phones }
     );
     return response.data.data.validation;
@@ -33,7 +33,7 @@ const campaignService = {
     data: CreateCampaignRequest
   ): Promise<Campaign> {
     const response = await apiGeneral.post<{ data: { campaign: Campaign } }>(
-      `/organizations/${orgId}/campaigns`,
+      `/campaigns/organizations/${orgId}`,
       data
     );
     return response.data.data.campaign;
@@ -51,7 +51,7 @@ const campaignService = {
     }
   ): Promise<CampaignListResponse> {
     const response = await apiGeneral.get<{ data: CampaignListResponse }>(
-      `/organizations/${orgId}/campaigns`,
+      `/campaigns/organizations/${orgId}`,
       { params }
     );
     return response.data.data;
@@ -65,7 +65,7 @@ const campaignService = {
     campaignId: string
   ): Promise<Campaign> {
     const response = await apiGeneral.get<{ data: CampaignDetailResponse }>(
-      `/organizations/${orgId}/campaigns/${campaignId}`
+      `/campaigns/organizations/${orgId}/${campaignId}`
     );
     return response.data.data.campaign;
   },
@@ -75,7 +75,7 @@ const campaignService = {
    */
   async cancelCampaign(orgId: string, campaignId: string): Promise<void> {
     await apiGeneral.post(
-      `/organizations/${orgId}/campaigns/${campaignId}/cancel`
+      `/campaigns/organizations/${orgId}/${campaignId}/cancel`
     );
   },
 
@@ -84,7 +84,7 @@ const campaignService = {
    */
   async convertDryRunToReal(orgId: string, campaignId: string): Promise<Campaign> {
     const response = await apiGeneral.post<{ data: { campaign: Campaign } }>(
-      `/organizations/${orgId}/campaigns/${campaignId}/convert-to-real`
+      `/campaigns/organizations/${orgId}/${campaignId}/convert-to-real`
     );
     return response.data.data.campaign;
   },
@@ -99,7 +99,7 @@ const campaignService = {
     page?: number
   ): Promise<AudienceSuggestionsResponse> {
     const response = await apiGeneral.get<{ data: AudienceSuggestionsResponse }>(
-      `/organizations/${orgId}/campaigns/audience/suggestions`,
+      `/campaigns/organizations/${orgId}/audience/suggestions`,
       { params: { search, limit, page } }
     );
     return response.data.data;
@@ -113,7 +113,7 @@ const campaignService = {
     search?: string
   ): Promise<{ ok: boolean; total: number; clients: { id: string; name: string; phone: string }[] }> {
     const response = await apiGeneral.get<{ data: any }>(
-      `/organizations/${orgId}/campaigns/audience/all`,
+      `/campaigns/organizations/${orgId}/audience/all`,
       { params: { search } }
     );
     return response.data.data;

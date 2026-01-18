@@ -1,7 +1,10 @@
 // pages/admin/campaigns/components/MessageComposer.tsx
-import { Box, TextInput, Title, Paper, Alert, Badge, Textarea, Text, Image } from "@mantine/core";
+import { useState } from "react";
+import { Box, TextInput, Title, Paper, Alert, Badge, Textarea, Text, Image, FileInput, Group, Button, Loader } from "@mantine/core";
+import { IconUpload, IconX } from "@tabler/icons-react";
 import type { CampaignRecipient } from "../../../../types/campaign";
 import { renderMessagePreview } from "../../../../utils/campaignValidations";
+import { uploadImage } from "../../../../services/imageService";
 
 interface MessageComposerProps {
   title: string;
@@ -18,6 +21,9 @@ export default function MessageComposer({
   onUpdate,
   previewRecipient,
 }: MessageComposerProps) {
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  
   const charCount = message.length;
   const maxChars = 1000;
   const isOverLimit = charCount > maxChars;
@@ -25,6 +31,29 @@ export default function MessageComposer({
   const preview = previewRecipient
     ? renderMessagePreview(message, { name: previewRecipient.name })
     : message;
+
+  const handleImageUpload = async (file: File | null) => {
+    if (!file) return;
+
+    setUploadingImage(true);
+    setUploadError(null);
+
+    try {
+      const imageUrl = await uploadImage(file);
+      if (imageUrl) {
+        onUpdate({ image: imageUrl });
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setUploadError("Error al subir la imagen. Por favor, intenta de nuevo.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    onUpdate({ image: undefined });
+  };
 
   return (
     <Box>
@@ -70,14 +99,49 @@ Agenda tu cita: wa.me/573001234567`}
       </Alert>
 
       {/* Imagen opcional */}
-      <TextInput
-        label="URL de imagen (opcional)"
-        placeholder="https://ejemplo.com/imagen-promocion.jpg"
-        value={image || ""}
-        onChange={(e) => onUpdate({ image: e.currentTarget.value })}
-        description="Puedes agregar una imagen a tu campaña pegando la URL"
-        mb="lg"
-      />
+      <Box mb="lg">
+        <Text size="sm" fw={500} mb="xs">
+          Imagen (opcional)
+        </Text>
+        
+        {image ? (
+          <Box>
+            <Image
+              src={image}
+              alt="Imagen seleccionada"
+              style={{
+                maxHeight: 200,
+                maxWidth: 400,
+                objectFit: "contain",
+                borderRadius: 8,
+                border: "1px solid #dee2e6",
+              }}
+              mb="sm"
+            />
+            <Group>
+              <Button
+                variant="subtle"
+                color="red"
+                size="xs"
+                leftSection={<IconX size={16} />}
+                onClick={handleRemoveImage}
+              >
+                Eliminar imagen
+              </Button>
+            </Group>
+          </Box>
+        ) : (
+          <FileInput
+            placeholder="Selecciona una imagen"
+            accept="image/*"
+            leftSection={uploadingImage ? <Loader size={18} /> : <IconUpload size={18} />}
+            onChange={handleImageUpload}
+            disabled={uploadingImage}
+            description="Formatos: JPG, PNG, GIF (máx. 5MB)"
+            error={uploadError}
+          />
+        )}
+      </Box>
 
       {/* Previsualización */}
       <Box>

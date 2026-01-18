@@ -1,4 +1,4 @@
-import { apiEmployee } from "./axiosConfig";
+import { apiEmployee, apiEmployeePublic } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
 
@@ -62,7 +62,7 @@ export const getEmployeesByOrganizationId = async (
   organizationId: string
 ): Promise<Employee[]> => {
   try {
-    const response = await apiEmployee.get<Response<Employee[]>>(
+    const response = await apiEmployeePublic.get<Response<Employee[]>>(
       `/organization/${organizationId}`
     );
     return response.data.data;

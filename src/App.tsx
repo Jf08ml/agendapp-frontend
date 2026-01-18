@@ -119,6 +119,21 @@ function AppContent() {
     };
   }, []);
 
+  // Escuchar evento de sesión expirada
+  useEffect(() => {
+    const handleSessionExpired = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      // Usar el sistema de notificaciones de Mantine si está disponible
+      // Por ahora mostramos un alert simple
+      alert(customEvent.detail.message || "Tu sesión ha expirado");
+    };
+
+    window.addEventListener("session-expired", handleSessionExpired);
+    return () => {
+      window.removeEventListener("session-expired", handleSessionExpired);
+    };
+  }, []);
+
   // 🔔 Notificaciones push (con guards para Instagram / Telegram / FB in-app)
   useEffect(() => {
     const requestNotificationPermission = async () => {
