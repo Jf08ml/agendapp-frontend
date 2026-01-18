@@ -9,6 +9,13 @@ const addTenantHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
     // window.location.hostname: el dominio actual donde está corriendo tu frontend
     config.headers["X-Tenant-Domain"] = window.location.hostname;
+    
+    // Agregar token de autenticación si existe
+    const token = localStorage.getItem("app_token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     return config;
   });
   return api;
@@ -32,6 +39,27 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         });
         window.dispatchEvent(event);
       }
+      
+      // Detectar error 401 por token expirado o inválido
+      if (error.response?.status === 401) {
+        // Limpiar datos de autenticación
+        localStorage.removeItem("app_token");
+        localStorage.removeItem("app_userId");
+        localStorage.removeItem("app_role");
+        
+        // Solo redirigir a login si estamos en rutas protegidas
+        // No redirigir si estamos en landing, login, o rutas públicas
+        const publicPaths = ['/login', '/login-admin', '/planes', '/servicios-precios', '/'];
+        const currentPath = window.location.pathname;
+        
+        const isPublicPath = publicPaths.some(path => currentPath === path || currentPath.startsWith(path));
+        
+        if (!isPublicPath && !currentPath.includes('/login')) {
+          console.log('Sesión expirada o inválida, redirigiendo a login...');
+          window.location.href = '/login-admin';
+        }
+      }
+      
       return Promise.reject(error);
     }
   );
