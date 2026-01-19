@@ -203,11 +203,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   }, [appointment, setNewAppointment]);
 
   useEffect(() => {
-    // SOLO en modo CREACIÓN: recalcular endDate automáticamente
-    // En modo EDICIÓN: respetar el endDate de la BD (permite duraciones personalizadas)
     if (!appointment) {
-      // MODO CREACIÓN
-      // Sumar la duración de todos los servicios (usando duraciones personalizadas si existen)
+      // MODO CREACIÓN: recalcular endDate basado en duración de servicios
       if (newAppointment.startDate && newAppointment.services) {
         const totalDuration = newAppointment.services.reduce((acc, s) => {
           // Usar duración personalizada si existe, sino la duración del servicio
@@ -216,6 +213,25 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }, 0);
         const end = addMinutes(newAppointment.startDate, totalDuration);
         setNewAppointment((prev) => ({ ...prev, endDate: end }));
+      }
+    } else {
+      // MODO EDICIÓN: mantener la duración original al cambiar startDate
+      // Calcular la duración actual y aplicarla al nuevo startDate
+      if (newAppointment.startDate && newAppointment.endDate) {
+        const currentDurationMs =
+          new Date(newAppointment.endDate).getTime() -
+          new Date(newAppointment.startDate).getTime();
+
+        // Solo recalcular si la duración es inválida (endDate antes de startDate)
+        // Esto ocurre cuando se cambia el día del startDate
+        if (currentDurationMs < 0) {
+          // Obtener la duración original de la cita en BD
+          const originalDurationMs =
+            new Date(appointment.endDate).getTime() -
+            new Date(appointment.startDate).getTime();
+          const newEnd = new Date(newAppointment.startDate.getTime() + originalDurationMs);
+          setNewAppointment((prev) => ({ ...prev, endDate: newEnd }));
+        }
       }
     }
   }, [
