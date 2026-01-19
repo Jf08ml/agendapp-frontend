@@ -72,8 +72,8 @@ export const TIMEZONES_BY_COUNTRY: Record<CountryCode, TimezoneOption[]> = {
   ],
 
   ES: [
-    { value: "Europe/Madrid", label: "🇪🇸 España (Madrid, Barcelona, Valencia)", offset: "UTC+1" },
-    { value: "Europe/Madrid", label: "🇪🇸 España Canarias (Las Palmas, Tenerife)", offset: "UTC+0" },
+    { value: "Europe/Madrid", label: "🇪🇸 España Peninsular (Madrid, Barcelona, Valencia)", offset: "UTC+1" },
+    { value: "Atlantic/Canary", label: "🇪🇸 España Canarias (Las Palmas, Tenerife)", offset: "UTC+0" },
   ],
 
   SV: [
