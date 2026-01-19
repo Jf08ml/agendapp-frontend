@@ -1,29 +1,41 @@
 // pages/admin/campaigns/components/MessageComposer.tsx
-import { useState } from "react";
-import { Box, TextInput, Title, Paper, Alert, Badge, Textarea, Text, Image, FileInput, Group, Button, Loader } from "@mantine/core";
-import { IconUpload, IconX } from "@tabler/icons-react";
+import { useState, useRef } from "react";
+import { Box, TextInput, Title, Paper, Alert, Badge, Textarea, Text, Image, Group, Button, Loader, Progress } from "@mantine/core";
+import { IconUpload, IconX, IconPhoto, IconGif, IconVideo } from "@tabler/icons-react";
 import type { CampaignRecipient } from "../../../../types/campaign";
+import type { MediaType } from "../../../../services/imageService";
 import { renderMessagePreview } from "../../../../utils/campaignValidations";
-import { uploadImage } from "../../../../services/imageService";
+import { uploadMediaDirect, validateFile, getMediaType } from "../../../../services/imageService";
 
 interface MessageComposerProps {
   title: string;
   message: string;
+  media?: {
+    url: string;
+    type: MediaType;
+    fileId?: string;
+  };
+  // Legacy support
   image?: string;
-  onUpdate: (updates: any) => void;
+  onUpdate: (updates: { title?: string; message?: string; media?: { url: string; type: MediaType; fileId?: string }; image?: string }) => void;
   previewRecipient?: CampaignRecipient;
 }
+
+const ACCEPTED_FILE_TYPES = "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 
 export default function MessageComposer({
   title,
   message,
+  media,
   image,
   onUpdate,
   previewRecipient,
 }: MessageComposerProps) {
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const charCount = message.length;
   const maxChars = 1000;
   const isOverLimit = charCount > maxChars;
@@ -32,27 +44,77 @@ export default function MessageComposer({
     ? renderMessagePreview(message, { name: previewRecipient.name })
     : message;
 
-  const handleImageUpload = async (file: File | null) => {
+  // Determinar el media actual (soportar legacy 'image' prop)
+  const currentMedia = media || (image ? { url: image, type: "image" as MediaType } : undefined);
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
-    setUploadingImage(true);
+    // Reset input para permitir seleccionar el mismo archivo de nuevo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    // Validar archivo antes de subir
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      setUploadError(validation.error || "Archivo no válido");
+      return;
+    }
+
+    setUploading(true);
     setUploadError(null);
+    setUploadProgress(10);
 
     try {
-      const imageUrl = await uploadImage(file);
-      if (imageUrl) {
-        onUpdate({ image: imageUrl });
+      // Simular progreso mientras sube
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 200);
+
+      const result = await uploadMediaDirect(file, "campaigns");
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (result) {
+        onUpdate({
+          media: {
+            url: result.url,
+            type: result.fileType,
+            fileId: result.fileId,
+          },
+          image: result.url, // Legacy support
+        });
       }
     } catch (error) {
-      console.error("Error uploading image:", error);
-      setUploadError("Error al subir la imagen. Por favor, intenta de nuevo.");
+      console.error("Error uploading media:", error);
+      setUploadError(error instanceof Error ? error.message : "Error al subir el archivo");
     } finally {
-      setUploadingImage(false);
+      setUploading(false);
+      setUploadProgress(0);
     }
   };
 
-  const handleRemoveImage = () => {
-    onUpdate({ image: undefined });
+  const handleRemoveMedia = () => {
+    onUpdate({ media: undefined, image: undefined });
+  };
+
+  const getMediaTypeIcon = (type: MediaType) => {
+    switch (type) {
+      case "video": return <IconVideo size={16} />;
+      case "gif": return <IconGif size={16} />;
+      default: return <IconPhoto size={16} />;
+    }
+  };
+
+  const getMediaTypeLabel = (type: MediaType) => {
+    switch (type) {
+      case "video": return "Video";
+      case "gif": return "GIF";
+      default: return "Imagen";
+    }
   };
 
   return (
@@ -98,48 +160,94 @@ Agenda tu cita: wa.me/573001234567`}
         </Text>
       </Alert>
 
-      {/* Imagen opcional */}
+      {/* Media (imagen, GIF o video) */}
       <Box mb="lg">
         <Text size="sm" fw={500} mb="xs">
-          Imagen (opcional)
+          Multimedia (opcional)
         </Text>
-        
-        {image ? (
+
+        {currentMedia ? (
           <Box>
-            <Image
-              src={image}
-              alt="Imagen seleccionada"
-              style={{
-                maxHeight: 200,
-                maxWidth: 400,
-                objectFit: "contain",
-                borderRadius: 8,
-                border: "1px solid #dee2e6",
-              }}
+            <Badge
+              leftSection={getMediaTypeIcon(currentMedia.type)}
+              color={currentMedia.type === "video" ? "blue" : currentMedia.type === "gif" ? "grape" : "green"}
               mb="sm"
-            />
-            <Group>
+            >
+              {getMediaTypeLabel(currentMedia.type)}
+            </Badge>
+
+            {currentMedia.type === "video" ? (
+              <video
+                src={currentMedia.url}
+                controls
+                style={{
+                  maxHeight: 200,
+                  maxWidth: 400,
+                  borderRadius: 8,
+                  border: "1px solid #dee2e6",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <Image
+                src={currentMedia.url}
+                alt="Media seleccionado"
+                style={{
+                  maxHeight: 200,
+                  maxWidth: 400,
+                  objectFit: "contain",
+                  borderRadius: 8,
+                  border: "1px solid #dee2e6",
+                }}
+              />
+            )}
+
+            <Group mt="sm">
               <Button
                 variant="subtle"
                 color="red"
                 size="xs"
                 leftSection={<IconX size={16} />}
-                onClick={handleRemoveImage}
+                onClick={handleRemoveMedia}
               >
-                Eliminar imagen
+                Eliminar {getMediaTypeLabel(currentMedia.type).toLowerCase()}
               </Button>
             </Group>
           </Box>
         ) : (
-          <FileInput
-            placeholder="Selecciona una imagen"
-            accept="image/*"
-            leftSection={uploadingImage ? <Loader size={18} /> : <IconUpload size={18} />}
-            onChange={handleImageUpload}
-            disabled={uploadingImage}
-            description="Formatos: JPG, PNG, GIF (máx. 5MB)"
-            error={uploadError}
-          />
+          <Box>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_FILE_TYPES}
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+              id="media-upload-input"
+            />
+            <Button
+              component="label"
+              htmlFor="media-upload-input"
+              variant="light"
+              leftSection={uploading ? <Loader size={18} /> : <IconUpload size={18} />}
+              disabled={uploading}
+            >
+              {uploading ? "Subiendo..." : "Seleccionar archivo"}
+            </Button>
+
+            {uploading && (
+              <Progress value={uploadProgress} size="sm" mt="sm" animated />
+            )}
+
+            <Text size="xs" c="dimmed" mt="xs">
+              Formatos: JPG, PNG, WebP, GIF, MP4, WebM (máx. 25MB)
+            </Text>
+
+            {uploadError && (
+              <Text size="sm" c="red" mt="xs">
+                {uploadError}
+              </Text>
+            )}
+          </Box>
         )}
       </Box>
 
@@ -166,20 +274,34 @@ Agenda tu cita: wa.me/573001234567`}
               position: "relative",
             }}
           >
-            {image && (
-              <Image
-                src={image}
-                alt="Preview"
-                style={{
-                  maxHeight: 200,
-                  objectFit: "cover",
-                  borderRadius: 4,
-                  marginBottom: 8,
-                }}
-                onError={(e: any) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+            {currentMedia && (
+              currentMedia.type === "video" ? (
+                <video
+                  src={currentMedia.url}
+                  controls
+                  style={{
+                    maxHeight: 200,
+                    width: "100%",
+                    objectFit: "cover",
+                    borderRadius: 4,
+                    marginBottom: 8,
+                  }}
+                />
+              ) : (
+                <Image
+                  src={currentMedia.url}
+                  alt="Preview"
+                  style={{
+                    maxHeight: 200,
+                    objectFit: "cover",
+                    borderRadius: 4,
+                    marginBottom: 8,
+                  }}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              )
             )}
 
             <Text

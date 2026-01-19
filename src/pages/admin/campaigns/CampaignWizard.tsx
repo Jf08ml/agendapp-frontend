@@ -116,6 +116,7 @@ export default function CampaignWizard() {
         message: wizardState.message,
         recipients: wizardState.recipients,
         image: wizardState.image,
+        media: wizardState.media,
         dryRun,
       });
 
@@ -173,6 +174,7 @@ export default function CampaignWizard() {
             title={wizardState.title}
             message={wizardState.message}
             image={wizardState.image}
+            media={wizardState.media}
             onUpdate={updateWizardState}
             previewRecipient={wizardState.recipients[0]}
           />

@@ -15,6 +15,14 @@ export interface CampaignItemDetail {
   errorMessage?: string;
 }
 
+export type CampaignMediaType = "image" | "gif" | "video";
+
+export interface CampaignMedia {
+  url: string;
+  type: CampaignMediaType;
+  fileId?: string;
+}
+
 export interface CampaignStats {
   total: number;
   sent: number;
@@ -38,7 +46,8 @@ export interface Campaign {
   createdBy?: string;
   title: string;
   message: string;
-  image?: string;
+  image?: string; // Legacy
+  media?: CampaignMedia;
   bulkId?: string;
   status: CampaignStatus;
   isDryRun: boolean;
@@ -56,7 +65,8 @@ export interface CreateCampaignRequest {
   title: string;
   message: string;
   recipients: CampaignRecipient[];
-  image?: string;
+  image?: string; // Legacy
+  media?: CampaignMedia;
   dryRun?: boolean;
 }
 
@@ -121,7 +131,8 @@ export interface CampaignWizardState {
   // Paso 2: Mensaje
   title: string;
   message: string;
-  image?: string;
+  image?: string; // Legacy
+  media?: CampaignMedia;
   // Paso 3: Confirmación
   validation?: PhoneValidation;
   isDryRun: boolean;
