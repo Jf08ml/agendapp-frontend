@@ -14,6 +14,8 @@ import {
   Avatar,
   Card,
   Loader,
+  Divider,
+  Badge,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
@@ -28,7 +30,10 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { formatCurrency } from "../../../../utils/formatCurrency";
-import { formatInTimezone, formatFullDateInTimezone } from "../../../../utils/timezoneUtils";
+import {
+  formatInTimezone,
+  formatFullDateInTimezone,
+} from "../../../../utils/timezoneUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -39,10 +44,10 @@ import { RootState } from "../../../../app/store";
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
 import SeriesPreview from "../../../../components/customCalendar/components/SeriesPreview";
-import { 
-  RecurrencePattern, 
+import {
+  RecurrencePattern,
   SeriesPreview as SeriesPreviewType,
-  createAppointmentSeries 
+  createAppointmentSeries,
 } from "../../../../services/appointmentService";
 import { notifications } from "@mantine/notifications";
 
@@ -85,7 +90,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
   const auth = useSelector((state: RootState) => state.auth);
-  
+
   // 🚀 Estado para búsqueda asíncrona de clientes
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [debouncedSearch] = useDebouncedValue(clientSearchQuery, 300);
@@ -93,37 +98,47 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [loadingClients, setLoadingClients] = useState(false);
 
   // 🔁 Estados para citas recurrentes
-  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>({
-    type: 'none',
-    intervalWeeks: 1,
-    weekdays: [],
-    endType: 'count',
-    count: 4
-  });
-  const [seriesPreview, setSeriesPreview] = useState<SeriesPreviewType | null>(null);
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>(
+    {
+      type: "none",
+      intervalWeeks: 1,
+      weekdays: [],
+      endType: "count",
+      count: 4,
+    },
+  );
+  const [seriesPreview, setSeriesPreview] = useState<SeriesPreviewType | null>(
+    null,
+  );
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [notifyAllAppointments, setNotifyAllAppointments] = useState(false); // 📨 Por defecto solo primera cita
 
   const today = dayjs();
-  const organization = useSelector((state: RootState) => state.organization.organization);
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization,
+  );
   const organizationId = organization?._id;
-  const timezone = organization?.timezone || 'America/Bogota'; // 🌍 Timezone de la organización
+  const timezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la organización
 
   // 🚀 Búsqueda asíncrona de clientes con debounce
   useEffect(() => {
     if (!organizationId) return;
-    
+
     const searchClientsAsync = async () => {
       setLoadingClients(true);
       try {
-        const results = await searchClients(organizationId, debouncedSearch, 20);
-        
+        const results = await searchClients(
+          organizationId,
+          debouncedSearch,
+          20,
+        );
+
         // Si hay un cliente seleccionado, asegurarse de que esté en la lista
         if (
           newAppointment.client &&
           typeof newAppointment.client._id !== "undefined" &&
-          !results.find(c => c._id === newAppointment.client!._id)
+          !results.find((c) => c._id === newAppointment.client!._id)
         ) {
           setSearchedClients([newAppointment.client, ...results]);
         } else {
@@ -151,23 +166,23 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       // This prevents TimeSelector from showing wrong time due to browser timezone conversion
       const startParsed = dayjs.tz(appointment.startDate, timezone);
       const endParsed = dayjs.tz(appointment.endDate, timezone);
-      
+
       const startDate = new Date(
         startParsed.year(),
         startParsed.month(),
         startParsed.date(),
         startParsed.hour(),
-        startParsed.minute()
+        startParsed.minute(),
       );
-      
+
       const endDate = new Date(
         endParsed.year(),
         endParsed.month(),
         endParsed.date(),
         endParsed.hour(),
-        endParsed.minute()
+        endParsed.minute(),
       );
-      
+
       setNewAppointment({
         ...appointment,
         startDate,
@@ -176,10 +191,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
       });
-      
+
       // Si hay cliente en appointment, agregarlo a la lista de búsqueda
-      if (appointment.client && !searchedClients.find(c => c._id === appointment.client._id)) {
-        setSearchedClients(prev => [appointment.client, ...prev]);
+      if (
+        appointment.client &&
+        !searchedClients.find((c) => c._id === appointment.client._id)
+      ) {
+        setSearchedClients((prev) => [appointment.client, ...prev]);
       }
     }
   }, [appointment, setNewAppointment]);
@@ -189,12 +207,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     // En modo EDICIÓN: respetar el endDate de la BD (permite duraciones personalizadas)
     if (!appointment) {
       // MODO CREACIÓN
-      // Sumar la duración de todos los servicios
+      // Sumar la duración de todos los servicios (usando duraciones personalizadas si existen)
       if (newAppointment.startDate && newAppointment.services) {
-        const totalDuration = newAppointment.services.reduce(
-          (acc, s) => acc + (s.duration || 0),
-          0
-        );
+        const totalDuration = newAppointment.services.reduce((acc, s) => {
+          // Usar duración personalizada si existe, sino la duración del servicio
+          const customDuration = newAppointment.customDurations?.[s._id];
+          return acc + (customDuration ?? s.duration ?? 0);
+        }, 0);
         const end = addMinutes(newAppointment.startDate, totalDuration);
         setNewAppointment((prev) => ({ ...prev, endDate: end }));
       }
@@ -203,8 +222,36 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     appointment,
     newAppointment.startDate,
     newAppointment.services,
+    newAppointment.customDurations,
     setNewAppointment,
   ]);
+
+  // Inicializar customDurations cuando cambian los servicios seleccionados
+  useEffect(() => {
+    if (
+      !appointment &&
+      newAppointment.services &&
+      newAppointment.services.length > 0
+    ) {
+      // Solo inicializar si no existen duraciones personalizadas para los servicios actuales
+      const currentDurations = newAppointment.customDurations || {};
+      const needsInit = newAppointment.services.some(
+        (s) => !(s._id in currentDurations),
+      );
+
+      if (needsInit) {
+        const initialDurations: Record<string, number> = {};
+        newAppointment.services.forEach((s) => {
+          // Mantener duración existente o usar la del servicio
+          initialDurations[s._id] = currentDurations[s._id] ?? s.duration ?? 0;
+        });
+        setNewAppointment((prev) => ({
+          ...prev,
+          customDurations: initialDurations,
+        }));
+      }
+    }
+  }, [appointment, newAppointment.services]);
 
   const renderMultiSelectOption: MultiSelectProps["renderOption"] = ({
     option,
@@ -230,20 +277,26 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
   // 🔁 Función para generar preview de citas recurrentes
   const handleGeneratePreview = async () => {
-    if (!newAppointment.employee || !newAppointment.client || !newAppointment.startDate || !newAppointment.services || newAppointment.services.length === 0) {
+    if (
+      !newAppointment.employee ||
+      !newAppointment.client ||
+      !newAppointment.startDate ||
+      !newAppointment.services ||
+      newAppointment.services.length === 0
+    ) {
       notifications.show({
-        title: '⚠️ Campos requeridos',
-        message: 'Por favor completa empleado, cliente, servicios y fecha',
-        color: 'yellow'
+        title: "⚠️ Campos requeridos",
+        message: "Por favor completa empleado, cliente, servicios y fecha",
+        color: "yellow",
       });
       return;
     }
 
     if (!organizationId) {
       notifications.show({
-        title: '⚠️ Error',
-        message: 'No se encontró la organización',
-        color: 'red'
+        title: "⚠️ Error",
+        message: "No se encontró la organización",
+        color: "red",
       });
       return;
     }
@@ -251,26 +304,29 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     setLoadingPreview(true);
     try {
       // Extraer IDs de objetos
-      const employeeId = typeof newAppointment.employee === 'string' 
-        ? newAppointment.employee 
-        : newAppointment.employee?._id;
-      const clientId = typeof newAppointment.client === 'string' 
-        ? newAppointment.client 
-        : newAppointment.client?._id;
-      const serviceIds = newAppointment.services
-        ?.filter(s => s && (s._id || typeof s === 'string'))
-        .map(s => typeof s === 'string' ? s : s._id) || [];
+      const employeeId =
+        typeof newAppointment.employee === "string"
+          ? newAppointment.employee
+          : newAppointment.employee?._id;
+      const clientId =
+        typeof newAppointment.client === "string"
+          ? newAppointment.client
+          : newAppointment.client?._id;
+      const serviceIds =
+        newAppointment.services
+          ?.filter((s) => s && (s._id || typeof s === "string"))
+          .map((s) => (typeof s === "string" ? s : s._id)) || [];
 
       if (!employeeId || !clientId || serviceIds.length === 0) {
         const missing = [];
-        if (!employeeId) missing.push('empleado');
-        if (!clientId) missing.push('cliente');
-        if (serviceIds.length === 0) missing.push('servicios');
-        
+        if (!employeeId) missing.push("empleado");
+        if (!clientId) missing.push("cliente");
+        if (serviceIds.length === 0) missing.push("servicios");
+
         notifications.show({
-          title: '⚠️ Campos faltantes',
-          message: `Por favor selecciona: ${missing.join(', ')}`,
-          color: 'yellow'
+          title: "⚠️ Campos faltantes",
+          message: `Por favor selecciona: ${missing.join(", ")}`,
+          color: "yellow",
         });
         return;
       }
@@ -282,32 +338,37 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
           services: serviceIds,
           startDate: newAppointment.startDate,
           organizationId,
-          advancePayment: newAppointment.advancePayment
+          advancePayment: newAppointment.advancePayment,
         },
         recurrencePattern,
-        { previewOnly: true }
+        { previewOnly: true },
       );
 
       // El backend devuelve el preview directamente: { totalOccurrences, availableCount, occurrences }
-      if (result && 'totalOccurrences' in result && 'availableCount' in result && 'occurrences' in result) {
+      if (
+        result &&
+        "totalOccurrences" in result &&
+        "availableCount" in result &&
+        "occurrences" in result
+      ) {
         setSeriesPreview(result as SeriesPreviewType);
         notifications.show({
-          title: '✅ Preview generado',
+          title: "✅ Preview generado",
           message: `Se generaron ${result.totalOccurrences} citas (${result.availableCount} disponibles)`,
-          color: 'green'
+          color: "green",
         });
       } else {
         notifications.show({
-          title: '⚠️ Sin preview',
-          message: 'No se pudo generar el preview',
-          color: 'yellow'
+          title: "⚠️ Sin preview",
+          message: "No se pudo generar el preview",
+          color: "yellow",
         });
       }
     } catch (error: unknown) {
       notifications.show({
-        title: '❌ Error al generar preview',
-        message: error instanceof Error ? error.message : 'Ocurrió un error',
-        color: 'red'
+        title: "❌ Error al generar preview",
+        message: error instanceof Error ? error.message : "Ocurrió un error",
+        color: "red",
       });
       setSeriesPreview(null);
     } finally {
@@ -318,7 +379,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   // 🔁 Resetear preview cuando cambian los parámetros de recurrencia
   useEffect(() => {
     setSeriesPreview(null);
-  }, [recurrencePattern, newAppointment.employee, newAppointment.client, newAppointment.startDate, newAppointment.services]);
+  }, [
+    recurrencePattern,
+    newAppointment.employee,
+    newAppointment.client,
+    newAppointment.startDate,
+    newAppointment.services,
+  ]);
 
   return (
     <>
@@ -391,8 +458,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     label: isBirthday
                       ? `🎉 ${client.name} 🎉`
                       : auth.role === "admin"
-                      ? client.name + " - " + client.phoneNumber
-                      : client.name,
+                        ? client.name + " - " + client.phoneNumber
+                        : client.name,
                     isBirthday,
                   };
                 }),
@@ -422,7 +489,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 ) : (
                   <Box p="sm">
                     <Text size="sm" c="dimmed">
-                      {clientSearchQuery 
+                      {clientSearchQuery
                         ? `No se encontraron clientes con "${clientSearchQuery}"`
                         : "Escribe para buscar clientes"}
                     </Text>
@@ -499,7 +566,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               onChange={(selectedIds) => {
                 // selectedIds es un array de IDs
                 const selectedServices = services.filter((s) =>
-                  selectedIds.includes(s._id)
+                  selectedIds.includes(s._id),
                 );
                 setNewAppointment((prev) => ({
                   ...prev,
@@ -556,7 +623,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                             {service.price && (
                               <Text size="xs" c="dimmed">
                                 💵{" "}
-                                {formatCurrency(service.price, organization?.currency || "COP")}
+                                {formatCurrency(
+                                  service.price,
+                                  organization?.currency || "COP",
+                                )}
                               </Text>
                             )}
                           </Group>
@@ -583,7 +653,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               🕒 Fecha y Hora
             </Text>
 
-            <Grid gutter="md">
+            {/* Selector de fecha de inicio (siempre visible) */}
+            <Grid gutter="md" mb="md">
               <Grid.Col span={{ base: 12, sm: 6 }}>
                 <Box
                   p="xs"
@@ -594,7 +665,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   }}
                 >
                   <Text size="xs" fw={600} mb="xs" c="dimmed">
-                    Inicio
+                    Inicio de la primera cita
                   </Text>
                   <DateSelector
                     label="Fecha"
@@ -613,35 +684,206 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 </Box>
               </Grid.Col>
 
-              <Grid.Col span={{ base: 12, sm: 6 }}>
-                <Box
-                  p="xs"
-                  style={{
-                    backgroundColor: "white",
-                    borderRadius: 8,
-                    border: "1px solid #e9ecef",
-                  }}
-                >
-                  <Text size="xs" fw={600} mb="xs" c="dimmed">
-                    Fin
-                  </Text>
-                  <DateSelector
-                    label="Fecha"
-                    value={newAppointment.endDate}
-                    onChange={(date) =>
-                      setNewAppointment({ ...newAppointment, endDate: date })
-                    }
-                  />
-                  <TimeSelector
-                    label="Hora"
-                    date={newAppointment.endDate}
-                    onChange={(date) =>
-                      setNewAppointment({ ...newAppointment, endDate: date })
-                    }
-                  />
-                </Box>
-              </Grid.Col>
+              {/* Mostrar selector de fin solo si hay 1 servicio o en modo edición */}
+              {(newAppointment.services?.length === 1 || appointment) && (
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Box
+                    p="xs"
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: 8,
+                      border: "1px solid #e9ecef",
+                    }}
+                  >
+                    <Text size="xs" fw={600} mb="xs" c="dimmed">
+                      Fin
+                    </Text>
+                    <DateSelector
+                      label="Fecha"
+                      value={newAppointment.endDate}
+                      onChange={(date) =>
+                        setNewAppointment({ ...newAppointment, endDate: date })
+                      }
+                    />
+                    <TimeSelector
+                      label="Hora"
+                      date={newAppointment.endDate}
+                      onChange={(date) =>
+                        setNewAppointment({ ...newAppointment, endDate: date })
+                      }
+                    />
+                  </Box>
+                </Grid.Col>
+              )}
             </Grid>
+
+            {/* Controles de duración individual para múltiples servicios */}
+            {!appointment &&
+              newAppointment.services &&
+              newAppointment.services.length > 1 && (
+                <>
+                  <Divider
+                    label="Duración por servicio"
+                    labelPosition="center"
+                    mb="md"
+                    color="blue"
+                  />
+                  <Box
+                    p="sm"
+                    style={{
+                      backgroundColor: "#e7f5ff",
+                      borderRadius: 8,
+                      border: "1px solid #74c0fc",
+                    }}
+                  >
+                    <Text size="xs" c="blue.7" mb="sm">
+                      Ajusta la duración de cada servicio. El horario se
+                      calculará automáticamente en secuencia.
+                    </Text>
+
+                    {newAppointment.services.map((service, index) => {
+                      // Calcular hora de inicio para este servicio
+                      let serviceStartTime = newAppointment.startDate;
+                      if (serviceStartTime && index > 0) {
+                        let accumulatedMinutes = 0;
+                        for (let i = 0; i < index; i++) {
+                          const prevService = newAppointment.services![i];
+                          const prevDuration =
+                            newAppointment.customDurations?.[prevService._id] ??
+                            prevService.duration ??
+                            0;
+                          accumulatedMinutes += prevDuration;
+                        }
+                        serviceStartTime = addMinutes(
+                          newAppointment.startDate!,
+                          accumulatedMinutes,
+                        );
+                      }
+
+                      // Calcular hora de fin para este servicio
+                      const currentDuration =
+                        newAppointment.customDurations?.[service._id] ??
+                        service.duration ??
+                        0;
+                      const serviceEndTime = serviceStartTime
+                        ? addMinutes(serviceStartTime, currentDuration)
+                        : undefined;
+
+                      return (
+                        <Box
+                          key={service._id}
+                          p="sm"
+                          mb={
+                            index < newAppointment.services!.length - 1
+                              ? "sm"
+                              : 0
+                          }
+                          style={{
+                            backgroundColor: "white",
+                            borderRadius: 8,
+                            border: "1px solid #d0ebff",
+                          }}
+                        >
+                          <Group justify="space-between" wrap="nowrap" mb="xs">
+                            <Group gap="xs">
+                              <Badge size="sm" variant="light" color="blue">
+                                {index + 1}
+                              </Badge>
+                              <Text size="sm" fw={600}>
+                                {service.name}
+                              </Text>
+                            </Group>
+                            <Text size="xs" c="dimmed">
+                              Original: {service.duration} min
+                            </Text>
+                          </Group>
+
+                          <Grid gutter="xs" align="center">
+                            <Grid.Col span={4}>
+                              <NumberInput
+                                size="xs"
+                                label="Duración (min)"
+                                value={
+                                  newAppointment.customDurations?.[
+                                    service._id
+                                  ] ??
+                                  service.duration ??
+                                  0
+                                }
+                                onChange={(value) => {
+                                  const numValue =
+                                    typeof value === "number" ? value : 0;
+                                  setNewAppointment((prev) => ({
+                                    ...prev,
+                                    customDurations: {
+                                      ...prev.customDurations,
+                                      [service._id]: numValue,
+                                    },
+                                  }));
+                                }}
+                                min={5}
+                                max={480}
+                                step={5}
+                                styles={{
+                                  input: { borderRadius: 6 },
+                                }}
+                              />
+                            </Grid.Col>
+                            <Grid.Col span={8}>
+                              <Text size="xs" c="dimmed" ta="right">
+                                {serviceStartTime && serviceEndTime ? (
+                                  <>
+                                    {dayjs(serviceStartTime).format("h:mm A")} →{" "}
+                                    {dayjs(serviceEndTime).format("h:mm A")}
+                                  </>
+                                ) : (
+                                  "Selecciona hora de inicio"
+                                )}
+                              </Text>
+                            </Grid.Col>
+                          </Grid>
+                        </Box>
+                      );
+                    })}
+
+                    {/* Resumen del tiempo total */}
+                    <Box
+                      mt="sm"
+                      pt="sm"
+                      style={{ borderTop: "1px dashed #74c0fc" }}
+                    >
+                      <Group justify="space-between">
+                        <Text size="sm" fw={600} c="blue.7">
+                          Tiempo total:
+                        </Text>
+                        <Text size="sm" fw={700} c="blue.7">
+                          {newAppointment.services.reduce(
+                            (acc, s) =>
+                              acc +
+                              (newAppointment.customDurations?.[s._id] ??
+                                s.duration ??
+                                0),
+                            0,
+                          )}{" "}
+                          min
+                          {newAppointment.startDate &&
+                            newAppointment.endDate && (
+                              <Text span size="xs" c="dimmed" ml="xs">
+                                (
+                                {dayjs(newAppointment.startDate).format(
+                                  "h:mm A",
+                                )}{" "}
+                                →{" "}
+                                {dayjs(newAppointment.endDate).format("h:mm A")}
+                                )
+                              </Text>
+                            )}
+                        </Text>
+                      </Group>
+                    </Box>
+                  </Box>
+                </>
+              )}
           </Box>
 
           {/* 🔁 Sección: Citas Recurrentes (solo para nuevas citas) */}
@@ -665,7 +907,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 startDate={newAppointment.startDate}
               />
 
-              {recurrencePattern.type === 'weekly' && (
+              {recurrencePattern.type === "weekly" && (
                 <>
                   <Button
                     mt="md"
@@ -691,7 +933,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs">
                       📨 Notificación por WhatsApp
                     </Text>
-                    
+
                     <Checkbox
                       label={
                         <Text size="sm" fw={500}>
@@ -699,21 +941,29 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         </Text>
                       }
                       checked={notifyAllAppointments}
-                      onChange={(event) => setNotifyAllAppointments(event.currentTarget.checked)}
+                      onChange={(event) =>
+                        setNotifyAllAppointments(event.currentTarget.checked)
+                      }
                       color="blue"
                     />
-                    
+
                     <Box
                       mt="xs"
                       p="xs"
                       style={{
-                        backgroundColor: notifyAllAppointments ? "#d0ebff" : "#fff3bf",
+                        backgroundColor: notifyAllAppointments
+                          ? "#d0ebff"
+                          : "#fff3bf",
                         borderRadius: 6,
                         borderLeft: `3px solid ${notifyAllAppointments ? "#339af0" : "#fab005"}`,
                       }}
                     >
-                      <Text size="xs" c={notifyAllAppointments ? "blue.7" : "yellow.9"} fw={600}>
-                        {notifyAllAppointments 
+                      <Text
+                        size="xs"
+                        c={notifyAllAppointments ? "blue.7" : "yellow.9"}
+                        fw={600}
+                      >
+                        {notifyAllAppointments
                           ? "✅ Se enviará un mensaje con TODAS las citas programadas"
                           : "📅 Se enviará mensaje solo de LA PRIMERA cita"}
                       </Text>
@@ -765,7 +1015,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               }}
             />
 
-            {(newAppointment.client || newAppointment.employee || (newAppointment.services && newAppointment.services.length > 0)) && (
+            {(newAppointment.client ||
+              newAppointment.employee ||
+              (newAppointment.services &&
+                newAppointment.services.length > 0)) && (
               <Box
                 mt="md"
                 p="md"
@@ -796,10 +1049,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       Profesional:
                     </Text>
                     <Group gap="xs">
-                      <Avatar 
-                        src={newAppointment.employee.profileImage} 
-                        size={24} 
-                        radius="xl" 
+                      <Avatar
+                        src={newAppointment.employee.profileImage}
+                        size={24}
+                        radius="xl"
                       />
                       <Text size="sm" fw={600}>
                         {newAppointment.employee.names}
@@ -813,88 +1066,92 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   </Box>
                 )}
 
-                {newAppointment.services && newAppointment.services.length > 0 && (
-                  <>
-                    <Box mb="xs">
-                      <Text size="xs" c="dimmed" mb={4}>
-                        Servicios:
-                      </Text>
-                      {newAppointment.services.map((service, index) => (
-                        <Box
-                          key={service._id}
-                          mb={4}
-                          p={6}
-                          style={{
-                            backgroundColor: "white",
-                            borderRadius: 6,
-                            border: "1px solid #d0ebff",
-                          }}
-                        >
-                          <Group justify="space-between" wrap="nowrap">
-                            <Text size="sm" fw={500}>
-                              {index + 1}. {service.name}
-                            </Text>
-                            <Text size="xs" c="dimmed">
-                              ⏱️ {service.duration} min
-                            </Text>
-                          </Group>
-                        </Box>
-                      ))}
-                    </Box>
-
-                    <Box
-                      mt="sm"
-                      pt="sm"
-                      style={{
-                        borderTop: "1px solid #a5d8ff",
-                      }}
-                    >
-                      <Group justify="space-between" mb={4}>
-                        <Text size="sm" c="dimmed">
-                          Total servicios:
+                {newAppointment.services &&
+                  newAppointment.services.length > 0 && (
+                    <>
+                      <Box mb="xs">
+                        <Text size="xs" c="dimmed" mb={4}>
+                          Servicios:
                         </Text>
-                        <Text size="sm" fw={700}>
-                          {formatCurrency(
-                            newAppointment.services.reduce(
-                              (acc, s) => acc + (s.price || 0),
-                              0
-                            ),
-                            organization?.currency || "COP"
+                        {newAppointment.services.map((service, index) => (
+                          <Box
+                            key={service._id}
+                            mb={4}
+                            p={6}
+                            style={{
+                              backgroundColor: "white",
+                              borderRadius: 6,
+                              border: "1px solid #d0ebff",
+                            }}
+                          >
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text size="sm" fw={500}>
+                                {index + 1}. {service.name}
+                              </Text>
+                              <Text size="xs" c="dimmed">
+                                ⏱️ {service.duration} min
+                              </Text>
+                            </Group>
+                          </Box>
+                        ))}
+                      </Box>
+
+                      <Box
+                        mt="sm"
+                        pt="sm"
+                        style={{
+                          borderTop: "1px solid #a5d8ff",
+                        }}
+                      >
+                        <Group justify="space-between" mb={4}>
+                          <Text size="sm" c="dimmed">
+                            Total servicios:
+                          </Text>
+                          <Text size="sm" fw={700}>
+                            {formatCurrency(
+                              newAppointment.services.reduce(
+                                (acc, s) => acc + (s.price || 0),
+                                0,
+                              ),
+                              organization?.currency || "COP",
+                            )}
+                          </Text>
+                        </Group>
+
+                        {typeof newAppointment.advancePayment === "number" &&
+                          newAppointment.advancePayment > 0 && (
+                            <>
+                              <Group justify="space-between" mb={4}>
+                                <Text size="sm" c="dimmed">
+                                  Abono:
+                                </Text>
+                                <Text size="sm" fw={600} c="green">
+                                  -{" "}
+                                  {formatCurrency(
+                                    newAppointment.advancePayment,
+                                    organization?.currency || "COP",
+                                  )}
+                                </Text>
+                              </Group>
+                              <Group justify="space-between">
+                                <Text size="sm" fw={600}>
+                                  Pendiente:
+                                </Text>
+                                <Text size="sm" fw={700} c="orange">
+                                  {formatCurrency(
+                                    newAppointment.services.reduce(
+                                      (acc, s) => acc + (s.price || 0),
+                                      0,
+                                    ) - (newAppointment.advancePayment || 0),
+                                    organization?.currency || "COP",
+                                  )}
+                                </Text>
+                              </Group>
+                            </>
                           )}
-                        </Text>
-                      </Group>
-
-                      {typeof newAppointment.advancePayment === "number" &&
-                        newAppointment.advancePayment > 0 && (
-                          <>
-                            <Group justify="space-between" mb={4}>
-                              <Text size="sm" c="dimmed">
-                                Abono:
-                              </Text>
-                              <Text size="sm" fw={600} c="green">
-                                -{" "}
-                                {formatCurrency(newAppointment.advancePayment, organization?.currency || "COP")}
-                              </Text>
-                            </Group>
-                            <Group justify="space-between">
-                              <Text size="sm" fw={600}>
-                                Pendiente:
-                              </Text>
-                              <Text size="sm" fw={700} c="orange">
-                                {formatCurrency(
-                                  newAppointment.services.reduce(
-                                    (acc, s) => acc + (s.price || 0),
-                                    0
-                                  ) - (newAppointment.advancePayment || 0),
-                                  organization?.currency || "COP"
-                                )}
-                              </Text>
-                            </Group>
-                          </>
-                        )}
-                    </Box>
-                  </>
-                )}
+                      </Box>
+                    </>
+                  )}
 
                 {newAppointment.startDate && newAppointment.endDate && (
                   <Box
@@ -909,22 +1166,28 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     </Text>
                     <Text size="sm" fw={600}>
                       {formatFullDateInTimezone(
-                        appointment ? appointment.startDate : newAppointment.startDate!, 
-                        timezone, 
-                        "DD/MM/YYYY"
+                        appointment
+                          ? appointment.startDate
+                          : newAppointment.startDate!,
+                        timezone,
+                        "DD/MM/YYYY",
                       )}
                     </Text>
                     <Text size="sm" c="dimmed">
                       {formatInTimezone(
-                        appointment ? appointment.startDate : newAppointment.startDate!, 
-                        timezone, 
-                        "h:mm A"
+                        appointment
+                          ? appointment.startDate
+                          : newAppointment.startDate!,
+                        timezone,
+                        "h:mm A",
                       )}{" "}
                       -{" "}
                       {formatInTimezone(
-                        appointment ? appointment.endDate : newAppointment.endDate!, 
-                        timezone, 
-                        "h:mm A"
+                        appointment
+                          ? appointment.endDate
+                          : newAppointment.endDate!,
+                        timezone,
+                        "h:mm A",
                       )}
                     </Text>
                   </Box>
@@ -953,39 +1216,43 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             <Button
               onClick={async () => {
                 // 🔁 Si es cita recurrente, crearla como serie
-                if (!appointment && recurrencePattern.type === 'weekly') {
+                if (!appointment && recurrencePattern.type === "weekly") {
                   if (!organizationId) {
                     notifications.show({
-                      title: '⚠️ Error',
-                      message: 'No se encontró la organización',
-                      color: 'red'
+                      title: "⚠️ Error",
+                      message: "No se encontró la organización",
+                      color: "red",
                     });
                     return;
                   }
 
                   try {
                     // Extraer IDs de objetos si es necesario
-                    const employeeId = typeof newAppointment.employee === 'string' 
-                      ? newAppointment.employee 
-                      : newAppointment.employee?._id;
-                    const clientId = typeof newAppointment.client === 'string' 
-                      ? newAppointment.client 
-                      : newAppointment.client?._id;
-                    const serviceIds = newAppointment.services
-                      ?.filter(s => s && (s._id || typeof s === 'string'))
-                      .map(s => typeof s === 'string' ? s : s._id) || [];
+                    const employeeId =
+                      typeof newAppointment.employee === "string"
+                        ? newAppointment.employee
+                        : newAppointment.employee?._id;
+                    const clientId =
+                      typeof newAppointment.client === "string"
+                        ? newAppointment.client
+                        : newAppointment.client?._id;
+                    const serviceIds =
+                      newAppointment.services
+                        ?.filter((s) => s && (s._id || typeof s === "string"))
+                        .map((s) => (typeof s === "string" ? s : s._id)) || [];
 
                     if (serviceIds.length === 0) {
                       notifications.show({
-                        title: '⚠️ Error',
-                        message: 'No se pudieron procesar los servicios seleccionados',
-                        color: 'yellow'
+                        title: "⚠️ Error",
+                        message:
+                          "No se pudieron procesar los servicios seleccionados",
+                        color: "yellow",
                       });
                       return;
                     }
 
                     setCreatingSeries(true);
-                    
+
                     const result = await createAppointmentSeries(
                       {
                         employee: employeeId,
@@ -993,37 +1260,42 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         services: serviceIds,
                         startDate: newAppointment.startDate,
                         organizationId,
-                        advancePayment: newAppointment.advancePayment
+                        advancePayment: newAppointment.advancePayment,
                       },
                       recurrencePattern,
-                      { 
+                      {
                         previewOnly: false,
-                        notifyAllAppointments // 📨 Enviar a backend la opción seleccionada
-                      }
+                        notifyAllAppointments, // 📨 Enviar a backend la opción seleccionada
+                      },
                     );
 
-                    if (result && 'createdCount' in result) {
+                    if (result && "createdCount" in result) {
                       notifications.show({
-                        title: '✅ Serie creada exitosamente',
+                        title: "✅ Serie creada exitosamente",
                         message: `Se crearon ${result.createdCount} de ${result.totalOccurrences} citas recurrentes`,
-                        color: 'green',
-                        autoClose: 4000
+                        color: "green",
+                        autoClose: 4000,
                       });
                     }
-                    
+
                     // Cerrar modal
                     onClose();
-                    
+
                     // Refrescar citas del mes actual sin recargar toda la página
                     if (fetchAppointmentsForMonth) {
-                      await fetchAppointmentsForMonth(newAppointment.startDate || new Date());
+                      await fetchAppointmentsForMonth(
+                        newAppointment.startDate || new Date(),
+                      );
                     }
                   } catch (error: unknown) {
                     notifications.show({
-                      title: '❌ Error al crear serie',
-                      message: error instanceof Error ? error.message : 'Error al crear las citas recurrentes',
-                      color: 'red',
-                      autoClose: 5000
+                      title: "❌ Error al crear serie",
+                      message:
+                        error instanceof Error
+                          ? error.message
+                          : "Error al crear las citas recurrentes",
+                      color: "red",
+                      autoClose: 5000,
                     });
                   } finally {
                     setCreatingSeries(false);
@@ -1037,17 +1309,23 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               loading={creatingAppointment || creatingSeries}
               size="xs"
               radius="md"
-              leftSection={appointment ? "✏️" : recurrencePattern.type === 'weekly' ? "🔁" : "➕"}
+              leftSection={
+                appointment
+                  ? "✏️"
+                  : recurrencePattern.type === "weekly"
+                    ? "🔁"
+                    : "➕"
+              }
               styles={{
                 root: {
                   minWidth: 160,
                 },
               }}
             >
-              {appointment 
-                ? "Actualizar Cita" 
-                : recurrencePattern.type === 'weekly' 
-                  ? "Crear Serie Recurrente" 
+              {appointment
+                ? "Actualizar Cita"
+                : recurrencePattern.type === "weekly"
+                  ? "Crear Serie Recurrente"
                   : "Crear Cita"}
             </Button>
           </Group>
@@ -1061,7 +1339,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
           setCreateClientModalOpened(false);
           // Recargar búsqueda después de crear cliente
           if (organizationId) {
-            searchClients(organizationId, clientSearchQuery, 20).then(setSearchedClients);
+            searchClients(organizationId, clientSearchQuery, 20).then(
+              setSearchedClients,
+            );
           }
         }}
         fetchClients={fetchClients}

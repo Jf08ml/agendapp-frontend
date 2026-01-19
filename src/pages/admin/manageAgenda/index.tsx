@@ -62,6 +62,9 @@ export interface CreateAppointmentPayload {
   status: string;
   organizationId: string;
   advancePayment?: number;
+  // Duraciones personalizadas por servicio (en minutos)
+  // Clave: serviceId, Valor: duración en minutos
+  customDurations?: Record<string, number>;
 }
 
 const ScheduleView: React.FC = () => {
@@ -569,6 +572,7 @@ const ScheduleView: React.FC = () => {
         endDate,
         status,
         advancePayment,
+        customDurations,
       } = newAppointment;
 
       if (
@@ -608,12 +612,13 @@ const ScheduleView: React.FC = () => {
             client,
             employeeRequestedByClient: employeeRequestedByClient ?? false,
             startDate,
-            endDate, // 🕐 Enviar endDate para permitir duraciones personalizadas
+            // Solo enviar endDate si hay un solo servicio (para duraciones personalizadas simples)
+            // Para múltiples servicios, enviar customDurations
+            endDate: services.length === 1 ? endDate : undefined,
             organizationId: organizationId as string,
             advancePayment,
-            // si manejas precios personalizados o adicionales, aquí también:
-            // customPrices: { [serviceId]: number },
-            // additionalItemsByService: { [serviceId]: [{ name, price, quantity }] }
+            // Duraciones personalizadas por servicio (en minutos)
+            customDurations: services.length > 1 ? customDurations : undefined,
           };
 
           await createAppointmentsBatch(payload);

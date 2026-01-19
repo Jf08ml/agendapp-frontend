@@ -108,7 +108,7 @@ export interface CreateAppointmentsBatchPayload {
   employee: Employee | string;
   client: Client | string;
   startDate: Date | string; // inicio de la primera cita
-  endDate?: Date | string; // 🕐 fin personalizado (opcional)
+  endDate?: Date | string; // 🕐 fin personalizado (opcional, solo para un servicio)
   organizationId: string;
   advancePayment?: number;
   employeeRequestedByClient?: boolean;
@@ -116,6 +116,8 @@ export interface CreateAppointmentsBatchPayload {
   customPrices?: Record<string, number>;
   /** { [serviceId]: AdditionalItem[] } */
   additionalItemsByService?: Record<string, AdditionalItem[]>;
+  /** { [serviceId]: duración en minutos } - Duraciones personalizadas por servicio */
+  customDurations?: Record<string, number>;
 }
 
 interface Response<T> {
@@ -280,12 +282,13 @@ export const createAppointmentsBatch = async (
       employee: asId(data.employee),
       client: asId(data.client),
       startDate: asISO(data.startDate),
-      ...(data.endDate && { endDate: asISO(data.endDate) }), // 🕐 Incluir endDate si está presente
+      ...(data.endDate && { endDate: asISO(data.endDate) }), // 🕐 Incluir endDate si está presente (solo para un servicio)
       organizationId: data.organizationId,
       advancePayment: data.advancePayment,
       employeeRequestedByClient: data.employeeRequestedByClient ?? false,
       customPrices: data.customPrices,
       additionalItemsByService: data.additionalItemsByService,
+      ...(data.customDurations && { customDurations: data.customDurations }), // 🕐 Duraciones personalizadas por servicio
     };
     const res = await apiAppointment.post<Response<Appointment[]>>(
       "/batch",
