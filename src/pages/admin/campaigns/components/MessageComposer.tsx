@@ -5,7 +5,7 @@ import { IconUpload, IconX, IconPhoto, IconGif, IconVideo } from "@tabler/icons-
 import type { CampaignRecipient } from "../../../../types/campaign";
 import type { MediaType } from "../../../../services/imageService";
 import { renderMessagePreview } from "../../../../utils/campaignValidations";
-import { uploadMediaDirect, validateFile, getMediaType } from "../../../../services/imageService";
+import { uploadMediaDirect, validateFile } from "../../../../services/imageService";
 
 interface MessageComposerProps {
   title: string;
