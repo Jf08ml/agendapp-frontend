@@ -693,9 +693,19 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <TimeSelector
                     label="Hora"
                     date={newAppointment.startDate}
-                    onChange={(date) =>
-                      setNewAppointment({ ...newAppointment, startDate: date })
-                    }
+                    onChange={(date) => {
+                      // En modo edición, recalcular endDate basado en la duración del servicio
+                      if (appointment && newAppointment.services && newAppointment.services.length > 0) {
+                        const totalDuration = newAppointment.services.reduce(
+                          (acc, s) => acc + (s.duration ?? 0),
+                          0
+                        );
+                        const newEndDate = addMinutes(date, totalDuration);
+                        setNewAppointment({ ...newAppointment, startDate: date, endDate: newEndDate });
+                      } else {
+                        setNewAppointment({ ...newAppointment, startDate: date });
+                      }
+                    }}
                   />
                 </Box>
               </Grid.Col>

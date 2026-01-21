@@ -87,13 +87,12 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
         placeholder="AM/PM"
         size="sm"
         value={date && date.getHours() >= 12 ? "PM" : "AM"}
-        onChange={(value) =>
-          handleTimeChange(
-            date?.getHours() || 0,
-            date?.getMinutes() || 0,
-            value || ""
-          )
-        }
+        onChange={(value) => {
+          // Convert 24h hour to 12h format before passing to handleTimeChange
+          const hour24 = date?.getHours() || 0;
+          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+          handleTimeChange(hour12, date?.getMinutes() || 0, value || "");
+        }}
         searchable
       />
     </div>
