@@ -163,11 +163,13 @@ function getCountryCallingCode(countryCode: CountryCode): string {
     'EC': '593',  // Ecuador
     'VE': '58',   // Venezuela
     'PA': '507',  // Panamá
+    'CR': '506',  // Costa Rica
     'CL': '56',   // Chile
     'AR': '54',   // Argentina
     'BR': '55',   // Brasil
     'US': '1',    // Estados Unidos
     'CA': '1',    // Canadá
+    'SV': '503',  // El Salvador
     'ES': '34',   // España
   };
   return codes[countryCode] || '57'; // Default CO si no encuentra
@@ -202,7 +204,7 @@ export function detectUserCountry(): CountryCode {
 }
 
 function isValidCountryCode(code: string): code is CountryCode {
-  const validCodes = ['CO', 'MX', 'PE', 'EC', 'VE', 'PA', 'CL', 'AR', 'BR', 'US', 'CA', 'SV', 'ES'];
+  const validCodes = ['CO', 'MX', 'PE', 'EC', 'VE', 'PA', 'CR', 'CL', 'AR', 'BR', 'US', 'CA', 'SV', 'ES'];
   return validCodes.includes(code);
 }
 
@@ -214,6 +216,7 @@ function getCountryFromTimezone(timezone: string): CountryCode | null {
     'America/Guayaquil': 'EC',
     'America/Caracas': 'VE',
     'America/Panama': 'PA',
+    'America/Costa_Rica': 'CR',
     'America/Santiago': 'CL',
     'America/Buenos_Aires': 'AR',
     'America/Sao_Paulo': 'BR',
@@ -223,7 +226,7 @@ function getCountryFromTimezone(timezone: string): CountryCode | null {
     'Europe/Madrid': 'ES',
     'Atlantic/Canary': 'ES',
   };
-  
+
   return timezoneMap[timezone] || null;
 }
 

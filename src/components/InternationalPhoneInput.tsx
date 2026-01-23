@@ -22,6 +22,7 @@ const COUNTRIES: Country[] = [
   { value: "EC", label: "Ecuador", code: "+593", flag: "🇪🇨" },
   { value: "VE", label: "Venezuela", code: "+58", flag: "🇻🇪" },
   { value: "PA", label: "Panamá", code: "+507", flag: "🇵🇦" },
+  { value: "CR", label: "Costa Rica", code: "+506", flag: "🇨🇷" },
   { value: "CL", label: "Chile", code: "+56", flag: "🇨🇱" },
   { value: "AR", label: "Argentina", code: "+54", flag: "🇦🇷" },
   { value: "BR", label: "Brasil", code: "+55", flag: "🇧🇷" },

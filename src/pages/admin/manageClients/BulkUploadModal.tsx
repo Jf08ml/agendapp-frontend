@@ -83,6 +83,8 @@ export default function BulkUploadModal({
         return ['55 1234 5678', '33 8765 4321', '+52 55 1234 5678'];
       case 'PE': // Perú
         return ['987 654 321', '912 345 678', '+51 987 654 321'];
+      case 'CR': // Costa Rica
+        return ['8123 4567', '7012 3456', '+506 8123 4567'];
       case 'CO': // Colombia
       default:
         return ['300 123 4567', '310 987 6543', '+57 300 123 4567'];
@@ -221,6 +223,7 @@ export default function BulkUploadModal({
       'SV': 'El Salvador',
       'MX': 'México',
       'PE': 'Perú',
+      'CR': 'Costa Rica',
     };
     
     const countryName = countryNames[defaultCountry] || defaultCountry;
@@ -280,7 +283,7 @@ export default function BulkUploadModal({
                 </ThemeIcon>
               }
             >
-              Para clientes de <strong>{defaultCountry === 'SV' ? 'El Salvador' : defaultCountry === 'MX' ? 'México' : defaultCountry === 'PE' ? 'Perú' : 'Colombia'}</strong>: ingresa el teléfono sin prefijo (el sistema lo agregará automáticamente)
+              Para clientes de <strong>{defaultCountry === 'SV' ? 'El Salvador' : defaultCountry === 'MX' ? 'México' : defaultCountry === 'PE' ? 'Perú' : defaultCountry === 'CR' ? 'Costa Rica' : 'Colombia'}</strong>: ingresa el teléfono sin prefijo (el sistema lo agregará automáticamente)
             </List.Item>
             <List.Item
               icon={

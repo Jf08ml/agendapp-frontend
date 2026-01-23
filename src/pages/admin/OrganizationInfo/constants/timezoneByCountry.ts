@@ -5,7 +5,7 @@
  * Un país puede tener múltiples zonas horarias (ej: México, Canadá, USA)
  */
 
-export type CountryCode = "CO" | "MX" | "PE" | "EC" | "VE" | "PA" | "CL" | "AR" | "BR" | "US" | "CA" | "ES" | "SV";
+export type CountryCode = "CO" | "MX" | "PE" | "EC" | "VE" | "PA" | "CL" | "AR" | "BR" | "US" | "CA" | "ES" | "SV" | "CR";
 
 export interface TimezoneOption {
   value: string;
@@ -78,6 +78,10 @@ export const TIMEZONES_BY_COUNTRY: Record<CountryCode, TimezoneOption[]> = {
 
   SV: [
     { value: "America/El_Salvador", label: "🇸🇻 El Salvador (San Salvador)", offset: "UTC-6" },
+  ],
+
+  CR: [
+    { value: "America/Costa_Rica", label: "🇨🇷 Costa Rica (San José, Alajuela)", offset: "UTC-6" },
   ],
 };
 

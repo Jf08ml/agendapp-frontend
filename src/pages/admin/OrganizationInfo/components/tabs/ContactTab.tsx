@@ -57,6 +57,7 @@ export default function ContactTab({
               { value: "EC", label: "🇪🇨 Ecuador" },
               { value: "VE", label: "🇻🇪 Venezuela" },
               { value: "PA", label: "🇵🇦 Panamá" },
+              { value: "CR", label: "🇨🇷 Costa Rica" },
               { value: "CL", label: "🇨🇱 Chile" },
               { value: "AR", label: "🇦🇷 Argentina" },
               { value: "BR", label: "🇧🇷 Brasil" },
@@ -68,8 +69,8 @@ export default function ContactTab({
           />
           <Select
             label="Zona horaria"
-            description={selectedCountry 
-              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : 'el país seleccionado'}` 
+            description={selectedCountry
+              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CR' ? 'Costa Rica' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : 'el país seleccionado'}`
               : "Selecciona un país primero"}
             {...form.getInputProps("timezone")}
             disabled={!isEditing || !selectedCountry}
@@ -90,6 +91,7 @@ export default function ContactTab({
               { value: "USD", label: "USD - Dólar americano" },
               { value: "EUR", label: "EUR - Euro" },
               { value: "CLP", label: "CLP - Peso chileno" },
+              { value: "CRC", label: "CRC - Colón costarricense" },
             ]}
           />
           <TextInput
