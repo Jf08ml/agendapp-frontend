@@ -34,6 +34,10 @@ export interface ReminderSettings {
   hoursBefore?: number;
   sendTimeStart?: string;
   sendTimeEnd?: string;
+  secondReminder?: {
+    enabled: boolean;
+    hoursBefore: number;
+  };
 }
 
 export interface PaymentMethod {
