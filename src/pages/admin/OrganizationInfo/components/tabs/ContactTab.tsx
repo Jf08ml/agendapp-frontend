@@ -195,11 +195,32 @@ export default function ContactTab({
 
               <Group gap="xs">
                 <Text size="sm" c="blue">
-                  ℹ️ Si un cliente tiene varias citas el mismo día, recibirá un solo mensaje 
-                  consolidado con todas sus citas. Los recordatorios se envían de forma 
+                  ℹ️ Si un cliente tiene varias citas el mismo día, recibirá un solo mensaje
+                  consolidado con todas sus citas. Los recordatorios se envían de forma
                   distribuida para evitar detección de spam.
                 </Text>
               </Group>
+
+              <Switch
+                label="Activar segundo recordatorio"
+                description="Envía un recordatorio adicional más cercano a la cita"
+                {...form.getInputProps("reminderSettings.secondReminder.enabled", { type: "checkbox" })}
+                disabled={!isEditing}
+                mt="md"
+              />
+
+              {form.values.reminderSettings?.secondReminder?.enabled && (
+                <NumberInput
+                  label="Segundo recordatorio con anticipación"
+                  description="Horas antes de cada cita para enviar el segundo recordatorio"
+                  placeholder="2"
+                  min={1}
+                  max={72}
+                  {...form.getInputProps("reminderSettings.secondReminder.hoursBefore")}
+                  disabled={!isEditing}
+                  rightSection={<Text size="sm" c="dimmed">horas</Text>}
+                />
+              )}
             </>
           )}
         </Stack>

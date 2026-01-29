@@ -89,6 +89,10 @@ export default function OrganizationInfo() {
               hoursBefore: response.reminderSettings?.hoursBefore ?? 24,
               sendTimeStart: response.reminderSettings?.sendTimeStart ?? "07:00",
               sendTimeEnd: response.reminderSettings?.sendTimeEnd ?? "20:00",
+              secondReminder: {
+                enabled: response.reminderSettings?.secondReminder?.enabled ?? false,
+                hoursBefore: response.reminderSettings?.secondReminder?.hoursBefore ?? 2,
+              },
             },
             openingHours: {
               start: response.openingHours?.start ?? "",

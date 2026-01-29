@@ -155,6 +155,14 @@ export const schema = z.object({
       ]).optional(),
       sendTimeStart: hhmmOrEmpty.optional(),
       sendTimeEnd: hhmmOrEmpty.optional(),
+      secondReminder: z.object({
+        enabled: z.boolean().optional(),
+        hoursBefore: z.union([
+          z.number().int().min(1).max(72),
+          z.null(),
+          z.undefined()
+        ]).optional(),
+      }).optional(),
     })
     .optional(),
 
