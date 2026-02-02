@@ -185,7 +185,7 @@ export const schema = z.object({
   paymentMethods: z
     .array(
       z.object({
-        type: z.enum(["nequi", "bancolombia", "daviplata", "otros"]),
+        type: z.enum(["nequi", "bancolombia", "daviplata", "mercado_pago", "pix", "yape", "sinpe", "transferencia_bancaria", "efectivo", "otros"]),
         accountName: optionalString,
         accountNumber: optionalString,
         phoneNumber: optionalString,

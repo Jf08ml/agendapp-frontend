@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { useState } from "react";
+import { formatCurrency } from "../utils/formatCurrency";
 
 interface ReservationDepositAlertProps {
   reservationId?: string;
@@ -34,6 +35,7 @@ export function ReservationDepositAlert({
   const depositPercentage = organization?.reservationDepositPercentage || 50;
   const paymentMethods = organization?.paymentMethods || [];
   const whatsappUrl = organization?.whatsappUrl || "";
+  const currency = organization?.currency || "COP";
 
   // Si no se requiere depósito, no mostrar nada
   if (!requireDeposit) {
@@ -46,6 +48,12 @@ export function ReservationDepositAlert({
     nequi: "Nequi",
     bancolombia: "Bancolombia",
     daviplata: "Daviplata",
+    mercado_pago: "Mercado Pago",
+    pix: "Pix",
+    yape: "Yape",
+    sinpe: "SINPE Móvil",
+    transferencia_bancaria: "Transferencia bancaria",
+    efectivo: "Efectivo",
     otros: "Otros",
   };
 
@@ -53,6 +61,12 @@ export function ReservationDepositAlert({
     nequi: "grape",
     bancolombia: "yellow",
     daviplata: "red",
+    mercado_pago: "blue",
+    pix: "teal",
+    yape: "violet",
+    sinpe: "indigo",
+    transferencia_bancaria: "cyan",
+    efectivo: "green",
     otros: "gray",
   };
 
@@ -76,7 +90,7 @@ export function ReservationDepositAlert({
       `Hora: ${appointmentTime || "N/A"}\n` +
       `Servicio: ${serviceName || "N/A"}\n` +
       `Cliente: ${clientName || "N/A"}\n` +
-      `Abono: $${depositAmount.toLocaleString()} COP (${depositPercentage}%)\n` +
+      `Abono: ${formatCurrency(depositAmount, currency)} (${depositPercentage}%)\n` +
       `ID Reserva: ${reservationId || "N/A"}\n\n` +
       `Espero confirmacion de la reserva. Gracias!`
     );
@@ -115,7 +129,7 @@ export function ReservationDepositAlert({
                 Monto a abonar:
               </Text>
               <Text size={isMobile ? "md" : "lg"} fw={700} c="orange">
-                ${depositAmount.toLocaleString()} COP
+                {formatCurrency(depositAmount, currency)}
               </Text>
             </div>
             <CopyButton value={depositAmount.toString()}>

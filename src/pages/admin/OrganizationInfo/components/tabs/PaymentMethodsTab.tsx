@@ -29,7 +29,7 @@ import { FormValues } from "../../schema";
 
 // Tipo local para el formulario (sin valores null)
 type PaymentMethodFormData = {
-  type: "nequi" | "bancolombia" | "daviplata" | "otros";
+  type: "nequi" | "bancolombia" | "daviplata" | "mercado_pago" | "pix" | "yape" | "sinpe" | "transferencia_bancaria" | "efectivo" | "otros";
   accountName: string;
   accountNumber: string;
   phoneNumber: string;
@@ -68,6 +68,12 @@ export default function PaymentMethodsTab({
     nequi: "Nequi",
     bancolombia: "Bancolombia",
     daviplata: "Daviplata",
+    mercado_pago: "Mercado Pago",
+    pix: "Pix",
+    yape: "Yape",
+    sinpe: "SINPE Móvil",
+    transferencia_bancaria: "Transferencia bancaria",
+    efectivo: "Efectivo",
     otros: "Otros",
   };
 
@@ -297,6 +303,12 @@ export default function PaymentMethodsTab({
               { value: "nequi", label: "Nequi" },
               { value: "bancolombia", label: "Bancolombia" },
               { value: "daviplata", label: "Daviplata" },
+              { value: "mercado_pago", label: "Mercado Pago" },
+              { value: "pix", label: "Pix" },
+              { value: "yape", label: "Yape" },
+              { value: "sinpe", label: "SINPE Móvil" },
+              { value: "transferencia_bancaria", label: "Transferencia bancaria" },
+              { value: "efectivo", label: "Efectivo" },
               { value: "otros", label: "Otros" },
             ]}
             value={formData.type}

@@ -41,7 +41,7 @@ export interface ReminderSettings {
 }
 
 export interface PaymentMethod {
-  type: "nequi" | "bancolombia" | "daviplata" | "otros";
+  type: "nequi" | "bancolombia" | "daviplata" | "mercado_pago" | "pix" | "yape" | "sinpe" | "transferencia_bancaria" | "efectivo" | "otros";
   accountName?: string;
   accountNumber?: string;
   phoneNumber?: string;

@@ -92,6 +92,12 @@ export default function ContactTab({
               { value: "EUR", label: "EUR - Euro" },
               { value: "CLP", label: "CLP - Peso chileno" },
               { value: "CRC", label: "CRC - Colón costarricense" },
+              { value: "ARS", label: "ARS - Peso argentino" },
+              { value: "BRL", label: "BRL - Real brasileño" },
+              { value: "PEN", label: "PEN - Sol peruano" },
+              { value: "VES", label: "VES - Bolívar venezolano" },
+              { value: "PAB", label: "PAB - Balboa panameño" },
+              { value: "CAD", label: "CAD - Dólar canadiense" },
             ]}
           />
           <TextInput
