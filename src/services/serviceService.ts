@@ -13,6 +13,7 @@ export interface Service {
   isActive?: boolean;
   hidePrice?: boolean;
   maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un empleado (default: 1)
+  recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
 }
 
 interface CreateServicePayload {
@@ -23,6 +24,7 @@ interface CreateServicePayload {
   price: number;
   duration: number;
   maxConcurrentAppointments?: number;
+  recommendations?: string;
 }
 
 interface Response<T> {

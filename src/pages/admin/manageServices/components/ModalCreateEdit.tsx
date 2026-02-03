@@ -54,6 +54,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     images: [],
     hidePrice: false,
     maxConcurrentAppointments: 1,
+    recommendations: "",
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
@@ -73,6 +74,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         images: [],
         hidePrice: false,
         maxConcurrentAppointments: 1,
+        recommendations: "",
       });
       setImageFiles([]);
     }
@@ -214,6 +216,15 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 value={editingService.description ?? ""}
                 onChange={(e) => setEditingService({ ...editingService, description: e.currentTarget.value })}
                 minRows={3}
+                autosize
+              />
+              <Textarea
+                label="📋 Recomendaciones para el cliente"
+                description="Se incluirán en los recordatorios de WhatsApp"
+                placeholder="Ej: Llegar sin maquillaje, no consumir cafeína 2h antes, traer ropa cómoda..."
+                value={editingService.recommendations ?? ""}
+                onChange={(e) => setEditingService({ ...editingService, recommendations: e.currentTarget.value })}
+                minRows={2}
                 autosize
               />
               <Switch
