@@ -1,5 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider } from "@mantine/core";
+import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -20,7 +20,7 @@ import {
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
-import { BiCalendar, BiListUl } from "react-icons/bi";
+import { BiCalendar, BiListUl, BiTrash } from "react-icons/bi";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
 
 /* Subcomponentes */
@@ -45,6 +45,7 @@ interface DayModalProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  onDeleteAppointment?: (appointmentId: string) => void;
   employees: Employee[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   timezone?: string; // 🌍 Timezone de la organización
@@ -60,6 +61,7 @@ const DayModal: FC<DayModalProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  onDeleteAppointment,
   employees,
   setAppointments,
   timezone = 'America/Bogota', // 🌍 Default timezone
@@ -487,10 +489,8 @@ const DayModal: FC<DayModalProps> = ({
                 withBorder
                 style={{
                   backgroundColor: '#f8f9fa',
-                  cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
-                onClick={() => onEditAppointment(apt)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#e9ecef';
                 }}
@@ -499,7 +499,10 @@ const DayModal: FC<DayModalProps> = ({
                 }}
               >
                 <Flex justify="space-between" align="center">
-                  <Box>
+                  <Box
+                    style={{ cursor: 'pointer', flex: 1 }}
+                    onClick={() => onEditAppointment(apt)}
+                  >
                     <Text size="sm" fw={600} style={{ textDecoration: 'line-through' }}>
                       {formatInTimezone(apt.startDate, timezone, 'HH:mm')} - {formatInTimezone(apt.endDate, timezone, 'HH:mm')}
                     </Text>
@@ -512,9 +515,26 @@ const DayModal: FC<DayModalProps> = ({
                       </Text>
                     )}
                   </Box>
-                  <Badge size="xs" color="red" variant="light">
-                    {apt.status === 'cancelled_by_customer' ? 'Cliente' : 'Admin'}
-                  </Badge>
+                  <Group gap="xs">
+                    <Badge size="xs" color="red" variant="light">
+                      {apt.status === 'cancelled_by_customer' ? 'Cliente' : 'Admin'}
+                    </Badge>
+                    {onDeleteAppointment && (
+                      <Tooltip label="Eliminar cita" withArrow>
+                        <ActionIcon
+                          color="red"
+                          variant="subtle"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteAppointment(apt._id);
+                          }}
+                        >
+                          <BiTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Flex>
               </Paper>
             ))}

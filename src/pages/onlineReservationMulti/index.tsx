@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
@@ -17,7 +17,6 @@ import {
   SelectedService,
   ServiceWithDate,
   MultiServiceBlockSelection,
-  ServiceTimeSelection,
 } from "../../types/multiBooking";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -37,18 +36,11 @@ import {
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
-  createReservation,
   createMultipleReservations,
   type CreateMultipleReservationsPayload,
   type Reservation,
-  type CreateReservationPayload,
 } from "../../services/reservationService";
 import dayjs from "dayjs";
-import {
-  getAppointmentsByOrganizationId,
-  type Appointment,
-} from "../../services/appointmentService";
-import { buildDateTimeForBackend, getId } from "./bookingUtilsMulti";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
@@ -65,9 +57,7 @@ export default function MultiBookingWizard() {
   // Paso 2: fechas
   const [dates, setDates] = useState<ServiceWithDate[]>([]);
   // Paso 3: horarios
-  const [times, setTimes] = useState<
-    MultiServiceBlockSelection | ServiceTimeSelection[]
-  >([]);
+  const [times, setTimes] = useState<MultiServiceBlockSelection | null>(null);
   // Paso 4: datos cliente
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
@@ -117,11 +107,11 @@ export default function MultiBookingWizard() {
   // Reset encadenado cuando cambian selecciones/fechas
   useEffect(() => {
     setDates([]);
-    setTimes([]);
+    setTimes(null);
   }, [selected]);
 
   useEffect(() => {
-    setTimes([]);
+    setTimes(null);
   }, [dates]);
 
   // Scroll al top al cambiar de paso
@@ -132,38 +122,23 @@ export default function MultiBookingWizard() {
     });
   }, [currentStep]);
 
-  const splitDates = useMemo(
-    () =>
-      dates.some(
-        (d, _i, arr) => d.date?.toDateString() !== arr[0]?.date?.toDateString()
-      ),
-    [dates]
-  );
-
   // Validaciones para navegación
   const canGoNextFromStep0 = selected.length > 0;
 
   const canGoNextFromStep1 = (() => {
     if (selected.length === 0) return false;
     if (dates.length === 0) return false;
-    if (splitDates) return dates.every((d) => !!d.date);
     return !!dates[0]?.date;
   })();
 
-  const hasChosenTimes = useMemo(() => {
+  const hasChosenTimes = (() => {
     if (!times) return false;
-    if (Array.isArray(times)) {
-      if (times.length !== selected.length) return false;
-      return times.every(
-        (t) => typeof t.time === "string" && t.time.trim().length > 0
-      );
-    }
     return (
-      !!(times as MultiServiceBlockSelection).startTime &&
-      Array.isArray((times as MultiServiceBlockSelection).intervals) &&
-      (times as MultiServiceBlockSelection).intervals.length > 0
+      !!times.startTime &&
+      Array.isArray(times.intervals) &&
+      times.intervals.length > 0
     );
-  }, [times, selected.length]);
+  })();
 
   const hasCustomerData = (() => {
     const hasName = customerDetails.name.trim().length > 0;
@@ -208,36 +183,6 @@ export default function MultiBookingWizard() {
     } satisfies CreateMultipleReservationsPayload;
   };
 
-  const buildSingles = (): CreateReservationPayload[] => {
-    const arr = times as ServiceTimeSelection[];
-
-    return arr.map((t) => {
-      const sid = getId(t.serviceId) ?? (t as any).serviceId; // id seguro
-      // Busca la fecha por id normalizado
-      const d = dates.find(
-        (x) => (getId(x.serviceId) ?? (x as any).serviceId) === sid
-      );
-      const svc = services.find((s) => s._id === sid);
-
-      if (!d?.date)
-        throw new Error(`Falta fecha para el servicio "${svc?.name ?? sid}"`);
-      if (!t.time)
-        throw new Error(`Falta hora para el servicio "${svc?.name ?? sid}"`);
-
-      // Usar formato sin timezone para que el backend lo interprete correctamente
-      const startDate = buildDateTimeForBackend(d.date, t.time);
-
-      return {
-        serviceId: sid,
-        employeeId: d.employeeId ?? null,
-        startDate, // Formato: "YYYY-MM-DDTHH:mm:ss" sin timezone
-        customerDetails,
-        organizationId: orgId,
-        status: "pending",
-      } satisfies CreateReservationPayload;
-    });
-  };
-
   const handleSchedule = async () => {
     if (completed || submitting) return; // evita doble envío post-finish
     try {
@@ -253,89 +198,21 @@ export default function MultiBookingWizard() {
         await updateClientRef.current();
       }
 
-      let count = 0;
-      let firstDateText = "";
+      const payload = buildMultiplePayload();
+      const result = await createMultipleReservations(payload);
+
       let reservationIds: string[] = [];
-
-      if (!splitDates) {
-        const payload = buildMultiplePayload();
-        const result = await createMultipleReservations(payload);
-        if (result && Array.isArray(result)) {
-          reservationIds = result
-            .map((r) => r._id)
-            .filter((id): id is string => !!id);
-        }
-        count = (times as MultiServiceBlockSelection).intervals.length;
-        const start =
-          (times as MultiServiceBlockSelection).startTime ??
-          (times as MultiServiceBlockSelection).intervals[0]?.from;
-        if (start) firstDateText = dayjs(start).format("DD/MM/YYYY HH:mm");
-      } else {
-        const singles = buildSingles();
-
-        const dayCache = new Map<string, Appointment[]>();
-
-        for (const p of singles) {
-          // si ya viene employeeId, normal
-          if (p.employeeId) {
-            const result = await createReservation(p);
-            if (result?._id) reservationIds.push(result._id);
-            continue;
-          }
-
-          // ---- Auto-assign ----
-          const svc = services.find((s) => s._id === p.serviceId);
-          if (!svc) throw new Error("Servicio no encontrado");
-
-          const start = dayjs(p.startDate);
-          // const end = start.add(svc.duration ?? 0, "minute");
-          const dk = start.format("YYYY-MM-DD");
-
-          let allAppointments = dayCache.get(dk);
-          if (!allAppointments) {
-            const startISO = start.startOf("day").toISOString();
-            const endISO = start.endOf("day").toISOString();
-            allAppointments = await getAppointmentsByOrganizationId(
-              orgId,
-              startISO,
-              endISO
-            );
-            dayCache.set(dk, allAppointments);
-          }
-
-          // empleados elegibles para el servicio
-          const eligibleEmpIds = employees
-            .filter((e) => e.isActive)
-            .filter((e) => {
-              const svcIds = (e.services || []).map((x: any) =>
-                typeof x === "string" ? x : x._id
-              );
-              return svcIds.includes(p.serviceId);
-            })
-            .map((e) => e._id);
-
-          // ✅ Simplificado: tomar el primer empleado elegible
-          // El backend ya maneja la auto-asignación inteligente en los nuevos endpoints
-          const chosenEmpId = eligibleEmpIds[0] || null;
-
-          if (!chosenEmpId) {
-            throw new Error(
-              `No hay empleados disponibles para ${
-                svc.name
-              } a las ${start.format("HH:mm")} (${dk}).`
-            );
-          }
-
-          const result = await createReservation({
-            ...p,
-            employeeId: chosenEmpId,
-          });
-          if (result?._id) reservationIds.push(result._id);
-        }
-
-        count = singles.length;
-        firstDateText = dayjs(singles[0].startDate).format("DD/MM/YYYY HH:mm");
+      if (result && Array.isArray(result)) {
+        reservationIds = result
+          .map((r) => r._id)
+          .filter((id): id is string => !!id);
       }
+
+      const count = (times as MultiServiceBlockSelection).intervals.length;
+      const start =
+        (times as MultiServiceBlockSelection).startTime ??
+        (times as MultiServiceBlockSelection).intervals[0]?.from;
+      const firstDateText = start ? dayjs(start).format("DD/MM/YYYY HH:mm") : "";
 
       setFinishInfo({
         count,
@@ -354,7 +231,7 @@ export default function MultiBookingWizard() {
   const handleNewBooking = () => {
     setSelected([]);
     setDates([]);
-    setTimes([]);
+    setTimes(null);
     setCustomerDetails({ name: "", email: "", phone: "", birthDate: null });
     setFinishInfo(null);
     setCompleted(false);
@@ -446,7 +323,6 @@ export default function MultiBookingWizard() {
       case 4:
         return (
           <StepMultiServiceSummary
-            splitDates={splitDates}
             services={services}
             employees={employees}
             dates={dates}
@@ -579,15 +455,10 @@ export default function MultiBookingWizard() {
                       : ""
                   }
                   appointmentTime={(() => {
-                    const value =
-                      Array.isArray(times) && times.length > 0
-                        ? times[0].time
-                        : typeof times === "object" && "startTime" in times
-                        ? times.startTime
-                        : "";
-                    return value instanceof Date
-                      ? dayjs(value).format("HH:mm")
-                      : value || undefined;
+                    if (!times?.startTime) return undefined;
+                    return times.startTime instanceof Date
+                      ? dayjs(times.startTime).format("HH:mm")
+                      : String(times.startTime);
                   })()}
                 />
               )}

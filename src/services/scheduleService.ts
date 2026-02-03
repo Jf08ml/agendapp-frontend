@@ -275,3 +275,32 @@ export const getAvailableSlotsBatch = async (
   }
 };
 
+// ============ DISPONIBILIDAD DE DÍAS ============
+
+export interface DaysAvailabilityResponse {
+  availability: Record<string, boolean>;
+}
+
+// Verificar disponibilidad de múltiples días para un conjunto de servicios
+export const checkDaysAvailability = async (
+  organizationId: string,
+  services: Array<{ serviceId: string; employeeId: string | null; duration: number }>,
+  startDate: string,
+  endDate: string
+): Promise<DaysAvailabilityResponse | undefined> => {
+  try {
+    const response = await apiGeneral.post<Response<DaysAvailabilityResponse>>(
+      `/schedule/check-days-availability`,
+      {
+        organizationId,
+        services,
+        startDate,
+        endDate
+      }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al verificar disponibilidad de días");
+  }
+};
+

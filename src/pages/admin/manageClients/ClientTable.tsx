@@ -34,6 +34,31 @@ interface ClientTableProps {
   error: string | null;
 }
 
+// Opciones de filtro de estado
+const STATUS_OPTIONS = [
+  { value: "", label: "Todos los estados" },
+  { value: "pending", label: "Pendientes" },
+  { value: "confirmed", label: "Confirmadas" },
+  { value: "cancelled_by_admin,cancelled_by_customer,cancelled", label: "Canceladas" },
+];
+
+// Mapeo de estados a texto y colores
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case "pending":
+      return { label: "Pendiente", color: "yellow" };
+    case "confirmed":
+      return { label: "Confirmada", color: "green" };
+    case "cancelled":
+    case "cancelled_by_customer":
+      return { label: "Cancelada por cliente", color: "red" };
+    case "cancelled_by_admin":
+      return { label: "Cancelada por admin", color: "orange" };
+    default:
+      return { label: status, color: "gray" };
+  }
+};
+
 const ClientTable: React.FC<ClientTableProps> = ({
   clients,
   handleDeleteClient,
@@ -49,6 +74,9 @@ const ClientTable: React.FC<ClientTableProps> = ({
   const [loading, setLoading] = useState(false);
   const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [currentClientId, setCurrentClientId] = useState<string | null>(null);
+  const [currentClientName, setCurrentClientName] = useState<string>("");
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,19 +91,22 @@ const ClientTable: React.FC<ClientTableProps> = ({
     [clients, currentPage, pageSize]
   );
 
-  const fetchAppointments = async (clientId: string, clientName?: string) => {
+  const fetchAppointments = async (
+    clientId: string,
+    clientName?: string,
+    status?: string
+  ) => {
     setLoading(true);
     setLoadingClientId(clientId);
+    setCurrentClientId(clientId);
+    if (clientName) setCurrentClientName(clientName);
     try {
-      const response = await getAppointmentsByClient(clientId);
-      const recentAppointments = response
-        .sort(
-          (a: Appointment, b: Appointment) =>
-            new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-        )
-        .slice(0, 7);
-      setModalTitle(`Citas de ${clientName ?? ""}`.trim());
-      setAppointments(recentAppointments);
+      const response = await getAppointmentsByClient(
+        clientId,
+        status || undefined
+      );
+      setModalTitle(`Citas de ${clientName ?? currentClientName}`.trim());
+      setAppointments(response); // Ya viene ordenado del backend
     } catch (err) {
       console.error("Error obteniendo las citas:", err);
       setAppointments([]);
@@ -83,6 +114,15 @@ const ClientTable: React.FC<ClientTableProps> = ({
       setLoading(false);
       setLoadingClientId(null);
       setOpened(true);
+    }
+  };
+
+  // Refiltrar cuando cambia el filtro de estado
+  const handleStatusFilterChange = (value: string | null) => {
+    const newStatus = value ?? "";
+    setStatusFilter(newStatus);
+    if (currentClientId) {
+      fetchAppointments(currentClientId, currentClientName, newStatus);
     }
   };
 
@@ -308,14 +348,34 @@ const ClientTable: React.FC<ClientTableProps> = ({
         </Text>
       </Group>
 
-      {/* Modal historial corto */}
+      {/* Modal historial de citas */}
       <Modal
         opened={opened}
-        onClose={() => setOpened(false)}
+        onClose={() => {
+          setOpened(false);
+          setStatusFilter("");
+        }}
         title={modalTitle}
         centered
-        size="lg"
+        size="xl"
       >
+        {/* Filtro de estado */}
+        <Group mb="md" justify="space-between" align="center">
+          <Select
+            placeholder="Filtrar por estado"
+            data={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={handleStatusFilterChange}
+            w={200}
+            clearable={false}
+          />
+          {!loading && (
+            <Text size="sm" c="dimmed">
+              {appointments.length} cita{appointments.length !== 1 ? "s" : ""}
+            </Text>
+          )}
+        </Group>
+
         {loading ? (
           <Loader size="md" />
         ) : appointments.length > 0 ? (
@@ -324,31 +384,44 @@ const ClientTable: React.FC<ClientTableProps> = ({
               <strong>Tipo de servicio más tomado:</strong>{" "}
               {getMostTakenServiceType()}
             </Text>
-            <ScrollArea.Autosize mah={340}>
+            <ScrollArea.Autosize mah={400}>
               <Table striped highlightOnHover>
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Servicio</Table.Th>
                     <Table.Th>Empleado</Table.Th>
                     <Table.Th>Fecha</Table.Th>
+                    <Table.Th>Estado</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {appointments.map((a) => (
-                    <Table.Tr key={a._id}>
-                      <Table.Td>{a.service.name}</Table.Td>
-                      <Table.Td>{a.employee.names}</Table.Td>
-                      <Table.Td>
-                        {new Date(a.startDate).toLocaleString("es-ES")}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
+                  {appointments.map((a) => {
+                    const statusBadge = getStatusBadge(a.status);
+                    return (
+                      <Table.Tr key={a._id}>
+                        <Table.Td>{a.service.name}</Table.Td>
+                        <Table.Td>{a.employee.names}</Table.Td>
+                        <Table.Td>
+                          {new Date(a.startDate).toLocaleString("es-ES")}
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={statusBadge.color} variant="light">
+                            {statusBadge.label}
+                          </Badge>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
                 </Table.Tbody>
               </Table>
             </ScrollArea.Autosize>
           </>
         ) : (
-          <Text c="dimmed">No hay citas recientes</Text>
+          <Text c="dimmed">
+            {statusFilter
+              ? "No hay citas con el estado seleccionado"
+              : "No hay citas registradas"}
+          </Text>
         )}
       </Modal>
     </Box>

@@ -216,11 +216,14 @@ export const getAppointmentsByEmployee = async (
 };
 
 export const getAppointmentsByClient = async (
-  clientId: string
+  clientId: string,
+  status?: string // Filtro opcional: "pending", "confirmed", "cancelled_by_admin,cancelled_by_customer"
 ): Promise<Appointment[]> => {
   try {
+    const params = status ? { status } : {};
     const response = await apiAppointment.get<Response<Appointment[]>>(
-      `/client/${clientId}`
+      `/client/${clientId}`,
+      { params }
     );
     return response.data.data;
   } catch (error) {
@@ -349,7 +352,18 @@ export const batchConfirmAppointments = async (
   }
 };
 
-// Eliminar una cita
+// Cancelar una cita (cambia estado a cancelled_by_admin, mantiene historial)
+export const cancelAppointment = async (
+  appointmentId: string
+): Promise<void> => {
+  try {
+    await apiAppointment.patch<Response<void>>(`/${appointmentId}/cancel`);
+  } catch (error) {
+    handleAxiosError(error, "Error al cancelar la cita");
+  }
+};
+
+// Eliminar una cita definitivamente (sin historial)
 export const deleteAppointment = async (
   appointmentId: string
 ): Promise<void> => {

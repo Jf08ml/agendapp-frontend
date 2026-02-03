@@ -8,11 +8,12 @@ import React, {
   Suspense,
   lazy,
 } from "react";
-import { Badge, Box, Button, Group, Paper, Text } from "@mantine/core";
+import { Badge, Box, Button, Group, Paper, Stack, Text } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
+  cancelAppointment,
   createAppointmentsBatch,
   deleteAppointment,
   getAppointmentsByOrganizationId,
@@ -29,7 +30,7 @@ import {
 } from "../../../services/clientService";
 import { Service } from "../../../services/serviceService";
 import { showNotification } from "@mantine/notifications";
-import { openConfirmModal } from "@mantine/modals";
+import { openConfirmModal, modals } from "@mantine/modals";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
@@ -444,27 +445,26 @@ const ScheduleView: React.FC = () => {
   }, []);
 
   /**
-   * CANCELAR CITA
+   * ELIMINAR CITA - Elimina definitivamente una cita (útil para citas canceladas)
    */
-  const handleCancelAppointment = useCallback(
+  const handleDeleteAppointment = useCallback(
     (appointmentId: string) => {
       openConfirmModal({
-        title: "Cancelar cita",
-        children: (
-          <p>
-            Al cancelar se <strong>elimina</strong> el registro de la cita.
-            ¿Estás seguro de que deseas cancelar esta cita?
-          </p>
-        ),
+        title: "Eliminar cita",
         centered: true,
-        labels: { confirm: "Cancelar y eliminar", cancel: "Volver" },
+        children: (
+          <Text size="sm">
+            ¿Estás seguro de que deseas eliminar esta cita definitivamente? Esta acción no se puede deshacer.
+          </Text>
+        ),
+        labels: { confirm: "Eliminar", cancel: "Cancelar" },
         confirmProps: { color: "red" },
         onConfirm: async () => {
           try {
             await deleteAppointment(appointmentId);
             showNotification({
               title: "Éxito",
-              message: "La cita ha sido cancelada y eliminada.",
+              message: "La cita ha sido eliminada definitivamente.",
               color: "green",
               autoClose: 3000,
               position: "top-right",
@@ -473,7 +473,7 @@ const ScheduleView: React.FC = () => {
           } catch (error) {
             showNotification({
               title: "Error",
-              message: "No se pudo cancelar la cita.",
+              message: "No se pudo eliminar la cita.",
               color: "red",
               autoClose: 3000,
               position: "top-right",
@@ -481,6 +481,104 @@ const ScheduleView: React.FC = () => {
             console.error(error);
           }
         },
+      });
+    },
+    [currentDate, fetchAppointmentsForMonth]
+  );
+
+  /**
+   * CANCELAR CITA - Muestra modal con opciones de cancelar o eliminar
+   */
+  const handleCancelAppointment = useCallback(
+    (appointmentId: string) => {
+      const handleCancel = async () => {
+        modals.closeAll();
+        try {
+          await cancelAppointment(appointmentId);
+          showNotification({
+            title: "Éxito",
+            message: "La cita ha sido cancelada y se mantiene en el historial.",
+            color: "green",
+            autoClose: 3000,
+            position: "top-right",
+          });
+          fetchAppointmentsForMonth(currentDate);
+        } catch (error) {
+          showNotification({
+            title: "Error",
+            message: "No se pudo cancelar la cita.",
+            color: "red",
+            autoClose: 3000,
+            position: "top-right",
+          });
+          console.error(error);
+        }
+      };
+
+      const handleDelete = async () => {
+        modals.closeAll();
+        try {
+          await deleteAppointment(appointmentId);
+          showNotification({
+            title: "Éxito",
+            message: "La cita ha sido eliminada definitivamente.",
+            color: "green",
+            autoClose: 3000,
+            position: "top-right",
+          });
+          fetchAppointmentsForMonth(currentDate);
+        } catch (error) {
+          showNotification({
+            title: "Error",
+            message: "No se pudo eliminar la cita.",
+            color: "red",
+            autoClose: 3000,
+            position: "top-right",
+          });
+          console.error(error);
+        }
+      };
+
+      modals.open({
+        title: "¿Qué deseas hacer con esta cita?",
+        centered: true,
+        children: (
+          <Stack gap="md">
+            <Text size="sm" c="dimmed">
+              Selecciona una opción:
+            </Text>
+            <Button
+              color="orange"
+              variant="light"
+              fullWidth
+              onClick={handleCancel}
+            >
+              Cancelar cita (mantener en historial)
+            </Button>
+            <Text size="xs" c="dimmed" ta="center">
+              La cita quedará marcada como cancelada pero visible en el historial del cliente.
+            </Text>
+            <Button
+              color="red"
+              variant="filled"
+              fullWidth
+              onClick={handleDelete}
+            >
+              Eliminar definitivamente
+            </Button>
+            <Text size="xs" c="dimmed" ta="center">
+              La cita se eliminará por completo del sistema. Útil para citas creadas por error.
+            </Text>
+            <Button
+              variant="subtle"
+              color="gray"
+              fullWidth
+              onClick={() => modals.closeAll()}
+            >
+              Volver
+            </Button>
+          </Stack>
+        ),
       });
     },
     [currentDate, fetchAppointmentsForMonth]
@@ -769,6 +867,7 @@ const ScheduleView: React.FC = () => {
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}
         onConfirmAppointment={handleConfirmAppointment}
+        onDeleteAppointment={handleDeleteAppointment}
         fetchAppointmentsForMonth={fetchAppointmentsForMonth}
         loadingMonth={loadingMonth}
         fetchAppointmentsForDay={fetchAppointmentsForDay}

@@ -1,21 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Stack,
-  Group,
   Text,
   Paper,
   Divider,
-  SegmentedControl,
-  SimpleGrid,
+  Loader,
+  Center,
+  Badge,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { DatePicker, DateInput } from "@mantine/dates";
+import { DatePicker } from "@mantine/dates";
 import { Service } from "../../services/serviceService";
 import { SelectedService, ServiceWithDate } from "../../types/multiBooking";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
+import { checkDaysAvailability } from "../../services/scheduleService";
 dayjs.locale("es");
 
 interface StepMultiServiceDateProps {
@@ -31,172 +32,286 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   value,
   onChange,
 }) => {
-  const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
-
-  // UI:  "one" = un solo día para todos, "split" = fechas por servicio
-  const [mode, setMode] = useState<"one" | "split">("one");
+  const isMobile = useMediaQuery("(max-width: 48rem)");
+  const [loading, setLoading] = useState(false);
+  const [availability, setAvailability] = useState<Record<string, boolean>>({});
 
   const organization = useSelector(
     (s: RootState) => s.organization.organization
   );
-  const businessDays = organization?.openingHours?.businessDays ?? [
-    1, 2, 3, 4, 5,
-  ];
+  const organizationId = organization?._id;
 
-  const isDisabledDay = (d: Date) => {
-    // Deshabilitar días anteriores a hoy
-    if (dayjs(d).isBefore(dayjs(), 'day')) return true;
-    // Deshabilitar días que no son laborables
-    return !businessDays.includes(dayjs(d).day());
-  };
+  // Días de negocio de la organización (fallback)
+  const businessDays = organization?.openingHours?.businessDays ?? [1, 2, 3, 4, 5];
 
-  // Mantener value sincronizado con servicios seleccionados
+  // Cargar disponibilidad cuando cambian los servicios seleccionados
   useEffect(() => {
-    if (mode === "split") {
-      if (value.length !== selectedServices.length) {
-        onChange(
-          selectedServices.map((s) => ({
-            serviceId: s.serviceId,
-            employeeId: s.employeeId,
-            date: value.find((v) => v.serviceId === s.serviceId)?.date ?? null,
-          }))
-        );
-      }
-    } else {
-      if (
-        selectedServices.length > 0 &&
-        value.length !== selectedServices.length
-      ) {
-        onChange(
-          selectedServices.map((s) => ({
-            serviceId: s.serviceId,
-            employeeId: s.employeeId,
-            date: value[0]?.date ?? null,
-          }))
-        );
-      }
+    if (!organizationId || selectedServices.length === 0) {
+      setAvailability({});
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, selectedServices]);
 
-  const handleUniqueDate = (date: Date | null) => {
-    onChange(
-      selectedServices.map((s) => ({
-        serviceId: s.serviceId,
-        employeeId: s.employeeId,
-        date,
-      }))
-    );
-  };
+    const loadAvailability = async () => {
+      setLoading(true);
+      try {
+        // Preparar servicios con duración
+        const servicesWithDuration = selectedServices.map((sel) => {
+          const svc = services.find((s) => s._id === sel.serviceId);
+          return {
+            serviceId: sel.serviceId,
+            employeeId: sel.employeeId,
+            duration: svc?.duration ?? 30,
+          };
+        });
 
-  const handleSplitDateChange = (serviceId: string, date: Date | null) => {
-    onChange(
-      selectedServices.map((s) => {
-        const current = value.find((v) => v.serviceId === s.serviceId);
-        if (s.serviceId === serviceId) {
-          return { serviceId: s.serviceId, employeeId: s.employeeId, date };
+        // Calcular rango: desde hoy hasta 59 días adelante (60 días en total)
+        const startDate = dayjs().format("YYYY-MM-DD");
+        const endDate = dayjs().add(59, "day").format("YYYY-MM-DD");
+
+        const response = await checkDaysAvailability(
+          organizationId,
+          servicesWithDuration,
+          startDate,
+          endDate
+        );
+
+        console.log("checkDaysAvailability response:", response);
+
+        if (response?.availability) {
+          console.log("Availability loaded:", Object.keys(response.availability).length, "days");
+          setAvailability(response.availability);
+        } else {
+          console.log("No availability data in response:", response);
         }
-        return {
+      } catch (error) {
+        console.error("Error loading availability:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAvailability();
+  }, [organizationId, selectedServices, services]);
+
+  // Handler para seleccionar fecha
+  const handleDateSelect = useCallback(
+    (date: Date | null) => {
+      onChange(
+        selectedServices.map((s) => ({
           serviceId: s.serviceId,
           employeeId: s.employeeId,
-          date: current?.date ?? null,
-        };
-      })
-    );
-  };
+          date,
+        }))
+      );
+    },
+    [selectedServices, onChange]
+  );
 
-  const gridCols = useMemo(() => {
-    if (isMobile) return 1;
-    return selectedServices.length >= 3 ? 3 : 2;
-  }, [isMobile, selectedServices.length]);
+  // Determinar si un día está deshabilitado (solo días pasados y no laborables)
+  // NO deshabilitamos días sin disponibilidad para poder aplicar estilos
+  const isDisabledDay = useCallback(
+    (d: Date) => {
+      // Días anteriores a hoy
+      if (dayjs(d).isBefore(dayjs(), "day")) return true;
+
+      // Días que no son laborables (según organización)
+      if (!businessDays.includes(dayjs(d).day())) return true;
+
+      // NO deshabilitamos por falta de disponibilidad aquí
+      // para que los estilos se apliquen correctamente
+      return false;
+    },
+    [businessDays]
+  );
+
+  // Fecha seleccionada actualmente
+  const selectedDate = value[0]?.date;
+
+  // getDayProps con estilos y control de selección
+  const getDayProps = useCallback(
+    (date: Date) => {
+      const dateStr = dayjs(date).format("YYYY-MM-DD");
+      const isToday = dayjs(date).isSame(dayjs(), "day");
+      const isPast = dayjs(date).isBefore(dayjs(), "day");
+      const isBusinessDay = businessDays.includes(dayjs(date).day());
+      const isSelected = selectedDate && dayjs(date).isSame(dayjs(selectedDate), "day");
+
+      // Día pasado o no laborable - sin estilo especial
+      if (isPast || !isBusinessDay) {
+        return {};
+      }
+
+      // Si está seleccionado, mostrar estilo de selección prominente
+      if (isSelected) {
+        return {
+          style: {
+            backgroundColor: "#228be6",
+            color: "#ffffff",
+            fontWeight: 700,
+            borderRadius: "50%",
+            boxShadow: "0 0 0 2px #228be6, 0 0 0 4px #ffffff",
+          },
+        };
+      }
+
+      // Si tenemos datos de disponibilidad
+      if (Object.keys(availability).length > 0) {
+        const hasAvailability = availability[dateStr];
+
+        if (hasAvailability === false) {
+          return {
+            disabled: true, // Deshabilitar para que no se pueda seleccionar
+            style: {
+              backgroundColor: "#ffe0e0",
+              color: "#c92a2a",
+              textDecoration: "line-through",
+              cursor: "not-allowed",
+            },
+          };
+        }
+
+        if (hasAvailability === true) {
+          return {
+            style: {
+              backgroundColor: isToday ? "#d0ebff" : "#d3f9d8",
+              color: isToday ? "#1864ab" : "#2b8a3e",
+              fontWeight: 700,
+            },
+          };
+        }
+      }
+
+      return {};
+    },
+    [availability, businessDays, selectedDate]
+  );
+
+  // Contar días disponibles
+  const availableDaysCount = useMemo(
+    () => Object.values(availability).filter(Boolean).length,
+    [availability]
+  );
+
+  const hasAvailabilityData = Object.keys(availability).length > 0;
 
   return (
     <Stack>
-      <Group align="center" justify="space-between" wrap="wrap" gap="xs">
-        <Text fw={600} size={isMobile ? "sm" : "md"}>
-          Selecciona la(s) fecha(s) de tus servicios
-        </Text>
-
-        <SegmentedControl
-          value={mode}
-          onChange={(v) => setMode(v as "one" | "split")}
-          data={[
-            { label: "Mismo día", value: "one" },
-            { label: "Día diferente", value: "split" },
-          ]}
-          size={isMobile ? "xs" : "sm"}
-          radius="md"
-        />
-      </Group>
+      <Text fw={600} size={isMobile ? "sm" : "md"}>
+        Selecciona el día de tu cita
+      </Text>
 
       <Divider />
 
-      {mode === "one" ? (
-        <Stack gap="xs">
+      <Stack gap="xs">
+        {hasAvailabilityData && (
           <Text c="dimmed" size="sm">
-            Elige un día y aplicará a todos los servicios seleccionados.
+            Los días en <Text span c="green" fw={600}>verde</Text> tienen horarios disponibles.
+            <Text span c="red" fw={600}> Los días tachados</Text> no tienen disponibilidad.
           </Text>
-          <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
-            <DatePicker
-              minDate={new Date()}
-              value={value[0]?.date || null}
-              onChange={handleUniqueDate}
-              size={isMobile ? "sm" : "md"}
-              style={{ width: "100%" }}
-              locale="es"
-              getDayProps={(date) => ({ disabled: isDisabledDay(date) })}
-            />
-          </Paper>
-        </Stack>
-      ) : (
-        <Stack gap="sm">
-          <Text c="dimmed" size="sm">
-            Asigna una fecha específica para cada servicio.
-          </Text>
+        )}
 
-          <SimpleGrid cols={gridCols} spacing={isMobile ? "sm" : "md"}>
-            {selectedServices.map((sel) => {
-              const item = value.find((v) => v.serviceId === sel.serviceId);
-              const service = services.find((s) => s._id === sel.serviceId);
+        {loading ? (
+          <Center py="xl">
+            <Stack align="center" gap="xs">
+              <Loader size="sm" />
+              <Text size="sm" c="dimmed">
+                Verificando disponibilidad...
+              </Text>
+            </Stack>
+          </Center>
+        ) : (
+          <>
+            {availableDaysCount > 0 && (
+              <Badge variant="light" color="green" size="sm">
+                {availableDaysCount} días con disponibilidad
+              </Badge>
+            )}
 
-              return (
-                <Paper
-                  key={sel.serviceId}
-                  withBorder
-                  radius="md"
-                  p={isMobile ? "sm" : "md"}
-                >
-                  <Stack gap="xs">
-                    <Text fw={600} lh="sm">
-                      {service?.name}{" "}
-                      <Text span c="dimmed" size="sm">
-                        ({service?.duration} min)
-                      </Text>
-                    </Text>
+            {availableDaysCount === 0 && hasAvailabilityData && (
+              <Badge variant="light" color="red" size="sm">
+                No hay disponibilidad en los próximos días
+              </Badge>
+            )}
 
-                    <DateInput
-                      label={isMobile ? undefined : "Fecha"}
-                      placeholder="Selecciona una fecha"
-                      minDate={new Date()}
-                      value={item?.date ?? null}
-                      onChange={(date) =>
-                        handleSplitDateChange(sel.serviceId, date)
-                      }
-                      size={isMobile ? "sm" : "md"}
-                      clearable
-                      style={{ width: "100%" }}
-                      popoverProps={{ withinPortal: true, trapFocus: false }}
-                      locale="es"
-                      valueFormat="DD/MM/YYYY"
-                      getDayProps={(date) => ({ disabled: isDisabledDay(date) })}
+            <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
+              <DatePicker
+                minDate={new Date()}
+                maxDate={dayjs().add(59, "day").toDate()}
+                value={value[0]?.date || null}
+                onChange={handleDateSelect}
+                size={isMobile ? "sm" : "md"}
+                style={{ width: "100%" }}
+                locale="es"
+                getDayProps={getDayProps}
+                excludeDate={isDisabledDay}
+              />
+            </Paper>
+
+            {/* Día seleccionado */}
+            {selectedDate && (
+              <Paper withBorder p="sm" radius="md" bg="blue.0">
+                <Text size="sm" fw={600} c="blue.7">
+                  Día seleccionado: {dayjs(selectedDate).format("dddd, D [de] MMMM [de] YYYY")}
+                </Text>
+              </Paper>
+            )}
+
+            {/* Leyenda de colores */}
+            {hasAvailabilityData && (
+              <Stack gap={4}>
+                <Text size="xs" c="dimmed" fw={500}>
+                  Leyenda:
+                </Text>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        backgroundColor: "#d3f9d8",
+                        borderRadius: 4,
+                        border: "1px solid #2b8a3e",
+                      }}
                     />
-                  </Stack>
-                </Paper>
-              );
-            })}
-          </SimpleGrid>
-        </Stack>
-      )}
+                    <Text size="xs" c="dimmed">
+                      Disponible
+                    </Text>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        backgroundColor: "#ffe0e0",
+                        borderRadius: 4,
+                        border: "1px solid #c92a2a",
+                      }}
+                    />
+                    <Text size="xs" c="dimmed">
+                      Sin disponibilidad
+                    </Text>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        backgroundColor: "#228be6",
+                        borderRadius: "50%",
+                        border: "2px solid #228be6",
+                        boxShadow: "0 0 0 2px #ffffff",
+                      }}
+                    />
+                    <Text size="xs" c="dimmed">
+                      Seleccionado
+                    </Text>
+                  </div>
+                </div>
+              </Stack>
+            )}
+          </>
+        )}
+      </Stack>
     </Stack>
   );
 };
