@@ -166,6 +166,18 @@ export const schema = z.object({
     })
     .optional(),
 
+  // Política de cancelación de citas
+  cancellationPolicy: z
+    .object({
+      minHoursBeforeAppointment: z.union([
+        z.number().int().min(0).max(168), // Máximo 1 semana
+        z.null(),
+        z.undefined()
+      ]).optional(),
+      preventCancellingConfirmed: z.boolean().optional(),
+    })
+    .optional(),
+
   branding: z
     .object({
       logoUrl: optionalUrl,

@@ -40,6 +40,11 @@ export interface ReminderSettings {
   };
 }
 
+export interface CancellationPolicy {
+  minHoursBeforeAppointment?: number; // 0 = sin restricción
+  preventCancellingConfirmed?: boolean;
+}
+
 export interface PaymentMethod {
   type: "nequi" | "bancolombia" | "daviplata" | "mercado_pago" | "pix" | "yape" | "sinpe" | "transferencia_bancaria" | "efectivo" | "otros";
   accountName?: string;
@@ -101,6 +106,7 @@ export interface Organization {
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards";
   reminderSettings?: ReminderSettings;
+  cancellationPolicy?: CancellationPolicy;
   currency?: string;
   // Sistema de membresías
   currentMembershipId?: string;

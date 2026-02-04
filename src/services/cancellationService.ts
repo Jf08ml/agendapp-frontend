@@ -6,8 +6,16 @@ interface AppointmentInfo {
   startDate: string;
   endDate: string;
   status: string;
+  clientConfirmed?: boolean;
   isCancelled: boolean;
   isPast: boolean;
+  policyBlocked?: boolean;
+  policyBlockedReason?: string;
+}
+
+interface CancellationPolicy {
+  minHoursBeforeAppointment?: number;
+  preventCancellingConfirmed?: boolean;
 }
 
 interface CancellationInfo {
@@ -17,6 +25,10 @@ interface CancellationInfo {
   isGroup?: boolean;
   appointments?: AppointmentInfo[];
   type?: string;
+  allBlockedByPolicy?: boolean;
+  cancellationPolicy?: CancellationPolicy;
+  policyBlocked?: boolean; // Para reservaciones
+  policyBlockedReason?: string; // Para reservaciones
 }
 
 interface CancellationInfoResponse {

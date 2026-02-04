@@ -10,7 +10,7 @@ import { IoAlertCircle } from "react-icons/io5";
 import { GrOrganization } from "react-icons/gr";
 import { RiGlobalLine } from "react-icons/ri";
 import { BiLocationPlus, BiCreditCard } from "react-icons/bi";
-import { MdBrandingWatermark } from "react-icons/md";
+import { MdBrandingWatermark, MdBlock, MdNotifications } from "react-icons/md";
 
 import { RootState } from "../../../app/store";
 import {
@@ -32,6 +32,8 @@ import LocationTab from "./components/tabs/LocationTab";
 import FidelityTab from "./components/tabs/FidelityTab";
 import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
+import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
+import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
 
 import { schema, FormValues } from "./schema";
 import { ensureBranding, ensureDomains } from "./utils";
@@ -110,6 +112,10 @@ export default function OrganizationInfo() {
               stepMinutes: 30,
             },
             currency: response.currency ?? "COP",
+            cancellationPolicy: {
+              minHoursBeforeAppointment: response.cancellationPolicy?.minHoursBeforeAppointment ?? 0,
+              preventCancellingConfirmed: response.cancellationPolicy?.preventCancellingConfirmed ?? false,
+            },
           };
 
           setOrg(normalized);
@@ -346,6 +352,26 @@ export default function OrganizationInfo() {
           >
             Métodos de Pago
           </Tabs.Tab>
+          <Tabs.Tab
+            value="cancellation"
+            leftSection={
+              <MdBlock
+                style={{ width: rem(12), height: rem(12) }}
+              />
+            }
+          >
+            Cancelación
+          </Tabs.Tab>
+          <Tabs.Tab
+            value="reminders"
+            leftSection={
+              <MdNotifications
+                style={{ width: rem(12), height: rem(12) }}
+              />
+            }
+          >
+            Recordatorios
+          </Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="contact" pt="md">
@@ -388,6 +414,14 @@ export default function OrganizationInfo() {
             form={form}
             isEditing={isEditing}
           />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="cancellation" pt="md">
+          <CancellationPolicyTab form={form} isEditing={isEditing} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="reminders" pt="md">
+          <ReminderSettingsTab form={form} isEditing={isEditing} />
         </Tabs.Panel>
       </Tabs>
 

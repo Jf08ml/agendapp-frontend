@@ -35,6 +35,13 @@ interface AppointmentInfo {
   clientConfirmed?: boolean;
   isCancelled: boolean;
   isPast: boolean;
+  policyBlocked?: boolean;
+  policyBlockedReason?: string;
+}
+
+interface CancellationPolicy {
+  minHoursBeforeAppointment?: number;
+  preventCancellingConfirmed?: boolean;
 }
 
 interface CancellationInfo {
@@ -43,6 +50,10 @@ interface CancellationInfo {
   timezone?: string;
   isGroup?: boolean;
   appointments?: AppointmentInfo[];
+  allBlockedByPolicy?: boolean;
+  cancellationPolicy?: CancellationPolicy;
+  policyBlocked?: boolean; // Para reservaciones
+  policyBlockedReason?: string; // Para reservaciones
 }
 
 export const PublicCancelPage: React.FC = () => {
@@ -87,10 +98,10 @@ export const PublicCancelPage: React.FC = () => {
       if (response.status === "success") {
         setInfo(response.data);
 
-        // Pre-seleccionar citas que se pueden cancelar (no canceladas y futuras)
+        // Pre-seleccionar citas que se pueden cancelar (no canceladas, futuras y no bloqueadas por política)
         if (response.data.appointments) {
           const cancellableIds = response.data.appointments
-            .filter((apt: AppointmentInfo) => !apt.isCancelled && !apt.isPast)
+            .filter((apt: AppointmentInfo) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked)
             .map((apt: AppointmentInfo) => apt.id);
           setSelectedAppointments(cancellableIds);
         }
@@ -310,7 +321,7 @@ export const PublicCancelPage: React.FC = () => {
 
   const toggleAll = () => {
     const cancellableIds = (info?.appointments || [])
-      .filter((apt) => !apt.isCancelled && !apt.isPast)
+      .filter((apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked)
       .map((apt) => apt.id);
 
     if (selectedAppointments.length === cancellableIds.length) {
@@ -363,7 +374,7 @@ export const PublicCancelPage: React.FC = () => {
                 <Button size="xs" variant="subtle" onClick={toggleAll}>
                   {selectedAppointments.length ===
                   info.appointments.filter(
-                    (apt) => !apt.isCancelled && !apt.isPast
+                    (apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked
                   ).length
                     ? "Deseleccionar todas"
                     : "Seleccionar todas"}
@@ -371,75 +382,85 @@ export const PublicCancelPage: React.FC = () => {
               </Group>
 
               <Stack gap="xs">
-                {info.appointments.map((apt) => (
-                  <Card
-                    key={apt.id}
-                    padding="md"
-                    withBorder
-                    style={{
-                      opacity: apt.isCancelled || apt.isPast ? 0.5 : 1,
-                      cursor:
-                        apt.isCancelled || apt.isPast
-                          ? "not-allowed"
-                          : "pointer",
-                    }}
-                    onClick={() => {
-                      if (!apt.isCancelled && !apt.isPast) {
-                        toggleAppointment(apt.id);
-                      }
-                    }}
-                  >
-                    <Group justify="space-between" wrap="nowrap">
-                      <Group gap="md" wrap="nowrap">
-                        <Checkbox
-                          checked={selectedAppointments.includes(apt.id)}
-                          onChange={() => toggleAppointment(apt.id)}
-                          disabled={apt.isCancelled || apt.isPast}
-                        />
-                        <Stack gap={4}>
-                          <Text fw={600}>{apt.serviceName}</Text>
-                          <Text size="sm" c="dimmed">
-                            {formatFullDateInTimezone(
-                              apt.startDate,
-                              info?.timezone || "America/Bogota",
-                              "ddd, D [de] MMM YYYY"
+                {info.appointments.map((apt) => {
+                  const isDisabled = apt.isCancelled || apt.isPast || apt.policyBlocked;
+                  return (
+                    <Card
+                      key={apt.id}
+                      padding="md"
+                      withBorder
+                      style={{
+                        opacity: isDisabled ? 0.5 : 1,
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                      }}
+                      onClick={() => {
+                        if (!isDisabled) {
+                          toggleAppointment(apt.id);
+                        }
+                      }}
+                    >
+                      <Group justify="space-between" wrap="nowrap">
+                        <Group gap="md" wrap="nowrap">
+                          <Checkbox
+                            checked={selectedAppointments.includes(apt.id)}
+                            onChange={() => toggleAppointment(apt.id)}
+                            disabled={isDisabled}
+                          />
+                          <Stack gap={4}>
+                            <Text fw={600}>{apt.serviceName}</Text>
+                            <Text size="sm" c="dimmed">
+                              {formatFullDateInTimezone(
+                                apt.startDate,
+                                info?.timezone || "America/Bogota",
+                                "ddd, D [de] MMM YYYY"
+                              )}
+                            </Text>
+                            <Text size="sm" c="dimmed">
+                              {formatInTimezone(
+                                apt.startDate,
+                                info?.timezone || "America/Bogota",
+                                "HH:mm"
+                              )}{" "}
+                              -{" "}
+                              {formatInTimezone(
+                                apt.endDate,
+                                info?.timezone || "America/Bogota",
+                                "HH:mm"
+                              )}
+                            </Text>
+                            {apt.policyBlocked && apt.policyBlockedReason && (
+                              <Text size="xs" c="orange" fw={500}>
+                                {apt.policyBlockedReason}
+                              </Text>
                             )}
-                          </Text>
-                          <Text size="sm" c="dimmed">
-                            {formatInTimezone(
-                              apt.startDate,
-                              info?.timezone || "America/Bogota",
-                              "HH:mm"
-                            )}{" "}
-                            -{" "}
-                            {formatInTimezone(
-                              apt.endDate,
-                              info?.timezone || "America/Bogota",
-                              "HH:mm"
-                            )}
-                          </Text>
+                          </Stack>
+                        </Group>
+                        <Stack gap={4} align="flex-end">
+                          {apt.clientConfirmed && !apt.isCancelled && (
+                            <Badge color="green" size="sm" variant="light">
+                              Confirmado por ti
+                            </Badge>
+                          )}
+                          {apt.isCancelled && (
+                            <Badge color="red" size="sm">
+                              Cancelada
+                            </Badge>
+                          )}
+                          {apt.isPast && !apt.isCancelled && (
+                            <Badge color="gray" size="sm">
+                              Pasada
+                            </Badge>
+                          )}
+                          {apt.policyBlocked && !apt.isCancelled && !apt.isPast && (
+                            <Badge color="orange" size="sm">
+                              No cancelable
+                            </Badge>
+                          )}
                         </Stack>
                       </Group>
-                      <Stack gap={4} align="flex-end">
-                        {apt.clientConfirmed && !apt.isCancelled && (
-                          <Badge color="green" size="sm" variant="light">
-                            Confirmado por ti
-                          </Badge>
-                        )}
-                        {apt.isCancelled && (
-                          <Badge color="red" size="sm">
-                            Cancelada
-                          </Badge>
-                        )}
-                        {apt.isPast && !apt.isCancelled && (
-                          <Badge color="gray" size="sm">
-                            Pasada
-                          </Badge>
-                        )}
-                      </Stack>
-                    </Group>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </Stack>
             </Stack>
           ) : (
@@ -467,6 +488,17 @@ export const PublicCancelPage: React.FC = () => {
                   Ya has confirmado tu asistencia a esta cita
                 </Alert>
               )}
+
+              {info?.appointments?.[0]?.policyBlocked && (
+                <Alert color="orange" variant="light" icon={<MdError />}>
+                  <Stack gap="xs">
+                    <Text fw={500}>{info.appointments[0].policyBlockedReason || "Esta cita no puede ser cancelada según la política de cancelación"}</Text>
+                    <Text size="sm">
+                      Si necesitas cancelar, por favor comunícate directamente con {info?.organizationName || "el establecimiento"} a través de sus líneas de atención.
+                    </Text>
+                  </Stack>
+                </Alert>
+              )}
             </Stack>
           )}
 
@@ -479,6 +511,27 @@ export const PublicCancelPage: React.FC = () => {
             </Alert>
           )}
 
+          {/* Alerta cuando todas las citas están bloqueadas por política */}
+          {info?.allBlockedByPolicy && (
+            <Alert color="orange" icon={<MdError />}>
+              <Stack gap="xs">
+                <Text fw={500}>No hay citas que se puedan cancelar según la política de cancelación del establecimiento.</Text>
+                <Text size="sm">
+                  Si necesitas cancelar tu cita, por favor comunícate directamente con {info?.organizationName || "el establecimiento"} a través de sus líneas de atención.
+                </Text>
+              </Stack>
+            </Alert>
+          )}
+
+          {/* Nota cuando hay algunas citas bloqueadas por política */}
+          {!info?.allBlockedByPolicy && info?.appointments?.some(apt => apt.policyBlocked) && (
+            <Alert color="blue" icon={<MdError />} variant="light">
+              <Text size="sm">
+                Algunas citas no pueden ser canceladas según la política del establecimiento. Si necesitas cancelarlas, comunícate directamente con {info?.organizationName || "el establecimiento"}.
+              </Text>
+            </Alert>
+          )}
+
           {/* Acciones principales - antes de cualquier advertencia */}
           {!action && (
             <Stack gap="md">
@@ -486,7 +539,7 @@ export const PublicCancelPage: React.FC = () => {
                 ¿Qué deseas hacer con {selectedAppointments.length > 1 ? "estas citas" : "esta cita"}?
               </Text>
 
-              <Stack gap="md" style={{ 
+              <Stack gap="md" style={{
                 display: "grid",
                 gridTemplateColumns: source === "reminder" ? "repeat(auto-fit, minmax(min(100%, 250px), 1fr))" : "1fr",
                 gap: "1rem"
@@ -520,31 +573,48 @@ export const PublicCancelPage: React.FC = () => {
                   </Card>
                 )}
 
-                <Card
-                  padding="lg"
-                  radius="md"
-                  withBorder
-                  style={{
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    border: "2px solid var(--mantine-color-red-3)",
-                    backgroundColor: "var(--mantine-color-red-0)",
-                  }}
-                  onClick={handleCancel}
-                  className="hover-lift"
-                >
-                  <Stack align="center" gap="md">
-                    <MdEventBusy size={40} color="var(--mantine-color-red-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
-                    <Stack gap={4} align="center">
-                      <Title order={4} ta="center">
-                        No Podré Asistir
-                      </Title>
-                      <Text size="sm" c="dimmed" ta="center">
-                        Cancela si no puedes ir
-                      </Text>
-                    </Stack>
-                  </Stack>
-                </Card>
+                {/* Botón de cancelar - deshabilitado si no hay citas cancelables */}
+                {(() => {
+                  const cancellableCount = (info?.appointments || []).filter(
+                    (apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked
+                  ).length;
+                  const isDisabled = cancellableCount === 0 || info?.policyBlocked;
+
+                  return (
+                    <Card
+                      padding="lg"
+                      radius="md"
+                      withBorder
+                      style={{
+                        cursor: isDisabled ? "not-allowed" : "pointer",
+                        transition: "all 0.2s ease",
+                        border: `2px solid ${isDisabled ? "var(--mantine-color-gray-3)" : "var(--mantine-color-red-3)"}`,
+                        backgroundColor: isDisabled ? "var(--mantine-color-gray-0)" : "var(--mantine-color-red-0)",
+                        opacity: isDisabled ? 0.6 : 1,
+                      }}
+                      onClick={isDisabled ? undefined : handleCancel}
+                      className={isDisabled ? "" : "hover-lift"}
+                    >
+                      <Stack align="center" gap="md">
+                        <MdEventBusy
+                          size={40}
+                          color={isDisabled ? "var(--mantine-color-gray-5)" : "var(--mantine-color-red-6)"}
+                          style={{ fontSize: "clamp(40px, 8vw, 48px)" }}
+                        />
+                        <Stack gap={4} align="center">
+                          <Title order={4} ta="center" c={isDisabled ? "dimmed" : undefined}>
+                            No Podré Asistir
+                          </Title>
+                          <Text size="sm" c="dimmed" ta="center">
+                            {isDisabled
+                              ? "No hay citas que se puedan cancelar"
+                              : "Cancela si no puedes ir"}
+                          </Text>
+                        </Stack>
+                      </Stack>
+                    </Card>
+                  );
+                })()}
               </Stack>
             </Stack>
           )}
