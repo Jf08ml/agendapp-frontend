@@ -44,7 +44,7 @@ import { handleAxiosError } from "../../utils/handleAxiosError";
 
 const templateInfo = {
   scheduleAppointment: {
-    title: "Confirmación de Cita",
+    title: "Confirmación de Cita (No utilizado)",
     description: "Mensaje enviado cuando se agenda una cita individual",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -57,7 +57,7 @@ const templateInfo = {
     ],
   },
   scheduleAppointmentBatch: {
-    title: "Confirmación de Citas Múltiples",
+    title: "Confirmación de Citas",
     description: "Mensaje enviado cuando se agendan varias citas juntas",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -70,7 +70,7 @@ const templateInfo = {
     ],
   },
   recurringAppointmentSeries: {
-    title: "Serie de Citas Recurrentes",
+    title: "Mensaje de citas recurrentes",
     description: "Mensaje enviado cuando se crea una serie de citas recurrentes (semanal, quincenal, etc.)",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -82,7 +82,7 @@ const templateInfo = {
     ],
   },
   reminder: {
-    title: "Recordatorio de Cita",
+    title: "Primer recordatorio",
     description: "Mensaje de recordatorio enviado antes de la cita (ej: 24 horas antes)",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -416,7 +416,7 @@ export default function WhatsappTemplateEditor() {
               }}
             >
               {templateKeys.map((key) => {
-                const isDisabled = key === 'statusReservationApproved' || key === 'statusReservationRejected';
+                const isDisabled = key === 'scheduleAppointment' || key === 'statusReservationApproved' || key === 'statusReservationRejected';
                 return (
                   <Tabs.Tab 
                     key={key} 
