@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { GoogleMap, Marker } from "@react-google-maps/api";
 import {
   Text,
@@ -15,7 +15,6 @@ import {
 } from "@mantine/core";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
-import { getOrganizationById } from "../../services/organizationService";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { MdLocationOn } from "react-icons/md";
 
@@ -41,32 +40,12 @@ const Location: React.FC = () => {
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+  const loading = useSelector(
+    (state: RootState) => state.organization.loading
+  );
 
-  const [loading, setLoading] = useState(true);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [address, setAddress] = useState<string>("");
-
-  useEffect(() => {
-    const fetchOrganization = async () => {
-      if (!organization?._id) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const response = await getOrganizationById(organization._id);
-        if (response) {
-          setLocation(response.location);
-          setAddress(response.address || "Dirección no disponible");
-        }
-      } catch (error) {
-        console.error(error)
-        setAddress("No se pudo cargar la dirección");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrganization();
-  }, [organization]);
+  const location = organization?.location || null;
+  const address = organization?.address || "Dirección no disponible";
 
   // Un solo botón inteligente
   const handleOpenMap = () => {
