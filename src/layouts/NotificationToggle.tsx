@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Switch, Text, Flex, Loader, Notification as Alert, Modal, List, Button } from "@mantine/core";
+import { Switch, Text, Flex, Loader, Notification as Alert, List, Button } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import {
   createSubscription,
@@ -41,14 +41,13 @@ const getBrowserInfo = () => {
   return { isChrome, isSafari, isFirefox, isEdge, isAndroid, isIOS };
 };
 
-const NotificationToggle = ({ userId, showInstructions: externalShowInstructions, setShowInstructions: externalSetShowInstructions }: NotificationToggleProps) => {
+const NotificationToggle = ({ userId, setShowInstructions: externalSetShowInstructions }: NotificationToggleProps) => {
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [internalShowInstructions, setInternalShowInstructions] = useState<boolean>(false);
+  const [, setInternalShowInstructions] = useState<boolean>(false);
 
   // Usar el estado externo si se proporciona, si no usar el interno
-  const showInstructions = externalShowInstructions ?? internalShowInstructions;
   const setShowInstructions = externalSetShowInstructions ?? setInternalShowInstructions;
 
   // Verificar si las notificaciones ya están habilitadas
@@ -118,7 +117,7 @@ const NotificationToggle = ({ userId, showInstructions: externalShowInstructions
           throw new Error("La clave VAPID no está configurada en el servidor.");
         }
 
-        const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+        const applicationServerKey = urlBase64ToUint8Array(vapidKey) as Uint8Array<ArrayBuffer>;
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
