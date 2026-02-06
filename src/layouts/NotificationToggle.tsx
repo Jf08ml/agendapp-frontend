@@ -8,6 +8,8 @@ import {
 
 interface NotificationToggleProps {
   userId: string;
+  showInstructions?: boolean;
+  setShowInstructions?: (value: boolean) => void;
 }
 
 // Función para convertir la clave VAPID de base64url a Uint8Array
@@ -39,11 +41,15 @@ const getBrowserInfo = () => {
   return { isChrome, isSafari, isFirefox, isEdge, isAndroid, isIOS };
 };
 
-const NotificationToggle = ({ userId }: NotificationToggleProps) => {
+const NotificationToggle = ({ userId, showInstructions: externalShowInstructions, setShowInstructions: externalSetShowInstructions }: NotificationToggleProps) => {
   const [isEnabled, setIsEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [showInstructions, setShowInstructions] = useState<boolean>(false);
+  const [internalShowInstructions, setInternalShowInstructions] = useState<boolean>(false);
+
+  // Usar el estado externo si se proporciona, si no usar el interno
+  const showInstructions = externalShowInstructions ?? internalShowInstructions;
+  const setShowInstructions = externalSetShowInstructions ?? setInternalShowInstructions;
 
   // Verificar si las notificaciones ya están habilitadas
   useEffect(() => {
@@ -188,21 +194,13 @@ const NotificationToggle = ({ userId }: NotificationToggleProps) => {
       )}
 
       {/* Modal con instrucciones específicas según el navegador */}
-      <Modal
-        opened={showInstructions}
-        onClose={() => setShowInstructions(false)}
-        title="Cómo habilitar las notificaciones"
-        size="lg"
-        zIndex={10000}
-      >
-        <InstructionsContent />
-      </Modal>
+      {/* Este Modal está renderizado en NotificationsMenu para evitar conflictos con el portal del Menu */}
     </Flex>
   );
 };
 
 // Componente con las instrucciones específicas
-const InstructionsContent = () => {
+export const InstructionsContent = () => {
   const { isChrome, isSafari, isFirefox, isEdge, isAndroid, isIOS } = getBrowserInfo();
 
   if (isIOS) {

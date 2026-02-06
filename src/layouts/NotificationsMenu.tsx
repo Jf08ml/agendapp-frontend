@@ -25,11 +25,13 @@ import {
   Loader,
   Checkbox,
   Tooltip,
+  Modal,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt, FaTrash, FaCheckSquare } from "react-icons/fa";
 import { MdCardMembership, MdCancel } from "react-icons/md";
 import NotificationToggle from "./NotificationToggle";
+import { InstructionsContent } from "./NotificationToggle";
 
 type NotificationsMenuProps = {
   /** Si se pasa, esto será el botón/trigger del menú.
@@ -50,6 +52,7 @@ export default function NotificationsMenu({
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
   const auth = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
 
@@ -311,7 +314,11 @@ export default function NotificationsMenu({
 
       <Menu.Dropdown>
         <Flex justify="space-between" align="center" mb="xs">
-          <NotificationToggle userId={auth.userId ?? ""} />
+          <NotificationToggle 
+            userId={auth.userId ?? ""} 
+            showInstructions={showInstructions}
+            setShowInstructions={setShowInstructions}
+          />
           <Flex gap="xs">
             <Tooltip label="Seleccionar múltiples">
               <ActionIcon
@@ -464,6 +471,16 @@ export default function NotificationsMenu({
           </Menu.Item>
         )}
       </Menu.Dropdown>
+
+      {/* Modal renderizado fuera del Menu.Dropdown para evitar conflictos en Safari */}
+      <Modal
+        opened={showInstructions}
+        onClose={() => setShowInstructions(false)}
+        title="Cómo habilitar las notificaciones"
+        size="lg"
+      >
+        <InstructionsContent />
+      </Modal>
     </Menu>
   );
 }
