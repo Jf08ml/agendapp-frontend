@@ -260,7 +260,7 @@ export default function NotificationsMenu({
   };
 
   return (
-    <Menu shadow="md" width={dropdownWidth} position="bottom-end">
+    <Menu shadow="md" width={dropdownWidth} position="bottom-end" withArrow>
       <Menu.Target>
         {target ? (
           showBadgeOnTarget ? (
@@ -377,7 +377,7 @@ export default function NotificationsMenu({
         )}
 
         <Divider my="xs" />
-        <Box style={{ maxHeight: 320, overflowY: "auto", position: "relative" }}>
+        <Box style={{ maxHeight: 320, overflowY: "auto", position: "relative", WebkitOverflowScrolling: "touch" }}>
           {loading && notifications.length === 0 && (
             <Flex justify="center" align="center" py="xl">
               <Loader size="sm" />
