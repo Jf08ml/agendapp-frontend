@@ -25,13 +25,12 @@ import {
   Loader,
   Checkbox,
   Tooltip,
-  Modal,
+  UnstyledButton,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { FaBell, FaCalendarAlt, FaTrash, FaCheckSquare } from "react-icons/fa";
 import { MdCardMembership, MdCancel } from "react-icons/md";
 import NotificationToggle from "./NotificationToggle";
-import { InstructionsContent } from "./NotificationToggle";
 
 type NotificationsMenuProps = {
   /** Si se pasa, esto será el botón/trigger del menú.
@@ -52,7 +51,6 @@ export default function NotificationsMenu({
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false);
   const auth = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
 
@@ -107,8 +105,8 @@ export default function NotificationsMenu({
         await markAsRead(notification._id);
         setNotifications((prev) =>
           prev.map((n) =>
-            n._id === notification._id ? { ...n, status: "read" } : n
-          )
+            n._id === notification._id ? { ...n, status: "read" } : n,
+          ),
         );
       }
       if (notification.frontendRoute) navigate(notification.frontendRoute);
@@ -164,20 +162,18 @@ export default function NotificationsMenu({
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-    
+
     try {
       setLoading(true);
       const deletePromises = Array.from(selectedIds).map((id) =>
-        deleteNotification(id)
+        deleteNotification(id),
       );
       await Promise.all(deletePromises);
-      
-      setNotifications((prev) =>
-        prev.filter((n) => !selectedIds.has(n._id))
-      );
+
+      setNotifications((prev) => prev.filter((n) => !selectedIds.has(n._id)));
       setSelectedIds(new Set());
       setSelectionMode(false);
-      
+
       showNotification({
         title: "🗑️ Eliminadas",
         message: `${selectedIds.size} notificaciones eliminadas`,
@@ -197,16 +193,18 @@ export default function NotificationsMenu({
 
   const handleDeleteAll = async () => {
     if (notifications.length === 0) return;
-    
+
     try {
       setLoading(true);
-      const deletePromises = notifications.map((n) => deleteNotification(n._id));
+      const deletePromises = notifications.map((n) =>
+        deleteNotification(n._id),
+      );
       await Promise.all(deletePromises);
-      
+
       setNotifications([]);
       setSelectedIds(new Set());
       setSelectionMode(false);
-      
+
       showNotification({
         title: "🗑️ Todas eliminadas",
         message: "Todas las notificaciones han sido eliminadas",
@@ -246,7 +244,7 @@ export default function NotificationsMenu({
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => n.status === "unread").length,
-    [notifications]
+    [notifications],
   );
 
   const getNotificationIcon = (type: string) => {
@@ -263,62 +261,78 @@ export default function NotificationsMenu({
   };
 
   return (
-    <Menu shadow="md" width={dropdownWidth} position="bottom-end">
+    <Menu
+      shadow="md"
+      width={dropdownWidth}
+      position="bottom-end"
+      withinPortal
+      floatingStrategy="fixed"
+      trapFocus={false}
+      closeOnItemClick={false}
+    >
       <Menu.Target>
-        {target ? (
-          showBadgeOnTarget ? (
-            <Indicator
-              inline
-              size={16}
-              offset={4}
-              label={unreadCount > 99 ? "99+" : String(unreadCount)}
-              color="red"
-              disabled={unreadCount === 0}
-              withBorder
-              processing={unreadCount > 0}
-            >
-              <Box style={{ position: "relative" }}>
-                {loading && (
-                  <Loader
-                    size="xs"
-                    style={{
-                      position: "absolute",
-                      top: -2,
-                      right: -2,
-                      zIndex: 10,
-                    }}
-                  />
-                )}
-                {target}
-              </Box>
-            </Indicator>
-          ) : (
-            <>{target}</>
-          )
-        ) : (
-          // Fallback: campana
-          <Indicator
-            inline
-            size={16}
-            offset={4}
-            label={unreadCount}
-            color="red"
-            disabled={unreadCount === 0}
-          >
-            <ActionIcon radius="xl" size="md" variant="filled" color="yellow">
-              {loading ? <Loader size="xs" color="white" /> : <FaBell />}
-            </ActionIcon>
-          </Indicator>
-        )}
+        <Box style={{ touchAction: "manipulation" }}>
+          <UnstyledButton type="button" style={{ lineHeight: 0 }}>
+            {target ? (
+              showBadgeOnTarget ? (
+                <Indicator
+                  inline
+                  size={16}
+                  offset={4}
+                  label={unreadCount > 99 ? "99+" : String(unreadCount)}
+                  color="red"
+                  disabled={unreadCount === 0}
+                  withBorder
+                  processing={unreadCount > 0}
+                >
+                  <Box style={{ position: "relative" }}>
+                    {loading && (
+                      <Loader
+                        size="xs"
+                        style={{
+                          position: "absolute",
+                          top: -2,
+                          right: -2,
+                          zIndex: 10,
+                        }}
+                      />
+                    )}
+                    {target}
+                  </Box>
+                </Indicator>
+              ) : (
+                <>{target}</>
+              )
+            ) : (
+              // Fallback: campana
+              <Indicator
+                inline
+                size={16}
+                offset={4}
+                label={unreadCount}
+                color="red"
+                disabled={unreadCount === 0}
+              >
+                <ActionIcon
+                  radius="xl"
+                  size="md"
+                  variant="filled"
+                  color="yellow"
+                >
+                  {loading ? <Loader size="xs" color="white" /> : <FaBell />}
+                </ActionIcon>
+              </Indicator>
+            )}
+          </UnstyledButton>
+        </Box>
       </Menu.Target>
 
-      <Menu.Dropdown>
+      <Menu.Dropdown
+        onPointerDownCapture={(e) => e.stopPropagation()}
+        onClickCapture={(e) => e.stopPropagation()}
+      >
         <Flex justify="space-between" align="center" mb="xs">
-          <NotificationToggle 
-            userId={auth.userId ?? ""} 
-            showInstructions={showInstructions}
-            setShowInstructions={setShowInstructions}
-          />
+          <NotificationToggle userId={auth.userId ?? ""} />
           <Flex gap="xs">
             <Tooltip label="Seleccionar múltiples">
               <ActionIcon
@@ -333,7 +347,7 @@ export default function NotificationsMenu({
                 <FaCheckSquare />
               </ActionIcon>
             </Tooltip>
-            
+
             {!selectionMode && (
               <Button
                 variant="subtle"
@@ -352,8 +366,14 @@ export default function NotificationsMenu({
             <Flex justify="space-between" align="center" mb="xs" px="xs">
               <Checkbox
                 label={`Seleccionar todas (${selectedIds.size}/${notifications.length})`}
-                checked={selectedIds.size === notifications.length && notifications.length > 0}
-                indeterminate={selectedIds.size > 0 && selectedIds.size < notifications.length}
+                checked={
+                  selectedIds.size === notifications.length &&
+                  notifications.length > 0
+                }
+                indeterminate={
+                  selectedIds.size > 0 &&
+                  selectedIds.size < notifications.length
+                }
                 onChange={toggleSelectAll}
                 size="xs"
               />
@@ -384,23 +404,27 @@ export default function NotificationsMenu({
         )}
 
         <Divider my="xs" />
-        <Box style={{ maxHeight: 320, overflowY: "auto", position: "relative" }}>
+        <Box
+          style={{ maxHeight: 320, overflowY: "auto", position: "relative" }}
+        >
           {loading && notifications.length === 0 && (
             <Flex justify="center" align="center" py="xl">
               <Loader size="sm" />
             </Flex>
           )}
-          
+
           {[...notifications]
             .sort(
               (a, b) =>
                 new Date(b.createdAt).getTime() -
-                new Date(a.createdAt).getTime()
+                new Date(a.createdAt).getTime(),
             )
-            .map((notification, index) => (
+            .map((notification) => (
               <Menu.Item
-                key={index}
-                onClick={() => !selectionMode && handleNotificationClick(notification)}
+                key={notification._id}
+                onClick={() =>
+                  !selectionMode && handleNotificationClick(notification)
+                }
                 style={{
                   position: "relative",
                   backgroundColor:
@@ -422,11 +446,11 @@ export default function NotificationsMenu({
                       onClick={(e) => e.stopPropagation()}
                     />
                   )}
-                  
+
                   <Avatar radius="xl" size="sm">
                     {getNotificationIcon(notification.type)}
                   </Avatar>
-                  
+
                   <div style={{ flex: 1 }}>
                     <Text
                       fw={notification.status === "unread" ? 700 : 500}
@@ -471,16 +495,6 @@ export default function NotificationsMenu({
           </Menu.Item>
         )}
       </Menu.Dropdown>
-
-      {/* Modal renderizado fuera del Menu.Dropdown para evitar conflictos en Safari */}
-      <Modal
-        opened={showInstructions}
-        onClose={() => setShowInstructions(false)}
-        title="Cómo habilitar las notificaciones"
-        size="lg"
-      >
-        <InstructionsContent />
-      </Modal>
     </Menu>
   );
 }
