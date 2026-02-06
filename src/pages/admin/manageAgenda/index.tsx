@@ -96,6 +96,12 @@ const ScheduleView: React.FC = () => {
   // Identificador del usuario actual, con su "empleado" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
+  // organizationId del auth slice: se setea junto con los permisos en useAuthInitializer,
+  // así que su presencia garantiza que los permisos ya están cargados.
+  const authOrgId = useSelector(
+    (state: RootState) => state.auth.organizationId
+  );
+
   // Datos de la organización
   const organization = useSelector(
     (state: RootState) => state.organization.organization
@@ -121,7 +127,7 @@ const ScheduleView: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canViewAll = hasPermission("appointments:view_all");
   const readyForScopedFetch =
-    Boolean(organizationId) && (canViewAll || Boolean(userId));
+    Boolean(organizationId) && Boolean(authOrgId) && (canViewAll || Boolean(userId));
 
   const normalizeAppointmentDates = (apts: Appointment[]): Appointment[] =>
     apts.map((a) => ({

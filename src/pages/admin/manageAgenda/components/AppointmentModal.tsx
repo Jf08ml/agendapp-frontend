@@ -616,11 +616,27 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         cursor: "pointer",
                         transition: "all 0.2s ease",
                       }}
+                      onClick={() => {
+                        const currentIds = newAppointment.services
+                          ? newAppointment.services.map((s) => s._id)
+                          : [];
+                        const newIds = isSelected
+                          ? currentIds.filter((id) => id !== service._id)
+                          : [...currentIds, service._id];
+                        const selectedServices = services.filter((s) =>
+                          newIds.includes(s._id),
+                        );
+                        setNewAppointment((prev) => ({
+                          ...prev,
+                          services: selectedServices,
+                        }));
+                      }}
                     >
                       <Group gap="xs" wrap="nowrap" align="flex-start">
                         <Checkbox
                           size="xs"
                           value={service._id}
+                          onClick={(e) => e.stopPropagation()}
                           styles={{
                             input: {
                               cursor: "pointer",
