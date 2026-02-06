@@ -193,29 +193,7 @@ const NotificationToggle = ({ userId }: NotificationToggleProps) => {
         onClose={() => setShowInstructions(false)}
         title="Cómo habilitar las notificaciones"
         size="lg"
-        zIndex={1000}
-        centered
-        trapFocus={true}
-        overlayProps={{
-          blur: 0.5,
-          opacity: 0.55,
-          backgroundOpacity: 0.55,
-        }}
-        styles={{
-          content: {
-            backgroundColor: "white",
-            position: "relative",
-            zIndex: 1001,
-          },
-          header: {
-            backgroundColor: "white",
-            zIndex: 1001,
-          },
-          body: {
-            position: "relative",
-            zIndex: 1001,
-          },
-        }}
+        zIndex={10000}
       >
         <InstructionsContent />
       </Modal>
