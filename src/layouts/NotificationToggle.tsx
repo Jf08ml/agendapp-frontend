@@ -80,92 +80,120 @@ const NotificationToggle = ({
 
   // Manejar el cambio del switch
   const handleToggle = async () => {
-    if (!("serviceWorker" in navigator)) {
-      setError("El navegador no soporta notificaciones.");
+    // Guards (mobile-safe)
+    const hasSW =
+      typeof navigator !== "undefined" && "serviceWorker" in navigator;
+    const hasNotification =
+      typeof window !== "undefined" && "Notification" in window;
+    const hasPushManager =
+      typeof window !== "undefined" && "PushManager" in window;
+
+    // Si no hay soporte base, no seguimos
+    if (!hasSW || !hasNotification) {
+      setError("Este navegador no soporta notificaciones.");
       return;
     }
 
-    setIsLoading(true); // Mostrar indicador de carga
-    setError(null); // Reiniciar errores previos
+    setIsLoading(true);
+    setError(null);
 
     try {
       const registration = await navigator.serviceWorker.ready;
 
+      // 🔕 Deshabilitar
       if (isEnabled) {
-        // Deshabilitar notificaciones
-        const subscription = await registration.pushManager.getSubscription();
+        const subscription =
+          await registration.pushManager?.getSubscription?.();
         if (subscription) {
           await subscription.unsubscribe();
-          await deleteSubscription(subscription.endpoint, userId); // Llamar al backend para eliminar la suscripción
-          console.log("Suscripción eliminada del backend y navegador");
-        }
-      } else {
-        // Habilitar notificaciones
-        // Verificar el permiso actual
-        if (Notification.permission === "denied") {
-          setShowInstructions(true);
-          throw new Error(
-            "Los permisos de notificación están bloqueados. Haz clic en 'Ver instrucciones' para saber cómo habilitarlos.",
-          );
+
+          // Backend cleanup
+          await deleteSubscription(subscription.endpoint, userId);
         }
 
-        if (Notification.permission === "default") {
-          const permission = await Notification.requestPermission();
-          if (permission !== "granted") {
-            throw new Error(
-              "Permiso de notificaciones denegado por el usuario.",
-            );
-          }
+        setIsEnabled(false);
+        return;
+      }
+
+      // 🔔 Habilitar (validar push real)
+      // OJO: iOS puede tener Notification pero NO PushManager (o solo en PWA instalada).
+      if (!hasPushManager || !registration.pushManager) {
+        setShowInstructions(true);
+        throw new Error(
+          "Este dispositivo/navegador no soporta notificaciones push. En iPhone debes abrir en Safari y tener la PWA instalada (si tu versión lo soporta).",
+        );
+      }
+
+      // Permisos
+      const perm = window.Notification.permission;
+
+      if (perm === "denied") {
+        setShowInstructions(true);
+        throw new Error(
+          "Los permisos de notificación están bloqueados. Revisa las instrucciones para habilitarlos.",
+        );
+      }
+
+      if (perm === "default") {
+        const requested = await window.Notification.requestPermission();
+        if (requested !== "granted") {
+          throw new Error("Permiso de notificaciones denegado por el usuario.");
         }
+      }
 
-        // Verificar nuevamente después de solicitar permisos
-        if (Notification.permission !== "granted") {
-          throw new Error(
-            "No se pueden habilitar las notificaciones sin los permisos necesarios.",
-          );
-        }
+      if (window.Notification.permission !== "granted") {
+        throw new Error(
+          "No se pueden habilitar las notificaciones sin los permisos necesarios.",
+        );
+      }
 
-        // Convertir la clave VAPID a Uint8Array
-        const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-        if (!vapidKey) {
-          throw new Error("La clave VAPID no está configurada en el servidor.");
-        }
+      // VAPID
+      const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as
+        | string
+        | undefined;
+      if (!vapidKey) {
+        throw new Error("La clave VAPID no está configurada.");
+      }
 
-        const applicationServerKey = urlBase64ToUint8Array(
-          vapidKey,
-        ) as Uint8Array<ArrayBuffer>;
+      const applicationServerKey = urlBase64ToUint8Array(vapidKey);
 
-        const subscription = await registration.pushManager.subscribe({
+      // Evitar duplicados: si ya existe suscripción, úsala
+      const existing = await registration.pushManager.getSubscription();
+      const subscription =
+        existing ??
+        (await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey,
-        });
+        }));
 
-        // Enviar la suscripción al backend
-        await createSubscription({
-          endpoint: subscription.endpoint,
-          keys: {
-            p256dh: subscription.toJSON().keys?.p256dh ?? "",
-            auth: subscription.toJSON().keys?.auth ?? "",
-          },
-          userId,
-        });
-      }
+      // Enviar al backend
+      const json = subscription.toJSON();
+      await createSubscription({
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: json.keys?.p256dh ?? "",
+          auth: json.keys?.auth ?? "",
+        },
+        userId,
+      });
 
-      // Cambiar el estado del switch
-      setIsEnabled(!isEnabled);
+      setIsEnabled(true);
     } catch (err) {
       console.error("Error al cambiar el estado de las notificaciones:", err);
-
-      // Mostrar un mensaje de error más específico
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("No se pudo actualizar el estado de las notificaciones.");
-      }
+      setError(
+        err instanceof Error ? err.message : "No se pudo actualizar el estado.",
+      );
     } finally {
-      setIsLoading(false); // Ocultar indicador de carga
+      setIsLoading(false);
     }
   };
+
+  const hasNotificationAPI =
+    typeof window !== "undefined" && "Notification" in window;
+
+  const permission = hasNotificationAPI
+    ? window.Notification.permission
+    : "unsupported";
 
   return (
     <Flex direction="column" gap="xs">
@@ -194,7 +222,7 @@ const NotificationToggle = ({
           mt="xs"
         >
           {error}
-          {Notification.permission === "denied" && (
+          {permission === "denied" && (
             <Button
               size="xs"
               variant="light"
