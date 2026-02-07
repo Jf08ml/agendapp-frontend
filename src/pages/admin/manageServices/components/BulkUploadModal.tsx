@@ -39,6 +39,7 @@ interface BulkUploadModalProps {
 }
 
 interface ServiceRow {
+  _id?: string; // Para actualizar servicios existentes
   name: string;
   type?: string;
   description?: string;
@@ -46,14 +47,23 @@ interface ServiceRow {
   duration: number;
   hidePrice?: boolean;
   maxConcurrentAppointments?: number;
+  isActive?: boolean; // Para parsear desde Excel
 }
 
 interface UploadResult {
-  success: Array<{ row: number; name: string; price: number; duration: number }>;
+  success: Array<{ 
+    row: number; 
+    name: string; 
+    price: number; 
+    duration: number;
+    action?: string; // "CREADO" o "ACTUALIZADO"
+  }>;
   errors: Array<{ row: number; name: string; error: string }>;
   totalProcessed: number;
   totalSuccess: number;
   totalErrors: number;
+  created?: number; // Nuevos servicios creados
+  updated?: number; // Servicios actualizados
 }
 
 export default function BulkUploadModal({
@@ -88,13 +98,15 @@ export default function BulkUploadModal({
 
         // Mapear y validar datos
         const services: ServiceRow[] = jsonData.map((row: any) => ({
-          name: row.Nombre || row.nombre || row.Name || row.name || "",
+          _id: row.ID || row.id || row._id || undefined, // Leer ID de la primera columna
+          name: row["Nombre del Servicio"] || row.Nombre || row.nombre || row.Name || row.name || "",
           type: row.Tipo || row.tipo || row.Type || row.type || "",
           description: row.Descripción || row.descripcion || row.Description || row.description || "",
           price: parseFloat(row.Precio || row.precio || row.Price || row.price || 0),
-          duration: parseInt(row.Duración || row.duracion || row.Duration || row.duration || 0),
+          duration: parseInt(row["Duración (minutos)"] || row.Duración || row.duracion || row.Duration || row.duration || 0),
           hidePrice: row["Ocultar Precio"] === "Sí" || row["Ocultar Precio"] === "Si" || row.hidePrice === true,
-          maxConcurrentAppointments: row["Citas Concurrentes"] || row.maxConcurrentAppointments || 1,
+          maxConcurrentAppointments: parseInt(row["Citas Simultáneas"] || row["Citas Concurrentes"] || row.maxConcurrentAppointments || 1),
+          isActive: row.Activo === "Sí" || row.Activo === "Si" || row.isActive === true,
         }));
 
         setParsedData(services);
@@ -143,9 +155,21 @@ export default function BulkUploadModal({
       setUploadResult(result);
 
       if (result.totalSuccess > 0) {
+        const createdCount = result.created || 0;
+        const updatedCount = result.updated || 0;
+        let message = `Se procesaron ${result.totalSuccess} servicios exitosamente`;
+        
+        if (createdCount > 0 && updatedCount > 0) {
+          message = `${createdCount} creados, ${updatedCount} actualizados`;
+        } else if (createdCount > 0) {
+          message = `Se crearon ${createdCount} servicios`;
+        } else if (updatedCount > 0) {
+          message = `Se actualizaron ${updatedCount} servicios`;
+        }
+
         showNotification({
           title: "Carga completada",
-          message: `Se crearon ${result.totalSuccess} servicios exitosamente`,
+          message: message,
           color: "green",
         });
         onUploadComplete();
@@ -173,31 +197,37 @@ export default function BulkUploadModal({
   const handleDownloadTemplate = () => {
     const template = [
       {
-        Nombre: "Corte de Cabello",
+        ID: "(dejar vacío para crear nuevo)",
+        "Nombre del Servicio": "Corte de Cabello",
         Tipo: "Barbería",
         Descripción: "Corte de cabello clásico",
+        "Duración (minutos)": 30,
         Precio: 15000,
-        Duración: 30,
-        "Ocultar Precio": "No",
-        "Citas Concurrentes": 1,
+        "Citas Simultáneas": 1,
+        Activo: "Sí",
+        "Imágenes (URLs)": "",
       },
       {
-        Nombre: "Manicure",
+        ID: "(dejar vacío para crear nuevo)",
+        "Nombre del Servicio": "Manicure",
         Tipo: "Belleza",
         Descripción: "Manicure completo con esmaltado",
+        "Duración (minutos)": 45,
         Precio: 25000,
-        Duración: 45,
-        "Ocultar Precio": "No",
-        "Citas Concurrentes": 2,
+        "Citas Simultáneas": 2,
+        Activo: "Sí",
+        "Imágenes (URLs)": "",
       },
       {
-        Nombre: "Consulta Médica",
+        ID: "(dejar vacío para crear nuevo)",
+        "Nombre del Servicio": "Consulta Médica",
         Tipo: "Salud",
         Descripción: "Consulta médica general",
+        "Duración (minutos)": 20,
         Precio: 50000,
-        Duración: 20,
-        "Ocultar Precio": "Sí",
-        "Citas Concurrentes": 1,
+        "Citas Simultáneas": 1,
+        Activo: "No",
+        "Imágenes (URLs)": "",
       },
     ];
 
@@ -208,7 +238,7 @@ export default function BulkUploadModal({
     const noteRow = range.e.r + 2;
     
     worksheet[XLSX.utils.encode_cell({ r: noteRow, c: 0 })] = {
-      v: "NOTA: Nombre, Precio y Duración son obligatorios. La duración se especifica en minutos. Citas Concurrentes indica cuántos clientes pueden ser atendidos simultáneamente (por defecto: 1)",
+      v: "NOTA: Nombre, Precio y Duración son obligatorios. La duración se especifica en minutos. Deja el ID vacío para crear nuevos servicios, o copia el ID de servicios existentes para actualizarlos.",
       t: "s"
     };
     
@@ -271,9 +301,18 @@ export default function BulkUploadModal({
                 </ThemeIcon>
               }
             >
-              <strong>Citas Concurrentes</strong>: Indica cuántos clientes pueden ser atendidos simultáneamente (por defecto: 1)
+              <strong>Para actualizar servicios existentes:</strong> Descarga los servicios actuales, copia el ID en la columna ID y haz los cambios deseados
             </List.Item>
-            <List.Item>Tipo, Descripción y Ocultar Precio son opcionales</List.Item>
+            <List.Item
+              icon={
+                <ThemeIcon color="purple" size={20} radius="xl" variant="light">
+                  <IconInfoCircle size={14} />
+                </ThemeIcon>
+              }
+            >
+              <strong>Para crear nuevos servicios:</strong> Deja la columna ID vacía
+            </List.Item>
+            <List.Item>Tipo, Descripción e Imágenes son opcionales</List.Item>
           </List>
         </Alert>
 
@@ -351,6 +390,58 @@ export default function BulkUploadModal({
                   </Badge>
                 </Group>
               </Group>
+
+              {/* Resumen de creados/actualizados */}
+              {(uploadResult.created !== undefined || uploadResult.updated !== undefined) && (
+                <Group gap="sm" justify="center">
+                  {(uploadResult.created || 0) > 0 && (
+                    <Badge color="blue" size="md">
+                      Creados: {uploadResult.created}
+                    </Badge>
+                  )}
+                  {(uploadResult.updated || 0) > 0 && (
+                    <Badge color="cyan" size="md">
+                      Actualizados: {uploadResult.updated}
+                    </Badge>
+                  )}
+                </Group>
+              )}
+
+              {uploadResult.success.length > 0 && (
+                <Box>
+                  <Text fw={500} size="sm" mb="xs" c="green">
+                    Servicios procesados exitosamente:
+                  </Text>
+                  <ScrollArea h={200}>
+                    <Table striped highlightOnHover size="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Fila</Table.Th>
+                          <Table.Th>Nombre</Table.Th>
+                          <Table.Th>Acción</Table.Th>
+                          <Table.Th>Precio</Table.Th>
+                          <Table.Th>Duración</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {uploadResult.success.map((item, idx) => (
+                          <Table.Tr key={idx}>
+                            <Table.Td>{item.row}</Table.Td>
+                            <Table.Td>{item.name}</Table.Td>
+                            <Table.Td>
+                              <Badge size="sm" color={item.action === 'CREADO' ? 'blue' : 'cyan'}>
+                                {item.action || 'CREADO'}
+                              </Badge>
+                            </Table.Td>
+                            <Table.Td>{item.price}</Table.Td>
+                            <Table.Td>{item.duration} min</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </ScrollArea>
+                </Box>
+              )}
 
               {uploadResult.errors.length > 0 && (
                 <Box>

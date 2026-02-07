@@ -32,6 +32,7 @@ import {
   BsPlusCircle,
   BsCheckCircle,
   BsXCircle,
+  BsDownload,
 } from "react-icons/bs";
 import { IconFileUpload } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
@@ -48,6 +49,7 @@ import { uploadImage } from "../../../services/imageService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { modals } from "@mantine/modals";
+import { exportServicesToExcel, downloadEmptyTemplate } from "./utils/exportToExcel";
 
 const AdminServices: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
@@ -65,6 +67,7 @@ const AdminServices: React.FC = () => {
   const [, setLoading] = useState(false);
 
   const organizationId = useSelector((state: RootState) => state.auth.organizationId);
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -192,6 +195,24 @@ const AdminServices: React.FC = () => {
     });
   };
 
+  const handleExportServices = () => {
+    if (services.length === 0) {
+      showNotification({
+        title: "Sin servicios",
+        message: "Descargar plantilla vacía para empezar.",
+        color: "blue",
+      });
+      downloadEmptyTemplate(organization?.name || "Servicios");
+    } else {
+      exportServicesToExcel(services, organization?.name || "Servicios");
+      showNotification({
+        title: "Exportación completada",
+        message: `Se descargaron ${services.length} servicio(s)`,
+        color: "green",
+      });
+    }
+  };
+
   const handleDeleteService = async (serviceId: string, index: number) => {
     try {
       await deleteService(serviceId);
@@ -226,6 +247,17 @@ const AdminServices: React.FC = () => {
         <Group justify="space-between" align="center" wrap="nowrap">
           <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
           <Group gap="xs">
+            <Tooltip label="Descargar plantilla con servicios">
+              <Button
+                leftSection={<BsDownload size={18} />}
+                onClick={handleExportServices}
+                variant="light"
+                color="green"
+                size={isMobile ? "sm" : "md"}
+              >
+                {isMobile ? "Exportar" : "Descargar Servicios"}
+              </Button>
+            </Tooltip>
             <Tooltip label="Carga masiva desde Excel">
               <Button
                 leftSection={<IconFileUpload size={18} />}
