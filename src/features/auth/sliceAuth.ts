@@ -7,6 +7,7 @@ interface AuthState {
   token: string | null;
   role: string | null;
   permissions: string[];
+  expiresAt: string | null; // ISO timestamp de expiración del token
 }
 
 // Utilidades para manejar localStorage
@@ -22,6 +23,7 @@ const removeStorageItem = (key: string) =>
 const storedUserId = getStorageItem("userId");
 const storedToken = getStorageItem("token");
 const storedRole = getStorageItem("role");
+const storedExpiresAt = getStorageItem("token_expires_at");
 
 const initialState: AuthState = {
   isAuthenticated: !!storedToken,
@@ -30,6 +32,7 @@ const initialState: AuthState = {
   token: storedToken,
   role: storedRole,
   permissions: [],
+  expiresAt: storedExpiresAt,
 };
 
 const authSlice = createSlice({
@@ -44,6 +47,7 @@ const authSlice = createSlice({
         token: string;
         role: string;
         permissions: string[];
+        expiresAt?: string;
       }>
     ) => {
       state.isAuthenticated = true;
@@ -52,11 +56,31 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.role = action.payload.role;
       state.permissions = action.payload.permissions;
+      state.expiresAt = action.payload.expiresAt || null;
 
       // Guardar los datos en localStorage
       setStorageItem("userId", action.payload.userId);
       setStorageItem("token", action.payload.token);
       setStorageItem("role", action.payload.role);
+      if (action.payload.expiresAt) {
+        setStorageItem("token_expires_at", action.payload.expiresAt);
+      }
+    },
+    refreshTokenSuccess: (
+      state,
+      action: PayloadAction<{
+        token: string;
+        expiresAt?: string;
+      }>
+    ) => {
+      state.token = action.payload.token;
+      state.expiresAt = action.payload.expiresAt || null;
+
+      // Actualizar únicamente el token en localStorage
+      setStorageItem("token", action.payload.token);
+      if (action.payload.expiresAt) {
+        setStorageItem("token_expires_at", action.payload.expiresAt);
+      }
     },
     setOrganizationId: (state, action: PayloadAction<string>) => {
       state.organizationId = action.payload;
@@ -71,15 +95,16 @@ const authSlice = createSlice({
       state.token = null;
       state.role = null;
       state.permissions = [];
+      state.expiresAt = null;
 
       // Eliminar datos de localStorage
       removeStorageItem("userId");
       removeStorageItem("token");
       removeStorageItem("role");
+      removeStorageItem("token_expires_at");
     },
   },
 });
 
-export const { loginSuccess, logout, setOrganizationId, setPermissions } =
-  authSlice.actions;
+export const { loginSuccess, refreshTokenSuccess, logout, setOrganizationId, setPermissions } = authSlice.actions;
 export default authSlice.reducer;

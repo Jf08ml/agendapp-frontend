@@ -79,6 +79,7 @@ const LoginAdmin: React.FC = () => {
             token: data.token,
             role: data.userType,
             permissions: data.userPermissions,
+            expiresAt: data.expiresAt, // Agregar el timestamp de expiración
           })
         );
         navigation("/gestionar-agenda");

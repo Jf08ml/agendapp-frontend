@@ -1,9 +1,23 @@
 import axios, { AxiosInstance } from "axios";
+import { refreshToken } from "./authService";
 
 const API_BASE_URL: string =
   import.meta.env.VITE_NODE_ENV === "production"
     ? (import.meta.env.VITE_APP_API_URL as string)
     : (import.meta.env.VITE_APP_API_URL_DEPLOYMENT as string);
+
+// Control de refresh token en progreso
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+const subscribeTokenRefresh = (callback: (token: string) => void) => {
+  refreshSubscribers.push(callback);
+};
+
+const notifyTokenRefresh = (token: string) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
 
 const addTenantHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
@@ -14,6 +28,51 @@ const addTenantHeader = (api: AxiosInstance) => {
     const token = localStorage.getItem("app_token");
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
+      
+      // Verificar si el token está a punto de expirar durante esta solicitud
+      const expiresAtStr = localStorage.getItem("app_token_expires_at");
+      if (expiresAtStr) {
+        const expiresAt = new Date(expiresAtStr).getTime();
+        const now = Date.now();
+        const timeUntilExpiry = expiresAt - now;
+        const refreshThreshold = 5 * 60 * 1000; // 5 minutos
+        
+        // Si el token expira en menos de 5 minutos, intenta renovarlo
+        if (timeUntilExpiry < refreshThreshold && timeUntilExpiry > 0) {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            refreshToken(token)
+              .then((response) => {
+                if (response?.token) {
+                  localStorage.setItem("app_token", response.token);
+                  if (response.expiresAt) {
+                    localStorage.setItem("app_token_expires_at", response.expiresAt);
+                  }
+                  notifyTokenRefresh(response.token);
+                }
+              })
+              .catch((error) => {
+                console.error("Error renovando token:", error);
+                // Limpiar datos si el refresh falla
+                localStorage.removeItem("app_token");
+                localStorage.removeItem("app_token_expires_at");
+              })
+              .finally(() => {
+                isRefreshing = false;
+              });
+          }
+          
+          // Si ya estamos renovando, esperar a que termine
+          if (isRefreshing) {
+            return new Promise((resolve) => {
+              subscribeTokenRefresh((newToken: string) => {
+                config.headers["Authorization"] = `Bearer ${newToken}`;
+                resolve(config);
+              });
+            });
+          }
+        }
+      }
     }
     
     return config;
@@ -55,6 +114,7 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         localStorage.removeItem("app_token");
         localStorage.removeItem("app_userId");
         localStorage.removeItem("app_role");
+        localStorage.removeItem("app_token_expires_at");
         
         // Solo redirigir a login si estamos en rutas protegidas
         // No redirigir si estamos en landing, login, o rutas públicas
@@ -68,6 +128,7 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
           const event = new CustomEvent("session-expired", {
             detail: {
               message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+              type: "token-expired",
             },
           });
           window.dispatchEvent(event);
@@ -75,7 +136,7 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
           // Redirigir después de un breve delay para que se vea la notificación
           setTimeout(() => {
             window.location.href = '/login-admin';
-          }, 1500);
+          }, 2000);
         }
       }
       

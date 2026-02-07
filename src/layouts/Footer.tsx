@@ -7,9 +7,9 @@ import {
   Button,
   Tooltip,
   Box,
-  useMantineTheme,
   rem,
   Avatar,
+  Progress,
 } from "@mantine/core";
 import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
 import { MdInstallMobile } from "react-icons/md";
@@ -17,6 +17,8 @@ import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../app/store";
 import { logout } from "../features/auth/sliceAuth";
+import useTokenExpiry from "../hooks/useTokenExpiry";
+import { formatTimeRemaining } from "../utils/sessionNotifications";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => void;
@@ -34,7 +36,6 @@ export default function Footer() {
     useState<BeforeInstallPromptEvent | null>(null);
   const [appVersion, setAppVersion] = useState<Version | null>(null);
 
-  const theme = useMantineTheme();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -48,6 +49,9 @@ export default function Footer() {
     branding?.primaryColor || branding?.themeColor || "#DE739E";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
+
+  // Estado del token
+  const tokenExpiry = useTokenExpiry();
 
   // Obtener versión de la app
   useEffect(() => {
@@ -93,6 +97,22 @@ export default function Footer() {
     }
   };
 
+  // Calcular porcentaje de progreso del token
+  const calculateTokenProgress = () => {
+    if (!tokenExpiry.timeRemaining) return 100;
+    const totalTime = 7 * 24 * 60 * 60 * 1000; // 7 días
+    const progress = (tokenExpiry.timeRemaining / totalTime) * 100;
+    return Math.max(0, Math.min(100, progress));
+  };
+
+  // Determinar color de la barra de progreso
+  const getProgressColor = () => {
+    const progress = calculateTokenProgress();
+    if (progress > 50) return "green";
+    if (progress > 20) return "yellow";
+    return "red";
+  };
+
   return (
     <Box
       component="footer"
@@ -134,19 +154,35 @@ export default function Footer() {
           </Box>
         </Group>
 
-        {/* CENTRO: CTA PWA (sólo si hay prompt) */}
-        {deferredPrompt ? (
+        {/* CENTRO: Info de sesión o CTA PWA */}
+        {isAuthenticated && tokenExpiry.timeRemaining ? (
+          <Tooltip
+            label={`Sesión vence en ${formatTimeRemaining(tokenExpiry.timeRemaining)}`}
+            withArrow
+          >
+            <Box style={{ flex: 1, maxWidth: 150 }}>
+              <Text size="7px" opacity={0.8} style={{ color: textColor, marginBottom: 3 }}>
+                SESIÓN ACTIVA
+              </Text>
+              <Progress
+                value={calculateTokenProgress()}
+                size={6}
+                color={getProgressColor()}
+                radius="xs"
+              />
+            </Box>
+          </Tooltip>
+        ) : deferredPrompt ? (
           <Button
-            size="xs"
-            variant="white"
-            leftSection={<MdInstallMobile size={14} />}
             onClick={handleInstallClick}
-            styles={{
-              root: {
-                color: theme.colors.dark[7],
-                height: rem(28),
-                paddingInline: rem(10),
-              },
+            size="xs"
+            leftSection={<MdInstallMobile size={14} />}
+            style={{
+              backgroundColor: footerColor,
+              color: textColor,
+              border: `1px solid rgba(255,255,255,0.2)`,
+              height: rem(28),
+              paddingInline: rem(10),
             }}
           >
             Instalar app

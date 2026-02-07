@@ -23,6 +23,7 @@ import { RootState } from "./app/store";
 import { useEffect, useState, useRef } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
+import { registerSessionEventListeners } from "./utils/sessionNotifications";
 
 import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
 import { getCurrentMembership, Membership } from "./services/membershipService";
@@ -102,36 +103,10 @@ function AppContent() {
     void loadMembership();
   }, [organization?._id]);
 
-  // Escuchar evento de membresía suspendida
+  // Escuchar eventos de membresía y sesión
   useEffect(() => {
-    const handleMembershipSuspended = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.error("Membresía suspendida:", customEvent.detail);
-      setPaymentModalOpened(true);
-    };
-
-    window.addEventListener("membership-suspended", handleMembershipSuspended);
-    return () => {
-      window.removeEventListener(
-        "membership-suspended",
-        handleMembershipSuspended
-      );
-    };
-  }, []);
-
-  // Escuchar evento de sesión expirada
-  useEffect(() => {
-    const handleSessionExpired = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      // Usar el sistema de notificaciones de Mantine si está disponible
-      // Por ahora mostramos un alert simple
-      alert(customEvent.detail.message || "Tu sesión ha expirado");
-    };
-
-    window.addEventListener("session-expired", handleSessionExpired);
-    return () => {
-      window.removeEventListener("session-expired", handleSessionExpired);
-    };
+    const cleanup = registerSessionEventListeners();
+    return cleanup;
   }, []);
 
   // 🔔 Notificaciones push (con guards para Instagram / Telegram / FB in-app)
