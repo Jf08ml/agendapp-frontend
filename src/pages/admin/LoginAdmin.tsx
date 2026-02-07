@@ -67,18 +67,18 @@ const LoginAdmin: React.FC = () => {
         return;
       }
 
-      const organizationId = organization?._id as string;
-      const data = await login(email, password, organizationId);
+      const initialOrgId = organization?._id as string;
+      const data = await login(email, password, initialOrgId);
       if (data) {
         const organizationId =
-          data.userType === "admin" ? data.userId : data.organizationId;
+          data.userType === "admin" ? data.userId : (data.organizationId || initialOrgId);
         dispatch(
           loginSuccess({
             userId: data.userId,
             organizationId,
             token: data.token,
             role: data.userType,
-            permissions: data.userPermissions,
+            permissions: data.userPermissions || [],
             expiresAt: data.expiresAt, // Agregar el timestamp de expiración
           })
         );
