@@ -62,8 +62,8 @@ interface UploadResult {
   totalProcessed: number;
   totalSuccess: number;
   totalErrors: number;
-  created?: number; // Nuevos servicios creados
-  updated?: number; // Servicios actualizados
+  created: number; // Nuevos servicios creados
+  updated: number; // Servicios actualizados
 }
 
 export default function BulkUploadModal({
@@ -152,7 +152,11 @@ export default function BulkUploadModal({
     setUploading(true);
     try {
       const result = await bulkUploadServices(parsedData, organizationId);
-      setUploadResult(result);
+      setUploadResult({
+        ...result,
+        created: result.created ?? 0,
+        updated: result.updated ?? 0,
+      });
 
       if (result.totalSuccess > 0) {
         const createdCount = result.created || 0;
@@ -413,7 +417,7 @@ export default function BulkUploadModal({
                     Servicios procesados exitosamente:
                   </Text>
                   <ScrollArea h={200}>
-                    <Table striped highlightOnHover size="sm">
+                    <Table striped highlightOnHover>
                       <Table.Thead>
                         <Table.Tr>
                           <Table.Th>Fila</Table.Th>

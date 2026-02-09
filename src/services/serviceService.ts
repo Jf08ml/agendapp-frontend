@@ -122,6 +122,8 @@ export const bulkUploadServices = async (
   }>,
   organizationId: string
 ): Promise<{
+  created: number;
+  updated: number;
   success: Array<{ row: number; name: string; price: number; duration: number }>;
   errors: Array<{ row: number; name: string; error: string }>;
   totalProcessed: number;
@@ -131,6 +133,8 @@ export const bulkUploadServices = async (
   try {
     const response = await apiService.post<
       Response<{
+        created: number;
+        updated: number;
         success: Array<{ row: number; name: string; price: number; duration: number }>;
         errors: Array<{ row: number; name: string; error: string }>;
         totalProcessed: number;
