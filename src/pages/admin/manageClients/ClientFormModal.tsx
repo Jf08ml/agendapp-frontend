@@ -117,6 +117,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         await createClient({
           name: name.trim(),
           phoneNumber: phoneNumber.trim(), // Enviar el número como lo ingresa el usuario
+          phone_country: phoneCountry || undefined, // 🌍 Enviar el país seleccionado
           email: email.trim(),
           organizationId,
           birthDate: birthDate || null,
