@@ -19,6 +19,7 @@ export default function Home() {
       title: "Reserva en línea",
       icon: <BiCalendar size={28} />,
       link: "/online-reservation",
+      show: organization?.enableOnlineBooking ?? true,
     },
     {
       title: "Nuestros Servicios",
@@ -44,6 +45,8 @@ export default function Home() {
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
   const homeLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing";
 
+  const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
+
   // Seleccionar el layout según la configuración
   let LayoutComponent;
   switch (homeLayout) {
@@ -65,7 +68,7 @@ export default function Home() {
 
   return (
     <>
-      <LayoutComponent features={features} welcomeTitle={welcomeTitle} welcomeDescription={welcomeDescription} organizationId={organization?._id} />
+      <LayoutComponent features={features} welcomeTitle={welcomeTitle} welcomeDescription={welcomeDescription} organizationId={organization?._id} enableOnlineBooking={enableOnlineBooking} />
 
       <Box py="xl" style={{ position: "relative", zIndex: 10 }}>
         <Center>

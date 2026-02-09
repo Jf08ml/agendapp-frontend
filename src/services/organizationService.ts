@@ -99,6 +99,7 @@ export interface Organization {
   domains?: string[];
   reservationPolicy?: ReservationPolicy;
   showLoyaltyProgram?: boolean;
+  enableOnlineBooking?: boolean;
   paymentMethods?: PaymentMethod[];
   requireReservationDeposit?: boolean;
   reservationDepositPercentage?: number;

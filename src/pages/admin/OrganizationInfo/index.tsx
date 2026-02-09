@@ -9,7 +9,7 @@ import { showNotification } from "@mantine/notifications";
 import { IoAlertCircle } from "react-icons/io5";
 import { GrOrganization } from "react-icons/gr";
 import { RiGlobalLine } from "react-icons/ri";
-import { BiLocationPlus, BiCreditCard } from "react-icons/bi";
+import { BiLocationPlus, BiCreditCard, BiCalendar } from "react-icons/bi";
 import { MdBrandingWatermark, MdBlock, MdNotifications } from "react-icons/md";
 
 import { RootState } from "../../../app/store";
@@ -34,6 +34,7 @@ import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
 import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
 import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
+import OnlineBookingTab from "./components/tabs/OnlineBookingTab";
 
 import { schema, FormValues } from "./schema";
 import { ensureBranding, ensureDomains } from "./utils";
@@ -80,6 +81,7 @@ export default function OrganizationInfo() {
             default_country: response.default_country ?? "CO", // 🌍 País por defecto
             timezone: response.timezone || undefined, // 🕐 Zona horaria - NO resetear a Colombia
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
+            enableOnlineBooking: response.enableOnlineBooking ?? true,
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
             homeLayout: response.homeLayout ?? "modern",
@@ -325,6 +327,14 @@ export default function OrganizationInfo() {
             Ubicación
           </Tabs.Tab>
           <Tabs.Tab
+            value="onlineBooking"
+            leftSection={
+              <BiCalendar style={{ width: rem(12), height: rem(12) }} />
+            }
+          >
+            Reserva en línea
+          </Tabs.Tab>
+          <Tabs.Tab
             value="fidelity"
             leftSection={
               <GrOrganization style={{ width: rem(12), height: rem(12) }} />
@@ -392,6 +402,10 @@ export default function OrganizationInfo() {
 
         <Tabs.Panel value="location" pt="md">
           <LocationTab form={form} isEditing={isEditing} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="onlineBooking" pt="md">
+          <OnlineBookingTab form={form} isEditing={isEditing} />
         </Tabs.Panel>
 
         <Tabs.Panel value="fidelity" pt="md">

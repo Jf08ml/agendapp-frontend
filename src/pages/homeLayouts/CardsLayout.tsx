@@ -24,12 +24,14 @@ interface CardsLayoutProps {
   features: Feature[];
   welcomeTitle: string;
   welcomeDescription: string;
+  enableOnlineBooking?: boolean;
 }
 
 export function CardsLayout({
   features,
   welcomeTitle,
   welcomeDescription,
+  enableOnlineBooking = true,
 }: CardsLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];

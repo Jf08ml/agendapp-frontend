@@ -91,7 +91,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Reserva en línea",
           to: "/online-reservation",
           icon: <BiCalendar size={18} />,
-          canShow: true,
+          canShow: organization?.enableOnlineBooking ?? true,
         },
       ],
     },

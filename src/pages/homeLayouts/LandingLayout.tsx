@@ -33,6 +33,7 @@ interface LandingLayoutProps {
   welcomeTitle: string;
   welcomeDescription: string;
   organizationId?: string;
+  enableOnlineBooking?: boolean;
 }
 
 export function LandingLayout({
@@ -40,6 +41,7 @@ export function LandingLayout({
   welcomeTitle,
   welcomeDescription,
   organizationId,
+  enableOnlineBooking = true,
 }: LandingLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
@@ -273,15 +275,17 @@ export function LandingLayout({
                               {service.duration} min
                             </Text>
                           </div>
-                          <Button
-                            component={Link}
-                            to="/online-reservation"
-                            size="sm"
-                            variant="light"
-                            color={theme.primaryColor}
-                          >
-                            Reservar
-                          </Button>
+                          {enableOnlineBooking && (
+                            <Button
+                              component={Link}
+                              to="/online-reservation"
+                              size="sm"
+                              variant="light"
+                              color={theme.primaryColor}
+                            >
+                              Reservar
+                            </Button>
+                          )}
                         </Group>
                       </Stack>
                     </Stack>

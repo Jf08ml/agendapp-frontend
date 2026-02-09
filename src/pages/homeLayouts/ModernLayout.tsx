@@ -25,12 +25,14 @@ interface ModernLayoutProps {
   features: Feature[];
   welcomeTitle: string;
   welcomeDescription: string;
+  enableOnlineBooking?: boolean;
 }
 
 export function ModernLayout({
   features,
   welcomeTitle,
   welcomeDescription,
+  enableOnlineBooking = true,
 }: ModernLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];

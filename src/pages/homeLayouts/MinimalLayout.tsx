@@ -25,6 +25,7 @@ interface MinimalLayoutProps {
   welcomeTitle: string;
   welcomeDescription: string;
   organizationId?: string;
+  enableOnlineBooking?: boolean;
 }
 
 export function MinimalLayout({
@@ -32,6 +33,7 @@ export function MinimalLayout({
   welcomeTitle,
   welcomeDescription,
   organizationId,
+  enableOnlineBooking = true,
 }: MinimalLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
