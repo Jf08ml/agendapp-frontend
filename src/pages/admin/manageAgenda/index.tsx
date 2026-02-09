@@ -8,7 +8,7 @@ import React, {
   Suspense,
   lazy,
 } from "react";
-import { Badge, Box, Button, Group, Paper, Stack, Text } from "@mantine/core";
+import { Badge, Box, Button, Checkbox, Group, Loader, Paper, Stack, Text } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -497,94 +497,129 @@ const ScheduleView: React.FC = () => {
    */
   const handleCancelAppointment = useCallback(
     (appointmentId: string) => {
-      const handleCancel = async () => {
-        modals.closeAll();
-        try {
-          await cancelAppointment(appointmentId);
-          showNotification({
-            title: "Éxito",
-            message: "La cita ha sido cancelada y se mantiene en el historial.",
-            color: "green",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          fetchAppointmentsForMonth(currentDate);
-        } catch (error) {
-          showNotification({
-            title: "Error",
-            message: "No se pudo cancelar la cita.",
-            color: "red",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          console.error(error);
-        }
-      };
+      const CancelModalContent = () => {
+        const [loading, setLoading] = useState(false);
+        const [notifyClient, setNotifyClient] = useState(false);
 
-      const handleDelete = async () => {
-        modals.closeAll();
-        try {
-          await deleteAppointment(appointmentId);
-          showNotification({
-            title: "Éxito",
-            message: "La cita ha sido eliminada definitivamente.",
-            color: "green",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          fetchAppointmentsForMonth(currentDate);
-        } catch (error) {
-          showNotification({
-            title: "Error",
-            message: "No se pudo eliminar la cita.",
-            color: "red",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          console.error(error);
-        }
+        const handleCancel = async () => {
+          setLoading(true);
+          try {
+            await cancelAppointment(appointmentId, notifyClient);
+            modals.closeAll();
+            showNotification({
+              title: "Éxito",
+              message: notifyClient 
+                ? "La cita ha sido cancelada y se ha notificado al cliente."
+                : "La cita ha sido cancelada y se mantiene en el historial.",
+              color: "green",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            fetchAppointmentsForMonth(currentDate);
+          } catch (error) {
+            showNotification({
+              title: "Error",
+              message: "No se pudo cancelar la cita.",
+              color: "red",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            console.error(error);
+            setLoading(false);
+          }
+        };
+
+        const handleDelete = async () => {
+          setLoading(true);
+          try {
+            await deleteAppointment(appointmentId);
+            modals.closeAll();
+            showNotification({
+              title: "Éxito",
+              message: "La cita ha sido eliminada definitivamente.",
+              color: "green",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            fetchAppointmentsForMonth(currentDate);
+          } catch (error) {
+            showNotification({
+              title: "Error",
+              message: "No se pudo eliminar la cita.",
+              color: "red",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            console.error(error);
+            setLoading(false);
+          }
+        };
+
+        return (
+          <Stack gap="md">
+            {loading && (
+              <Group justify="center" py="md">
+                <Loader size="sm" />
+                <Text size="sm" c="dimmed">Procesando...</Text>
+              </Group>
+            )}
+            {!loading && (
+              <>
+                <Text size="sm" c="dimmed">
+                  Selecciona una opción:
+                </Text>
+                <Checkbox
+                  label="Informar al cliente de la cancelación por WhatsApp"
+                  description="Se enviará un mensaje automático al cliente notificando la cancelación"
+                  checked={notifyClient}
+                  onChange={(e) => setNotifyClient(e.currentTarget.checked)}
+                />
+                <Button
+                  color="orange"
+                  variant="light"
+                  fullWidth
+                  onClick={handleCancel}
+                  disabled={loading}
+                >
+                  Cancelar cita (mantener en historial)
+                </Button>
+                <Text size="xs" c="dimmed" ta="center">
+                  La cita quedará marcada como cancelada pero visible en el historial del cliente.
+                </Text>
+                <Button
+                  color="red"
+                  variant="filled"
+                  fullWidth
+                  onClick={handleDelete}
+                  disabled={loading}
+                >
+                  Eliminar definitivamente
+                </Button>
+                <Text size="xs" c="dimmed" ta="center">
+                  La cita se eliminará por completo del sistema. Útil para citas creadas por error.
+                </Text>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  fullWidth
+                  onClick={() => modals.closeAll()}
+                  disabled={loading}
+                >
+                  Volver
+                </Button>
+              </>
+            )}
+          </Stack>
+        );
       };
 
       modals.open({
         title: "¿Qué deseas hacer con esta cita?",
         centered: true,
-        children: (
-          <Stack gap="md">
-            <Text size="sm" c="dimmed">
-              Selecciona una opción:
-            </Text>
-            <Button
-              color="orange"
-              variant="light"
-              fullWidth
-              onClick={handleCancel}
-            >
-              Cancelar cita (mantener en historial)
-            </Button>
-            <Text size="xs" c="dimmed" ta="center">
-              La cita quedará marcada como cancelada pero visible en el historial del cliente.
-            </Text>
-            <Button
-              color="red"
-              variant="filled"
-              fullWidth
-              onClick={handleDelete}
-            >
-              Eliminar definitivamente
-            </Button>
-            <Text size="xs" c="dimmed" ta="center">
-              La cita se eliminará por completo del sistema. Útil para citas creadas por error.
-            </Text>
-            <Button
-              variant="subtle"
-              color="gray"
-              fullWidth
-              onClick={() => modals.closeAll()}
-            >
-              Volver
-            </Button>
-          </Stack>
-        ),
+        closeOnClickOutside: false,
+        closeOnEscape: false,
+        withCloseButton: true,
+        children: <CancelModalContent />,
       });
     },
     [currentDate, fetchAppointmentsForMonth]

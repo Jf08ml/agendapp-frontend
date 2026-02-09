@@ -354,10 +354,13 @@ export const batchConfirmAppointments = async (
 
 // Cancelar una cita (cambia estado a cancelled_by_admin, mantiene historial)
 export const cancelAppointment = async (
-  appointmentId: string
+  appointmentId: string,
+  notifyClient: boolean = false
 ): Promise<void> => {
   try {
-    await apiAppointment.patch<Response<void>>(`/${appointmentId}/cancel`);
+    await apiAppointment.patch<Response<void>>(`/${appointmentId}/cancel`, {
+      notifyClient,
+    });
   } catch (error) {
     handleAxiosError(error, "Error al cancelar la cita");
   }
