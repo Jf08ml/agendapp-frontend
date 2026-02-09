@@ -139,9 +139,11 @@ export default function NotificationsMenu({
   };
 
   const handleDeleteNotification = async (notificationId: string) => {
+    console.log('🗑️ Intentando eliminar notificación:', notificationId);
     try {
       setLoading(true);
       await deleteNotification(notificationId);
+      console.log('✅ Notificación eliminada exitosamente');
       setNotifications((prev) => prev.filter((n) => n._id !== notificationId));
       showNotification({
         title: "🗑️ Eliminada",
@@ -327,16 +329,13 @@ export default function NotificationsMenu({
         </Box>
       </Menu.Target>
 
-      <Menu.Dropdown
-        onPointerDownCapture={(e) => e.stopPropagation()}
-        onClickCapture={(e) => e.stopPropagation()}
-      >
+      <Menu.Dropdown>
         <Flex justify="space-between" align="center" mb="xs">
           <NotificationToggle userId={auth.userId ?? ""} />
           <Flex gap="xs">
-            <Tooltip label="Seleccionar múltiples">
+            <Tooltip label="Modo selección (eliminar múltiples)">
               <ActionIcon
-                variant={selectionMode ? "filled" : "subtle"}
+                variant={selectionMode ? "filled" : "light"}
                 size="sm"
                 onClick={() => {
                   setSelectionMode(!selectionMode);
@@ -420,11 +419,8 @@ export default function NotificationsMenu({
                 new Date(a.createdAt).getTime(),
             )
             .map((notification) => (
-              <Menu.Item
+              <Box
                 key={notification._id}
-                onClick={() =>
-                  !selectionMode && handleNotificationClick(notification)
-                }
                 style={{
                   position: "relative",
                   backgroundColor:
@@ -435,6 +431,16 @@ export default function NotificationsMenu({
                       : "4px solid transparent",
                   padding: "8px 12px",
                   cursor: selectionMode ? "default" : "pointer",
+                  borderBottom: "1px solid #f1f3f5",
+                }}
+                onClick={(e) => {
+                  // No hacer nada si se clickeó en el botón de eliminar o checkbox
+                  if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) {
+                    return;
+                  }
+                  if (!selectionMode) {
+                    handleNotificationClick(notification);
+                  }
                 }}
               >
                 <Flex direction="row" gap="xs" align="center">
@@ -467,23 +473,25 @@ export default function NotificationsMenu({
                   </div>
 
                   {!selectionMode && (
-                    <Tooltip label="Eliminar">
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteNotification(notification._id);
-                        }}
-                        disabled={loading}
-                      >
-                        <FaTrash size={12} />
-                      </ActionIcon>
-                    </Tooltip>
+                    <ActionIcon
+                      variant="light"
+                      color="red"
+                      size="sm"
+                      onClick={(e) => {
+                        console.log('🖱️ Click en botón eliminar');
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleDeleteNotification(notification._id);
+                      }}
+                      disabled={loading}
+                      style={{ flexShrink: 0 }}
+                      title="Eliminar notificación"
+                    >
+                      <FaTrash size={14} />
+                    </ActionIcon>
                   )}
                 </Flex>
-              </Menu.Item>
+              </Box>
             ))}
         </Box>
 
