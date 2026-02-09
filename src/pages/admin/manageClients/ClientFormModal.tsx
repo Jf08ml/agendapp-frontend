@@ -28,7 +28,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [name, setName] = useState<string>("");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [phoneE164, setPhoneE164] = useState<string | null>(null);
-  const [, setPhoneCountry] = useState<CountryCode | null>(null);
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode | null>(null);
   const [phoneValid, setPhoneValid] = useState<boolean>(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [email, setEmail] = useState<string>("");
@@ -53,9 +53,15 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   useEffect(() => {
     if (client) {
       setName(client.name.trim());
-      setPhoneNumber(client.phoneNumber.trim());
+      // 🌍 Usar phone_e164 si existe (incluye código de país), sino phoneNumber
+      setPhoneNumber((client.phone_e164 || client.phoneNumber).trim());
       setEmail(client.email?.trim() || "");
       setBirthDate(client.birthDate ? new Date(client.birthDate) : null);
+      
+      // 🌍 Establecer el país del cliente si existe
+      if (client.phone_country) {
+        setPhoneCountry(client.phone_country as CountryCode);
+      }
       
       // Resetear estados de validación al cargar cliente existente
       setPhoneError(null);
@@ -96,6 +102,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         await updateClient(client._id, {
           name: name.trim(),
           phoneNumber: phoneNumber.trim(), // Enviar el número como lo ingresa el usuario
+          phone_country: phoneCountry || undefined, // 🌍 Enviar el país seleccionado
           email: email.trim(),
           birthDate: birthDate || null,
         });

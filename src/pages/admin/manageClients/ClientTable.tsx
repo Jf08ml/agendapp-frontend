@@ -206,6 +206,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
               <Table.Tr>
                 <Table.Th style={{ textAlign: "center" }}>Nombre</Table.Th>
                 <Table.Th style={{ textAlign: "center" }}>Teléfono</Table.Th>
+                <Table.Th style={{ textAlign: "center" }}>País</Table.Th>
                 <Table.Th style={{ textAlign: "center" }}>
                   Servicios Tomados
                 </Table.Th>
@@ -232,7 +233,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
               ))}
               {displayedClients.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={5}>
+                  <Table.Td colSpan={6}>
                     <Text c="dimmed" ta="center" py="md">
                       No hay clientes para mostrar.
                     </Text>
@@ -259,7 +260,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
                   <div>
                     <Text fw={600}>{c.name}</Text>
                     <Text size="sm" c="dimmed">
-                      {c.phoneNumber}
+                      {c.phoneNumber} {c.phone_country && `(${c.phone_country})`}
                     </Text>
                   </div>
                 </Group>

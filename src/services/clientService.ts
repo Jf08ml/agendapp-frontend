@@ -6,6 +6,8 @@ export interface Client {
   _id: string;
   name: string;
   phoneNumber: string;
+  phone_e164?: string; // 🌍 Número normalizado en formato E.164
+  phone_country?: string; // 🌍 Código de país ISO2 (CO, MX, US, etc.)
   email?: string;
   servicesTaken: number;
   referralsMade: number;

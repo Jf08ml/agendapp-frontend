@@ -198,14 +198,10 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         updates.birthDate = customerDetails.birthDate;
       }
       
-      // ✨ Migración al nuevo modelo: actualizar teléfono con E.164 y país
+      // 🌍 Actualizar teléfono con el formato E.164 y país (igual que ClientFormModal)
       if (phoneE164) {
-        updates.phoneNumber = phoneE164; // Actualizar phoneNumber al formato E.164
-        updates.phone_e164 = phoneE164;  // Nuevo campo
-      }
-      
-      if (phoneCountry) {
-        updates.phone_country = phoneCountry; // Nuevo campo con el código de país
+        updates.phoneNumber = phoneE164; // El backend normalizará automáticamente
+        updates.phone_country = phoneCountry || undefined; // Enviar el país seleccionado
       }
 
       // Solo actualizar si hay cambios

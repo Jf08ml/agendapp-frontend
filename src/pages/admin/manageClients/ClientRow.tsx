@@ -1,9 +1,10 @@
 import React from "react";
 import { Client } from "../../../services/clientService";
-import { ActionIcon, Badge, Menu, Table, Text } from "@mantine/core";
+import { ActionIcon, Badge, Menu, Table, Text, Tooltip } from "@mantine/core";
 import { BiTrash } from "react-icons/bi";
 import { CgAdd, CgOptions, CgUserAdd } from "react-icons/cg";
 import { MdEdit, MdVisibility } from "react-icons/md";
+import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 
 const ClientRow = React.memo(
   ({
@@ -39,6 +40,17 @@ const ClientRow = React.memo(
         </Text>
       </Table.Td>
       <Table.Td style={{ textAlign: "center" }}>{client.phoneNumber}</Table.Td>
+      <Table.Td style={{ textAlign: "center" }}>
+        {client.phone_country ? (
+          <Tooltip label={getCountryName(client.phone_country)} position="top">
+            <Text size="xl" style={{ cursor: "help" }}>
+              {getCountryFlag(client.phone_country)}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text size="sm" c="dimmed">-</Text>
+        )}
+      </Table.Td>
       <Table.Td>
         <Badge
           fullWidth
