@@ -30,8 +30,7 @@ interface CardsLayoutProps {
 export function CardsLayout({
   features,
   welcomeTitle,
-  welcomeDescription,
-  enableOnlineBooking = true,
+  welcomeDescription
 }: CardsLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];

@@ -32,8 +32,7 @@ export function MinimalLayout({
   features,
   welcomeTitle,
   welcomeDescription,
-  organizationId,
-  enableOnlineBooking = true,
+  organizationId
 }: MinimalLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];

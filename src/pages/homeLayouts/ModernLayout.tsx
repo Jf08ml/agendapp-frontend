@@ -31,8 +31,7 @@ interface ModernLayoutProps {
 export function ModernLayout({
   features,
   welcomeTitle,
-  welcomeDescription,
-  enableOnlineBooking = true,
+  welcomeDescription
 }: ModernLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
