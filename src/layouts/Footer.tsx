@@ -12,13 +12,14 @@ import {
   Progress,
 } from "@mantine/core";
 import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
-import { MdInstallMobile } from "react-icons/md";
+import { MdInstallMobile, MdSystemUpdateAlt } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../app/store";
 import { logout } from "../features/auth/sliceAuth";
 import useTokenExpiry from "../hooks/useTokenExpiry";
 import { formatTimeRemaining } from "../utils/sessionNotifications";
+import { useServiceWorkerUpdate } from "../hooks/useServiceWorkerUpdate";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => void;
@@ -52,6 +53,12 @@ export default function Footer() {
 
   // Estado del token
   const tokenExpiry = useTokenExpiry();
+  const {
+    updateAvailable,
+    applyUpdate,
+    checkForUpdates,
+    isUpdateSupported,
+  } = useServiceWorkerUpdate();
 
   // Obtener versión de la app
   useEffect(() => {
@@ -95,6 +102,10 @@ export default function Footer() {
     } else {
       navigate("/login-admin");
     }
+  };
+
+  const handleCheckUpdates = () => {
+    void checkForUpdates();
   };
 
   // Calcular porcentaje de progreso del token
@@ -154,42 +165,79 @@ export default function Footer() {
           </Box>
         </Group>
 
-        {/* CENTRO: Info de sesión o CTA PWA */}
-        {isAuthenticated && tokenExpiry.timeRemaining ? (
-          <Tooltip
-            label={`Sesión vence en ${formatTimeRemaining(tokenExpiry.timeRemaining)}`}
-            withArrow
-          >
-            <Box style={{ flex: 1, maxWidth: 150 }}>
-              <Text size="7px" opacity={0.8} style={{ color: textColor, marginBottom: 3 }}>
-                SESIÓN ACTIVA
-              </Text>
-              <Progress
-                value={calculateTokenProgress()}
-                size={6}
-                color={getProgressColor()}
-                radius="xs"
-              />
-            </Box>
-          </Tooltip>
-        ) : deferredPrompt ? (
-          <Button
-            onClick={handleInstallClick}
-            size="xs"
-            leftSection={<MdInstallMobile size={14} />}
-            style={{
-              backgroundColor: footerColor,
-              color: textColor,
-              border: `1px solid rgba(255,255,255,0.2)`,
-              height: rem(28),
-              paddingInline: rem(10),
-            }}
-          >
-            Instalar app
-          </Button>
-        ) : (
-          <span /> // Mantiene el layout en 3 columnas aunque no haya CTA
-        )}
+        {/* CENTRO: sesión, instalación PWA o actualización manual */}
+        <Group gap={6} wrap="nowrap">
+          {isAuthenticated && tokenExpiry.timeRemaining ? (
+            <Tooltip
+              label={`Sesión vence en ${formatTimeRemaining(tokenExpiry.timeRemaining)}`}
+              withArrow
+            >
+              <Box style={{ flex: 1, maxWidth: 150 }}>
+                <Text size="7px" opacity={0.8} style={{ color: textColor, marginBottom: 3 }}>
+                  SESIÓN ACTIVA
+                </Text>
+                <Progress
+                  value={calculateTokenProgress()}
+                  size={6}
+                  color={getProgressColor()}
+                  radius="xs"
+                />
+              </Box>
+            </Tooltip>
+          ) : null}
+
+          {deferredPrompt ? (
+            <Button
+              onClick={handleInstallClick}
+              size="xs"
+              leftSection={<MdInstallMobile size={14} />}
+              style={{
+                backgroundColor: footerColor,
+                color: textColor,
+                border: `1px solid rgba(255,255,255,0.2)`,
+                height: rem(28),
+                paddingInline: rem(10),
+              }}
+            >
+              Instalar app
+            </Button>
+          ) : null}
+
+          {isUpdateSupported ? (
+            updateAvailable ? (
+              <Button
+                onClick={applyUpdate}
+                size="xs"
+                leftSection={<MdSystemUpdateAlt size={14} />}
+                style={{
+                  backgroundColor: footerColor,
+                  color: textColor,
+                  border: `1px solid rgba(255,255,255,0.2)`,
+                  height: rem(28),
+                  paddingInline: rem(10),
+                }}
+              >
+                Actualizar ahora
+              </Button>
+            ) : (
+              <Tooltip label="Buscar actualizaciones" withArrow>
+                <ActionIcon
+                  variant="subtle"
+                  onClick={handleCheckUpdates}
+                  radius="xl"
+                  style={{ color: textColor }}
+                  aria-label="Buscar actualizaciones"
+                >
+                  <MdSystemUpdateAlt size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )
+          ) : null}
+
+          {!isAuthenticated && !tokenExpiry.timeRemaining && !deferredPrompt && !isUpdateSupported ? (
+            <span />
+          ) : null}
+        </Group>
 
         {/* DERECHA: acción auth */}
         <Tooltip

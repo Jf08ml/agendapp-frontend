@@ -155,5 +155,7 @@ export const useServiceWorkerUpdate = () => {
     applyUpdate,
     currentVersion,
     registration,
+    checkForUpdates,
+    isUpdateSupported: Boolean(registration),
   };
 };
