@@ -18,7 +18,6 @@ import {
   Skeleton,
   Center,
   Stack,
-  Progress,
   Paper,
   Tabs,
 } from "@mantine/core";

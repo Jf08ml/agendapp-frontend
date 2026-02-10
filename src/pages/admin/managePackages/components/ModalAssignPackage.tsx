@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Modal,
@@ -13,7 +12,6 @@ import {
   Select,
   TextInput,
   Badge,
-  Loader,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { IconUserPlus } from "@tabler/icons-react";
