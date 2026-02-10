@@ -70,6 +70,8 @@ export default function MultiBookingWizard() {
 
   // Ref para guardar la función de actualización del cliente
   const updateClientRef = useRef<(() => Promise<boolean>) | null>(null);
+  // Paquete de sesiones detectado
+  const [clientPackageId, setClientPackageId] = useState<string | null>(null);
 
   // Datos para la pantalla de éxito
   const [finishInfo, setFinishInfo] = useState<{
@@ -180,6 +182,7 @@ export default function MultiBookingWizard() {
       startDate: startDateStr,
       customerDetails,
       organizationId: orgId,
+      ...(clientPackageId ? { clientPackageId } : {}),
     } satisfies CreateMultipleReservationsPayload;
   };
 
@@ -235,6 +238,7 @@ export default function MultiBookingWizard() {
     setCustomerDetails({ name: "", email: "", phone: "", birthDate: null });
     setFinishInfo(null);
     setCompleted(false);
+    setClientPackageId(null);
     setCurrentStep(0);
   };
 
@@ -318,6 +322,8 @@ export default function MultiBookingWizard() {
             onClientUpdateReady={(updateFn) => {
               updateClientRef.current = updateFn;
             }}
+            selectedServiceIds={selected.map((s) => s.serviceId)}
+            onPackageDetected={(pkgId) => setClientPackageId(pkgId)}
           />
         );
       case 4:

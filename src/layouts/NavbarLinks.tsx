@@ -18,6 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
+import { IconPackage } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -63,6 +64,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     cashRead: hasPermission("cashManagement:read"), // <-- fix typo
     whatsappRead: hasPermission("whatsapp:read"),
     analyticsRead: hasPermission("analytics:read"),
+    packagesRead: hasPermission("packages:view"),
   };
 
   // Estilos consistentes sobre navbar de color
@@ -156,6 +158,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/gestionar-empleados",
           icon: <FaUsers size={18} />,
           canShow: can.employeesRead,
+        },
+        {
+          label: "Paquetes / Planes",
+          to: "/gestionar-paquetes",
+          icon: <IconPackage size={18} />,
+          canShow: can.packagesRead,
         },
         {
           label: "Gestionar WhatsApp",

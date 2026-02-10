@@ -201,6 +201,12 @@ const apiNotification: AxiosInstance = createAxiosInstance(
 const apiPayments: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/payments`
 );
+const apiPackage: AxiosInstance = createAxiosInstance(
+  `${API_BASE_URL}/packages`
+);
+const apiPackagePublic: AxiosInstance = createPublicAxiosInstance(
+  `${API_BASE_URL}/packages`
+);
 
 export {
   apiGeneral,
@@ -219,4 +225,6 @@ export {
   apiReservation,
   apiNotification,
   apiPayments,
+  apiPackage,
+  apiPackagePublic,
 };

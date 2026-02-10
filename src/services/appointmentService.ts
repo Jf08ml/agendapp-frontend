@@ -118,6 +118,10 @@ export interface CreateAppointmentsBatchPayload {
   additionalItemsByService?: Record<string, AdditionalItem[]>;
   /** { [serviceId]: duración en minutos } - Duraciones personalizadas por servicio */
   customDurations?: Record<string, number>;
+  /** ID del paquete de sesiones del cliente (si aplica) */
+  clientPackageId?: string;
+  /** { [serviceId]: clientPackageId } - mapeo servicio → paquete */
+  usePackageForServices?: Record<string, string>;
 }
 
 interface Response<T> {
@@ -292,6 +296,8 @@ export const createAppointmentsBatch = async (
       customPrices: data.customPrices,
       additionalItemsByService: data.additionalItemsByService,
       ...(data.customDurations && { customDurations: data.customDurations }), // 🕐 Duraciones personalizadas por servicio
+      ...(data.clientPackageId && { clientPackageId: data.clientPackageId }),
+      ...(data.usePackageForServices && { usePackageForServices: data.usePackageForServices }),
     };
     const res = await apiAppointment.post<Response<Appointment[]>>(
       "/batch",

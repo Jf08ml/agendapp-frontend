@@ -40,6 +40,8 @@ dayjs.extend(timezone);
 import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
+import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
+import { IconPackage } from "@tabler/icons-react";
 
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
@@ -113,6 +115,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [notifyAllAppointments, setNotifyAllAppointments] = useState(false); // 📨 Por defecto solo primera cita
+
+  // Estado para paquetes de sesiones del cliente
+  const [availablePackages, setAvailablePackages] = useState<Record<string, ClientPackage[]>>({});
+  const [usePackage, setUsePackage] = useState<Record<string, string>>({}); // serviceId -> clientPackageId
 
   const today = dayjs();
   const organization = useSelector(
@@ -392,6 +398,52 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     }
   };
 
+  // Buscar paquetes activos del cliente para los servicios seleccionados
+  useEffect(() => {
+    if (!newAppointment.client?._id || !newAppointment.services?.length || !organizationId) {
+      setAvailablePackages({});
+      setUsePackage({});
+      return;
+    }
+
+    const fetchPackages = async () => {
+      const pkgsByService: Record<string, ClientPackage[]> = {};
+      const defaultUsePackage: Record<string, string> = {};
+
+      for (const svc of newAppointment.services!) {
+        try {
+          const pkgs = await getActivePackagesForService(
+            newAppointment.client!._id,
+            svc._id,
+            organizationId
+          );
+          if (pkgs.length > 0) {
+            pkgsByService[svc._id] = pkgs;
+            // Auto-seleccionar el primer paquete disponible
+            defaultUsePackage[svc._id] = pkgs[0]._id;
+          }
+        } catch {
+          // Silently ignore
+        }
+      }
+
+      setAvailablePackages(pkgsByService);
+      setUsePackage(defaultUsePackage);
+
+      // Actualizar el payload con los paquetes seleccionados
+      if (Object.keys(defaultUsePackage).length > 0) {
+        const firstPkgId = Object.values(defaultUsePackage)[0];
+        setNewAppointment((prev) => ({
+          ...prev,
+          clientPackageId: firstPkgId,
+          usePackageForServices: defaultUsePackage,
+        }));
+      }
+    };
+
+    fetchPackages();
+  }, [newAppointment.client?._id, newAppointment.services?.map(s => s._id).join(","), organizationId]);
+
   // 🔁 Resetear preview cuando cambian los parámetros de recurrencia
   useEffect(() => {
     setSeriesPreview(null);
@@ -670,6 +722,115 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               </Box>
             </Checkbox.Group>
           </Box>
+
+          {/* Sección: Paquetes de sesiones disponibles */}
+          {Object.keys(availablePackages).length > 0 && !appointment && (
+            <Box
+              mb="xl"
+              p="md"
+              style={{
+                backgroundColor: "#e6fcf5",
+                borderRadius: 8,
+                border: "1px solid #63e6be",
+              }}
+            >
+              <Group gap="xs" mb="md">
+                <IconPackage size={18} color="#099268" />
+                <Text size="sm" fw={600} c="teal.8" tt="uppercase">
+                  Paquetes de sesiones disponibles
+                </Text>
+              </Group>
+
+              {newAppointment.services
+                ?.filter((svc) => availablePackages[svc._id])
+                .map((svc) => {
+                  const pkgs = availablePackages[svc._id];
+                  const selectedPkgId = usePackage[svc._id];
+                  const selectedPkg = pkgs.find((p) => p._id === selectedPkgId);
+                  const svcInPkg = selectedPkg?.services.find(
+                    (s) =>
+                      (typeof s.serviceId === "object"
+                        ? s.serviceId._id
+                        : s.serviceId) === svc._id
+                  );
+
+                  return (
+                    <Box
+                      key={svc._id}
+                      p="sm"
+                      mb="xs"
+                      style={{
+                        backgroundColor: "white",
+                        borderRadius: 6,
+                        border: selectedPkgId
+                          ? "2px solid #12b886"
+                          : "1px solid #c3fae8",
+                      }}
+                    >
+                      <Group justify="space-between" mb={4}>
+                        <Text size="sm" fw={600}>
+                          {svc.name}
+                        </Text>
+                        {svcInPkg && (
+                          <Badge variant="light" color="teal" size="sm">
+                            {svcInPkg.sessionsRemaining} sesiones restantes
+                          </Badge>
+                        )}
+                      </Group>
+                      <Group gap="xs">
+                        <Checkbox
+                          label={
+                            <Text size="xs">
+                              Usar paquete:{" "}
+                              <Text span fw={600}>
+                                {typeof selectedPkg?.servicePackageId === "object"
+                                  ? selectedPkg.servicePackageId.name
+                                  : "Paquete"}
+                              </Text>
+                            </Text>
+                          }
+                          checked={!!selectedPkgId}
+                          onChange={(event) => {
+                            if (event.currentTarget.checked && pkgs.length > 0) {
+                              const newUsePackage = {
+                                ...usePackage,
+                                [svc._id]: pkgs[0]._id,
+                              };
+                              setUsePackage(newUsePackage);
+                              setNewAppointment((prev) => ({
+                                ...prev,
+                                clientPackageId: Object.values(newUsePackage)[0],
+                                usePackageForServices: newUsePackage,
+                              }));
+                            } else {
+                              const newUsePackage = { ...usePackage };
+                              delete newUsePackage[svc._id];
+                              setUsePackage(newUsePackage);
+                              setNewAppointment((prev) => ({
+                                ...prev,
+                                clientPackageId:
+                                  Object.values(newUsePackage)[0] || undefined,
+                                usePackageForServices:
+                                  Object.keys(newUsePackage).length > 0
+                                    ? newUsePackage
+                                    : undefined,
+                              }));
+                            }
+                          }}
+                          color="teal"
+                          size="sm"
+                        />
+                      </Group>
+                    </Box>
+                  );
+                })}
+
+              <Text size="xs" c="teal.6" mt="xs">
+                Las sesiones se descontarán del paquete al crear la cita.
+                Precio: $0 para servicios cubiertos por el paquete.
+              </Text>
+            </Box>
+          )}
 
           {/* Sección: Fecha y Hora */}
           <Box

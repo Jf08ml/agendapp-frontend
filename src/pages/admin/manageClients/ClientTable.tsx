@@ -425,6 +425,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
           </Text>
         )}
       </Modal>
+
     </Box>
   );
 };

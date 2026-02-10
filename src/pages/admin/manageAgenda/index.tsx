@@ -66,6 +66,9 @@ export interface CreateAppointmentPayload {
   // Duraciones personalizadas por servicio (en minutos)
   // Clave: serviceId, Valor: duración en minutos
   customDurations?: Record<string, number>;
+  // Paquete de sesiones del cliente (si aplica)
+  clientPackageId?: string;
+  usePackageForServices?: Record<string, string>; // serviceId -> clientPackageId
 }
 
 const ScheduleView: React.FC = () => {
@@ -712,6 +715,8 @@ const ScheduleView: React.FC = () => {
         status,
         advancePayment,
         customDurations,
+        clientPackageId,
+        usePackageForServices,
       } = newAppointment;
 
       if (
@@ -758,6 +763,9 @@ const ScheduleView: React.FC = () => {
             advancePayment,
             // Duraciones personalizadas por servicio (en minutos)
             customDurations: services.length > 1 ? customDurations : undefined,
+            // Paquete de sesiones (si el admin eligió usar paquete)
+            clientPackageId,
+            usePackageForServices,
           };
 
           await createAppointmentsBatch(payload);

@@ -61,7 +61,7 @@ export interface CreateMultipleReservationsPayload {
     birthDate: Date | null;
   };
   organizationId: string;
-  // status? Por defecto puede ser 'pending'
+  clientPackageId?: string; // ID del paquete de sesiones del cliente (si aplica)
 }
 
 // Obtener todas las reservas de una organización

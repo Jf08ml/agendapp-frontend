@@ -29,6 +29,7 @@ import PaymentHistory from "../pages/admin/PaymentHistory";
 import CampaignList from "../pages/admin/campaigns/CampaignList";
 import CampaignWizard from "../pages/admin/campaigns/CampaignWizard";
 import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
+import ManagePackages from "../pages/admin/managePackages";
 
 const generalRoutes = [
   {
@@ -178,6 +179,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Empleados",
       description: "Gestiona los empleados de Galaxia Glamour.",
+    },
+  },
+  {
+    path: "/gestionar-paquetes",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <ManagePackages {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Gestionar Paquetes",
+      description: "Gestiona los paquetes de sesiones.",
     },
   },
   {

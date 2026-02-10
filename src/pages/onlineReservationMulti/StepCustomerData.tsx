@@ -21,11 +21,16 @@ import { RootState } from "../../app/store";
 import { Reservation } from "../../services/reservationService";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { CountryCode } from "libphonenumber-js";
+import { checkClientPackagesPublic, ClientPackage } from "../../services/packageService";
+import { Paper, Checkbox } from "@mantine/core";
+import { IconPackage } from "@tabler/icons-react";
 
 interface StepCustomerDataProps {
   bookingData: Partial<Reservation>;
   setBookingData: React.Dispatch<React.SetStateAction<Partial<Reservation>>>;
   onClientUpdateReady?: (updateFn: () => Promise<boolean>) => void;
+  selectedServiceIds?: string[];
+  onPackageDetected?: (clientPackageId: string | null, packageInfo: any) => void;
 }
 
 const isValidEmail = (v: string) =>
@@ -35,6 +40,8 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
   bookingData,
   setBookingData,
   onClientUpdateReady,
+  selectedServiceIds = [],
+  onPackageDetected,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
 
@@ -57,6 +64,8 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
   const [emailError, setEmailError] = useState<string | null>(null);
   const [foundName, setFoundName] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null); // Guardar ID del cliente encontrado
+  const [detectedPackages, setDetectedPackages] = useState<ClientPackage[]>([]);
+  const [useDetectedPackage, setUseDetectedPackage] = useState(true);
   
   // Ref para evitar actualizaciones durante el montaje inicial
   const isInitialMount = useRef(true);
@@ -166,8 +175,31 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           };
         });
         if (client.name) setFoundName(client.name);
+
+        // Detectar paquetes activos del cliente
+        if (selectedServiceIds.length > 0) {
+          try {
+            const pkgResult = await checkClientPackagesPublic(
+              phoneE164,
+              selectedServiceIds,
+              orgId
+            );
+            if (pkgResult.packages.length > 0) {
+              setDetectedPackages(pkgResult.packages);
+              setUseDetectedPackage(true);
+              onPackageDetected?.(pkgResult.packages[0]._id, pkgResult.packages[0]);
+            } else {
+              setDetectedPackages([]);
+              onPackageDetected?.(null, null);
+            }
+          } catch {
+            setDetectedPackages([]);
+          }
+        }
       } else {
         setClientId(null); // No existe, se creará uno nuevo
+        setDetectedPackages([]);
+        onPackageDetected?.(null, null);
       }
     } catch (error) {
       // No bloqueamos el flujo si falla la búsqueda
@@ -307,6 +339,60 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         clearable
         popoverProps={{ withinPortal: true, trapFocus: false }}
       />
+
+      {detectedPackages.length > 0 && (
+        <Paper withBorder p="md" radius="md" bg="teal.0" style={{ borderColor: "#63e6be" }}>
+          <Group gap="xs" mb="xs">
+            <IconPackage size={18} color="#099268" />
+            <Text size="sm" fw={600} c="teal.8">
+              Paquete de sesiones detectado
+            </Text>
+          </Group>
+          {detectedPackages.map((pkg) => {
+            const pkgName = typeof pkg.servicePackageId === "object"
+              ? pkg.servicePackageId.name
+              : "Paquete";
+            return (
+              <Paper key={pkg._id} withBorder p="sm" radius="sm" mb="xs" bg="white">
+                <Group justify="space-between" mb={4}>
+                  <Text size="sm" fw={600}>{pkgName}</Text>
+                  <Badge variant="light" color="teal" size="sm">
+                    Activo
+                  </Badge>
+                </Group>
+                {pkg.services.map((svc, idx) => {
+                  const svcName = typeof svc.serviceId === "object"
+                    ? svc.serviceId.name
+                    : "Servicio";
+                  return svc.sessionsRemaining > 0 ? (
+                    <Group key={idx} justify="space-between" gap="xs">
+                      <Text size="xs">{svcName}</Text>
+                      <Text size="xs" c="teal" fw={600}>
+                        {svc.sessionsRemaining} sesiones restantes
+                      </Text>
+                    </Group>
+                  ) : null;
+                })}
+              </Paper>
+            );
+          })}
+          <Checkbox
+            label="Usar mi paquete para esta reserva"
+            checked={useDetectedPackage}
+            onChange={(event) => {
+              setUseDetectedPackage(event.currentTarget.checked);
+              if (event.currentTarget.checked && detectedPackages.length > 0) {
+                onPackageDetected?.(detectedPackages[0]._id, detectedPackages[0]);
+              } else {
+                onPackageDetected?.(null, null);
+              }
+            }}
+            color="teal"
+            size="sm"
+            mt="xs"
+          />
+        </Paper>
+      )}
     </Stack>
   );
 };
