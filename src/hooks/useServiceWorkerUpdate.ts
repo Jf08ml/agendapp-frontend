@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { showNotification } from '@mantine/notifications';
 
 interface Version {
@@ -7,24 +7,72 @@ interface Version {
   buildDate: string;
 }
 
+const POLL_INTERVAL = 60_000; // 60 segundos
+
 export const useServiceWorkerUpdate = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [currentVersion, setCurrentVersion] = useState<Version | null>(null);
 
-  // Obtener versión actual
-  const fetchCurrentVersion = useCallback(async () => {
+  // Refs para evitar problemas de closures stale en callbacks
+  const currentVersionRef = useRef<Version | null>(null);
+  const updateTriggeredRef = useRef(false);
+
+  // Obtener versión del servidor (cache-busted)
+  const fetchCurrentVersion = useCallback(async (): Promise<Version | null> => {
     try {
       const response = await fetch('/version.json?_=' + Date.now());
-      const version: Version = await response.json();
-      return version;
+      return await response.json();
     } catch (error) {
       console.error('Error fetching version:', error);
       return null;
     }
   }, []);
 
-  // Verificar si hay actualización disponible
+  // Mostrar countdown y recargar
+  const triggerUpdateReload = useCallback(() => {
+    if (updateTriggeredRef.current) return; // evitar doble trigger
+    updateTriggeredRef.current = true;
+    setUpdateAvailable(true);
+
+    let countdown = 10;
+    const notificationId = 'update-countdown';
+
+    const showCountdown = (seconds: number) => {
+      showNotification({
+        id: notificationId,
+        title: '🎉 Nueva versión disponible',
+        message: `Actualizando en ${seconds} segundo${seconds !== 1 ? 's' : ''}...`,
+        color: 'blue',
+        autoClose: false,
+        withCloseButton: false,
+        loading: true,
+      });
+    };
+
+    showCountdown(countdown);
+
+    const countdownInterval = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        showCountdown(countdown);
+      } else {
+        clearInterval(countdownInterval);
+        showNotification({
+          id: notificationId,
+          title: '✅ Actualizando ahora',
+          message: 'Aplicando nueva versión...',
+          color: 'green',
+          autoClose: 1000,
+        });
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      }
+    }, 1000);
+  }, []);
+
+  // Verificar si hay actualización comparando version.json
   const checkForUpdates = useCallback(async () => {
     if (!registration) return;
 
@@ -32,76 +80,36 @@ export const useServiceWorkerUpdate = () => {
       // Forzar chequeo de actualización del SW
       await registration.update();
 
-      // Verificar versión del archivo
+      // Comparar versión del archivo
       const newVersion = await fetchCurrentVersion();
-      if (!newVersion || !currentVersion) return;
+      const savedVersion = currentVersionRef.current;
+      if (!newVersion || !savedVersion) return;
 
-      if (newVersion.timestamp > currentVersion.timestamp) {
+      if (newVersion.timestamp > savedVersion.timestamp) {
         console.log('Nueva versión disponible:', newVersion.buildDate);
-        setUpdateAvailable(true);
-        
-        // Countdown de 10 segundos antes de actualizar
-        let countdown = 10;
-        const notificationId = 'update-countdown';
-        
-        const showCountdown = (seconds: number) => {
-          showNotification({
-            id: notificationId,
-            title: '🎉 Nueva versión disponible',
-            message: `Actualizando en ${seconds} segundo${seconds !== 1 ? 's' : ''}...`,
-            color: 'blue',
-            autoClose: false,
-            withCloseButton: false,
-            loading: true,
-          });
-        };
-        
-        showCountdown(countdown);
-        
-        const countdownInterval = setInterval(() => {
-          countdown--;
-          if (countdown > 0) {
-            showCountdown(countdown);
-          } else {
-            clearInterval(countdownInterval);
-            showNotification({
-              id: notificationId,
-              title: '✅ Actualizando ahora',
-              message: 'Aplicando nueva versión...',
-              color: 'green',
-              autoClose: 1000,
-            });
-            
-            // Aplicar actualización después de 500ms
-            setTimeout(() => {
-              window.location.reload();
-            }, 500);
-          }
-        }, 1000);
+        triggerUpdateReload();
       }
     } catch (error) {
       console.error('Error checking for updates:', error);
     }
-  }, [registration, currentVersion, fetchCurrentVersion]);
+  }, [registration, fetchCurrentVersion, triggerUpdateReload]);
 
-  // Aplicar actualización
+  // Aplicar actualización manual
   const applyUpdate = useCallback(() => {
-    if (!registration || !registration.waiting) {
-      window.location.reload();
-      return;
+    if (registration?.waiting) {
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     }
-
-    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
     window.location.reload();
   }, [registration]);
 
-  // Inicializar
+  // Inicializar SW y listeners
   useEffect(() => {
     const init = async () => {
       // Obtener versión inicial
       const version = await fetchCurrentVersion();
       if (version) {
         setCurrentVersion(version);
+        currentVersionRef.current = version;
         console.log('Versión actual:', version.buildDate);
       }
 
@@ -116,17 +124,26 @@ export const useServiceWorkerUpdate = () => {
         const reg = await navigator.serviceWorker.register('/custom-sw.js');
         setRegistration(reg);
 
-        // Detectar cuando un nuevo SW está instalado
+        // Detectar cuando un nuevo SW se instala
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           if (!newWorker) return;
 
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('Nuevo Service Worker instalado y esperando');
               setUpdateAvailable(true);
-              console.log('Service Worker actualizado y listo');
+              triggerUpdateReload();
             }
           });
+        });
+
+        // Detectar cuando un nuevo SW toma control (controllerchange)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('Nuevo Service Worker tomó control');
+          if (!updateTriggeredRef.current) {
+            triggerUpdateReload();
+          }
         });
 
         // Chequeo inicial
@@ -137,17 +154,31 @@ export const useServiceWorkerUpdate = () => {
     };
 
     void init();
-  }, [fetchCurrentVersion]);
+  }, [fetchCurrentVersion, triggerUpdateReload]);
 
-  // Polling cada 60 segundos
+  // Polling periódico + check al volver de background
   useEffect(() => {
     if (!registration) return;
 
+    // Polling regular
     const interval = setInterval(() => {
       void checkForUpdates();
-    }, 60000); // 60 segundos
+    }, POLL_INTERVAL);
 
-    return () => clearInterval(interval);
+    // Cuando el usuario vuelve al app (después de minimizar/cambiar tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App visible, verificando actualizaciones...');
+        void checkForUpdates();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [registration, checkForUpdates]);
 
   return {
