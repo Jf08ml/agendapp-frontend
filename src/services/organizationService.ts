@@ -115,6 +115,20 @@ export interface Organization {
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "suspended" | "none";
   hasAccessBlocked?: boolean;
+  // Límites del plan activo
+  planLimits?: {
+    maxEmployees?: number | null;
+    maxServices?: number | null;
+    maxAppointmentsPerMonth?: number | null;
+    maxStorageGB?: number;
+    customBranding?: boolean;
+    whatsappIntegration?: boolean;
+    analyticsAdvanced?: boolean;
+    prioritySupport?: boolean;
+    autoReminders?: boolean;
+    autoConfirmations?: boolean;
+    servicePackages?: boolean;
+  } | null;
 }
 
 // Crear una nueva organización

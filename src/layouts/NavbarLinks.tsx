@@ -51,6 +51,9 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     );
   }
 
+  // Límites del plan activo
+  const limits = organization?.planLimits;
+
   // Permisos (centralizado)
   const can = {
     businessInfo: hasPermission("businessInformation:read"),
@@ -62,9 +65,9 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     apptsOwn: hasPermission("appointments:view_own"),
     onlineRes: hasPermission("reservationOnline:read"),
     cashRead: hasPermission("cashManagement:read"), // <-- fix typo
-    whatsappRead: hasPermission("whatsapp:read"),
-    analyticsRead: hasPermission("analytics:read"),
-    packagesRead: hasPermission("packages:view"),
+    whatsappRead: hasPermission("whatsapp:read") && limits?.whatsappIntegration !== false,
+    analyticsRead: hasPermission("analytics:read") && limits?.analyticsAdvanced !== false,
+    packagesRead: hasPermission("packages:view") && limits?.servicePackages !== false,
   };
 
   // Estilos consistentes sobre navbar de color
