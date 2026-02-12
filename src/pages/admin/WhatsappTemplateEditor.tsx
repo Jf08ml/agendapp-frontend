@@ -152,6 +152,16 @@ const templateInfo = {
       { name: "{{appointments_list}}", desc: "Lista de citas con fecha/hora" },
     ],
   },
+  clientNoShowAck: {
+    title: "Aviso de No Asistencia",
+    description: "Mensaje enviado al cliente cuando se marca que no asistió a su cita",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{service}}", desc: "Nombre del servicio" },
+      { name: "{{date}}", desc: "Fecha y hora de la cita" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+    ],
+  },
 };
 
 type TemplateType = keyof WhatsappTemplates;
@@ -187,7 +197,7 @@ export default function WhatsappTemplateEditor() {
     }
   `;
   
-  const [activeTab, setActiveTab] = useState<string | null>("scheduleAppointment");
+  const [activeTab, setActiveTab] = useState<string | null>("scheduleAppointmentBatch");
   const [templates, setTemplates] = useState<WhatsappTemplates | null>(null);
   const [defaultTemplates, setDefaultTemplates] = useState<Record<string, string>>({});
   const [editedTemplates, setEditedTemplates] = useState<Record<string, string>>({});
@@ -770,6 +780,29 @@ export default function WhatsappTemplateEditor() {
                           setTemplateSettings(prev => ({
                             ...prev,
                             clientCancellationAck: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Aviso de No Asistencia */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>Aviso de No Asistencia</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando se marca que el cliente no asistió a su cita
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.clientNoShowAck ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            clientNoShowAck: checked
                           }));
                         }}
                         size="lg"

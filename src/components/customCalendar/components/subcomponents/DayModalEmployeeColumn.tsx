@@ -22,6 +22,7 @@ interface EmployeeColumnProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
   hasPermission: (permission: string) => boolean;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   timezone?: string; // 🌍 Timezone de la organización
@@ -52,6 +53,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  onMarkAttendance,
   hasPermission,
   onOpenModal,
   timezone = 'America/Bogota', // 🌍 Default timezone
@@ -178,6 +180,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             onEditAppointment={onEditAppointment}
             onCancelAppointment={onCancelAppointment}
             onConfirmAppointment={onConfirmAppointment}
+            onMarkAttendance={onMarkAttendance}
             isExpanded={isExpanded}
             handleToggleExpand={handleToggleExpand}
             timezone={timezone}

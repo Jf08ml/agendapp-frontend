@@ -45,6 +45,7 @@ interface DayModalProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
   onDeleteAppointment?: (appointmentId: string) => void;
   employees: Employee[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
@@ -61,6 +62,7 @@ const DayModal: FC<DayModalProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  onMarkAttendance,
   onDeleteAppointment,
   employees,
   setAppointments,
@@ -422,6 +424,7 @@ const DayModal: FC<DayModalProps> = ({
                       onEditAppointment={onEditAppointment}
                       onCancelAppointment={onCancelAppointment}
                       onConfirmAppointment={onConfirmAppointment}
+                      onMarkAttendance={onMarkAttendance}
                       hasPermission={hasPermission}
                       onOpenModal={onOpenModal}
                       timezone={timezone}

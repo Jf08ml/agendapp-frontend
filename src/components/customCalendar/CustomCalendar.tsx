@@ -17,6 +17,7 @@ interface CustomCalendarProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
   onDeleteAppointment?: (appointmentId: string) => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   fetchAppointmentsForMonth: (currentDate: Date) => void;
@@ -34,6 +35,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  onMarkAttendance,
   onDeleteAppointment,
   setAppointments,
   fetchAppointmentsForMonth,
@@ -130,6 +132,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         onEditAppointment={onEditAppointment}
         onCancelAppointment={onCancelAppointment}
         onConfirmAppointment={onConfirmAppointment}
+        onMarkAttendance={onMarkAttendance}
         onDeleteAppointment={onDeleteAppointment}
         setAppointments={setAppointments}
         fetchAppointmentsForDay={fetchAppointmentsForDay}

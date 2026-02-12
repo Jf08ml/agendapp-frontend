@@ -39,6 +39,8 @@ const STATUS_OPTIONS = [
   { value: "", label: "Todos los estados" },
   { value: "pending", label: "Pendientes" },
   { value: "confirmed", label: "Confirmadas" },
+  { value: "attended", label: "Asistió" },
+  { value: "no_show", label: "No asistió" },
   { value: "cancelled_by_admin,cancelled_by_customer,cancelled", label: "Canceladas" },
 ];
 
@@ -54,6 +56,10 @@ const getStatusBadge = (status: string) => {
       return { label: "Cancelada por cliente", color: "red" };
     case "cancelled_by_admin":
       return { label: "Cancelada por admin", color: "orange" };
+    case "attended":
+      return { label: "Asistió", color: "teal" };
+    case "no_show":
+      return { label: "No asistió", color: "pink" };
     default:
       return { label: status, color: "gray" };
   }

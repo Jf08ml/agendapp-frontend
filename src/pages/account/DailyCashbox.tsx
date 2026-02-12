@@ -64,6 +64,8 @@ type ApptStatus =
   | "cancelled"
   | "cancelled_by_customer"
   | "cancelled_by_admin"
+  | "attended"
+  | "no_show"
   | string;
 
 const STATUS_META: Record<
@@ -100,6 +102,18 @@ const STATUS_META: Record<
     bg: "#F3E8FF",
     text: "#4A235A",
   },
+  attended: {
+    label: "Asistió",
+    color: "teal",
+    bg: "#E6FAF5",
+    text: "#0B6E4F",
+  },
+  no_show: {
+    label: "No asistió",
+    color: "pink",
+    bg: "#FFE6EE",
+    text: "#8B1A4A",
+  },
 };
 
 function StatusBadge({ status }: { status: ApptStatus }) {
@@ -130,7 +144,9 @@ function canConfirm(status: ApptStatus) {
     status !== "confirmed" &&
     status !== "cancelled" &&
     status !== "cancelled_by_customer" &&
-    status !== "cancelled_by_admin"
+    status !== "cancelled_by_admin" &&
+    status !== "attended" &&
+    status !== "no_show"
   );
 }
 

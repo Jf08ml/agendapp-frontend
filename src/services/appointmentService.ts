@@ -372,6 +372,23 @@ export const cancelAppointment = async (
   }
 };
 
+// Marcar asistencia de una cita (attended / no_show)
+export const markAttendance = async (
+  appointmentId: string,
+  status: "attended" | "no_show",
+  notifyClient: boolean = false
+): Promise<Appointment | undefined> => {
+  try {
+    const response = await apiAppointment.patch<Response<Appointment>>(
+      `/${appointmentId}/attendance`,
+      { status, notifyClient }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al registrar asistencia");
+  }
+};
+
 // Eliminar una cita definitivamente (sin historial)
 export const deleteAppointment = async (
   appointmentId: string

@@ -47,6 +47,7 @@ import { RootState } from "../../../app/store";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { showNotification } from "@mantine/notifications";
 import { IoSettings } from "react-icons/io5";
+import { IconUserCheck, IconUserX } from "@tabler/icons-react";
 
 dayjs.extend(localizedFormat);
 dayjs.locale("es");
@@ -58,6 +59,7 @@ interface AppointmentCardProps {
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
+  onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
   isExpanded?: (appointment: Appointment) => boolean;
   handleToggleExpand?: (appointmentId: string) => void;
   timezone?: string; // 🌍 Timezone de la organización
@@ -93,6 +95,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
+  onMarkAttendance,
   isExpanded,
   handleToggleExpand,
   timezone = "America/Bogota", // 🌍 Default timezone
@@ -792,10 +795,16 @@ ${clientServices}`;
           position: "relative",
           cursor: isCancelled ? "default" : "pointer",
           fontSize: 10,
-          border: isCancelled ? "1px solid #ced4da" : "1px solid gray", // ❌ Borde gris si cancelada
-          opacity: isCancelled ? 0.5 : 1, // ❌ Opacidad reducida si cancelada
-          textDecoration: isCancelled ? "line-through" : "none", // ❌ Tachado si cancelada
-          pointerEvents: isCancelled ? "none" : "auto", // ❌ Permitir click a través de citas canceladas
+          border: isCancelled
+            ? "1px solid #ced4da"
+            : appointment.status === "attended"
+            ? "2px solid #12b886"
+            : appointment.status === "no_show"
+            ? "2px solid #e64980"
+            : "1px solid gray",
+          opacity: isCancelled ? 0.5 : appointment.status === "no_show" ? 0.65 : 1,
+          textDecoration: isCancelled ? "line-through" : "none",
+          pointerEvents: isCancelled ? "none" : "auto",
         }}
         onClick={(e) => {
           // clave para que NO se propague al onClick de la columna
@@ -905,6 +914,28 @@ ${clientServices}`;
             >
               Confirmar realizada
             </Menu.Item>
+            {isPastAppointment && !isCancelled && (
+              <>
+                <Menu.Divider />
+                <Menu.Label>Asistencia</Menu.Label>
+                <Menu.Item
+                  leftSection={<IconUserCheck size={16} />}
+                  disabled={!hasPermission("appointments:update")}
+                  onClick={() => onMarkAttendance(appointment._id, "attended")}
+                  color="teal"
+                >
+                  Asistió
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconUserX size={16} />}
+                  disabled={!hasPermission("appointments:update")}
+                  onClick={() => onMarkAttendance(appointment._id, "no_show")}
+                  color="pink"
+                >
+                  No asistió
+                </Menu.Item>
+              </>
+            )}
           </Menu.Dropdown>
         </Menu>
 
@@ -921,6 +952,36 @@ ${clientServices}`;
             }}
           >
             ❌ CANCELADA
+          </Badge>
+        )}
+
+        {/* Badge de asistencia */}
+        {appointment.status === "attended" && (
+          <Badge
+            color="teal"
+            size="xs"
+            radius="sm"
+            style={{
+              fontSize: 8,
+              marginTop: 4,
+              marginBottom: 2,
+            }}
+          >
+            ✓ ASISTIÓ
+          </Badge>
+        )}
+        {appointment.status === "no_show" && (
+          <Badge
+            color="pink"
+            size="xs"
+            radius="sm"
+            style={{
+              fontSize: 8,
+              marginTop: 4,
+              marginBottom: 2,
+            }}
+          >
+            ✗ NO ASISTIÓ
           </Badge>
         )}
 

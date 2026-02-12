@@ -17,6 +17,7 @@ import {
   createAppointmentsBatch,
   deleteAppointment,
   getAppointmentsByOrganizationId,
+  markAttendance,
   updateAppointment,
 } from "../../../services/appointmentService";
 import {
@@ -700,6 +701,134 @@ const ScheduleView: React.FC = () => {
   );
 
   /**
+   * MARCAR ASISTENCIA
+   */
+  const handleMarkAttendance = useCallback(
+    (appointmentId: string, status: "attended" | "no_show") => {
+      // "Asistió" se ejecuta directamente sin modal
+      if (status === "attended") {
+        openConfirmModal({
+          title: "Marcar asistencia",
+          centered: true,
+          children: (
+            <Text size="sm">
+              ¿Confirmas que el cliente asistió a esta cita?
+            </Text>
+          ),
+          labels: { confirm: "Sí, asistió", cancel: "Cancelar" },
+          confirmProps: { color: "teal" },
+          onConfirm: async () => {
+            try {
+              await markAttendance(appointmentId, "attended");
+              showNotification({
+                title: "Éxito",
+                message: "La cita se marcó como asistida.",
+                color: "teal",
+                autoClose: 3000,
+                position: "top-right",
+              });
+              fetchAppointmentsForMonth(currentDate);
+            } catch (error) {
+              showNotification({
+                title: "Error",
+                message: "No se pudo registrar la asistencia.",
+                color: "red",
+                autoClose: 3000,
+                position: "top-right",
+              });
+              console.error(error);
+            }
+          },
+        });
+        return;
+      }
+
+      // "No asistió" abre modal con opción de notificar por WhatsApp
+      const NoShowModalContent = () => {
+        const [loading, setLoading] = useState(false);
+        const [notifyClient, setNotifyClient] = useState(false);
+
+        const handleConfirm = async () => {
+          setLoading(true);
+          try {
+            await markAttendance(appointmentId, "no_show", notifyClient);
+            modals.closeAll();
+            showNotification({
+              title: "Éxito",
+              message: notifyClient
+                ? "La cita se marcó como no asistida y se notificó al cliente."
+                : "La cita se marcó como no asistida.",
+              color: "pink",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            fetchAppointmentsForMonth(currentDate);
+          } catch (error) {
+            showNotification({
+              title: "Error",
+              message: "No se pudo registrar la asistencia.",
+              color: "red",
+              autoClose: 3000,
+              position: "top-right",
+            });
+            console.error(error);
+            setLoading(false);
+          }
+        };
+
+        return (
+          <Stack gap="md">
+            {loading ? (
+              <Group justify="center" py="md">
+                <Loader size="sm" />
+                <Text size="sm" c="dimmed">Procesando...</Text>
+              </Group>
+            ) : (
+              <>
+                <Text size="sm">
+                  ¿Confirmas que el cliente no asistió a esta cita?
+                </Text>
+                <Checkbox
+                  label="Informar al cliente por WhatsApp"
+                  description="Se enviará un mensaje automático notificando la no asistencia"
+                  checked={notifyClient}
+                  onChange={(e) => setNotifyClient(e.currentTarget.checked)}
+                />
+                <Button
+                  color="pink"
+                  variant="light"
+                  fullWidth
+                  onClick={handleConfirm}
+                >
+                  Marcar como no asistió
+                </Button>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  fullWidth
+                  onClick={() => modals.closeAll()}
+                >
+                  Cancelar
+                </Button>
+              </>
+            )}
+          </Stack>
+        );
+      };
+
+      modals.open({
+        title: "Marcar no asistencia",
+        centered: true,
+        closeOnClickOutside: false,
+        closeOnEscape: false,
+        withCloseButton: true,
+        children: <NoShowModalContent />,
+      });
+    },
+    [fetchAppointmentsForMonth, currentDate]
+  );
+
+  /**
    * CREAR O ACTUALIZAR CITA
    */
   const addOrUpdateAppointment = async () => {
@@ -916,6 +1045,7 @@ const ScheduleView: React.FC = () => {
         onEditAppointment={handleEditAppointment}
         onCancelAppointment={handleCancelAppointment}
         onConfirmAppointment={handleConfirmAppointment}
+        onMarkAttendance={handleMarkAttendance}
         onDeleteAppointment={handleDeleteAppointment}
         fetchAppointmentsForMonth={fetchAppointmentsForMonth}
         loadingMonth={loadingMonth}
