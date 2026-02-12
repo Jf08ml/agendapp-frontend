@@ -20,6 +20,7 @@ import {
   NumberInput,
   Textarea,
   Alert,
+  Switch,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import {
@@ -46,6 +47,7 @@ const EMPTY_ORG_FORM = {
   timezone: "America/Bogota",
   default_country: "CO",
   isActive: true,
+  hasAccessBlocked: true,
 };
 
 export default function SuperadminManagement() {
@@ -200,6 +202,7 @@ export default function SuperadminManagement() {
         timezone: org.timezone || "America/Bogota",
         default_country: org.default_country || "CO",
         isActive: org.isActive !== false,
+        hasAccessBlocked: org.hasAccessBlocked ?? true,
       });
     } else {
       // Nueva organización
@@ -214,7 +217,7 @@ export default function SuperadminManagement() {
     try {
       if (selectedOrgForEdit?._id) {
         // Actualizar organización existente
-        const updateData: Partial<Organization> = {
+        const updateData: Partial<Organization> & { hasAccessBlocked?: boolean } = {
           name: orgForm.name,
           email: orgForm.email,
           phoneNumber: orgForm.phoneNumber,
@@ -223,6 +226,7 @@ export default function SuperadminManagement() {
           timezone: orgForm.timezone,
           default_country: orgForm.default_country,
           isActive: orgForm.isActive,
+          hasAccessBlocked: orgForm.hasAccessBlocked,
         };
         // Solo incluir password si se proporcionó uno nuevo
         if (orgForm.password) {
@@ -710,6 +714,16 @@ export default function SuperadminManagement() {
             <Alert icon={<IoAlertCircle size={16} />} color="blue">
               La ubicación (lat/lng) puede configurarse después desde el panel de administración
             </Alert>
+
+            <Switch
+              label="Acceso bloqueado"
+              description="Bloquea el acceso a la plataforma hasta que se active un plan"
+              checked={orgForm.hasAccessBlocked}
+              onChange={(e) =>
+                setOrgForm({ ...orgForm, hasAccessBlocked: e.currentTarget.checked })
+              }
+              color="red"
+            />
 
             <Group justify="end" mt="md">
               <Button
