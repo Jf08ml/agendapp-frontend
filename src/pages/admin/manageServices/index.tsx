@@ -475,8 +475,8 @@ const AdminServices: React.FC = () => {
                   )}
                   
                   <Group justify="space-between" align="center" mt="md">
-                    <Badge color={service.isActive ? "teal" : "gray"} variant="light" size="xl" radius="md">
-                      ${service.price.toLocaleString()}
+                    <Badge color={service.isActive ? (service.price === 0 ? "green" : "teal") : "gray"} variant="light" size="xl" radius="md">
+                      {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
                     </Badge>
                     <Group gap={6}>
                       <Tooltip label="Editar" withArrow>

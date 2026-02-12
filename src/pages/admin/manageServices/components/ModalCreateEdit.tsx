@@ -58,11 +58,13 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
+  const [isFreeService, setIsFreeService] = useState(false);
 
   useEffect(() => {
     if (service) {
       setEditingService(service);
       setImageFiles(service.images || []);
+      setIsFreeService(service.price === 0);
     } else {
       setEditingService({
         _id: "",
@@ -77,6 +79,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         recommendations: "",
       });
       setImageFiles([]);
+      setIsFreeService(false);
     }
   }, [service]);
 
@@ -119,7 +122,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   const canSave =
     editingService.name.trim().length > 1 &&
     editingService.type.trim().length > 1 &&
-    (editingService.price ?? 0) > 0 &&
+    (isFreeService || (editingService.price ?? 0) > 0) &&
     (editingService.duration ?? 0) > 0;
 
   const handleSave = async () => {
@@ -174,18 +177,32 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 required
                 withAsterisk
               />
-              <NumberInput
-                label="Precio"
-                description="Precio base del servicio"
-                prefix="$ "
-                thousandSeparator="."
-                decimalSeparator=","
-                value={editingService.price}
-                onChange={(value) => setEditingService({ ...editingService, price: typeof value === "number" ? value : 0 })}
-                required
-                withAsterisk
-                min={0}
+              <Switch
+                label="Servicio gratuito"
+                description="Este servicio no tiene costo para el cliente"
+                checked={isFreeService}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  setIsFreeService(checked);
+                  if (checked) {
+                    setEditingService({ ...editingService, price: 0, hidePrice: false });
+                  }
+                }}
               />
+              {!isFreeService && (
+                <NumberInput
+                  label="Precio"
+                  description="Precio base del servicio"
+                  prefix="$ "
+                  thousandSeparator="."
+                  decimalSeparator=","
+                  value={editingService.price}
+                  onChange={(value) => setEditingService({ ...editingService, price: typeof value === "number" ? value : 0 })}
+                  required
+                  withAsterisk
+                  min={1}
+                />
+              )}
               <Box>
                 <NumberInput
                   label="Duración (minutos)"
@@ -227,12 +244,14 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 minRows={2}
                 autosize
               />
-              <Switch
-                label="Ocultar precio al cliente"
-                description="El precio no será visible en la vista pública"
-                checked={editingService.hidePrice ?? false}
-                onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
-              />
+              {!isFreeService && (
+                <Switch
+                  label="Ocultar precio al cliente"
+                  description="El precio no será visible en la vista pública"
+                  checked={editingService.hidePrice ?? false}
+                  onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
+                />
+              )}
                 <Box>
                   <NumberInput
                     label="👥 Citas simultáneas que puede atender"

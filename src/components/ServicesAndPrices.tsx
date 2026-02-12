@@ -248,8 +248,8 @@ const ServicesAndPrices: React.FC = () => {
 
             <Group justify="space-between" align="center">
               {!modalService.hidePrice && (
-                <Text fz="xl" fw={800} c={primary}>
-                  {formatCurrency(modalService.price, organization?.currency || "COP")}
+                <Text fz="xl" fw={800} c={modalService.price === 0 ? "green" : primary}>
+                  {modalService.price === 0 ? "Gratis" : formatCurrency(modalService.price, organization?.currency || "COP")}
                 </Text>
               )}
               {typeof (modalService as any).duration === "number" && (
@@ -339,8 +339,8 @@ const ServiceCard = ({
 
         <Group justify="space-between" align="flex-end" mt="xs">
           {!service.hidePrice ? (
-            <Text fw={800} size="lg" c={primaryColor}>
-              {formatCurrency(service.price, organization?.currency || "COP")}
+            <Text fw={800} size="lg" c={service.price === 0 ? "green" : primaryColor}>
+              {service.price === 0 ? "Gratis" : formatCurrency(service.price, organization?.currency || "COP")}
             </Text>
           ) : (
             <Text size="sm" c="dimmed" fs="italic">

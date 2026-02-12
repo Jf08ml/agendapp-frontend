@@ -198,8 +198,8 @@ export default function StepMultiServiceSummary({
                       <Text fw={600} size="sm">
                         {svc?.name ?? "Servicio"}
                       </Text>
-                      <Text fw={600} size="sm">
-                        {fmtMoney(price)}
+                      <Text fw={600} size="sm" c={price === 0 ? "green" : undefined}>
+                        {price === 0 ? "Gratis" : fmtMoney(price)}
                       </Text>
                     </Group>
                     <Text c="dimmed" size="sm">
@@ -220,7 +220,7 @@ export default function StepMultiServiceSummary({
             Total a pagar
           </Text>
           <Text fw={800} size="lg" c="green">
-            {fmtMoney(grandTotal)}
+            {grandTotal === 0 ? "Gratis" : fmtMoney(grandTotal)}
           </Text>
         </Group>
       </Paper>
