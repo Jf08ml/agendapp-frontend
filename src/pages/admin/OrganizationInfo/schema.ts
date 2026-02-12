@@ -142,6 +142,8 @@ export const schema = z.object({
   serviceReward: optionalString,
   showLoyaltyProgram: z.boolean().optional(),
   enableOnlineBooking: z.boolean().optional(),
+  blockHolidaysForReservations: z.boolean().optional(),
+  allowedHolidayDates: z.array(z.string()).optional(),
   welcomeTitle: optionalString,
   welcomeDescription: optionalString,
   homeLayout: z.enum(["modern", "minimal", "cards", "landing"]).optional(),

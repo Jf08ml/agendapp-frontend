@@ -4,6 +4,8 @@ import MonthView from "./components/MonthView";
 import DayModal from "./components/DayModal";
 import { addMonths, subMonths, isSameDay } from "date-fns";
 import { useMediaQuery } from "@mantine/hooks";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 import { Employee } from "../../services/employeeService";
 
 interface CustomCalendarProps {
@@ -42,6 +44,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
+  const organization = useSelector((s: RootState) => s.organization.organization);
+  const holidayCountry = organization?.default_country || "CO";
 
   // Decide si filtrar localmente o pedir por día
   const handleNavigation = useCallback((direction: "prev" | "next") => {
@@ -88,7 +92,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         handleDayClick={handleDayClick}
         getAppointmentsForDay={getAppointmentsForDay}
         loadingMonth={loadingMonth}
-        holidayConfig={{ country: "CO", language: "es" }}
+        holidayConfig={{ country: holidayCountry, language: "es" }}
         onPrevMonth={useCallback(() => handleNavigation("prev"), [handleNavigation])}
         onNextMonth={useCallback(() => handleNavigation("next"), [handleNavigation])}
         // onToday={() => {

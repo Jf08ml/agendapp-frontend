@@ -82,6 +82,8 @@ export default function OrganizationInfo() {
             timezone: response.timezone || undefined, // 🕐 Zona horaria - NO resetear a Colombia
             showLoyaltyProgram: response.showLoyaltyProgram ?? true,
             enableOnlineBooking: response.enableOnlineBooking ?? true,
+            blockHolidaysForReservations: response.blockHolidaysForReservations ?? false,
+            allowedHolidayDates: Array.isArray(response.allowedHolidayDates) ? [...response.allowedHolidayDates] : [],
             welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
             welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
             homeLayout: response.homeLayout ?? "modern",
