@@ -120,6 +120,9 @@ export const useServiceWorkerUpdate = () => {
         return;
       }
 
+      // Recordar si ya había un SW controlando antes de registrar
+      const hadController = !!navigator.serviceWorker.controller;
+
       try {
         const reg = await navigator.serviceWorker.register('/custom-sw.js');
         setRegistration(reg);
@@ -139,7 +142,12 @@ export const useServiceWorkerUpdate = () => {
         });
 
         // Detectar cuando un nuevo SW toma control (controllerchange)
+        // Solo tratar como actualización si ya había un SW previo controlando
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!hadController) {
+            console.log('Service Worker registrado por primera vez, no es actualización');
+            return;
+          }
           console.log('Nuevo Service Worker tomó control');
           if (!updateTriggeredRef.current) {
             triggerUpdateReload();

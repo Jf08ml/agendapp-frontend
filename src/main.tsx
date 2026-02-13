@@ -15,6 +15,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 if (window.__swRecoveryTimeout) {
   clearTimeout(window.__swRecoveryTimeout);
 }
+// Limpiar flag de recovery para permitir futuros intentos
+sessionStorage.removeItem('sw_recovery_attempted');
 
 createRoot(document.getElementById("root")!).render(
   // <StrictMode>

@@ -60,14 +60,17 @@
   <div id="root"></div>
   <div id="debug-logs"></div>
 
-  <!-- Recuperación de SW atascado: si React no monta en 10s, limpiar caché y recargar -->
+  <!-- Recuperación de SW atascado: si React no monta en 20s, limpiar caché y recargar (solo 1 vez) -->
   <script>
     (function() {
       if (!('serviceWorker' in navigator)) return;
+      // Evitar loop: solo intentar recovery una vez por sesión del navegador
+      if (sessionStorage.getItem('sw_recovery_attempted')) return;
       var timeout = setTimeout(function() {
         var root = document.getElementById('root');
         if (root && root.children.length === 0) {
-          console.warn('[SW Recovery] App no montó en 10s, limpiando SW y caché...');
+          console.warn('[SW Recovery] App no montó en 20s, limpiando SW y caché...');
+          sessionStorage.setItem('sw_recovery_attempted', '1');
           navigator.serviceWorker.getRegistrations().then(function(regs) {
             var promises = regs.map(function(r) { return r.unregister(); });
             if ('caches' in window) {
@@ -80,7 +83,7 @@
             });
           });
         }
-      }, 10000);
+      }, 20000);
       window.__swRecoveryTimeout = timeout;
     })();
   </script>
