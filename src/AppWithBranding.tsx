@@ -14,6 +14,7 @@ import App from "./App";
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
+    __swRecoveryTimeout?: ReturnType<typeof setTimeout>;
   }
 }
 

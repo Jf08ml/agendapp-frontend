@@ -1,7 +1,6 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { createHandlerBoundToURL } from "workbox-precaching";
-import { CacheFirst } from "workbox-strategies";
+import { NetworkFirst, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { clientsClaim } from 'workbox-core';
 
@@ -18,11 +17,17 @@ console.log('[SW] Service Worker Version:', SW_VERSION);
 // Inyección de manifiesto (SOLO UNA REFERENCIA A self.__WB_MANIFEST)
 precacheAndRoute(self.__WB_MANIFEST);
 
-// Manejo de navegación para SPA
-const handler = createHandlerBoundToURL("/index.html");
-const navigationRoute = new NavigationRoute(handler, {
-  denylist: [/^\/api\//], // Excluye cualquier ruta de la API o que no quieras manejar con el service worker
-});
+// Manejo de navegación para SPA - NetworkFirst para siempre obtener HTML fresco
+// Solo usa caché como fallback cuando está offline
+const navigationRoute = new NavigationRoute(
+  new NetworkFirst({
+    cacheName: "navigation-cache",
+    networkTimeoutSeconds: 3,
+  }),
+  {
+    denylist: [/^\/api\//],
+  }
+);
 registerRoute(navigationRoute);
 
 // Caching runtime para imágenes

@@ -11,6 +11,11 @@ import { store } from "./app/store.ts";
 import AppWithBranding from "./AppWithBranding.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
+// Cancelar el timeout de recuperación del SW - la app cargó correctamente
+if (window.__swRecoveryTimeout) {
+  clearTimeout(window.__swRecoveryTimeout);
+}
+
 createRoot(document.getElementById("root")!).render(
   // <StrictMode>
   <Provider store={store}>

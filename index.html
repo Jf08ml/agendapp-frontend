@@ -59,6 +59,32 @@
 <body>
   <div id="root"></div>
   <div id="debug-logs"></div>
+
+  <!-- Recuperación de SW atascado: si React no monta en 10s, limpiar caché y recargar -->
+  <script>
+    (function() {
+      if (!('serviceWorker' in navigator)) return;
+      var timeout = setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          console.warn('[SW Recovery] App no montó en 10s, limpiando SW y caché...');
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            var promises = regs.map(function(r) { return r.unregister(); });
+            if ('caches' in window) {
+              promises.push(caches.keys().then(function(names) {
+                return Promise.all(names.map(function(n) { return caches.delete(n); }));
+              }));
+            }
+            Promise.all(promises).then(function() {
+              window.location.reload();
+            });
+          });
+        }
+      }, 10000);
+      window.__swRecoveryTimeout = timeout;
+    })();
+  </script>
+
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
