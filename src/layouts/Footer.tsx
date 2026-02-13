@@ -9,16 +9,14 @@ import {
   Box,
   rem,
   Avatar,
-  Progress,
 } from "@mantine/core";
 import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
 import { MdInstallMobile, MdSystemUpdateAlt } from "react-icons/md";
+import { IconRefresh } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../app/store";
 import { logout } from "../features/auth/sliceAuth";
-import useTokenExpiry from "../hooks/useTokenExpiry";
-import { formatTimeRemaining } from "../utils/sessionNotifications";
 import { useServiceWorkerUpdate } from "../hooks/useServiceWorkerUpdate";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -32,10 +30,26 @@ interface Version {
   buildDate: string;
 }
 
+async function clearSiteData() {
+  // Desregistrar todos los Service Workers
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((r) => r.unregister()));
+  }
+  // Limpiar todas las caches del Cache API
+  if ("caches" in window) {
+    const names = await caches.keys();
+    await Promise.all(names.map((n) => caches.delete(n)));
+  }
+  // Recargar desde el servidor
+  window.location.reload();
+}
+
 export default function Footer() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [appVersion, setAppVersion] = useState<Version | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -51,8 +65,6 @@ export default function Footer() {
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
 
-  // Estado del token
-  const tokenExpiry = useTokenExpiry();
   const {
     updateAvailable,
     applyUpdate,
@@ -91,7 +103,7 @@ export default function Footer() {
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
-    await deferredPrompt.userChoice; // opcional: puedes revisar outcome aquí
+    await deferredPrompt.userChoice;
     setDeferredPrompt(null);
   };
 
@@ -108,26 +120,15 @@ export default function Footer() {
     void checkForUpdates();
   };
 
-  // Calcular porcentaje de progreso del token
-  const calculateTokenProgress = () => {
-    if (!tokenExpiry.timeRemaining) return 100;
-    const totalTime = 7 * 24 * 60 * 60 * 1000; // 7 días
-    const progress = (tokenExpiry.timeRemaining / totalTime) * 100;
-    return Math.max(0, Math.min(100, progress));
-  };
-
-  // Determinar color de la barra de progreso
-  const getProgressColor = () => {
-    const progress = calculateTokenProgress();
-    if (progress > 50) return "green";
-    if (progress > 20) return "yellow";
-    return "red";
+  const handleClearCache = () => {
+    if (!confirm("Esto limpiará la caché y recargará la página. ¿Continuar?")) return;
+    setClearing(true);
+    void clearSiteData();
   };
 
   return (
     <Box
       component="footer"
-      // Fondo sólido con un leve overlay para profundidad
       style={{
         background: `linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06)), ${footerColor}`,
         color: textColor,
@@ -165,27 +166,8 @@ export default function Footer() {
           </Box>
         </Group>
 
-        {/* CENTRO: sesión, instalación PWA o actualización manual */}
+        {/* CENTRO: instalación PWA, actualización o limpiar caché */}
         <Group gap={6} wrap="nowrap">
-          {isAuthenticated && tokenExpiry.timeRemaining ? (
-            <Tooltip
-              label={`Sesión vence en ${formatTimeRemaining(tokenExpiry.timeRemaining)}`}
-              withArrow
-            >
-              <Box style={{ flex: 1, maxWidth: 150 }}>
-                <Text size="7px" opacity={0.8} style={{ color: textColor, marginBottom: 3 }}>
-                  SESIÓN ACTIVA
-                </Text>
-                <Progress
-                  value={calculateTokenProgress()}
-                  size={6}
-                  color={getProgressColor()}
-                  radius="xs"
-                />
-              </Box>
-            </Tooltip>
-          ) : null}
-
           {deferredPrompt ? (
             <Button
               onClick={handleInstallClick}
@@ -234,9 +216,18 @@ export default function Footer() {
             )
           ) : null}
 
-          {!isAuthenticated && !tokenExpiry.timeRemaining && !deferredPrompt && !isUpdateSupported ? (
-            <span />
-          ) : null}
+          <Tooltip label="Limpiar caché del sitio" withArrow>
+            <ActionIcon
+              variant="subtle"
+              onClick={handleClearCache}
+              loading={clearing}
+              radius="xl"
+              style={{ color: textColor }}
+              aria-label="Limpiar caché"
+            >
+              <IconRefresh size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
 
         {/* DERECHA: acción auth */}
