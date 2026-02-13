@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from "axios";
-import { refreshToken } from "./authService";
 
 const API_BASE_URL: string =
   import.meta.env.VITE_NODE_ENV === "production"
@@ -19,16 +18,27 @@ const notifyTokenRefresh = (token: string) => {
   refreshSubscribers = [];
 };
 
+// Notificar a los subscribers que el refresh falló (desbloquear peticiones)
+const notifyTokenRefreshFailed = () => {
+  // Resolver con el token actual (o vacío) para desbloquear las peticiones
+  const currentToken = localStorage.getItem("app_token") || "";
+  refreshSubscribers.forEach((callback) => callback(currentToken));
+  refreshSubscribers = [];
+};
+
+// Instancia dedicada para refresh (sin interceptores de auth para evitar deadlock)
+const refreshAxios = axios.create({ baseURL: API_BASE_URL });
+
 const addTenantHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
     // window.location.hostname: el dominio actual donde está corriendo tu frontend
     config.headers["X-Tenant-Domain"] = window.location.hostname;
-    
+
     // Agregar token de autenticación si existe
     const token = localStorage.getItem("app_token");
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
-      
+
       // Verificar si el token está a punto de expirar durante esta solicitud
       const expiresAtStr = localStorage.getItem("app_token_expires_at");
       if (expiresAtStr) {
@@ -36,32 +46,36 @@ const addTenantHeader = (api: AxiosInstance) => {
         const now = Date.now();
         const timeUntilExpiry = expiresAt - now;
         const refreshThreshold = 5 * 60 * 1000; // 5 minutos
-        
+
         // Si el token expira en menos de 5 minutos, intenta renovarlo
         if (timeUntilExpiry < refreshThreshold && timeUntilExpiry > 0) {
           if (!isRefreshing) {
             isRefreshing = true;
-            refreshToken(token)
+            // Usar refreshAxios directamente para evitar deadlock con interceptores
+            refreshAxios.post("/refresh", {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            })
               .then((response) => {
-                if (response?.token) {
-                  localStorage.setItem("app_token", response.token);
-                  if (response.expiresAt) {
-                    localStorage.setItem("app_token_expires_at", response.expiresAt);
+                const data = response.data?.data;
+                if (data?.token) {
+                  localStorage.setItem("app_token", data.token);
+                  if (data.expiresAt) {
+                    localStorage.setItem("app_token_expires_at", data.expiresAt);
                   }
-                  notifyTokenRefresh(response.token);
+                  notifyTokenRefresh(data.token);
+                } else {
+                  notifyTokenRefreshFailed();
                 }
               })
               .catch((error) => {
                 console.error("Error renovando token:", error);
-                // Limpiar datos si el refresh falla
-                localStorage.removeItem("app_token");
-                localStorage.removeItem("app_token_expires_at");
+                notifyTokenRefreshFailed();
               })
               .finally(() => {
                 isRefreshing = false;
               });
           }
-          
+
           // Si ya estamos renovando, esperar a que termine
           if (isRefreshing) {
             return new Promise((resolve) => {
@@ -74,7 +88,7 @@ const addTenantHeader = (api: AxiosInstance) => {
         }
       }
     }
-    
+
     return config;
   });
   return api;
@@ -207,6 +221,9 @@ const apiPackage: AxiosInstance = createAxiosInstance(
 const apiPackagePublic: AxiosInstance = createPublicAxiosInstance(
   `${API_BASE_URL}/packages`
 );
+const apiPlansPublic: AxiosInstance = createPublicAxiosInstance(
+  `${API_BASE_URL}/plans`
+);
 
 export {
   apiGeneral,
@@ -227,4 +244,5 @@ export {
   apiPayments,
   apiPackage,
   apiPackagePublic,
+  apiPlansPublic,
 };

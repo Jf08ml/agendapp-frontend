@@ -28,7 +28,7 @@ import {
   MembershipStatus,
 } from "../../services/membershipService";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
-import { apiGeneral } from "../../services/axiosConfig";
+import { apiPlansPublic } from "../../services/axiosConfig";
 import { createMembershipCheckout, getPaymentHistory, PaymentSession } from "../../services/paymentsService";
 import { IoAlertCircle } from "react-icons/io5";
 import { BiCalendar, BiCreditCard, BiX } from "react-icons/bi";
@@ -42,6 +42,7 @@ export default function MyMembership() {
   const [loading, setLoading] = useState(true);
   const [paymentModalOpened, setPaymentModalOpened] = useState(false);
   const [publicPlans, setPublicPlans] = useState<any[]>([]);
+  const [plansError, setPlansError] = useState(false);
   const [transferOpened, setTransferOpened] = useState(false);
   const [transferPlan, setTransferPlan] = useState<{ name: string; amount: number } | null>(null);
   const [lastPayment, setLastPayment] = useState<PaymentSession | null>(null);
@@ -76,14 +77,15 @@ export default function MyMembership() {
   };
 
   useEffect(() => {
-    // Cargar planes públicos para permitir selección si no hay membresía
+    // Cargar planes públicos (usando instancia sin auth para evitar bloqueos por token)
     (async () => {
       try {
-        const res = await apiGeneral.get("/plans/public");
+        setPlansError(false);
+        const res = await apiPlansPublic.get("/public");
         setPublicPlans(res.data?.data || []);
       } catch (e) {
-        console.error(e)
-        // noop
+        console.error("Error cargando planes:", e);
+        setPlansError(true);
       }
     })();
   }, []);
@@ -153,31 +155,57 @@ export default function MyMembership() {
             No se encontró una membresía activa para tu organización. Elige un plan para comenzar.
           </Alert>
 
-          <Grid>
-            {publicPlans.map((p) => (
-              <Grid.Col key={p._id} span={{ base: 12, md: 6, lg: 4 }}>
-                <Card withBorder shadow="sm" radius="md">
-                  <Stack gap="sm">
-                    <Group justify="space-between">
-                      <Text size="lg" fw={700}>{p.displayName}</Text>
-                      <Badge>{p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}</Badge>
-                    </Group>
-                    <Text c="dimmed">{p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}</Text>
-                    <Text fw={700} size="lg">
-                      ${p.price} {p.currency}
-                    </Text>
-                    <Group>
-                      <Button onClick={() => startUSDCheckout(p.slug)} leftSection={<CgCreditCard size={18} />}>Pagar con tarjeta</Button>
-                      <Button variant="light" onClick={() => {
-                        setTransferPlan({ name: p.displayName, amount: p.price });
-                        setTransferOpened(true);
-                      }}>Transferencia (COP)</Button>
-                    </Group>
-                  </Stack>
-                </Card>
-              </Grid.Col>
-            ))}
-          </Grid>
+          {plansError ? (
+            <Alert
+              icon={<IoAlertCircle size={18} />}
+              title="Error al cargar planes"
+              color="red"
+            >
+              <Stack gap="sm">
+                <Text size="sm">No se pudieron cargar los planes disponibles.</Text>
+                <Button size="xs" variant="light" onClick={() => {
+                  setPlansError(false);
+                  (async () => {
+                    try {
+                      const res = await apiPlansPublic.get("/public");
+                      setPublicPlans(res.data?.data || []);
+                    } catch (e) {
+                      console.error("Error cargando planes:", e);
+                      setPlansError(true);
+                    }
+                  })();
+                }}>
+                  Reintentar
+                </Button>
+              </Stack>
+            </Alert>
+          ) : (
+            <Grid>
+              {publicPlans.map((p) => (
+                <Grid.Col key={p._id} span={{ base: 12, md: 6, lg: 4 }}>
+                  <Card withBorder shadow="sm" radius="md">
+                    <Stack gap="sm">
+                      <Group justify="space-between">
+                        <Text size="lg" fw={700}>{p.displayName}</Text>
+                        <Badge>{p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}</Badge>
+                      </Group>
+                      <Text c="dimmed">{p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}</Text>
+                      <Text fw={700} size="lg">
+                        ${p.price} {p.currency}
+                      </Text>
+                      <Group>
+                        <Button onClick={() => startUSDCheckout(p.slug)} leftSection={<CgCreditCard size={18} />}>Pagar con tarjeta</Button>
+                        <Button variant="light" onClick={() => {
+                          setTransferPlan({ name: p.displayName, amount: p.price });
+                          setTransferOpened(true);
+                        }}>Transferencia (COP)</Button>
+                      </Group>
+                    </Stack>
+                  </Card>
+                </Grid.Col>
+              ))}
+            </Grid>
+          )}
 
           <PaymentMethodsModal
             opened={transferOpened}

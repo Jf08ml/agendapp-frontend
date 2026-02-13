@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode, useEffect, useState } from "react";
 import { Button, Card, Group, Stack, Text, Title, Badge, Modal, List } from "@mantine/core";
-import { apiGeneral } from "../../services/axiosConfig";
+import { apiGeneral, apiPlansPublic } from "../../services/axiosConfig";
 import { createMembershipCheckout } from "../../services/paymentsService";
 import { getPublicBillingInfo, PublicBillingInfo } from "../../services/platformBillingService";
 
@@ -28,11 +28,11 @@ export default function MembershipPlans() {
   useEffect(() => {
     (async () => {
       const [plansRes, orgRes, billingRes] = await Promise.all([
-        apiGeneral.get("/plans/public"),
+        apiPlansPublic.get("/public"),
         apiGeneral.get("/organization-config"),
         getPublicBillingInfo(),
       ]);
-      setPlans(plansRes.data.data || []);
+      setPlans(plansRes.data?.data || []);
       setOrgId(orgRes.data._id);
       setBilling(billingRes);
     })();
