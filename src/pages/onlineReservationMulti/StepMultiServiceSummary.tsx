@@ -15,6 +15,7 @@ import {
   ServiceWithDate,
   MultiServiceBlockSelection,
 } from "../../types/multiBooking";
+import { formatCurrency } from "../../utils/formatCurrency";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 
@@ -57,6 +58,7 @@ interface Props {
   employees: Employee[];
   dates: ServiceWithDate[];
   times: MultiServiceBlockSelection | null;
+  currency?: string;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -68,22 +70,12 @@ function toNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function fmtMoney(v: number, currency = "COP", locale = "es-CO") {
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-    }).format(v);
-  } catch {
-    return `${v.toFixed(0)}`;
-  }
-}
-
 export default function StepMultiServiceSummary({
   services,
   employees,
   dates,
   times,
+  currency,
 }: Props) {
   if (!times) return null;
 
@@ -199,7 +191,7 @@ export default function StepMultiServiceSummary({
                         {svc?.name ?? "Servicio"}
                       </Text>
                       <Text fw={600} size="sm" c={price === 0 ? "green" : undefined}>
-                        {price === 0 ? "Gratis" : fmtMoney(price)}
+                        {price === 0 ? "Gratis" : formatCurrency(price, currency)}
                       </Text>
                     </Group>
                     <Text c="dimmed" size="sm">
@@ -220,7 +212,7 @@ export default function StepMultiServiceSummary({
             Total a pagar
           </Text>
           <Text fw={800} size="lg" c="green">
-            {grandTotal === 0 ? "Gratis" : fmtMoney(grandTotal)}
+            {grandTotal === 0 ? "Gratis" : formatCurrency(grandTotal, currency)}
           </Text>
         </Group>
       </Paper>

@@ -65,12 +65,13 @@ export default function ContactTab({
               { value: "CA", label: "🇨🇦 Canadá" },
               { value: "SV", label: "🇸🇻 El Salvador" },
               { value: "ES", label: "🇪🇸 España" },
+              { value: "UY", label: "🇺🇾 Uruguay" },
             ]}
           />
           <Select
             label="Zona horaria"
             description={selectedCountry
-              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CR' ? 'Costa Rica' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : 'el país seleccionado'}`
+              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CR' ? 'Costa Rica' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : selectedCountry === 'UY' ? 'Uruguay' : 'el país seleccionado'}`
               : "Selecciona un país primero"}
             {...form.getInputProps("timezone")}
             disabled={!isEditing || !selectedCountry}
@@ -98,6 +99,7 @@ export default function ContactTab({
               { value: "VES", label: "VES - Bolívar venezolano" },
               { value: "PAB", label: "PAB - Balboa panameño" },
               { value: "CAD", label: "CAD - Dólar canadiense" },
+              { value: "UYU", label: "UYU - Peso uruguayo" },
             ]}
           />
           <TextInput

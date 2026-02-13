@@ -333,6 +333,7 @@ export default function MultiBookingWizard() {
             employees={employees}
             dates={dates}
             times={times}
+            currency={organization?.currency}
           />
         );
       default:

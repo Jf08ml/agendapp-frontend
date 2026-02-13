@@ -11,6 +11,7 @@ const DEFAULT_LOCALE_BY_CURRENCY: Record<string, string> = {
   VES: "es-VE",
   PAB: "es-PA",
   CAD: "en-CA",
+  UYU: "es-UY",
 };
 
 export const formatCurrency = (
