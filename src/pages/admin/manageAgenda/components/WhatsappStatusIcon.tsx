@@ -46,6 +46,8 @@ export interface WhatsappStatusIconProps {
   size?: Size; // default: "sm"
   ariaLabel?: string;
   disabled?: boolean;
+  /** Muestra el icono gris con mensaje "no disponible en tu plan" */
+  blocked?: boolean;
 
   // === controles del banner "bandera" ===
   /** ms visibilidad al cambiar de estado (ej. cuando se estabiliza en ready) */
@@ -177,6 +179,7 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
   size = "sm",
   ariaLabel = "Estado de WhatsApp",
   disabled,
+  blocked,
 
   // banner flags
   flagShowOnChangeMs = 2400,
@@ -184,7 +187,7 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
 }) => {
   if (disabled) return null;
 
-  const ui = useUi(code);
+  const ui = useUi(blocked ? "" : code);
   const isReady = code === "ready";
   const actionIconSize = SIZES[size];
   const dotSize = DOTS[size];
@@ -257,9 +260,9 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
             inline
             size={dotSize}
             offset={3}
-            color={ui.dot}
-            processing={ui.pulse}
-            disabled={!code}
+            color={blocked ? "gray" : ui.dot}
+            processing={!blocked && ui.pulse}
+            disabled={blocked || !code}
           >
             <ActionIcon
               variant="subtle"
@@ -268,18 +271,30 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
               onClick={
                 trigger === "click" ? (e) => e.preventDefault() : undefined
               }
-              style={
-                ui.pulse
+              style={{
+                ...(blocked ? { opacity: 0.45, cursor: "default" } : {}),
+                ...(ui.pulse && !blocked
                   ? { animation: "wa-pulse 1.2s ease-in-out infinite" }
-                  : undefined
-              }
+                  : {}),
+              }}
             >
-              {code && ui.iconAlt ? ui.iconAlt : <IoLogoWhatsapp />}
+              <IoLogoWhatsapp />
             </ActionIcon>
           </Indicator>
         </Popover.Target>
 
         <Popover.Dropdown>
+          {blocked ? (
+            <Stack gap={4} miw={0}>
+              <Text size="xs" fw={700} c="dimmed">
+                WhatsApp no disponible
+              </Text>
+              <Text size="xs" c="dimmed">
+                Tu plan actual no incluye integración con WhatsApp. Mejora tu
+                plan para activar esta función.
+              </Text>
+            </Stack>
+          ) : (
           <Stack gap="xs" miw={0}>
             <Group gap={8} align="center">
               <Indicator inline size={8} color={ui.dot} processing={ui.pulse}>
@@ -327,6 +342,7 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
               </Group>
             )}
           </Stack>
+          )}
         </Popover.Dropdown>
       </Popover>
 
@@ -338,7 +354,7 @@ const WhatsappStatusIcon: React.FC<WhatsappStatusIconProps> = ({
         style={{ zIndex: 5,width: "300px" }}
       >
         <Transition
-          mounted={flagOpen}
+          mounted={flagOpen && !blocked}
           transition="slide-down"
           duration={220}
           timingFunction="ease"

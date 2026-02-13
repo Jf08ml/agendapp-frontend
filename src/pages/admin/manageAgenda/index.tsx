@@ -997,6 +997,7 @@ const ScheduleView: React.FC = () => {
           onConfigure={() => navigate("/gestionar-whatsapp")}
           trigger="click"
           size="xs"
+          blocked={organization?.planLimits?.whatsappIntegration === false}
         />
 
         {/* Derecha: contador + quick actions */}
