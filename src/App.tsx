@@ -20,10 +20,11 @@ import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector } from "react-redux";
 import { RootState } from "./app/store";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
+import { extractTenantFromHost } from "./utils/domainUtils";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
@@ -55,6 +56,8 @@ function AppContent() {
   const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
   const hasRedirected = useRef(false);
+  const domainInfo = useMemo(() => extractTenantFromHost(), []);
+  const isSignupDomain = domainInfo.type === "signup";
 
   // Branding dinámico
   const color = organization?.branding?.primaryColor || "#DE739E";
@@ -141,8 +144,8 @@ function AppContent() {
     void requestNotificationPermission();
   }, [isAuthenticated, userId]);
 
-  // Loader mientras carga la organización/branding
-  if (loading || !organization) {
+  // Loader mientras carga la organización/branding (no aplica para signup domain)
+  if (!isSignupDomain && (loading || !organization)) {
     return (
       <CustomLoader
         loadingText={`Cargando ${organization?.name || "organización"}...`}
