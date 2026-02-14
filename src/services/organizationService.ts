@@ -107,7 +107,7 @@ export interface Organization {
   reservationDepositPercentage?: number;
   welcomeTitle?: string;
   welcomeDescription?: string;
-  homeLayout?: "modern" | "minimal" | "cards";
+  homeLayout?: "modern" | "minimal" | "cards" | "landing";
   reminderSettings?: ReminderSettings;
   cancellationPolicy?: CancellationPolicy;
   currency?: string;

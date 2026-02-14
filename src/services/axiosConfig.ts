@@ -212,9 +212,6 @@ const apiReservation: AxiosInstance = createAxiosInstance(
 const apiNotification: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/notifications`
 );
-const apiPayments: AxiosInstance = createAxiosInstance(
-  `${API_BASE_URL}/payments`
-);
 const apiPackage: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/packages`
 );
@@ -241,7 +238,6 @@ export {
   apiCron,
   apiReservation,
   apiNotification,
-  apiPayments,
   apiPackage,
   apiPackagePublic,
   apiPlansPublic,

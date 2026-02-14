@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode, useEffect, useState } from "react";
-import { Button, Card, Group, Stack, Text, Title, Badge, Modal, List } from "@mantine/core";
-import { apiGeneral, apiPlansPublic } from "../../services/axiosConfig";
-import { createMembershipCheckout } from "../../services/paymentsService";
-import { getPublicBillingInfo, PublicBillingInfo } from "../../services/platformBillingService";
+import { Button, Card, Group, Stack, Text, Title, Badge, List } from "@mantine/core";
+import { apiPlansPublic } from "../../services/axiosConfig";
+import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
 
 interface PlanPublic {
   currency: ReactNode;
@@ -16,37 +15,19 @@ interface PlanPublic {
   characteristics: string[];
   limits: Record<string, any>;
   price?: number;
-  prices?: { USD?: number; COP?: number };
 }
 
 export default function MembershipPlans() {
   const [plans, setPlans] = useState<PlanPublic[]>([]);
-  const [orgId, setOrgId] = useState<string>("");
-  const [billing, setBilling] = useState<PublicBillingInfo | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: number } | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [plansRes, orgRes, billingRes] = await Promise.all([
-        apiPlansPublic.get("/public"),
-        apiGeneral.get("/organization-config"),
-        getPublicBillingInfo(),
-      ]);
+      const plansRes = await apiPlansPublic.get("/public");
       setPlans(plansRes.data?.data || []);
-      setOrgId(orgRes.data._id);
-      setBilling(billingRes);
     })();
   }, []);
-
-  const startCheckout = async (planSlug: string) => {
-    if (!orgId) return;
-    const { checkoutUrl } = await createMembershipCheckout({
-      organizationId: orgId,
-      planSlug,
-      currency: "USD",
-    });
-    window.location.href = checkoutUrl;
-  };
 
   return (
     <Stack align="center" mt="xl" maw={1100} mx="auto">
@@ -68,43 +49,27 @@ export default function MembershipPlans() {
                   <List.Item key={i}>{c}</List.Item>
                 ))}
               </List>
-              <Group>
-                <Button onClick={() => startCheckout(p.slug)}>Pagar con tarjeta (USD)</Button>
-                <Button variant="light" onClick={() => setTransferOpen(true)}>
-                  Transferencia (COP)
-                </Button>
-              </Group>
+              <Button
+                variant="light"
+                onClick={() => {
+                  setSelectedPlan({ name: p.displayName, price: p.price || 0 });
+                  setTransferOpen(true);
+                }}
+              >
+                Pagar por transferencia
+              </Button>
             </Stack>
           </Card>
         ))}
       </Group>
 
-      <Modal opened={transferOpen} onClose={() => setTransferOpen(false)} title="Pago por transferencia (COP)" centered>
-        {billing ? (
-          <Stack>
-            {billing.copTransfers.accounts.length === 0 ? (
-              <Text c="dimmed">Pronto habilitaremos los datos para transferencia.</Text>
-            ) : (
-              billing.copTransfers.accounts.map((a, idx) => (
-                <Card key={idx} withBorder>
-                  <Text fw={600}>{a.label}</Text>
-                  <Text>Nombre: {a.accountName}</Text>
-                  {a.bank ? <Text>Banco: {a.bank}</Text> : null}
-                  <Text>Número: {a.accountNumber}</Text>
-                </Card>
-              ))
-            )}
-            {billing.copTransfers.whatsapp ? (
-              <Text>
-                Soporte por WhatsApp: <b>{billing.copTransfers.whatsapp}</b>
-              </Text>
-            ) : null}
-            {billing.copTransfers.note ? <Text c="dimmed">{billing.copTransfers.note}</Text> : null}
-          </Stack>
-        ) : (
-          <Text c="dimmed">Cargando información...</Text>
-        )}
-      </Modal>
+      <PaymentMethodsModal
+        opened={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        membership={null}
+        planName={selectedPlan?.name}
+        planPrice={selectedPlan?.price}
+      />
     </Stack>
   );
 }

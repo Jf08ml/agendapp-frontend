@@ -29,12 +29,8 @@ import {
 } from "../../services/membershipService";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
 import { apiPlansPublic } from "../../services/axiosConfig";
-import { createMembershipCheckout, getPaymentHistory, PaymentSession } from "../../services/paymentsService";
 import { IoAlertCircle } from "react-icons/io5";
 import { BiCalendar, BiCreditCard, BiX } from "react-icons/bi";
-import { CgCreditCard } from "react-icons/cg";
-import { notifications } from "@mantine/notifications";
-import { Link } from "react-router-dom";
 
 export default function MyMembership() {
   const [membership, setMembership] = useState<Membership | null>(null);
@@ -45,7 +41,6 @@ export default function MyMembership() {
   const [plansError, setPlansError] = useState(false);
   const [transferOpened, setTransferOpened] = useState(false);
   const [transferPlan, setTransferPlan] = useState<{ name: string; amount: number } | null>(null);
-  const [lastPayment, setLastPayment] = useState<PaymentSession | null>(null);
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
@@ -59,16 +54,12 @@ export default function MyMembership() {
 
     setLoading(true);
     try {
-      const [membershipData, statusData, paymentHistory] = await Promise.all([
+      const [membershipData, statusData] = await Promise.all([
         getCurrentMembership(organization._id),
         getMembershipStatus(organization._id),
-        getPaymentHistory({ organizationId: organization._id, limit: 1 }),
       ]);
       setMembership(membershipData);
       setStatus(statusData);
-      if (paymentHistory && paymentHistory.length > 0) {
-        setLastPayment(paymentHistory[0]);
-      }
     } catch (error) {
       console.error("Error al cargar membresía:", error);
     } finally {
@@ -77,7 +68,6 @@ export default function MyMembership() {
   };
 
   useEffect(() => {
-    // Cargar planes públicos (usando instancia sin auth para evitar bloqueos por token)
     (async () => {
       try {
         setPlansError(false);
@@ -126,24 +116,6 @@ export default function MyMembership() {
   }
 
   if (!membership) {
-    const startUSDCheckout = async (planSlug: string) => {
-      if (!organization?._id) return;
-      try {
-        const { checkoutUrl } = await createMembershipCheckout({
-          organizationId: organization._id,
-          planSlug,
-          currency: "USD",
-        });
-        window.location.href = checkoutUrl;
-      } catch (error: any) {
-        notifications.show({
-          title: "No se pudo iniciar el pago",
-          message: error.response?.data?.message || "Intenta de nuevo",
-          color: "red",
-        });
-      }
-    };
-
     return (
       <Container size="lg" py="xl">
         <Stack gap="xl">
@@ -193,13 +165,10 @@ export default function MyMembership() {
                       <Text fw={700} size="lg">
                         ${p.price} {p.currency}
                       </Text>
-                      <Group>
-                        <Button onClick={() => startUSDCheckout(p.slug)} leftSection={<CgCreditCard size={18} />}>Pagar con tarjeta</Button>
-                        <Button variant="light" onClick={() => {
-                          setTransferPlan({ name: p.displayName, amount: p.price });
-                          setTransferOpened(true);
-                        }}>Transferencia (COP)</Button>
-                      </Group>
+                      <Button variant="light" onClick={() => {
+                        setTransferPlan({ name: p.displayName, amount: p.price });
+                        setTransferOpened(true);
+                      }}>Pagar por transferencia</Button>
                     </Stack>
                   </Card>
                 </Grid.Col>
@@ -240,7 +209,6 @@ export default function MyMembership() {
             </Badge>
             <Button
               size="lg"
-              leftSection={<CgCreditCard size={20} />}
               onClick={() => setPaymentModalOpened(true)}
               variant="filled"
               color="blue"
@@ -379,76 +347,6 @@ export default function MyMembership() {
               </Grid.Col>
             ))}
           </Grid>
-        </Paper>
-
-        {/* Historial de Pagos */}
-        <Paper withBorder p="lg" radius="md">
-          <Group justify="space-between" mb="md">
-            <Text size="lg" fw={600}>
-              Historial de Pagos
-            </Text>
-            <Button variant="light" size="sm" component={Link} to="/payment-history">
-              Ver Historial Completo
-            </Button>
-          </Group>
-          
-          {lastPayment ? (
-            <Card withBorder padding="md" radius="md" bg="#f8f9fa">
-              <Stack gap="sm">
-                <Group justify="space-between">
-                  <Text size="sm" fw={500}>
-                    Último Pago Registrado
-                  </Text>
-                  <Badge 
-                    color={lastPayment.status === "succeeded" ? "green" : lastPayment.status === "failed" ? "red" : "blue"}
-                    variant="filled"
-                  >
-                    {lastPayment.status === "succeeded" ? "✓ Exitoso" : lastPayment.status === "failed" ? "✗ Fallido" : "Pendiente"}
-                  </Badge>
-                </Group>
-
-                <Divider />
-
-                <Grid>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text size="xs" c="dimmed">
-                      Fecha
-                    </Text>
-                    <Text size="sm" fw={500}>
-                      {new Date(lastPayment.createdAt).toLocaleDateString(
-                        "es-CO",
-                        {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        }
-                      )}
-                    </Text>
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text size="xs" c="dimmed">
-                      Monto
-                    </Text>
-                    <Text size="sm" fw={500}>
-                      {lastPayment.amount ? `$${lastPayment.amount}` : "-"}
-                    </Text>
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <Text size="xs" c="dimmed">
-                      Procesado
-                    </Text>
-                    <Badge size="sm" color={lastPayment.processed ? "green" : "gray"}>
-                      {lastPayment.processed ? "✓ Sí" : "No"}
-                    </Badge>
-                  </Grid.Col>
-                </Grid>
-              </Stack>
-            </Card>
-          ) : (
-            <Alert icon={<IoAlertCircle size={16} />} color="gray">
-              <Text size="sm">No hay pagos registrados aún</Text>
-            </Alert>
-          )}
         </Paper>
 
         {/* Límites del Plan */}

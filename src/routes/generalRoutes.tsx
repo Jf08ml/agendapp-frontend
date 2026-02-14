@@ -17,15 +17,14 @@ import Home from "../pages/Home";
 import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminManagement from "../pages/superadmin/SuperadminManagement";
+import SuperadminOrganizationEdit from "../pages/superadmin/SuperadminOrganizationEdit";
 
 import MyMembership from "../pages/admin/MyMembership";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 import PublicCancelPage from "../pages/public/PublicCancelPage";
 import WhatsappTemplateEditor from "../pages/admin/WhatsappTemplateEditor";
-import PaymentSuccess from "../pages/public/PaymentSuccess";
 import MembershipPlans from "../pages/public/MembershipPlans";
-import PaymentHistory from "../pages/admin/PaymentHistory";
 import CampaignList from "../pages/admin/campaigns/CampaignList";
 import CampaignWizard from "../pages/admin/campaigns/CampaignWizard";
 import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
@@ -46,14 +45,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Planes",
       description: "Elige y paga tu plan de membresía",
-    },
-  },
-  {
-    path: "/payment/success",
-    component: PaymentSuccess,
-    MediaMetadata: {
-      title: "Pago exitoso",
-      description: "Verificación de pago de membresía",
     },
   },
   {
@@ -265,19 +256,6 @@ const generalRoutes = [
       description: "Ver detalles de tu membresía y plan",
     },
   },
-  {
-    path: "/payment-history",
-    component: (props: JSX.IntrinsicAttributes) => (
-      <ProtectedRoute>
-        <PaymentHistory {...props} />
-      </ProtectedRoute>
-    ),
-    MediaMetadata: {
-      title: "Historial de Pagos",
-      description: "Eventos recientes del proveedor de pagos",
-    },
-  },
-
   // Campaign routes
   {
     path: "/admin/campaigns",
@@ -325,6 +303,16 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Panel de Superadmin",
       description: "Administra organizaciones y membresías.",
+    },
+  },
+  {
+    path: "/superadmin/organizaciones/:id",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <SuperadminOrganizationEdit {...props} />
+    ),
+    MediaMetadata: {
+      title: "Editar Organización",
+      description: "Edita todos los campos de una organización.",
     },
   },
 ];

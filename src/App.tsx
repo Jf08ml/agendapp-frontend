@@ -20,13 +20,11 @@ import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector } from "react-redux";
 import { RootState } from "./app/store";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 
-import { PaymentMethodsModal } from "./components/PaymentMethodsModal";
-import { getCurrentMembership, Membership } from "./services/membershipService";
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
 // Función para convertir la clave VAPID de base64url a Uint8Array
@@ -56,10 +54,6 @@ function AppContent() {
   );
   const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
-  const [paymentModalOpened, setPaymentModalOpened] = useState(false);
-  const [currentMembership, setCurrentMembership] = useState<Membership | null>(
-    null
-  );
   const hasRedirected = useRef(false);
 
   // Branding dinámico
@@ -86,22 +80,6 @@ function AppContent() {
       navigate("/gestionar-agenda", { replace: true });
     }
   }, [isAuthenticated, location.pathname, navigate]);
-
-  // Cargar membresía actual
-  useEffect(() => {
-    const loadMembership = async () => {
-      if (organization?._id) {
-        try {
-          const membership = await getCurrentMembership(organization._id);
-          setCurrentMembership(membership);
-        } catch (error) {
-          console.error("Error al cargar membresía:", error);
-        }
-      }
-    };
-
-    void loadMembership();
-  }, [organization?._id]);
 
   // Escuchar eventos de membresía y sesión
   useEffect(() => {
@@ -258,12 +236,6 @@ function AppContent() {
         </AppShell.Footer>
       </AppShell>
 
-      {/* Modal de pago */}
-      <PaymentMethodsModal
-        opened={paymentModalOpened}
-        onClose={() => setPaymentModalOpened(false)}
-        membership={currentMembership}
-      />
     </>
   );
 }

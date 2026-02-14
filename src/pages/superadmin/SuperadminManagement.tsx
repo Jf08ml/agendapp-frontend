@@ -20,49 +20,29 @@ import {
   NumberInput,
   Textarea,
   Alert,
-  Switch,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import {
   getOrganizations,
   Organization,
-  createOrganization,
-  updateOrganization,
 } from "../../services/organizationService";
-import { getCurrentMembership, Membership, getAllPlans, Plan } from "../../services/membershipService";
+import { getAllMemberships, Membership, getAllPlans, Plan } from "../../services/membershipService";
 import { apiGeneral } from "../../services/axiosConfig";
 import { notifications } from "@mantine/notifications";
 import { BiEdit, BiCreditCard, BiRefresh } from "react-icons/bi";
 import { GrOrganization } from "react-icons/gr";
 import { FaUsers } from "react-icons/fa";
 import { IoAlertCircle } from "react-icons/io5";
-
-const EMPTY_ORG_FORM = {
-  name: "",
-  email: "",
-  phoneNumber: "",
-  password: "",
-  address: "",
-  location: { lat: 0, lng: 0 },
-  timezone: "America/Bogota",
-  default_country: "CO",
-  isActive: true,
-  hasAccessBlocked: true,
-};
+import { useNavigate } from "react-router-dom";
 
 export default function SuperadminManagement() {
+  const navigate = useNavigate();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [memberships, setMemberships] = useState<Map<string, Membership>>(new Map());
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<string | null>("organizations");
-
-  // Modal de organización
-  const [orgModalOpened, setOrgModalOpened] = useState(false);
-  const [selectedOrgForEdit, setSelectedOrgForEdit] = useState<Organization | null>(null);
-  const [orgForm, setOrgForm] = useState(EMPTY_ORG_FORM);
-  const [savingOrg, setSavingOrg] = useState(false);
 
   // Modal de membresía
   const [membershipModalOpened, setMembershipModalOpened] = useState(false);
@@ -83,29 +63,25 @@ export default function SuperadminManagement() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [orgs, plansData] = await Promise.all([
+      const [orgs, plansData, allMemberships] = await Promise.all([
         getOrganizations(),
         getAllPlans(),
+        getAllMemberships(),
       ]);
       setOrganizations(orgs || []);
       setPlans(plansData || []);
 
-      // Cargar membresías para cada organización
+      // Mapear membresías por organizationId (una sola request)
       const membershipMap = new Map<string, Membership>();
-      await Promise.all(
-        (orgs || []).map(async (org) => {
-          if (org._id) {
-            try {
-              const membership = await getCurrentMembership(org._id);
-              if (membership) {
-                membershipMap.set(org._id, membership);
-              }
-            } catch (e) {
-              console.error(`Error cargando membresía para ${org._id}:`, e);
-            }
-          }
-        })
-      );
+      for (const m of (allMemberships || [])) {
+        // organizationId viene poblado como objeto o como string
+        const orgId = typeof m.organizationId === "object"
+          ? (m.organizationId as any)?._id
+          : m.organizationId;
+        if (orgId) {
+          membershipMap.set(orgId, m);
+        }
+      }
       setMemberships(membershipMap);
     } catch (error) {
       console.error("Error al cargar datos:", error);
@@ -186,93 +162,6 @@ export default function SuperadminManagement() {
       });
     }
     setMembershipModalOpened(true);
-  };
-
-  const handleOpenOrgModal = (org?: Organization) => {
-    if (org) {
-      // Editar organización existente
-      setSelectedOrgForEdit(org);
-      setOrgForm({
-        name: org.name || "",
-        email: org.email || "",
-        phoneNumber: org.phoneNumber || "",
-        password: "", // No pre-llenar password por seguridad
-        address: org.address || "",
-        location: org.location || { lat: 0, lng: 0 },
-        timezone: org.timezone || "America/Bogota",
-        default_country: org.default_country || "CO",
-        isActive: org.isActive !== false,
-        hasAccessBlocked: org.hasAccessBlocked ?? true,
-      });
-    } else {
-      // Nueva organización
-      setSelectedOrgForEdit(null);
-      setOrgForm(EMPTY_ORG_FORM);
-    }
-    setOrgModalOpened(true);
-  };
-
-  const handleSaveOrg = async () => {
-    setSavingOrg(true);
-    try {
-      if (selectedOrgForEdit?._id) {
-        // Actualizar organización existente
-        const updateData: Partial<Organization> & { hasAccessBlocked?: boolean } = {
-          name: orgForm.name,
-          email: orgForm.email,
-          phoneNumber: orgForm.phoneNumber,
-          address: orgForm.address,
-          location: orgForm.location,
-          timezone: orgForm.timezone,
-          default_country: orgForm.default_country,
-          isActive: orgForm.isActive,
-          hasAccessBlocked: orgForm.hasAccessBlocked,
-        };
-        // Solo incluir password si se proporcionó uno nuevo
-        if (orgForm.password) {
-          updateData.password = orgForm.password;
-        }
-        await updateOrganization(selectedOrgForEdit._id, updateData);
-        notifications.show({
-          title: "Éxito",
-          message: "Organización actualizada correctamente",
-          color: "green",
-        });
-      } else {
-        // Crear nueva organización
-        if (!orgForm.password) {
-          notifications.show({
-            title: "Error",
-            message: "La contraseña es requerida para nuevas organizaciones",
-            color: "red",
-          });
-          return;
-        }
-        await createOrganization({
-          ...orgForm,
-          role: "organization",
-        } as Organization);
-        notifications.show({
-          title: "Éxito",
-          message: "Organización creada correctamente",
-          color: "green",
-        });
-      }
-
-      setOrgModalOpened(false);
-      setSelectedOrgForEdit(null);
-      setOrgForm(EMPTY_ORG_FORM);
-      fetchData();
-    } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      notifications.show({
-        title: "Error",
-        message: err.response?.data?.message || "No se pudo guardar la organización",
-        color: "red",
-      });
-    } finally {
-      setSavingOrg(false);
-    }
   };
 
   const handleSaveMembership = async () => {
@@ -409,7 +298,7 @@ export default function SuperadminManagement() {
                     onChange={(e) => setSearchTerm(e.currentTarget.value)}
                     style={{ flex: 1 }}
                   />
-                  <Button onClick={() => handleOpenOrgModal()}>
+                  <Button onClick={() => navigate("/superadmin/organizaciones/nueva")}>
                     Nueva organización
                   </Button>
                 </Group>
@@ -466,7 +355,7 @@ export default function SuperadminManagement() {
                                   <ActionIcon
                                     variant="light"
                                     color="blue"
-                                    onClick={() => handleOpenOrgModal(org)}
+                                    onClick={() => navigate(`/superadmin/organizaciones/${org._id}`)}
                                   >
                                     <BiEdit size={16} />
                                   </ActionIcon>
@@ -564,7 +453,6 @@ export default function SuperadminManagement() {
                 }
                 data={[
                   { value: "manual", label: "Pago manual / Transferencia" },
-                  { value: "polar", label: "Polar (tarjeta)" },
                 ]}
               />
 
@@ -612,133 +500,6 @@ export default function SuperadminManagement() {
           )}
         </Modal>
 
-        {/* Modal de organización */}
-        <Modal
-          opened={orgModalOpened}
-          onClose={() => !savingOrg && setOrgModalOpened(false)}
-          title={
-            selectedOrgForEdit
-              ? "Editar organización"
-              : "Nueva organización"
-          }
-          size="lg"
-        >
-          <Stack gap="md">
-            <TextInput
-              label="Nombre"
-              placeholder="Nombre de la organización"
-              value={orgForm.name}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, name: e.currentTarget.value })
-              }
-              required
-            />
-
-            <TextInput
-              label="Email"
-              placeholder="email@ejemplo.com"
-              type="email"
-              value={orgForm.email}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, email: e.currentTarget.value })
-              }
-              required
-            />
-
-            <TextInput
-              label="Teléfono"
-              placeholder="+573001234567"
-              value={orgForm.phoneNumber}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, phoneNumber: e.currentTarget.value })
-              }
-              required
-            />
-
-            <TextInput
-              label="Contraseña"
-              placeholder={
-                selectedOrgForEdit
-                  ? "Dejar vacío para mantener la actual"
-                  : "Contraseña"
-              }
-              type="password"
-              value={orgForm.password}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, password: e.currentTarget.value })
-              }
-              required={!selectedOrgForEdit}
-            />
-
-            <TextInput
-              label="Dirección"
-              placeholder="Dirección física"
-              value={orgForm.address}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, address: e.currentTarget.value })
-              }
-            />
-
-            <Group grow>
-              <Select
-                label="Zona horaria"
-                value={orgForm.timezone}
-                onChange={(value) =>
-                  setOrgForm({ ...orgForm, timezone: value || "America/Bogota" })
-                }
-                data={[
-                  { value: "America/Bogota", label: "Colombia (UTC-5)" },
-                  { value: "America/Mexico_City", label: "México (UTC-6)" },
-                  { value: "America/Lima", label: "Perú (UTC-5)" },
-                  { value: "America/Argentina/Buenos_Aires", label: "Argentina (UTC-3)" },
-                  { value: "America/Santiago", label: "Chile (UTC-3)" },
-                ]}
-              />
-
-              <Select
-                label="País por defecto"
-                value={orgForm.default_country}
-                onChange={(value) =>
-                  setOrgForm({ ...orgForm, default_country: value || "CO" })
-                }
-                data={[
-                  { value: "CO", label: "Colombia" },
-                  { value: "MX", label: "México" },
-                  { value: "PE", label: "Perú" },
-                  { value: "AR", label: "Argentina" },
-                  { value: "CL", label: "Chile" },
-                ]}
-              />
-            </Group>
-
-            <Alert icon={<IoAlertCircle size={16} />} color="blue">
-              La ubicación (lat/lng) puede configurarse después desde el panel de administración
-            </Alert>
-
-            <Switch
-              label="Acceso bloqueado"
-              description="Bloquea el acceso a la plataforma hasta que se active un plan"
-              checked={orgForm.hasAccessBlocked}
-              onChange={(e) =>
-                setOrgForm({ ...orgForm, hasAccessBlocked: e.currentTarget.checked })
-              }
-              color="red"
-            />
-
-            <Group justify="end" mt="md">
-              <Button
-                variant="light"
-                onClick={() => setOrgModalOpened(false)}
-                disabled={savingOrg}
-              >
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveOrg} loading={savingOrg}>
-                {selectedOrgForEdit ? "Actualizar" : "Crear"} organización
-              </Button>
-            </Group>
-          </Stack>
-        </Modal>
       </Stack>
     </Container>
   );
