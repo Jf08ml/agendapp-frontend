@@ -31,7 +31,9 @@ const refreshAxios = axios.create({ baseURL: API_BASE_URL });
 
 const addAuthHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
-    // El backend resuelve tenant desde Host/x-forwarded-host automáticamente
+    // Enviar hostname del tenant para que el backend resuelva la organización
+    config.headers["X-Tenant-Domain"] = window.location.hostname;
+
     // En dev, enviar slug como header para override
     if (import.meta.env.DEV) {
       // Leer de URL (?slug=) y persistir en localStorage para navegación interna
@@ -107,8 +109,10 @@ const addAuthHeader = (api: AxiosInstance) => {
 };
 
 const addNoAuthInterceptor = (api: AxiosInstance) => {
-  // No auth token, pero en dev enviar slug para resolver tenant
+  // No auth token, pero enviar hostname del tenant
   api.interceptors.request.use((config) => {
+    config.headers["X-Tenant-Domain"] = window.location.hostname;
+
     if (import.meta.env.DEV) {
       const urlParams = new URLSearchParams(window.location.search);
       const urlSlug = urlParams.get("slug");
