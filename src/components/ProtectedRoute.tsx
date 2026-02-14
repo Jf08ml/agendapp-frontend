@@ -16,8 +16,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login-admin" />;
   }
 
-  // Redirigir a my-membership si el servicio está bloqueado
-  if (organization?.hasAccessBlocked && location.pathname !== "/my-membership") {
+  // Redirigir a my-membership si el acceso está bloqueado (suspended/cancelled)
+  // past_due NO redirige: puede consultar datos (read-only), banner se muestra en App.tsx
+  const blockedStatuses = ["suspended", "cancelled"];
+  const isMembershipBlocked =
+    organization?.hasAccessBlocked ||
+    blockedStatuses.includes(organization?.membershipStatus || "");
+
+  if (isMembershipBlocked && location.pathname !== "/my-membership") {
     return <Navigate to="/my-membership" />;
   }
 

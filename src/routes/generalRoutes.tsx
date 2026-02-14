@@ -29,6 +29,8 @@ import CampaignList from "../pages/admin/campaigns/CampaignList";
 import CampaignWizard from "../pages/admin/campaigns/CampaignWizard";
 import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
 import ManagePackages from "../pages/admin/managePackages";
+import SignupPage from "../pages/public/SignupPage";
+import ExchangePage from "../pages/public/ExchangePage";
 
 const generalRoutes = [
   {
@@ -291,6 +293,24 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Detalle de Campaña",
       description: "Ver detalles y métricas de campaña",
+    },
+  },
+
+  // Public registration routes (app.agenditapp.com)
+  {
+    path: "/signup",
+    component: SignupPage,
+    MediaMetadata: {
+      title: "Crear cuenta",
+      description: "Crea tu cuenta en AgenditApp",
+    },
+  },
+  {
+    path: "/exchange",
+    component: ExchangePage,
+    MediaMetadata: {
+      title: "Accediendo",
+      description: "Configurando tu cuenta",
     },
   },
 

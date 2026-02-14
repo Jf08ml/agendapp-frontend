@@ -42,7 +42,7 @@ export interface Membership {
     | "active"
     | "trial"
     | "pending"
-    | "grace_period"
+    | "past_due"
     | "suspended"
     | "cancelled"
     | "expired";
@@ -54,8 +54,8 @@ export interface Membership {
     threeDaysSent: boolean;
     oneDaySent: boolean;
     expirationSent: boolean;
-    gracePeriodDay1Sent: boolean;
-    gracePeriodDay2Sent: boolean;
+    pastDueDay1Sent: boolean;
+    pastDueDay2Sent: boolean;
   };
   lastPaymentDate: string | null;
   lastPaymentAmount: number;
@@ -133,9 +133,9 @@ export const getMembershipStatus = async (
     if (membership.status === "suspended") {
       statusColor = "red";
       statusMessage = "Tu membresía está suspendida. Renueva para reactivar.";
-    } else if (membership.status === "grace_period") {
+    } else if (membership.status === "past_due") {
       statusColor = "orange";
-      statusMessage = `Período de gracia. Renueva hoy para evitar suspensión.`;
+      statusMessage = `Tu plan ha vencido. Solo puedes consultar datos. Renueva para recuperar acceso completo.`;
     } else if (daysUntilExpiration <= 3 && daysUntilExpiration > 0) {
       statusColor = "yellow";
       statusMessage = `Tu membresía vence en ${daysUntilExpiration} días`;
@@ -213,6 +213,12 @@ export const changePlan = async (membershipId: string, planId: string) => {
   return response.data.data;
 };
 
+// Solicitar upgrade a plan pago (self-service)
+export const upgradeMembership = async (planId: string) => {
+  const response = await apiGeneral.post("/memberships/upgrade", { planId });
+  return response.data.data;
+};
+
 // === ENDPOINTS DE SUPERADMIN ===
 
 // Obtener todas las membresías
@@ -261,6 +267,19 @@ export const reactivateMembership = async (
   const response = await apiGeneral.post(
     `/memberships/${membershipId}/reactivate`,
     { newPeriodEnd }
+  );
+  return response.data.data;
+};
+
+// Activar plan pago (superadmin: trial → active con nuevo plan)
+export const activatePlanSuperadmin = async (
+  membershipId: string,
+  planId: string,
+  paymentAmount: number
+) => {
+  const response = await apiGeneral.post(
+    `/memberships/superadmin/${membershipId}/activate`,
+    { planId, paymentAmount }
   );
   return response.data.data;
 };

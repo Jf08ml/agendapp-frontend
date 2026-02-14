@@ -110,6 +110,21 @@ export const showMembershipSuspendedNotification = (message: string) => {
 };
 
 /**
+ * Muestra una notificación de membresía past_due (read-only)
+ */
+export const showMembershipPastDueNotification = (message: string) => {
+  notifications.show({
+    id: "membership-past-due",
+    title: "Plan vencido",
+    message,
+    color: "orange",
+    icon: React.createElement(FiAlertCircle, { size: 20 }),
+    autoClose: 5000,
+    withCloseButton: true,
+  });
+};
+
+/**
  * Registra los listeners para los eventos de sesión
  */
 export const registerSessionEventListeners = () => {
@@ -126,12 +141,22 @@ export const registerSessionEventListeners = () => {
     );
   };
 
+  // Escuchar evento de membresía past_due (read-only)
+  const handleMembershipPastDue = (event: Event) => {
+    const customEvent = event as CustomEvent;
+    showMembershipPastDueNotification(
+      customEvent.detail?.message || "Tu plan ha vencido. Solo puedes consultar tus datos."
+    );
+  };
+
   window.addEventListener("session-expired", handleSessionExpired);
   window.addEventListener("membership-suspended", handleMembershipSuspended);
+  window.addEventListener("membership-past-due", handleMembershipPastDue);
 
   // Limpiar listeners
   return () => {
     window.removeEventListener("session-expired", handleSessionExpired);
     window.removeEventListener("membership-suspended", handleMembershipSuspended);
+    window.removeEventListener("membership-past-due", handleMembershipPastDue);
   };
 };

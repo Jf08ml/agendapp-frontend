@@ -113,7 +113,7 @@ export interface Organization {
   currency?: string;
   // Sistema de membresías
   currentMembershipId?: string;
-  membershipStatus?: "active" | "trial" | "suspended" | "none";
+  membershipStatus?: "active" | "trial" | "past_due" | "suspended" | "cancelled" | "none";
   hasAccessBlocked?: boolean;
   // Límites del plan activo
   planLimits?: {

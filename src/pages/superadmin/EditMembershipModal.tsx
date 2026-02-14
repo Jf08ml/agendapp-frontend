@@ -147,7 +147,7 @@ export function EditMembershipModal({
             { value: "active", label: "Activa" },
             { value: "trial", label: "Prueba" },
             { value: "pending", label: "Pendiente" },
-            { value: "grace_period", label: "Período de Gracia" },
+            { value: "past_due", label: "Vencida (Read-only)" },
             { value: "suspended", label: "Suspendida" },
             { value: "cancelled", label: "Cancelada" },
             { value: "expired", label: "Expirada" },

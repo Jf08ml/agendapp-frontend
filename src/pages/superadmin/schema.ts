@@ -11,7 +11,7 @@ export const superadminSchema = baseSchema.extend({
   isActive: z.boolean().optional(),
   hasAccessBlocked: z.boolean().optional(),
   membershipStatus: z
-    .enum(["active", "trial", "suspended", "none"])
+    .enum(["active", "trial", "past_due", "suspended", "cancelled", "none"])
     .optional(),
   clientIdWhatsapp: z
     .union([z.string(), z.literal(""), z.null(), z.undefined()])

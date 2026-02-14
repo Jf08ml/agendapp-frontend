@@ -220,6 +220,40 @@ function AppContent() {
         </AppShell.Navbar>
 
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
+          {isAuthenticated && organization?.membershipStatus === "trial" && (
+            <div
+              style={{
+                background: "#E3F2FD",
+                borderBottom: "1px solid #90CAF9",
+                padding: "8px 16px",
+                textAlign: "center",
+                fontSize: "14px",
+                color: "#1565C0",
+                cursor: "pointer",
+              }}
+              onClick={() => navigate("/my-membership")}
+            >
+              Estás en período de prueba gratuita.{" "}
+              <strong>Conoce nuestros planes</strong> para seguir usando la plataforma.
+            </div>
+          )}
+          {isAuthenticated && organization?.membershipStatus === "past_due" && (
+            <div
+              style={{
+                background: "#FFF3CD",
+                borderBottom: "1px solid #FFEEBA",
+                padding: "8px 16px",
+                textAlign: "center",
+                fontSize: "14px",
+                color: "#856404",
+                cursor: "pointer",
+              }}
+              onClick={() => navigate("/my-membership")}
+            >
+              Tu plan ha vencido. Solo puedes consultar tus datos.{" "}
+              <strong>Renueva ahora</strong> para recuperar el acceso completo.
+            </div>
+          )}
           <Routes>
             {generalRoutes.map((route, index) => (
               <Route

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 import { AppDispatch, RootState } from "./app/store";
@@ -10,6 +10,7 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
+import { extractTenantFromHost } from "./utils/domainUtils";
 
 declare global {
   interface Window {
@@ -59,11 +60,21 @@ export default function AppWithBranding() {
   const loading = useSelector((state: RootState) => state.organization.loading);
   const hasSentInitialPageView = useRef(false);
 
+  const domainInfo = useMemo(() => extractTenantFromHost(), []);
+
+  // Landing → redirigir a app.agenditapp.com
   useEffect(() => {
-    if (!organization) {
+    if (domainInfo.type === "landing") {
+      window.location.href = "https://app.agenditapp.com";
+    }
+  }, [domainInfo.type]);
+
+  // Solo cargar config de org si estamos en un tenant o custom domain
+  useEffect(() => {
+    if (!organization && (domainInfo.type === "tenant" || domainInfo.type === "custom")) {
       dispatch(fetchOrganizationConfig());
     }
-  }, [dispatch, organization]);
+  }, [dispatch, organization, domainInfo.type]);
 
   // Cambia el <title>
   useEffect(() => {
@@ -152,7 +163,14 @@ export default function AppWithBranding() {
     primaryColor,
   });
 
-  if (loading && !organization)
+  // En signup domain: no loading, no org needed
+  // En landing: redirigiendo
+  if (domainInfo.type === "landing") {
+    return <CustomLoaderHtml loadingText="Redirigiendo..." />;
+  }
+
+  // Solo mostrar loading para tenant/custom (signup no necesita org)
+  if (domainInfo.type !== "signup" && loading && !organization)
     return <CustomLoaderHtml loadingText="Cargando tu espacio..." />;
 
   return (

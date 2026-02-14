@@ -29,10 +29,22 @@ const notifyTokenRefreshFailed = () => {
 // Instancia dedicada para refresh (sin interceptores de auth para evitar deadlock)
 const refreshAxios = axios.create({ baseURL: API_BASE_URL });
 
-const addTenantHeader = (api: AxiosInstance) => {
+const addAuthHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
-    // window.location.hostname: el dominio actual donde está corriendo tu frontend
-    config.headers["X-Tenant-Domain"] = window.location.hostname;
+    // El backend resuelve tenant desde Host/x-forwarded-host automáticamente
+    // En dev, enviar slug como header para override
+    if (import.meta.env.DEV) {
+      // Leer de URL (?slug=) y persistir en localStorage para navegación interna
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlSlug = urlParams.get("slug");
+      if (urlSlug) {
+        localStorage.setItem("app_dev_slug", urlSlug);
+      }
+      const devSlug = urlSlug || localStorage.getItem("app_dev_slug");
+      if (devSlug) {
+        config.headers["X-Dev-Tenant-Slug"] = devSlug;
+      }
+    }
 
     // Agregar token de autenticación si existe
     const token = localStorage.getItem("app_token");
@@ -94,10 +106,20 @@ const addTenantHeader = (api: AxiosInstance) => {
   return api;
 };
 
-const addTenantHeaderWithoutAuth = (api: AxiosInstance) => {
+const addNoAuthInterceptor = (api: AxiosInstance) => {
+  // No auth token, pero en dev enviar slug para resolver tenant
   api.interceptors.request.use((config) => {
-    // Solo agregar el header del tenant, NO el token de autenticación
-    config.headers["X-Tenant-Domain"] = window.location.hostname;
+    if (import.meta.env.DEV) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlSlug = urlParams.get("slug");
+      if (urlSlug) {
+        localStorage.setItem("app_dev_slug", urlSlug);
+      }
+      const devSlug = urlSlug || localStorage.getItem("app_dev_slug");
+      if (devSlug) {
+        config.headers["X-Dev-Tenant-Slug"] = devSlug;
+      }
+    }
     return config;
   });
   return api;
@@ -112,11 +134,37 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         error.response?.status === 403 &&
         error.response?.data?.reason === "membership_suspended"
       ) {
-        // Dispatch de evento personalizado para mostrar modal/notificación
         const event = new CustomEvent("membership-suspended", {
           detail: {
             message: error.response.data.message,
             orgId: error.response.data.orgId,
+          },
+        });
+        window.dispatchEvent(event);
+      }
+
+      // Detectar error 403 por membresía past_due (read-only)
+      if (
+        error.response?.status === 403 &&
+        error.response?.data?.reason === "membership_past_due"
+      ) {
+        const event = new CustomEvent("membership-past-due", {
+          detail: {
+            message: error.response.data.message,
+            data: error.response.data.data,
+          },
+        });
+        window.dispatchEvent(event);
+      }
+
+      // Detectar error 403 por no tener membresía activa
+      if (
+        error.response?.status === 403 &&
+        error.response?.data?.reason === "no_active_membership"
+      ) {
+        const event = new CustomEvent("membership-suspended", {
+          detail: {
+            message: error.response.data.message,
           },
         });
         window.dispatchEvent(event);
@@ -129,6 +177,7 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         localStorage.removeItem("app_userId");
         localStorage.removeItem("app_role");
         localStorage.removeItem("app_token_expires_at");
+        localStorage.removeItem("app_dev_slug");
         
         // Solo redirigir a login si estamos en rutas protegidas
         // No redirigir si estamos en landing, login, o rutas públicas
@@ -162,14 +211,14 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
 
 const createAxiosInstance = (baseURL: string): AxiosInstance => {
   const api = axios.create({ baseURL });
-  addTenantHeader(api);
+  addAuthHeader(api);
   addMembershipInterceptor(api);
   return api;
 };
 
 const createPublicAxiosInstance = (baseURL: string): AxiosInstance => {
   const api = axios.create({ baseURL });
-  addTenantHeaderWithoutAuth(api);
+  addNoAuthInterceptor(api);
   // No agregamos el interceptor de membresía para rutas públicas
   return api;
 };
