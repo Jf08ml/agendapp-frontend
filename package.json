@@ -24,6 +24,7 @@
     "@mantine/hooks": "^7.13.4",
     "@mantine/modals": "^7.13.4",
     "@mantine/notifications": "^7.13.4",
+    "@marsidev/react-turnstile": "^1.4.2",
     "@react-google-maps/api": "^2.20.3",
     "@reduxjs/toolkit": "^2.3.0",
     "@tabler/icons-react": "^3.36.1",

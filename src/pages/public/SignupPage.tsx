@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 import {
   Container,
   Paper,
@@ -48,7 +49,10 @@ const signupSchema = z.object({
     .string()
     .min(3, "Mínimo 3 caracteres")
     .max(63, "Máximo 63 caracteres")
-    .regex(/^[a-z]{3,63}$/, "Solo letras minúsculas, sin números, guiones ni espacios."),
+    .regex(
+      /^[a-z]{3,63}$/,
+      "Solo letras minúsculas, sin números, guiones ni espacios.",
+    ),
   businessName: z.string().min(2, "Mínimo 2 caracteres"),
   ownerName: z.string().min(2, "Mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
@@ -86,10 +90,14 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [turnstileToken, setTurnstileToken] = useState<string>("");
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const tokenResolverRef = useRef<((t: string) => void) | null>(null);
+
   // ✅ Soporte: expanded -> collapsed -> hidden
-  const [supportState, setSupportState] = useState<"expanded" | "collapsed" | "hidden">(
-    "expanded"
-  );
+  const [supportState, setSupportState] = useState<
+    "expanded" | "collapsed" | "hidden"
+  >("expanded");
   const supportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const form = useForm<SignupFormValues>({
@@ -181,6 +189,36 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
+      let token = turnstileToken;
+
+      if (!token && turnstileRef.current) {
+        token = await new Promise<string>((resolve, reject) => {
+          tokenResolverRef.current = resolve;
+
+          // Por seguridad: timeout real
+          const t = setTimeout(() => {
+            tokenResolverRef.current = null;
+            reject(new Error("turnstile_timeout"));
+          }, 8000);
+
+          // envolver resolve para limpiar timeout
+          tokenResolverRef.current = (tok: string) => {
+            clearTimeout(t);
+            resolve(tok);
+          };
+
+          turnstileRef.current?.execute();
+        }).catch(() => "");
+      }
+
+      if (!token) {
+        setError("Verificación de captcha fallida. Intenta de nuevo.");
+        turnstileRef.current?.reset?.();
+        setTurnstileToken("");
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await registerOrganization({
         slug: values.slug.toLowerCase(),
         businessName: values.businessName,
@@ -188,6 +226,7 @@ export default function SignupPage() {
         email: values.email,
         password: values.password,
         phone: values.phone,
+        turnstileToken: token,
       });
 
       notifications.show({
@@ -199,7 +238,7 @@ export default function SignupPage() {
 
       const redirectUrl = getPostSignupRedirectUrl(
         values.slug.toLowerCase(),
-        result.exchangeCode
+        result.exchangeCode,
       );
 
       setTimeout(() => {
@@ -208,18 +247,28 @@ export default function SignupPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const message =
-        axiosErr.response?.data?.message || "Error al crear la cuenta. Intenta de nuevo.";
+        axiosErr.response?.data?.message ||
+        "Error al crear la cuenta. Intenta de nuevo.";
       setError(message);
       setIsSubmitting(false);
+      turnstileRef.current?.reset?.();
+      setTurnstileToken("");
     }
   };
 
   const slugRightSection = () => {
     if (slugStatus === "checking") return <Loader size="xs" />;
     if (slugStatus === "available")
-      return <IconCheck size={16} style={{ color: "var(--mantine-color-green-6)" }} />;
+      return (
+        <IconCheck
+          size={16}
+          style={{ color: "var(--mantine-color-green-6)" }}
+        />
+      );
     if (slugStatus === "taken" || slugStatus === "invalid")
-      return <IconX size={16} style={{ color: "var(--mantine-color-red-6)" }} />;
+      return (
+        <IconX size={16} style={{ color: "var(--mantine-color-red-6)" }} />
+      );
     return null;
   };
 
@@ -312,14 +361,18 @@ export default function SignupPage() {
                     Acceso por enlace
                   </Text>
                   <Text size="xs" c="rgba(255,255,255,0.68)">
-                    Tu negocio tendrá una URL (dominio o subdominio) para entrar al panel.
+                    Tu negocio tendrá una URL (dominio o subdominio) para entrar
+                    al panel.
                   </Text>
                 </Box>
               </Group>
             </Paper>
           </Group>
 
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: "xl", md: 48 }}>
+          <SimpleGrid
+            cols={{ base: 1, md: 2 }}
+            spacing={{ base: "xl", md: 48 }}
+          >
             {/* LEFT */}
             <Box>
               <Title c="white" order={1} style={{ letterSpacing: -0.6 }}>
@@ -331,8 +384,9 @@ export default function SignupPage() {
               </Title>
 
               <Text mt={10} c="rgba(255,255,255,0.72)" maw={520}>
-                Configura tu organización y tu URL. Al finalizar, quedarás dentro de tu panel para
-                empezar a configurar servicios, horarios y reservas.
+                Configura tu organización y tu URL. Al finalizar, quedarás
+                dentro de tu panel para empezar a configurar servicios, horarios
+                y reservas.
               </Text>
 
               <Paper
@@ -359,7 +413,12 @@ export default function SignupPage() {
                       mt={10}
                       spacing={8}
                       icon={
-                        <ThemeIcon radius="xl" size={20} variant="light" color="yellow">
+                        <ThemeIcon
+                          radius="xl"
+                          size={20}
+                          variant="light"
+                          color="yellow"
+                        >
                           <IconArrowRight size={12} />
                         </ThemeIcon>
                       }
@@ -376,7 +435,8 @@ export default function SignupPage() {
                       </List.Item>
                       <List.Item>
                         <Text c="rgba(255,255,255,0.72)">
-                          Empiezas a agendar y a gestionar clientes desde tu panel.
+                          Empiezas a agendar y a gestionar clientes desde tu
+                          panel.
                         </Text>
                       </List.Item>
                     </List>
@@ -386,7 +446,12 @@ export default function SignupPage() {
                 <Divider my="md" opacity={0.25} />
 
                 <Group gap="md" wrap="nowrap" align="flex-start">
-                  <ThemeIcon radius="xl" size={44} variant="light" color="green">
+                  <ThemeIcon
+                    radius="xl"
+                    size={44}
+                    variant="light"
+                    color="green"
+                  >
                     <IconBrandWhatsapp size={22} />
                   </ThemeIcon>
 
@@ -396,8 +461,9 @@ export default function SignupPage() {
                     </Text>
 
                     <Text mt={6} c="rgba(255,255,255,0.72)">
-                      AgenditApp te acompaña en la configuración para que puedas enviar mensajes a tus
-                      clientes desde tu WhatsApp Business y mantener tus citas organizadas.
+                      AgenditApp te acompaña en la configuración para que puedas
+                      enviar mensajes a tus clientes desde tu WhatsApp Business
+                      y mantener tus citas organizadas.
                     </Text>
                   </Box>
                 </Group>
@@ -423,8 +489,8 @@ export default function SignupPage() {
                       Listo para operar
                     </Text>
                     <Text size="sm" mt={4} c="rgba(255,255,255,0.68)">
-                      Al finalizar, tu panel queda activo en tu URL y puedes empezar a configurar
-                      servicios, horarios y reservas.
+                      Al finalizar, tu panel queda activo en tu URL y puedes
+                      empezar a configurar servicios, horarios y reservas.
                     </Text>
                   </Box>
                 </Group>
@@ -460,7 +526,12 @@ export default function SignupPage() {
                 <Box style={{ position: "relative" }}>
                   <Group justify="space-between" align="center">
                     <Group gap={10} wrap="nowrap">
-                      <ThemeIcon radius="xl" size={40} variant="light" color="yellow">
+                      <ThemeIcon
+                        radius="xl"
+                        size={40}
+                        variant="light"
+                        color="yellow"
+                      >
                         <IconBuildingStore size={18} />
                       </ThemeIcon>
                       <Box>
@@ -483,7 +554,10 @@ export default function SignupPage() {
                       }}
                     >
                       <Group gap={8} wrap="nowrap">
-                        <IconArrowRight size={14} style={{ color: "rgba(191,219,254,0.95)" }} />
+                        <IconArrowRight
+                          size={14}
+                          style={{ color: "rgba(191,219,254,0.95)" }}
+                        />
                         <Text size="xs" fw={800} c="rgba(191,219,254,0.95)">
                           1 minuto
                         </Text>
@@ -507,16 +581,25 @@ export default function SignupPage() {
                         </Alert>
                       )}
 
-                      <Text size="xs" c="rgba(255,255,255,0.65)" fw={800} tt="uppercase">
+                      <Text
+                        size="xs"
+                        c="rgba(255,255,255,0.65)"
+                        fw={800}
+                        tt="uppercase"
+                      >
                         Datos del negocio
                       </Text>
 
                       <TextInput
                         leftSection={<IconBuildingStore size={16} />}
-                        label={<RequiredLabel>Nombre del negocio</RequiredLabel>}
+                        label={
+                          <RequiredLabel>Nombre del negocio</RequiredLabel>
+                        }
                         placeholder="Mi Salón de Belleza"
                         value={form.values.businessName}
-                        onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
+                        onChange={(e) =>
+                          handleBusinessNameChange(e.currentTarget.value)
+                        }
                         error={form.errors.businessName}
                         styles={{
                           input: { background: "rgba(255,255,255,0.06)" },
@@ -529,10 +612,13 @@ export default function SignupPage() {
                           label={<RequiredLabel>Dirección web</RequiredLabel>}
                           placeholder="misalon"
                           value={form.values.slug}
-                          onChange={(e) => handleSlugChange(e.currentTarget.value)}
+                          onChange={(e) =>
+                            handleSlugChange(e.currentTarget.value)
+                          }
                           error={
                             form.errors.slug ||
-                            (slugStatus === "taken" && "Este nombre ya está en uso") ||
+                            (slugStatus === "taken" &&
+                              "Este nombre ya está en uso") ||
                             (slugStatus === "invalid" &&
                               "Solo letras minúsculas, sin números ni guiones")
                           }
@@ -557,13 +643,21 @@ export default function SignupPage() {
                               border: "1px solid rgba(255,255,255,0.10)",
                             }}
                           >
-                            <Group justify="space-between" wrap="nowrap" align="center">
+                            <Group
+                              justify="space-between"
+                              wrap="nowrap"
+                              align="center"
+                            >
                               <Group gap={10} wrap="nowrap">
                                 <ThemeIcon
                                   radius="xl"
                                   size={34}
                                   variant="light"
-                                  color={slugStatus === "available" ? "green" : "gray"}
+                                  color={
+                                    slugStatus === "available"
+                                      ? "green"
+                                      : "gray"
+                                  }
                                 >
                                   {slugStatus === "available" ? (
                                     <IconCheck size={18} />
@@ -573,8 +667,14 @@ export default function SignupPage() {
                                 </ThemeIcon>
 
                                 <Box>
-                                  <Text size="xs" fw={800} c="rgba(255,255,255,0.85)">
-                                    {slugStatus === "available" ? "Disponible" : "Tu subdominio"}
+                                  <Text
+                                    size="xs"
+                                    fw={800}
+                                    c="rgba(255,255,255,0.85)"
+                                  >
+                                    {slugStatus === "available"
+                                      ? "Disponible"
+                                      : "Tu subdominio"}
                                   </Text>
                                   <Text size="sm" fw={900} c="white">
                                     {slugHelpText}
@@ -582,7 +682,11 @@ export default function SignupPage() {
                                 </Box>
                               </Group>
 
-                              <Text size="xs" c="rgba(255,255,255,0.60)" visibleFrom="sm">
+                              <Text
+                                size="xs"
+                                c="rgba(255,255,255,0.60)"
+                                visibleFrom="sm"
+                              >
                                 Podrás usar dominio propio más adelante
                               </Text>
                             </Group>
@@ -614,7 +718,12 @@ export default function SignupPage() {
 
                       <Divider my={4} opacity={0.25} />
 
-                      <Text size="xs" c="rgba(255,255,255,0.65)" fw={800} tt="uppercase">
+                      <Text
+                        size="xs"
+                        c="rgba(255,255,255,0.65)"
+                        fw={800}
+                        tt="uppercase"
+                      >
                         Administrador
                       </Text>
 
@@ -659,12 +768,29 @@ export default function SignupPage() {
                         }}
                       />
 
+                      <Box>
+                        <Turnstile
+                          ref={turnstileRef}
+                          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                          options={{ size: "invisible" }}
+                          onSuccess={(token) => {
+                            setTurnstileToken(token);
+                            tokenResolverRef.current?.(token);
+                            tokenResolverRef.current = null;
+                          }}
+                          onExpire={() => setTurnstileToken("")}
+                          onError={() => setTurnstileToken("")}
+                        />
+                      </Box>
+
                       <Button
                         type="submit"
                         fullWidth
                         mt="xs"
                         loading={isSubmitting}
-                        disabled={slugStatus === "taken" || slugStatus === "invalid"}
+                        disabled={
+                          slugStatus === "taken" || slugStatus === "invalid"
+                        }
                         styles={{
                           root: {
                             height: 44,
@@ -689,8 +815,9 @@ export default function SignupPage() {
                         }}
                       >
                         <Text size="xs" c="rgba(255,255,255,0.65)">
-                          Al finalizar, podrás entrar desde el enlace de tu negocio (dominio o
-                          subdominio). Si necesitas ayuda, contáctanos.
+                          Al finalizar, podrás entrar desde el enlace de tu
+                          negocio (dominio o subdominio). Si necesitas ayuda,
+                          contáctanos.
                         </Text>
                       </Paper>
                     </Stack>
@@ -729,7 +856,12 @@ export default function SignupPage() {
             >
               <Group justify="space-between" align="flex-start" wrap="nowrap">
                 <Group gap={10} wrap="nowrap" align="flex-start">
-                  <ThemeIcon radius="xl" size={38} variant="light" color="green">
+                  <ThemeIcon
+                    radius="xl"
+                    size={38}
+                    variant="light"
+                    color="green"
+                  >
                     <IconBrandWhatsapp size={18} />
                   </ThemeIcon>
 
@@ -738,7 +870,8 @@ export default function SignupPage() {
                       ¿Necesitas ayuda?
                     </Text>
                     <Text size="xs" c="rgba(255,255,255,0.72)" mt={2}>
-                      Escríbenos por WhatsApp para dudas, soporte o cualquier inquietud.
+                      Escríbenos por WhatsApp para dudas, soporte o cualquier
+                      inquietud.
                     </Text>
 
                     <Group gap={10} mt={8} wrap="wrap">
