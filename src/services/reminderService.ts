@@ -6,7 +6,7 @@ export const sendOrgReminders = async (
   opts?: { dryRun?: boolean; targetDate?: string }
 ) => {
   const { data } = await apiGeneral.post(
-    `/organizations/${organizationId}/wa/reminders`,
+    `/reminders/organizations/${organizationId}/wa/reminders`,
     {
       dryRun: opts?.dryRun ?? false,
       targetDate: opts?.targetDate,
