@@ -40,6 +40,7 @@ import {
   type CreateMultipleReservationsPayload,
   type Reservation,
 } from "../../services/reservationService";
+import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
 import dayjs from "dayjs";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
@@ -65,6 +66,12 @@ export default function MultiBookingWizard() {
     phone: "",
     birthDate: null as Date | null,
   });
+
+  // 🔁 Recurrencia
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>({
+    type: 'none', intervalWeeks: 1, weekdays: [], endType: 'count', count: 1,
+  });
+  const [seriesPreview, setSeriesPreview] = useState<SeriesPreview | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -110,10 +117,14 @@ export default function MultiBookingWizard() {
   useEffect(() => {
     setDates([]);
     setTimes(null);
+    setRecurrencePattern({ type: 'none', intervalWeeks: 1, weekdays: [], endType: 'count', count: 1 });
+    setSeriesPreview(null);
   }, [selected]);
 
   useEffect(() => {
     setTimes(null);
+    setRecurrencePattern({ type: 'none', intervalWeeks: 1, weekdays: [], endType: 'count', count: 1 });
+    setSeriesPreview(null);
   }, [dates]);
 
   // Scroll al top al cambiar de paso
@@ -183,6 +194,7 @@ export default function MultiBookingWizard() {
       customerDetails,
       organizationId: orgId,
       ...(clientPackageId ? { clientPackageId } : {}),
+      ...(recurrencePattern.type === 'weekly' ? { recurrencePattern } : {}),
     } satisfies CreateMultipleReservationsPayload;
   };
 
@@ -211,7 +223,10 @@ export default function MultiBookingWizard() {
           .filter((id): id is string => !!id);
       }
 
-      const count = (times as MultiServiceBlockSelection).intervals.length;
+      const servicesPerOccurrence = (times as MultiServiceBlockSelection).intervals.length;
+      const isRecurring = recurrencePattern.type === 'weekly';
+      const occurrenceCount = isRecurring && seriesPreview ? seriesPreview.availableCount : 1;
+      const count = servicesPerOccurrence * occurrenceCount;
       const start =
         (times as MultiServiceBlockSelection).startTime ??
         (times as MultiServiceBlockSelection).intervals[0]?.from;
@@ -239,6 +254,8 @@ export default function MultiBookingWizard() {
     setFinishInfo(null);
     setCompleted(false);
     setClientPackageId(null);
+    setRecurrencePattern({ type: 'none', intervalWeeks: 1, weekdays: [], endType: 'count', count: 1 });
+    setSeriesPreview(null);
     setCurrentStep(0);
   };
 
@@ -296,6 +313,10 @@ export default function MultiBookingWizard() {
             dates={dates}
             value={times}
             onChange={setTimes}
+            recurrencePattern={recurrencePattern}
+            onRecurrenceChange={setRecurrencePattern}
+            seriesPreview={seriesPreview}
+            onSeriesPreviewChange={setSeriesPreview}
           />
         );
       case 3:
@@ -334,6 +355,8 @@ export default function MultiBookingWizard() {
             dates={dates}
             times={times}
             currency={organization?.currency}
+            recurrencePattern={recurrencePattern}
+            seriesPreview={seriesPreview}
           />
         );
       default:
@@ -430,10 +453,10 @@ export default function MultiBookingWizard() {
               Todo listo, {finishInfo?.customer ?? "Cliente"} 🎉
             </Title>
             <Text ta="center" c="dimmed" mb="md">
-              {finishInfo?.count ?? 0}{" "}
-              {finishInfo?.count === 1 ? "reserva" : "reservas"} programada
-              {finishInfo && finishInfo.count !== 1 ? "s" : ""} desde{" "}
-              {finishInfo?.dateText ?? "—"}.
+              {recurrencePattern.type === 'weekly' && seriesPreview
+                ? `${seriesPreview.availableCount} citas recurrentes programadas desde ${finishInfo?.dateText ?? "—"}.`
+                : `${finishInfo?.count ?? 0} ${finishInfo?.count === 1 ? "reserva" : "reservas"} programada${finishInfo && finishInfo.count !== 1 ? "s" : ""} desde ${finishInfo?.dateText ?? "—"}.`
+              }
             </Text>
             <Divider my="md" />
 

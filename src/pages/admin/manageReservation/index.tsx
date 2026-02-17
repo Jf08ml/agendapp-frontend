@@ -23,6 +23,7 @@ import {
   Switch,
   Box,
   Divider,
+  Checkbox,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
@@ -32,6 +33,7 @@ import {
   getReservationsByOrganization,
   updateReservation,
   deleteReservation,
+  cancelReservation,
 } from "../../../services/reservationService";
 import {
   getEmployeesByOrganizationId,
@@ -62,7 +64,7 @@ import {
   updateReservationPolicy,
 } from "../../../features/organization/sliceOrganization";
 
-type RowAction = "approve" | "reject" | "delete" | "assign";
+type RowAction = "approve" | "reject" | "delete" | "assign" | "cancel";
 
 const ReservationsList: React.FC = () => {
   const dispatch = useDispatch<any>();
@@ -87,6 +89,13 @@ const ReservationsList: React.FC = () => {
   const [deletingReservationId, setDeletingReservationId] = useState<
     string | null
   >(null);
+  const [deleteAlsoAppointments, setDeleteAlsoAppointments] = useState(true);
+
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [cancellingReservationId, setCancellingReservationId] = useState<
+    string | null
+  >(null);
+  const [cancelNotifyClient, setCancelNotifyClient] = useState(false);
 
   // Modal de detalle de reserva
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -454,24 +463,24 @@ const ReservationsList: React.FC = () => {
 
   const handleDelete = async (reservationId: string) => {
     setDeletingReservationId(reservationId);
+    setDeleteAlsoAppointments(true);
     setDeleteConfirmOpen(true);
   };
 
   const confirmDelete = async () => {
     if (!deletingReservationId) return;
-    
-    // Buscar si es un grupo para mostrar el mensaje correcto
+
     const reservation = reservations.find(r => r._id === deletingReservationId);
     const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
     const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
-    
+
     try {
       setRowBusy(deletingReservationId, "delete");
-      await deleteReservation(deletingReservationId);
-      
+      await deleteReservation(deletingReservationId, { deleteAppointments: deleteAlsoAppointments });
+
       showNotification({
         title: "Eliminada",
-        message: isGroup 
+        message: isGroup
           ? `Grupo de ${groupSize} reservas eliminado correctamente`
           : "Reserva eliminada correctamente",
         color: "green",
@@ -492,6 +501,50 @@ const ReservationsList: React.FC = () => {
       });
     } finally {
       if (deletingReservationId) setRowBusy(deletingReservationId, null);
+    }
+  };
+
+  // Cancelar reserva (soft: cambia status + cancela citas vinculadas)
+  const handleCancelReservation = (reservationId: string) => {
+    setCancellingReservationId(reservationId);
+    setCancelNotifyClient(false);
+    setCancelConfirmOpen(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!cancellingReservationId) return;
+
+    const reservation = reservations.find(r => r._id === cancellingReservationId);
+    const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
+    const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+
+    try {
+      setRowBusy(cancellingReservationId, "cancel");
+      await cancelReservation(cancellingReservationId, { notifyClient: cancelNotifyClient });
+
+      showNotification({
+        title: "Cancelada",
+        message: isGroup
+          ? `Grupo de ${groupSize} reservas cancelado correctamente`
+          : "Reserva cancelada correctamente",
+        color: "orange",
+        position: "top-right",
+        autoClose: 3000,
+      });
+      setCancelConfirmOpen(false);
+      setCancellingReservationId(null);
+      if (organization?._id) await loadPage(organization._id);
+    } catch (err) {
+      console.error(err);
+      showNotification({
+        title: "Error",
+        message: "Error al cancelar la reserva",
+        color: "red",
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      if (cancellingReservationId) setRowBusy(cancellingReservationId, null);
     }
   };
 
@@ -745,6 +798,77 @@ const ReservationsList: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Modal Confirmar cancelación */}
+      <Modal
+        opened={cancelConfirmOpen}
+        onClose={() => {
+          if (!cancellingReservationId || !isRowBusy(cancellingReservationId)) {
+            setCancelConfirmOpen(false);
+            setCancellingReservationId(null);
+          }
+        }}
+        title="Confirmar cancelación"
+        centered
+      >
+        {(() => {
+          const reservation = reservations.find(r => r._id === cancellingReservationId);
+          const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
+          const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
+          const hasAppointments = isGroup
+            ? (groupsMap.get(reservation?.groupId ?? "")?.some(r => r.appointmentId) ?? false)
+            : !!reservation?.appointmentId;
+
+          return (
+            <Stack gap="sm">
+              <Text size="sm">
+                {isGroup ? (
+                  <>
+                    ¿Seguro que deseas cancelar este <strong>grupo de {groupSize} reservas</strong>?
+                    Se cancelarán todas las reservas del grupo.
+                  </>
+                ) : (
+                  <>
+                    ¿Seguro que deseas cancelar esta reserva?
+                  </>
+                )}
+              </Text>
+              {hasAppointments && (
+                <Alert color="orange" variant="light">
+                  <Text size="sm">
+                    Las citas vinculadas también serán canceladas.
+                    Los registros se mantendrán en el historial.
+                  </Text>
+                </Alert>
+              )}
+              <Checkbox
+                label="Notificar al cliente por WhatsApp"
+                checked={cancelNotifyClient}
+                onChange={(e) => setCancelNotifyClient(e.currentTarget.checked)}
+              />
+            </Stack>
+          );
+        })()}
+        <Group mt="md" justify="flex-end">
+          <Button
+            variant="default"
+            onClick={() => {
+              setCancelConfirmOpen(false);
+              setCancellingReservationId(null);
+            }}
+            disabled={!!(cancellingReservationId && isRowBusy(cancellingReservationId))}
+          >
+            Volver
+          </Button>
+          <Button
+            color="orange"
+            onClick={confirmCancel}
+            loading={!!(cancellingReservationId && isRowBusy(cancellingReservationId))}
+          >
+            Cancelar reserva
+          </Button>
+        </Group>
+      </Modal>
+
       {/* Modal Confirmar eliminación */}
       <Modal
         opened={deleteConfirmOpen}
@@ -761,20 +885,33 @@ const ReservationsList: React.FC = () => {
           const reservation = reservations.find(r => r._id === deletingReservationId);
           const isGroup = reservation?.groupId ? groupsMap.has(reservation.groupId) : false;
           const groupSize = isGroup && reservation?.groupId ? groupsMap.get(reservation.groupId)?.length || 0 : 0;
-          
+          const hasAppointments = isGroup
+            ? (groupsMap.get(reservation?.groupId ?? "")?.some(r => r.appointmentId) ?? false)
+            : !!reservation?.appointmentId;
+
           return (
-            <Text size="sm">
-              {isGroup ? (
-                <>
-                  ¿Seguro que deseas eliminar este <strong>grupo de {groupSize} reservas</strong>? 
-                  Se eliminarán todas las reservas asociadas. Esta acción no se puede deshacer.
-                </>
-              ) : (
-                <>
-                  ¿Seguro que deseas eliminar esta reserva? Esta acción no se puede deshacer.
-                </>
+            <Stack gap="sm">
+              <Text size="sm">
+                {isGroup ? (
+                  <>
+                    ¿Seguro que deseas eliminar este <strong>grupo de {groupSize} reservas</strong>?
+                    Se eliminarán permanentemente de la base de datos. Esta acción no se puede deshacer.
+                  </>
+                ) : (
+                  <>
+                    ¿Seguro que deseas eliminar esta reserva? Se eliminará permanentemente. Esta acción no se puede deshacer.
+                  </>
+                )}
+              </Text>
+              {hasAppointments && (
+                <Checkbox
+                  label="También eliminar las citas creadas"
+                  checked={deleteAlsoAppointments}
+                  onChange={(e) => setDeleteAlsoAppointments(e.currentTarget.checked)}
+                  color="red"
+                />
               )}
-            </Text>
+            </Stack>
           );
         })()}
         <Group mt="md" justify="flex-end">
@@ -784,18 +921,14 @@ const ReservationsList: React.FC = () => {
               setDeleteConfirmOpen(false);
               setDeletingReservationId(null);
             }}
-            disabled={
-              !!(deletingReservationId && isRowBusy(deletingReservationId))
-            }
+            disabled={!!(deletingReservationId && isRowBusy(deletingReservationId))}
           >
-            Cancelar
+            Volver
           </Button>
           <Button
             color="red"
             onClick={confirmDelete}
-            loading={
-              !!(deletingReservationId && isRowBusy(deletingReservationId))
-            }
+            loading={!!(deletingReservationId && isRowBusy(deletingReservationId))}
           >
             Eliminar
           </Button>
@@ -1025,18 +1158,32 @@ const ReservationsList: React.FC = () => {
                 </Group>
               )}
 
-            {/* Botón de Eliminar */}
-            <Button
-              variant="subtle"
-              color="gray"
-              leftSection={<BiTrash />}
-              onClick={() => {
-                handleDelete(selectedReservation._id!);
-                handleCloseDetail();
-              }}
-            >
-              Eliminar Reserva
-            </Button>
+            {/* Botones de Cancelar y Eliminar */}
+            <Divider my="xs" />
+            <Group gap="xs">
+              <Button
+                variant="subtle"
+                color="orange"
+                leftSection={<BiXCircle />}
+                onClick={() => {
+                  handleCancelReservation(selectedReservation._id!);
+                  handleCloseDetail();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="subtle"
+                color="gray"
+                leftSection={<BiTrash />}
+                onClick={() => {
+                  handleDelete(selectedReservation._id!);
+                  handleCloseDetail();
+                }}
+              >
+                Eliminar
+              </Button>
+            </Group>
           </Stack>
           ) : (
             <Text c="dimmed" ta="center">No hay información disponible</Text>

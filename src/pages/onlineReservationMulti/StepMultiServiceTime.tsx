@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Stack,
   Group,
@@ -12,6 +12,7 @@ import {
   SimpleGrid,
   UnstyledButton,
   Button,
+  Switch,
 } from "@mantine/core";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -24,6 +25,10 @@ import {
   MultiServiceBlockSelection,
 } from "../../types/multiBooking";
 import { getMultiServiceBlocks } from "../../services/scheduleService";
+import type { RecurrencePattern, SeriesPreview as SeriesPreviewType } from "../../services/appointmentService";
+import RecurrenceSelector from "../../components/customCalendar/components/RecurrenceSelector";
+import SeriesPreviewComponent from "../../components/customCalendar/components/SeriesPreview";
+import { previewRecurringReservations } from "../../services/reservationService";
 
 interface StepMultiServiceTimeProps {
   organizationId: string;
@@ -33,6 +38,11 @@ interface StepMultiServiceTimeProps {
   dates: ServiceWithDate[];
   value: MultiServiceBlockSelection | null;
   onChange: (next: MultiServiceBlockSelection | null) => void;
+  // 🔁 Recurrencia
+  recurrencePattern: RecurrencePattern;
+  onRecurrenceChange: (pattern: RecurrencePattern) => void;
+  seriesPreview: SeriesPreviewType | null;
+  onSeriesPreviewChange: (preview: SeriesPreviewType | null) => void;
 }
 
 const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
@@ -43,6 +53,10 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   dates,
   value,
   onChange,
+  recurrencePattern,
+  onRecurrenceChange,
+  seriesPreview,
+  onSeriesPreviewChange,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -64,9 +78,54 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   // UI state: mostrar/ocultar grid
   const [showBlockPicker, setShowBlockPicker] = useState(true);
 
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const dateMissing = dates.length === 0 || !dates[0]?.date;
 
   const isBlockSelected = !!value?.startTime;
+  const isRecurrenceActive = recurrencePattern.type === 'weekly';
+
+  // Fetch preview cuando cambia el patrón de recurrencia
+  const fetchPreview = useCallback(async () => {
+    if (!isRecurrenceActive || !isBlockSelected || !dates[0]?.date) return;
+    if (!recurrencePattern.weekdays || recurrencePattern.weekdays.length === 0) return;
+
+    const block = value as MultiServiceBlockSelection;
+    let startDateStr: string;
+    if ((block as any).startTimeStr) {
+      startDateStr = (block as any).startTimeStr;
+    } else {
+      const startDateTime = block.startTime ?? block.intervals[0].from;
+      startDateStr = dayjs(startDateTime).format("YYYY-MM-DDTHH:mm:ss");
+    }
+
+    setPreviewLoading(true);
+    try {
+      const preview = await previewRecurringReservations({
+        services: block.intervals.map(iv => ({
+          serviceId: iv.serviceId,
+          employeeId: iv.employeeId ?? null,
+        })),
+        startDate: startDateStr,
+        recurrencePattern,
+        organizationId,
+      });
+      onSeriesPreviewChange(preview ?? null);
+    } catch {
+      onSeriesPreviewChange(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [isRecurrenceActive, isBlockSelected, recurrencePattern, value, dates, organizationId, onSeriesPreviewChange]);
+
+  useEffect(() => {
+    if (isRecurrenceActive && isBlockSelected) {
+      fetchPreview();
+    } else {
+      onSeriesPreviewChange(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recurrencePattern, isBlockSelected, isRecurrenceActive]);
 
   // Al seleccionar bloque: colapsar el grid
   useEffect(() => {
@@ -351,6 +410,59 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
             </>
           )}
         </Paper>
+      )}
+
+      {/* 🔁 Sección de recurrencia (solo cuando ya hay horario seleccionado) */}
+      {isBlockSelected && (
+        <>
+          <Divider my="xs" />
+          <Switch
+            label="Repetir esta cita semanalmente"
+            checked={isRecurrenceActive}
+            onChange={(e) => {
+              if (e.currentTarget.checked) {
+                const dayOfWeek = dates[0]?.date ? new Date(dates[0].date).getDay() : 1;
+                onRecurrenceChange({
+                  type: 'weekly',
+                  intervalWeeks: 1,
+                  weekdays: [dayOfWeek],
+                  endType: 'count',
+                  count: 4,
+                });
+              } else {
+                onRecurrenceChange({
+                  type: 'none',
+                  intervalWeeks: 1,
+                  weekdays: [],
+                  endType: 'count',
+                  count: 1,
+                });
+                onSeriesPreviewChange(null);
+              }
+            }}
+          />
+
+          {isRecurrenceActive && (
+            <Stack gap="md">
+              <RecurrenceSelector
+                value={recurrencePattern}
+                onChange={onRecurrenceChange}
+                startDate={dates[0]?.date ? new Date(dates[0].date) : null}
+              />
+
+              {previewLoading && (
+                <Stack align="center" gap="xs">
+                  <Loader size="sm" />
+                  <Text size="sm" c="dimmed">Verificando disponibilidad...</Text>
+                </Stack>
+              )}
+
+              {!previewLoading && seriesPreview && (
+                <SeriesPreviewComponent preview={seriesPreview} />
+              )}
+            </Stack>
+          )}
+        </>
       )}
     </Stack>
   );

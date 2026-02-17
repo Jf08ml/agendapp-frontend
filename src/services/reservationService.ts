@@ -3,6 +3,7 @@ import { apiReservation } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
 import { Employee } from "./employeeService";
+import type { RecurrencePattern, SeriesPreview } from "./appointmentService";
 
 export interface Reservation {
   _id?: string;
@@ -17,8 +18,9 @@ export interface Reservation {
     birthDate: Date | null;
   };
   organizationId: string | undefined;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin";
   groupId?: string; // 👥 ID de grupo para reservas múltiples
+  appointmentId?: string | null; // 🔗 Cita vinculada (cuando fue aprobada)
   errorMessage?: string; // ⚠️ Mensaje de error cuando falla la creación automática
 }
 
@@ -62,6 +64,7 @@ export interface CreateMultipleReservationsPayload {
   };
   organizationId: string;
   clientPackageId?: string; // ID del paquete de sesiones del cliente (si aplica)
+  recurrencePattern?: RecurrencePattern; // 🔁 Patrón de recurrencia (opcional)
 }
 
 // Obtener todas las reservas de una organización
@@ -143,13 +146,47 @@ export const updateReservation = async (
   }
 };
 
-// Eliminar una reserva
-export const deleteReservation = async (
-  reservationId: string
+// Cancelar una reserva (soft: cambia status + cancela citas vinculadas)
+export const cancelReservation = async (
+  reservationId: string,
+  options?: { notifyClient?: boolean }
 ): Promise<void> => {
   try {
-    await apiReservation.delete<Response<void>>(`/${reservationId}`);
+    await apiReservation.put<Response<void>>(`/${reservationId}/cancel`, {
+      notifyClient: options?.notifyClient ?? false,
+    });
+  } catch (error) {
+    handleAxiosError(error, "Error al cancelar la reserva");
+  }
+};
+
+// Eliminar una reserva (hard delete + opcionalmente eliminar citas)
+export const deleteReservation = async (
+  reservationId: string,
+  options?: { deleteAppointments?: boolean }
+): Promise<void> => {
+  try {
+    const params = options?.deleteAppointments ? "?deleteAppointments=true" : "";
+    await apiReservation.delete<Response<void>>(`/${reservationId}${params}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar la reserva");
+  }
+};
+
+// 🔁 Preview de reservas recurrentes (público)
+export const previewRecurringReservations = async (data: {
+  services: MultipleReservationServiceItem[];
+  startDate: string;
+  recurrencePattern: RecurrencePattern;
+  organizationId: string;
+}): Promise<SeriesPreview | undefined> => {
+  try {
+    const response = await apiReservation.post<Response<SeriesPreview>>(
+      "/multi/preview",
+      data
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al generar preview de recurrencia");
   }
 };

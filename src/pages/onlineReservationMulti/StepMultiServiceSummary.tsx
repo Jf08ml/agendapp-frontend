@@ -16,6 +16,8 @@ import {
   MultiServiceBlockSelection,
 } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
+import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
+import { IconRepeat } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 
@@ -59,6 +61,8 @@ interface Props {
   dates: ServiceWithDate[];
   times: MultiServiceBlockSelection | null;
   currency?: string;
+  recurrencePattern?: RecurrencePattern;
+  seriesPreview?: SeriesPreview | null;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -70,12 +74,16 @@ function toNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
 export default function StepMultiServiceSummary({
   services,
   employees,
   dates,
   times,
   currency,
+  recurrencePattern,
+  seriesPreview,
 }: Props) {
   if (!times) return null;
 
@@ -206,13 +214,42 @@ export default function StepMultiServiceSummary({
         </Stack>
       </Paper>
 
+      {/* 🔁 Info de recurrencia */}
+      {recurrencePattern?.type === 'weekly' && seriesPreview && (
+        <Paper withBorder p="md" radius="md" style={{ borderLeft: '4px solid var(--mantine-color-blue-6)' }}>
+          <Group gap="xs" mb="xs">
+            <IconRepeat size={18} />
+            <Text fw={700} size="sm">Citas recurrentes</Text>
+          </Group>
+          <Stack gap={4}>
+            <Text size="sm">
+              Cada {recurrencePattern.intervalWeeks === 1 ? 'semana' : `${recurrencePattern.intervalWeeks} semanas`}
+              {' · '}
+              {recurrencePattern.weekdays?.map(d => WEEKDAY_LABELS[d]).join(', ')}
+            </Text>
+            <Text size="sm" c="dimmed">
+              Se crearán <Text span fw={700} c="green">{seriesPreview.availableCount}</Text> de {seriesPreview.totalOccurrences} citas
+            </Text>
+          </Stack>
+        </Paper>
+      )}
+
       <Paper p="md" shadow="sm" radius="md" withBorder>
         <Group justify="space-between">
           <Text fw={700} size="md">
-            Total a pagar
+            {recurrencePattern?.type === 'weekly' && seriesPreview
+              ? `Total estimado (${seriesPreview.availableCount} citas)`
+              : 'Total a pagar'
+            }
           </Text>
           <Text fw={800} size="lg" c="green">
-            {grandTotal === 0 ? "Gratis" : formatCurrency(grandTotal, currency)}
+            {(() => {
+              const multiplier = recurrencePattern?.type === 'weekly' && seriesPreview
+                ? seriesPreview.availableCount
+                : 1;
+              const total = grandTotal * multiplier;
+              return total === 0 ? "Gratis" : formatCurrency(total, currency);
+            })()}
           </Text>
         </Group>
       </Paper>
