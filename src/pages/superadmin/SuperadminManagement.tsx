@@ -29,11 +29,16 @@ import {
   suspendMembership,
   reactivateMembership,
   activatePlanSuperadmin,
+  createMembership,
   Membership,
   Plan,
 } from "../../services/membershipService";
+import {
+  getOrganizations,
+  Organization,
+} from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
-import { BiRefresh, BiX, BiEdit, BiCreditCard } from "react-icons/bi";
+import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
@@ -63,6 +68,16 @@ export default function SuperadminManagement() {
   const [activatePaymentAmount, setActivatePaymentAmount] = useState<number>(0);
   const [activateLoading, setActivateLoading] = useState(false);
 
+  // Orgs sin membresía
+  const [orgsWithoutMembership, setOrgsWithoutMembership] = useState<Organization[]>([]);
+
+  // Modal de crear membresía
+  const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [createOrgId, setCreateOrgId] = useState<string>("");
+  const [createPlanId, setCreatePlanId] = useState<string>("");
+  const [createTrialDays, setCreateTrialDays] = useState<number>(0);
+  const [createLoading, setCreateLoading] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, [filterStatus]);
@@ -70,12 +85,25 @@ export default function SuperadminManagement() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [membershipsData, plansData] = await Promise.all([
+      const [membershipsData, plansData, orgsData] = await Promise.all([
         getAllMemberships(filterStatus ? { status: filterStatus } : undefined),
         getAllPlans(),
+        getOrganizations(),
       ]);
       setMemberships(membershipsData);
       setPlans(plansData);
+
+      // Filtrar orgs que no tienen membresía
+      const orgIdsWithMembership = new Set(
+        membershipsData.map((m: Membership) =>
+          typeof m.organizationId === "string"
+            ? m.organizationId
+            : (m.organizationId as any)?._id
+        )
+      );
+      setOrgsWithoutMembership(
+        (orgsData || []).filter((org) => !orgIdsWithMembership.has(org._id))
+      );
     } catch (error) {
       console.error("Error al cargar datos:", error);
       notifications.show({
@@ -204,6 +232,44 @@ export default function SuperadminManagement() {
       });
     } finally {
       setActivateLoading(false);
+    }
+  };
+
+  const handleCreateMembership = async () => {
+    if (!createOrgId || !createPlanId) {
+      notifications.show({
+        title: "Error",
+        message: "Selecciona una organización y un plan",
+        color: "red",
+      });
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      await createMembership({
+        organizationId: createOrgId,
+        planId: createPlanId,
+        trialDays: createTrialDays > 0 ? createTrialDays : undefined,
+      });
+      notifications.show({
+        title: "Membresía creada",
+        message: "Se asignó la membresía correctamente",
+        color: "green",
+      });
+      setCreateModalOpened(false);
+      setCreateOrgId("");
+      setCreatePlanId("");
+      setCreateTrialDays(0);
+      fetchData();
+    } catch (error: any) {
+      notifications.show({
+        title: "Error",
+        message: error.response?.data?.message || "No se pudo crear la membresía",
+        color: "red",
+      });
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -466,7 +532,120 @@ export default function SuperadminManagement() {
             </Stack>
           )}
         </Paper>
+
+        {/* Orgs sin membresía */}
+        {orgsWithoutMembership.length > 0 && !filterStatus && (
+          <Paper withBorder p="md">
+            <Title order={4} mb="md">
+              Organizaciones sin membresía ({orgsWithoutMembership.length})
+            </Title>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Organización</Table.Th>
+                  <Table.Th>Email</Table.Th>
+                  <Table.Th>Acciones</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {orgsWithoutMembership
+                  .filter((org) =>
+                    searchTerm
+                      ? org.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        org.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                      : true
+                  )
+                  .map((org) => (
+                    <Table.Tr key={org._id}>
+                      <Table.Td>
+                        <Text size="sm" fw={500}>
+                          {org.name}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="sm" c="dimmed">
+                          {org.email}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<BiPlus size={14} />}
+                          onClick={() => {
+                            setCreateOrgId(org._id!);
+                            setCreatePlanId("");
+                            setCreateTrialDays(0);
+                            setCreateModalOpened(true);
+                          }}
+                        >
+                          Asignar Membresía
+                        </Button>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+              </Table.Tbody>
+            </Table>
+          </Paper>
+        )}
       </Stack>
+
+      {/* Modal de Crear Membresía */}
+      <Modal
+        opened={createModalOpened}
+        onClose={() => setCreateModalOpened(false)}
+        title="Asignar Membresía"
+        centered
+      >
+        <Stack gap="md">
+          <Alert icon={<IoAlertCircle size={18} />} color="blue">
+            <Text size="sm">
+              Organización:{" "}
+              <strong>
+                {orgsWithoutMembership.find((o) => o._id === createOrgId)?.name}
+              </strong>
+            </Text>
+          </Alert>
+
+          <Select
+            label="Plan"
+            placeholder="Selecciona un plan"
+            value={createPlanId}
+            onChange={(value) => setCreatePlanId(value || "")}
+            data={plans.map((p) => ({
+              value: p._id,
+              label: `${p.displayName} - $${p.price.toLocaleString()} ${p.currency}`,
+            }))}
+            required
+          />
+
+          <NumberInput
+            label="Días de prueba"
+            description="Dejar en 0 para activar inmediatamente"
+            value={createTrialDays}
+            onChange={(val) => setCreateTrialDays(Number(val) || 0)}
+            min={0}
+            max={90}
+          />
+
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="light"
+              onClick={() => setCreateModalOpened(false)}
+              disabled={createLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateMembership}
+              loading={createLoading}
+              disabled={!createPlanId}
+            >
+              Crear Membresía
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Modal de Renovación */}
       <Modal

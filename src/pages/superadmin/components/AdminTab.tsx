@@ -10,24 +10,57 @@ import {
   Badge,
   Paper,
   PasswordInput,
+  Modal,
+  NumberInput,
 } from "@mantine/core";
 import { UseFormReturnType } from "@mantine/form";
-import { BiPlus, BiTrash } from "react-icons/bi";
-import { useState } from "react";
+import { notifications } from "@mantine/notifications";
+import { BiPlus, BiTrash, BiCreditCard } from "react-icons/bi";
+import { useEffect, useState } from "react";
 import type { SuperadminFormValues } from "../schema";
+import {
+  createMembership,
+  getAllPlans,
+  type Plan,
+} from "../../../services/membershipService";
 
 export default function AdminTab({
   form,
   isEditing,
   isCreateMode,
+  organizationId,
+  currentMembershipId,
+  onMembershipCreated,
 }: {
   form: UseFormReturnType<SuperadminFormValues>;
   isEditing: boolean;
   isCreateMode: boolean;
+  organizationId?: string;
+  currentMembershipId?: string | null;
+  onMembershipCreated?: () => void;
 }) {
   const [newDomain, setNewDomain] = useState("");
+  const [membershipModalOpen, setMembershipModalOpen] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [trialDays, setTrialDays] = useState<number>(0);
+  const [creatingMembership, setCreatingMembership] = useState(false);
 
   const domains = form.values.domains || [];
+
+  useEffect(() => {
+    if (membershipModalOpen && plans.length === 0) {
+      getAllPlans()
+        .then(setPlans)
+        .catch(() =>
+          notifications.show({
+            title: "Error",
+            message: "No se pudieron cargar los planes",
+            color: "red",
+          })
+        );
+    }
+  }, [membershipModalOpen, plans.length]);
 
   const handleAddDomain = () => {
     const trimmed = newDomain.trim().toLowerCase();
@@ -42,6 +75,37 @@ export default function AdminTab({
       "domains",
       domains.filter((_, i) => i !== index)
     );
+  };
+
+  const handleCreateMembership = async () => {
+    if (!organizationId || !selectedPlanId) return;
+
+    try {
+      setCreatingMembership(true);
+      await createMembership({
+        organizationId,
+        planId: selectedPlanId,
+        trialDays: trialDays > 0 ? trialDays : undefined,
+      });
+      notifications.show({
+        title: "Membresía creada",
+        message: "Se asignó la membresía correctamente",
+        color: "green",
+      });
+      setMembershipModalOpen(false);
+      setSelectedPlanId(null);
+      setTrialDays(0);
+      onMembershipCreated?.();
+    } catch (e) {
+      console.error(e);
+      notifications.show({
+        title: "Error",
+        message: "No se pudo crear la membresía",
+        color: "red",
+      });
+    } finally {
+      setCreatingMembership(false);
+    }
   };
 
   return (
@@ -163,6 +227,31 @@ export default function AdminTab({
         </Stack>
       </Paper>
 
+      {!isCreateMode && (
+        <Paper withBorder p="md" radius="md">
+          <Text fw={600} mb="sm">
+            Membresía
+          </Text>
+          {currentMembershipId ? (
+            <Badge variant="light" color="green" size="lg">
+              Tiene membresía asignada
+            </Badge>
+          ) : (
+            <>
+              <Text size="sm" c="dimmed" mb="md">
+                Esta organización no tiene una membresía asignada
+              </Text>
+              <Button
+                leftSection={<BiCreditCard size={16} />}
+                onClick={() => setMembershipModalOpen(true)}
+              >
+                Asignar Membresía
+              </Button>
+            </>
+          )}
+        </Paper>
+      )}
+
       <Paper withBorder p="md" radius="md">
         <Text fw={600} mb="sm">
           WhatsApp
@@ -174,6 +263,49 @@ export default function AdminTab({
           {...form.getInputProps("clientIdWhatsapp")}
         />
       </Paper>
+
+      <Modal
+        opened={membershipModalOpen}
+        onClose={() => setMembershipModalOpen(false)}
+        title="Asignar Membresía"
+      >
+        <Stack gap="md">
+          <Select
+            label="Plan"
+            placeholder="Selecciona un plan"
+            data={plans.map((p) => ({
+              value: p._id,
+              label: `${p.displayName} - $${p.price} ${p.currency}/${p.billingCycle}`,
+            }))}
+            value={selectedPlanId}
+            onChange={setSelectedPlanId}
+            required
+          />
+          <NumberInput
+            label="Días de prueba"
+            description="Dejar en 0 para activar inmediatamente como activa"
+            value={trialDays}
+            onChange={(val) => setTrialDays(Number(val) || 0)}
+            min={0}
+            max={90}
+          />
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => setMembershipModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateMembership}
+              loading={creatingMembership}
+              disabled={!selectedPlanId}
+            >
+              Crear Membresía
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

@@ -527,6 +527,13 @@ export default function SuperadminOrganizationEdit() {
             form={form}
             isEditing={isEditing}
             isCreateMode={isCreateMode}
+            organizationId={org?._id}
+            currentMembershipId={org?.currentMembershipId}
+            onMembershipCreated={async () => {
+              if (!id) return;
+              const updated = await getOrganizationById(id);
+              if (updated) setOrg(updated);
+            }}
           />
         </Tabs.Panel>
 
