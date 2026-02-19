@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/superadmin/SuperadminManagement.tsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -38,11 +39,12 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
-import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
+import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiArrowBack, BiBuildings } from "react-icons/bi";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
 export default function SuperadminManagement() {
+  const navigate = useNavigate();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -330,6 +332,25 @@ export default function SuperadminManagement() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
+        {/* Navegación superadmin */}
+        <Group gap="xs">
+          <Button
+            variant="light"
+            leftSection={<BiBuildings size={16} />}
+            size="sm"
+            onClick={() => navigate("/superadmin/orgs")}
+          >
+            Organizaciones
+          </Button>
+          <Button
+            variant="filled"
+            leftSection={<BiCreditCard size={16} />}
+            size="sm"
+          >
+            Gestión de membresías
+          </Button>
+        </Group>
+
         {/* Header */}
         <Group justify="space-between">
           <div>

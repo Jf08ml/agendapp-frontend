@@ -61,7 +61,7 @@ export default function Footer() {
 
   const { name, branding } = organization || {};
   const footerColor =
-    branding?.primaryColor || branding?.themeColor || "#DE739E";
+    branding?.primaryColor || branding?.themeColor || "#1C3461";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
 

@@ -40,7 +40,11 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
   const { organization, loading } = useSelector(
     (s: RootState) => s.organization
   );
+  const role = useSelector((s: RootState) => s.auth.role);
   const location = useLocation();
+
+  // Superadmin de plataforma: no mostrar navbar de org (no hay org cargada)
+  if (role === "superadmin") return null;
 
   if (loading || !organization) {
     return (

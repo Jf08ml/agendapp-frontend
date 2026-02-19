@@ -26,6 +26,15 @@ export default function ExchangePage() {
       try {
         const result = await exchangeCodeForToken(code);
 
+        // Si es sesión de impersonación, marcar para poder volver al panel de superadmin
+        if (result.isImpersonated) {
+          localStorage.setItem("sa_is_impersonating", "true");
+        } else {
+          // Limpiar flags de impersonación si era una sesión normal
+          localStorage.removeItem("sa_is_impersonating");
+          localStorage.removeItem("sa_backup");
+        }
+
         // loginSuccess guarda en Redux + localStorage automáticamente
         dispatch(
           loginSuccess({

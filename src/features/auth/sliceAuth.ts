@@ -104,6 +104,9 @@ const authSlice = createSlice({
       removeStorageItem("token_expires_at");
       // Limpiar slug de dev para no quedar pegado a una org
       localStorage.removeItem("app_dev_slug");
+      // Limpiar flags de sesión de impersonación de superadmin
+      localStorage.removeItem("sa_is_impersonating");
+      localStorage.removeItem("sa_backup");
     },
   },
 });

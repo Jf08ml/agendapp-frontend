@@ -1,8 +1,8 @@
 const colors = {
-    primaryBackground: '#DE739E',
+    primaryBackground: '#1C3461',
     primaryText: '#E2E8F0',
     errorText: '#FF6B6B',
-    cardBackground: '#DE739E',
+    cardBackground: '#1C3461',
     cardShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
   };
   

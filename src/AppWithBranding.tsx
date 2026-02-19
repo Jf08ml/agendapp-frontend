@@ -69,12 +69,15 @@ export default function AppWithBranding() {
     }
   }, [domainInfo.type]);
 
-  // Solo cargar config de org si estamos en un tenant o custom domain
+  // Las rutas /superadmin* no necesitan org (evita fetch innecesario en localhost)
+  const isSuperadminPath = window.location.pathname.startsWith("/superadmin");
+
+  // Solo cargar config de org si estamos en un tenant o custom domain y no es ruta de superadmin
   useEffect(() => {
-    if (!organization && (domainInfo.type === "tenant" || domainInfo.type === "custom")) {
+    if (!organization && !isSuperadminPath && (domainInfo.type === "tenant" || domainInfo.type === "custom")) {
       dispatch(fetchOrganizationConfig());
     }
-  }, [dispatch, organization, domainInfo.type]);
+  }, [dispatch, organization, domainInfo.type, isSuperadminPath]);
 
   // Cambia el <title>
   useEffect(() => {
@@ -108,7 +111,7 @@ export default function AppWithBranding() {
   useFavicon(organization?.branding?.faviconUrl);
 
   // Lógica para color principal personalizado
-  const colorValue = organization?.branding?.primaryColor || "#DE739E";
+  const colorValue = organization?.branding?.primaryColor || "#1C3461";
   const isHex = typeof colorValue === "string" && colorValue.startsWith("#");
 
   // Si es HEX, crea paleta custom, si no, fallback al default Mantine
@@ -169,8 +172,8 @@ export default function AppWithBranding() {
     return <CustomLoaderHtml loadingText="Redirigiendo..." />;
   }
 
-  // Solo mostrar loading para tenant/custom (signup no necesita org)
-  if (domainInfo.type !== "signup" && loading && !organization)
+  // Solo mostrar loading para tenant/custom (signup y rutas /superadmin* no necesitan org)
+  if (domainInfo.type !== "signup" && !isSuperadminPath && loading && !organization)
     return <CustomLoaderHtml loadingText="Cargando tu espacio..." />;
 
   return (

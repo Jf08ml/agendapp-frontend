@@ -37,6 +37,7 @@ export interface ExchangeResponse {
   organizationId: string;
   userPermissions: string[];
   expiresAt: string;
+  isImpersonated?: boolean;
 }
 
 export const checkSlugAvailability = async (

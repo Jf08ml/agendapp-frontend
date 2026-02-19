@@ -71,6 +71,7 @@ export interface WeeklySchedule {
 
 export interface Organization {
   _id?: string;
+  slug?: string;
   name: string;
   email: string;
   location: {

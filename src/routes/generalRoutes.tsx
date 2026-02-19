@@ -18,6 +18,8 @@ import Location from "../pages/location/location";
 import WhatsappMultiSession from "../pages/admin/manageWhatsapp";
 import SuperadminManagement from "../pages/superadmin/SuperadminManagement";
 import SuperadminOrganizationEdit from "../pages/superadmin/SuperadminOrganizationEdit";
+import SuperadminOrganizations from "../pages/superadmin/SuperadminOrganizations";
+import SuperadminLogin from "../pages/superadmin/SuperadminLogin";
 
 import MyMembership from "../pages/admin/MyMembership";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
@@ -316,6 +318,14 @@ const generalRoutes = [
 
   // Superadmin routes
   {
+    path: "/superadmin-login",
+    component: SuperadminLogin,
+    MediaMetadata: {
+      title: "Acceso de plataforma",
+      description: "Login de superadmin",
+    },
+  },
+  {
     path: "/superadmin",
     component: (props: JSX.IntrinsicAttributes) => (
       <SuperadminManagement {...props} />
@@ -323,6 +333,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Panel de Superadmin",
       description: "Administra organizaciones y membresías.",
+    },
+  },
+  {
+    path: "/superadmin/orgs",
+    component: SuperadminOrganizations,
+    MediaMetadata: {
+      title: "Organizaciones",
+      description: "Lista de organizaciones — Superadmin",
     },
   },
   {

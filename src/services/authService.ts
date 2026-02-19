@@ -1,4 +1,4 @@
-import { apiAuth } from "./axiosConfig";
+import { apiAuth, apiGeneral } from "./axiosConfig";
 import { AxiosResponse } from "axios";
 
 // Definir el tipo de respuesta para el inicio de sesión
@@ -9,6 +9,14 @@ interface LoginResponse {
   userType: string;
   userPermissions?: string[];
   expiresAt?: string; // ISO timestamp de expiración
+}
+
+interface SuperadminLoginResponse {
+  token: string;
+  adminId: string;
+  name: string;
+  userType: "superadmin";
+  expiresAt: string;
 }
 
 // Función para iniciar sesión
@@ -31,6 +39,17 @@ export const login = async (
     console.error("Error al iniciar sesión:", error);
     return null;
   }
+};
+
+// Función para iniciar sesión como superadmin de plataforma
+// Llama a POST /api/admin/login (no depende de organización)
+export const loginSuperadmin = async (
+  email: string,
+  password: string
+): Promise<SuperadminLoginResponse> => {
+  const response: AxiosResponse<{ data: SuperadminLoginResponse }> =
+    await apiGeneral.post("/admin/login", { email, password });
+  return response.data.data;
 };
 
 // Función para renovar el token

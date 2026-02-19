@@ -18,13 +18,15 @@ import NavbarLinks from "./layouts/NavbarLinks";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
-import { useSelector } from "react-redux";
-import { RootState } from "./app/store";
-import { useEffect, useMemo, useRef } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState, AppDispatch } from "./app/store";
+import { useEffect, useMemo, useRef, useCallback } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
+import { loginSuccess } from "./features/auth/sliceAuth";
+import { clearOrganization } from "./features/organization/sliceOrganization";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
@@ -47,7 +49,8 @@ const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
 function AppContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userId, isAuthenticated } = useSelector(
+  const dispatch = useDispatch<AppDispatch>();
+  const { userId, isAuthenticated, role } = useSelector(
     (state: RootState) => state.auth
   );
   const organization = useSelector(
@@ -58,9 +61,40 @@ function AppContent() {
   const hasRedirected = useRef(false);
   const domainInfo = useMemo(() => extractTenantFromHost(), []);
   const isSignupDomain = domainInfo.type === "signup";
+  const isSuperadmin = role === "superadmin";
+  // Las rutas /superadmin* no necesitan org (ni antes de login ni después)
+  const isSuperadminPath = location.pathname.startsWith("/superadmin");
+  const isImpersonating = localStorage.getItem("sa_is_impersonating") === "true";
+
+  const handleReturnToSuperadmin = useCallback(() => {
+    try {
+      const raw = localStorage.getItem("sa_backup");
+      if (raw) {
+        const backup = JSON.parse(raw) as { token: string; userId: string; expiresAt?: string };
+        if (backup.token) {
+          dispatch(
+            loginSuccess({
+              token: backup.token,
+              userId: backup.userId,
+              role: "superadmin",
+              organizationId: "",
+              permissions: [],
+              expiresAt: backup.expiresAt ?? undefined,
+            })
+          );
+          dispatch(clearOrganization());
+        }
+      }
+    } finally {
+      localStorage.removeItem("sa_backup");
+      localStorage.removeItem("sa_is_impersonating");
+      localStorage.removeItem("app_dev_slug");
+    }
+    navigate("/superadmin/orgs", { replace: true });
+  }, [dispatch, navigate]);
 
   // Branding dinámico
-  const color = organization?.branding?.primaryColor || "#DE739E";
+  const color = organization?.branding?.primaryColor || "#1C3461";
   const logoUrl = organization?.branding?.logoUrl || "/logo-default.png";
 
   // Inicializa autenticación en el cliente
@@ -76,13 +110,17 @@ function AppContent() {
     }
   }, [currentVersion]);
 
-  // Redirigir a agenda en carga inicial si está autenticado
+  // Redirigir a agenda en carga inicial si está autenticado (no aplica para superadmin)
   useEffect(() => {
-    if (isAuthenticated && location.pathname === "/" && !hasRedirected.current) {
+    if (isAuthenticated && !isSuperadmin && location.pathname === "/" && !hasRedirected.current) {
       hasRedirected.current = true;
       navigate("/gestionar-agenda", { replace: true });
     }
-  }, [isAuthenticated, location.pathname, navigate]);
+    if (isAuthenticated && isSuperadmin && location.pathname === "/" && !hasRedirected.current) {
+      hasRedirected.current = true;
+      navigate("/superadmin/orgs", { replace: true });
+    }
+  }, [isAuthenticated, isSuperadmin, location.pathname, navigate]);
 
   // Escuchar eventos de membresía y sesión
   useEffect(() => {
@@ -144,8 +182,8 @@ function AppContent() {
     void requestNotificationPermission();
   }, [isAuthenticated, userId]);
 
-  // Loader mientras carga la organización/branding (no aplica para signup domain)
-  if (!isSignupDomain && (loading || !organization)) {
+  // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
+  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && (loading || !organization)) {
     return (
       <CustomLoader
         loadingText={`Cargando ${organization?.name || "organización"}...`}
@@ -223,7 +261,41 @@ function AppContent() {
         </AppShell.Navbar>
 
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
-          {isAuthenticated && organization?.membershipStatus === "trial" && (
+          {/* Banner de sesión de soporte (impersonación activa) */}
+          {isImpersonating && isAuthenticated && (
+            <div
+              style={{
+                background: "#1A1A2E",
+                borderBottom: "2px solid #E040FB",
+                padding: "8px 16px",
+                textAlign: "center",
+                fontSize: "14px",
+                color: "#E040FB",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "12px",
+              }}
+            >
+              <span>🛠️ Sesión de soporte técnico activa — estás operando como admin de <strong>{organization?.name || "esta organización"}</strong></span>
+              <button
+                onClick={handleReturnToSuperadmin}
+                style={{
+                  background: "#E040FB",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "4px 12px",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                }}
+              >
+                Volver al panel de superadmin
+              </button>
+            </div>
+          )}
+          {isAuthenticated && !isImpersonating && organization?.membershipStatus === "trial" && (
             <div
               style={{
                 background: "#E3F2FD",
@@ -240,7 +312,7 @@ function AppContent() {
               <strong>Conoce nuestros planes</strong> para seguir usando la plataforma.
             </div>
           )}
-          {isAuthenticated && organization?.membershipStatus === "past_due" && (
+          {isAuthenticated && !isImpersonating && organization?.membershipStatus === "past_due" && (
             <div
               style={{
                 background: "#FFF3CD",

@@ -1,5 +1,6 @@
 // src/pages/superadmin/SuperadminOrganizations.tsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   Button,
@@ -14,15 +15,22 @@ import {
   NumberInput,
   FileInput,
   Stack,
+  Textarea,
+  Badge,
+  Tooltip,
+  ActionIcon,
 } from "@mantine/core";
+import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard } from "react-icons/bi";
 import {
   getOrganizations,
   Organization,
   updateOrganization,
   createOrganization,
 } from "../../services/organizationService";
-import { uploadImage } from "../../services/imageService"; // ajusta la ruta si tu archivo se llama diferente
+import { getAllMemberships, Membership } from "../../services/membershipService";
+import { uploadImage } from "../../services/imageService";
 import { TimeInput } from "@mantine/dates";
+import { apiGeneral } from "../../services/axiosConfig";
 
 type Notif = { msg: string; color: "red" | "green" | "yellow" | "blue" } | null;
 
@@ -44,7 +52,9 @@ const emptyNewOrg = (): Partial<Organization> => ({
 const isHHmm = (s?: string) => !!s && /^\d{2}:\d{2}$/.test(s);
 
 export default function SuperadminOrganizations() {
+  const navigate = useNavigate();
   const [orgs, setOrgs] = useState<Organization[] | null>([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
@@ -52,6 +62,50 @@ export default function SuperadminOrganizations() {
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [notif, setNotif] = useState<Notif>(null);
+
+  // Estado para impersonación
+  const [impersonateOrg, setImpersonateOrg] = useState<Organization | null>(null);
+  const [impersonateReason, setImpersonateReason] = useState("");
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonateError, setImpersonateError] = useState("");
+
+  const handleImpersonate = async () => {
+    if (!impersonateOrg || impersonateReason.trim().length < 5) {
+      setImpersonateError("La razón debe tener al menos 5 caracteres");
+      return;
+    }
+    setImpersonating(true);
+    setImpersonateError("");
+    try {
+      const res = await apiGeneral.post("/admin/impersonate", {
+        organizationId: impersonateOrg._id,
+        reason: impersonateReason.trim(),
+      });
+      const { exchangeCode, subdomain } = res.data.data;
+
+      // Guardar el token de superadmin antes de ser reemplazado por el de la org
+      const backupToken = localStorage.getItem("app_token");
+      const backupUserId = localStorage.getItem("app_userId");
+      const backupExpiresAt = localStorage.getItem("app_token_expires_at");
+      if (backupToken && backupUserId) {
+        localStorage.setItem(
+          "sa_backup",
+          JSON.stringify({ token: backupToken, userId: backupUserId, expiresAt: backupExpiresAt })
+        );
+      }
+
+      const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      if (isDev) {
+        window.location.href = `/exchange?slug=${impersonateOrg.slug}&code=${exchangeCode}`;
+      } else {
+        window.location.href = `https://${subdomain}/exchange?code=${exchangeCode}`;
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setImpersonateError(e?.response?.data?.message || "Error al generar acceso");
+      setImpersonating(false);
+    }
+  };
 
   // Estado para crear organización
   const [createOpen, setCreateOpen] = useState(false);
@@ -69,10 +123,47 @@ export default function SuperadminOrganizations() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      setOrgs(await getOrganizations());
+      const [orgsData, membershipsData] = await Promise.all([
+        getOrganizations(),
+        getAllMemberships().catch(() => []),
+      ]);
+      setOrgs(orgsData);
+      setMemberships(membershipsData);
       setLoading(false);
     })();
   }, []);
+
+  // Map orgId → membership for quick lookup
+  const membershipByOrg = new Map<string, Membership>(
+    memberships.map((m) => [
+      typeof m.organizationId === "string" ? m.organizationId : (m.organizationId as unknown as { _id: string })._id,
+      m,
+    ])
+  );
+
+  const membershipBadge = (orgId?: string) => {
+    if (!orgId) return <Badge color="gray" variant="light">Sin membresía</Badge>;
+    const m = membershipByOrg.get(orgId);
+    if (!m) return <Badge color="gray" variant="light">Sin membresía</Badge>;
+    const cfg: Record<string, { color: string; label: string }> = {
+      active:    { color: "green",  label: "Activa" },
+      trial:     { color: "blue",   label: "Prueba" },
+      past_due:  { color: "orange", label: "Vencida" },
+      suspended: { color: "red",    label: "Suspendida" },
+      cancelled: { color: "gray",   label: "Cancelada" },
+      expired:   { color: "red",    label: "Expirada" },
+      pending:   { color: "yellow", label: "Pendiente" },
+    };
+    const { color, label } = cfg[m.status] ?? { color: "gray", label: m.status };
+    return (
+      <Stack gap={2}>
+        <Badge color={color} variant="filled" size="sm">{label}</Badge>
+        {m.planId?.displayName && (
+          <Text size="xs" c="dimmed">{m.planId.displayName}</Text>
+        )}
+      </Stack>
+    );
+  };
 
   const filteredOrgs = orgs?.filter(
     (o) =>
@@ -210,10 +301,29 @@ export default function SuperadminOrganizations() {
   };
 
   return (
-    <div style={{ maxWidth: 1000, margin: "auto", padding: 24 }}>
+    <div style={{ maxWidth: 1100, margin: "auto", padding: 24 }}>
+      {/* Navegación superadmin */}
+      <Group mb="lg" gap="xs">
+        <Button
+          variant="filled"
+          leftSection={<BiBuildings size={16} />}
+          size="sm"
+        >
+          Organizaciones
+        </Button>
+        <Button
+          variant="light"
+          leftSection={<BiCreditCard size={16} />}
+          size="sm"
+          onClick={() => navigate("/superadmin")}
+        >
+          Gestión de membresías
+        </Button>
+      </Group>
+
       <Group justify="space-between" mb="md">
         <Text size="xl" fw={600}>
-          Organizaciones (Superadmin)
+          Organizaciones
         </Text>
         <Group>
           <TextInput
@@ -233,10 +343,10 @@ export default function SuperadminOrganizations() {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Nombre</Table.Th>
-              <Table.Th>Email</Table.Th>
-              <Table.Th>Teléfono</Table.Th>
+              <Table.Th>Email / Teléfono</Table.Th>
               <Table.Th>Dominio(s)</Table.Th>
-              <Table.Th>Activo</Table.Th>
+              <Table.Th>Membresía</Table.Th>
+              <Table.Th>Estado</Table.Th>
               <Table.Th>Acciones</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -244,24 +354,64 @@ export default function SuperadminOrganizations() {
             {filteredOrgs &&
               filteredOrgs.map((org) => (
                 <Table.Tr key={org._id}>
-                  <Table.Td>{org.name}</Table.Td>
-                  <Table.Td>{org.email}</Table.Td>
-                  <Table.Td>{org.phoneNumber}</Table.Td>
                   <Table.Td>
-                    {Array.isArray(org.domains) && org.domains.length
-                      ? org.domains.join(", ")
-                      : "-"}
+                    <Text size="sm" fw={500}>{org.name}</Text>
                   </Table.Td>
-                  <Table.Td>{org.isActive ? "Sí" : "No"}</Table.Td>
                   <Table.Td>
-                    <Group gap="xs">
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={() => handleOpenModal(org)}
-                      >
-                        Cambiar contraseña
-                      </Button>
+                    <Stack gap={2}>
+                      <Text size="sm">{org.email}</Text>
+                      <Text size="xs" c="dimmed">{org.phoneNumber}</Text>
+                    </Stack>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {Array.isArray(org.domains) && org.domains.length
+                        ? org.domains.join(", ")
+                        : "-"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>{membershipBadge(org._id)}</Table.Td>
+                  <Table.Td>
+                    <Badge color={org.isActive ? "green" : "red"} variant="light">
+                      {org.isActive ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      <Tooltip label="Entrar como este admin">
+                        <ActionIcon
+                          color="teal"
+                          variant="filled"
+                          size="sm"
+                          onClick={() => {
+                            setImpersonateOrg(org);
+                            setImpersonateReason("");
+                            setImpersonateError("");
+                          }}
+                        >
+                          <BiUserCheck size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Editar organización">
+                        <ActionIcon
+                          color="blue"
+                          variant="light"
+                          size="sm"
+                          onClick={() => navigate(`/superadmin/organizaciones/${org._id}`)}
+                        >
+                          <BiEdit size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Cambiar contraseña">
+                        <ActionIcon
+                          color="gray"
+                          variant="light"
+                          size="sm"
+                          onClick={() => handleOpenModal(org)}
+                        >
+                          <BiKey size={14} />
+                        </ActionIcon>
+                      </Tooltip>
                     </Group>
                   </Table.Td>
                 </Table.Tr>
@@ -269,6 +419,40 @@ export default function SuperadminOrganizations() {
           </Table.Tbody>
         </Table>
       )}
+
+      {/* Modal: Entrar como (impersonación) */}
+      <Modal
+        opened={!!impersonateOrg}
+        onClose={() => setImpersonateOrg(null)}
+        title={`Entrar como: ${impersonateOrg?.name}`}
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            Ingresarás como administrador de esta organización. La sesión expira en 60 minutos y quedará registrada en el log de auditoría.
+          </Text>
+          <Textarea
+            label="Razón del acceso *"
+            placeholder="Ej: Soporte técnico — cliente reportó error en agenda"
+            value={impersonateReason}
+            onChange={(e) => setImpersonateReason(e.currentTarget.value)}
+            minRows={2}
+            autosize
+            disabled={impersonating}
+          />
+          {impersonateError && (
+            <Text size="sm" c="red">{impersonateError}</Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setImpersonateOrg(null)} disabled={impersonating}>
+              Cancelar
+            </Button>
+            <Button color="teal" onClick={handleImpersonate} loading={impersonating}>
+              Ingresar
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* Modal: Cambiar contraseña */}
       <Modal
