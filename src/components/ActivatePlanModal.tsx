@@ -66,6 +66,7 @@ export function ActivatePlanModal({ opened, onClose, plan }: ActivatePlanModalPr
         provider: "lemonsqueezy",
         planId: plan._id,
         organizationId,
+        currency: plan.currency,
         successUrl: `${window.location.origin}/payment-success`,
         cancelUrl: `${window.location.origin}/my-membership`,
       });
