@@ -38,7 +38,7 @@ import {
   IconX,
   IconCheck,
 } from "@tabler/icons-react";
-import { BiBuildings, BiCreditCard, BiArrowBack } from "react-icons/bi";
+import { BiBuildings, BiArrowBack } from "react-icons/bi";
 import {
   getAllPlans,
   createPlan,
@@ -378,7 +378,6 @@ export default function SuperadminPlans() {
         }
         size="xl"
         centered
-        scrollAreaComponent="div"
       >
         <Tabs defaultValue="general">
           <Tabs.List mb="md">
@@ -463,7 +462,7 @@ export default function SuperadminPlans() {
                 onChange={(v) => setField("domainType", v || "subdomain")}
               />
 
-              <Divider label="Lemon Squeezy" labelProps={{ color: "green", fw: 600 }} />
+              <Divider label="Lemon Squeezy" />
 
               <TextInput
                 label="Variant ID de Lemon Squeezy"

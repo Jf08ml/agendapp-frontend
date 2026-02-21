@@ -39,7 +39,7 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
-import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiArrowBack, BiBuildings, BiPackage } from "react-icons/bi";
+import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiBuildings, BiPackage } from "react-icons/bi";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
