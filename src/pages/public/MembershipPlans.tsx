@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ReactNode, useEffect, useState } from "react";
-import { Button, Card, Group, Stack, Text, Title, Badge, List } from "@mantine/core";
-import { apiPlansPublic } from "../../services/axiosConfig";
+import { Button, Card, Group, Stack, Text, Title, Badge, List, Loader } from "@mantine/core";
+import { apiPlansPublic, apiGeneral } from "../../services/axiosConfig";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 
 interface PlanPublic {
   currency: ReactNode;
@@ -20,7 +22,10 @@ interface PlanPublic {
 export default function MembershipPlans() {
   const [plans, setPlans] = useState<PlanPublic[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<{ name: string; price: number } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<{ _id: string; name: string; price: number } | null>(null);
+  const [lsLoading, setLsLoading] = useState<string | null>(null); // planId en carga
+
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +33,28 @@ export default function MembershipPlans() {
       setPlans(plansRes.data?.data || []);
     })();
   }, []);
+
+  const handleCardCheckout = async (plan: PlanPublic) => {
+    if (!organizationId) return;
+    setLsLoading(plan._id);
+    try {
+      const res = await apiGeneral.post("/payments/checkout", {
+        provider: "lemonsqueezy",
+        planId: plan._id,
+        organizationId,
+        successUrl: `${window.location.origin}/payment-success`,
+        cancelUrl: `${window.location.origin}/plans`,
+      });
+      const checkoutUrl = res.data?.data?.checkoutUrl;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      }
+    } catch (err: any) {
+      console.error("Error al crear checkout:", err);
+    } finally {
+      setLsLoading(null);
+    }
+  };
 
   return (
     <Stack align="center" mt="xl" maw={1100} mx="auto">
@@ -49,10 +76,24 @@ export default function MembershipPlans() {
                   <List.Item key={i}>{c}</List.Item>
                 ))}
               </List>
+
+              {/* Pago con tarjeta vía Lemon Squeezy */}
+              {organizationId && (
+                <Button
+                  onClick={() => handleCardCheckout(p)}
+                  loading={lsLoading === p._id}
+                  disabled={lsLoading !== null && lsLoading !== p._id}
+                  leftSection={lsLoading === p._id ? <Loader size="xs" color="white" /> : undefined}
+                >
+                  Pagar con tarjeta
+                </Button>
+              )}
+
+              {/* Pago manual (transferencia) */}
               <Button
                 variant="light"
                 onClick={() => {
-                  setSelectedPlan({ name: p.displayName, price: p.price || 0 });
+                  setSelectedPlan({ _id: p._id, name: p.displayName, price: p.price || 0 });
                   setTransferOpen(true);
                 }}
               >

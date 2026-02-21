@@ -23,9 +23,11 @@ export interface Plan {
     prioritySupport: boolean;
     autoReminders: boolean;
     autoConfirmations: boolean;
+    servicePackages: boolean;
   };
   description: string;
   isActive: boolean;
+  lsVariantId: string | null;
   payment?: {
     provider: string;
     productId: string | null;
@@ -288,6 +290,52 @@ export const activatePlanSuperadmin = async (
 export const getAllPlans = async (): Promise<Plan[]> => {
   const response = await apiGeneral.get("/plans");
   return response.data.data;
+};
+
+// === CRUD DE PLANES (superadmin) ===
+
+export type PlanInput = {
+  name: string;
+  slug: string;
+  displayName: string;
+  price: number;
+  currency: string;
+  billingCycle: string;
+  domainType: string;
+  description: string;
+  characteristics: string[];
+  isActive: boolean;
+  lsVariantId?: string | null;
+  limits: {
+    maxEmployees: number | null;
+    maxServices: number | null;
+    maxAppointmentsPerMonth: number | null;
+    maxStorageGB: number | null;
+    customBranding: boolean;
+    whatsappIntegration: boolean;
+    analyticsAdvanced: boolean;
+    prioritySupport: boolean;
+    autoReminders: boolean;
+    autoConfirmations: boolean;
+    servicePackages: boolean;
+  };
+};
+
+export const createPlan = async (data: PlanInput): Promise<Plan> => {
+  const response = await apiGeneral.post("/plans", data);
+  return response.data.data;
+};
+
+export const updatePlan = async (
+  planId: string,
+  data: Partial<PlanInput>
+): Promise<Plan> => {
+  const response = await apiGeneral.put(`/plans/${planId}`, data);
+  return response.data.data;
+};
+
+export const deletePlan = async (planId: string): Promise<void> => {
+  await apiGeneral.delete(`/plans/${planId}`);
 };
 
 // Notificaciones de membresía

@@ -33,6 +33,8 @@ import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
 import ManagePackages from "../pages/admin/managePackages";
 import SignupPage from "../pages/public/SignupPage";
 import ExchangePage from "../pages/public/ExchangePage";
+import PaymentSuccess from "../pages/public/PaymentSuccess";
+import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 
 const generalRoutes = [
   {
@@ -315,6 +317,14 @@ const generalRoutes = [
       description: "Configurando tu cuenta",
     },
   },
+  {
+    path: "/payment-success",
+    component: PaymentSuccess,
+    MediaMetadata: {
+      title: "Pago exitoso",
+      description: "Tu pago fue procesado correctamente",
+    },
+  },
 
   // Superadmin routes
   {
@@ -341,6 +351,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Organizaciones",
       description: "Lista de organizaciones — Superadmin",
+    },
+  },
+  {
+    path: "/superadmin/planes",
+    component: SuperadminPlans,
+    MediaMetadata: {
+      title: "Gestión de Planes",
+      description: "Crea y edita los planes de la plataforma",
     },
   },
   {

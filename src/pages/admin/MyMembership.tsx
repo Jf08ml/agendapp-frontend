@@ -31,22 +31,32 @@ import {
   MembershipStatus,
 } from "../../services/membershipService";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
+import { ActivatePlanModal } from "../../components/ActivatePlanModal";
 import { apiPlansPublic } from "../../services/axiosConfig";
 import { IoAlertCircle } from "react-icons/io5";
 import { BiCalendar, BiCreditCard, BiX } from "react-icons/bi";
+
+interface PublicPlan {
+  _id: string;
+  displayName: string;
+  billingCycle: string;
+  domainType: string;
+  price: number;
+  currency: string;
+  characteristics: string[];
+  limits: Record<string, any>;
+  slug: string;
+}
 
 export default function MyMembership() {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [status, setStatus] = useState<MembershipStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentModalOpened, setPaymentModalOpened] = useState(false);
-  const [publicPlans, setPublicPlans] = useState<any[]>([]);
+  const [publicPlans, setPublicPlans] = useState<PublicPlan[]>([]);
   const [plansError, setPlansError] = useState(false);
-  const [transferOpened, setTransferOpened] = useState(false);
-  const [transferPlan, setTransferPlan] = useState<{
-    name: string;
-    amount: number;
-  } | null>(null);
+  const [activatePlan, setActivatePlan] = useState<PublicPlan | null>(null);
+
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
@@ -57,7 +67,6 @@ export default function MyMembership() {
 
   const loadMembership = async () => {
     if (!organization?._id) return;
-
     setLoading(true);
     try {
       const [membershipData, statusData] = await Promise.all([
@@ -74,16 +83,7 @@ export default function MyMembership() {
   };
 
   useEffect(() => {
-    (async () => {
-      try {
-        setPlansError(false);
-        const res = await apiPlansPublic.get("/public");
-        setPublicPlans(res.data?.data || []);
-      } catch (e) {
-        console.error("Error cargando planes:", e);
-        setPlansError(true);
-      }
-    })();
+    loadPlans();
   }, []);
 
   const loadPlans = async () => {
@@ -121,10 +121,8 @@ export default function MyMembership() {
     return labels[s] || s;
   };
 
-  // Calculate trial progress
   const getTrialInfo = () => {
     if (!membership || membership.status !== "trial") return null;
-
     const now = new Date();
     const end = new Date(membership.currentPeriodEnd);
     const start = new Date(membership.startDate);
@@ -136,11 +134,7 @@ export default function MyMembership() {
       0,
       Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     );
-    const progress = Math.min(
-      100,
-      ((totalDays - daysRemaining) / totalDays) * 100
-    );
-
+    const progress = Math.min(100, ((totalDays - daysRemaining) / totalDays) * 100);
     return { totalDays, daysRemaining, progress, endDate: end };
   };
 
@@ -169,28 +163,16 @@ export default function MyMembership() {
     return (
       <Container size="lg" py="xl">
         <Stack gap="xl">
-          <Alert
-            icon={<IoAlertCircle size={18} />}
-            title="Sin membresía"
-            color="yellow"
-          >
+          <Alert icon={<IoAlertCircle size={18} />} title="Sin membresía" color="yellow">
             No se encontró una membresía activa para tu organización. Elige un
             plan para comenzar.
           </Alert>
 
           {plansError ? (
-            <Alert
-              icon={<IoAlertCircle size={18} />}
-              title="Error al cargar planes"
-              color="red"
-            >
+            <Alert icon={<IoAlertCircle size={18} />} title="Error al cargar planes" color="red">
               <Stack gap="sm">
-                <Text size="sm">
-                  No se pudieron cargar los planes disponibles.
-                </Text>
-                <Button size="xs" variant="light" onClick={loadPlans}>
-                  Reintentar
-                </Button>
+                <Text size="sm">No se pudieron cargar los planes disponibles.</Text>
+                <Button size="xs" variant="light" onClick={loadPlans}>Reintentar</Button>
               </Stack>
             </Alert>
           ) : (
@@ -200,32 +182,17 @@ export default function MyMembership() {
                   <Card withBorder shadow="sm" radius="md">
                     <Stack gap="sm">
                       <Group justify="space-between">
-                        <Text size="lg" fw={700}>
-                          {p.displayName}
-                        </Text>
+                        <Text size="lg" fw={700}>{p.displayName}</Text>
                         <Badge>
-                          {p.domainType === "custom_domain"
-                            ? "Dominio propio"
-                            : "Subdominio"}
+                          {p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}
                         </Badge>
                       </Group>
                       <Text c="dimmed">
                         {p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}
                       </Text>
-                      <Text fw={700} size="lg">
-                        ${p.price} {p.currency}
-                      </Text>
-                      <Button
-                        variant="light"
-                        onClick={() => {
-                          setTransferPlan({
-                            name: p.displayName,
-                            amount: p.price,
-                          });
-                          setTransferOpened(true);
-                        }}
-                      >
-                        Pagar por transferencia
+                      <Text fw={700} size="lg">${p.price} {p.currency}</Text>
+                      <Button onClick={() => setActivatePlan(p)}>
+                        Activar mi plan
                       </Button>
                     </Stack>
                   </Card>
@@ -233,15 +200,13 @@ export default function MyMembership() {
               ))}
             </Grid>
           )}
-
-          <PaymentMethodsModal
-            opened={transferOpened}
-            onClose={() => setTransferOpened(false)}
-            membership={null}
-            planName={transferPlan?.name}
-            planPrice={transferPlan?.amount}
-          />
         </Stack>
+
+        <ActivatePlanModal
+          opened={!!activatePlan}
+          onClose={() => setActivatePlan(null)}
+          plan={activatePlan}
+        />
       </Container>
     );
   }
@@ -262,27 +227,18 @@ export default function MyMembership() {
             </Text>
           </div>
           <Group gap="md">
-            <Badge
-              size="xl"
-              variant="filled"
-              color={getStatusColor(membership.status)}
-            >
+            <Badge size="xl" variant="filled" color={getStatusColor(membership.status)}>
               {getStatusLabel(membership.status)}
             </Badge>
             {!isTrial && (
-              <Button
-                size="lg"
-                onClick={() => setPaymentModalOpened(true)}
-                variant="filled"
-                color="blue"
-              >
+              <Button size="lg" onClick={() => setPaymentModalOpened(true)} variant="filled" color="blue">
                 Renovar Membresía
               </Button>
             )}
           </Group>
         </Group>
 
-        {/* Trial alert with countdown */}
+        {/* Trial alert */}
         {isTrial && trialInfo && (
           <Alert
             icon={<IoAlertCircle size={18} />}
@@ -318,20 +274,10 @@ export default function MyMembership() {
 
         {/* Alerta de estado (non-trial) */}
         {!isTrial && status?.ui && (
-          <Alert
-            icon={<IoAlertCircle size={18} />}
-            color={status.ui.statusColor as any}
-            variant="light"
-          >
-            <Text size="sm" fw={600}>
-              {status.ui.statusMessage}
-            </Text>
+          <Alert icon={<IoAlertCircle size={18} />} color={status.ui.statusColor as any} variant="light">
+            <Text size="sm" fw={600}>{status.ui.statusMessage}</Text>
             {status.ui.showRenewalButton && (
-              <Button
-                size="xs"
-                mt="sm"
-                onClick={() => setPaymentModalOpened(true)}
-              >
+              <Button size="xs" mt="sm" onClick={() => setPaymentModalOpened(true)}>
                 Renovar Ahora
               </Button>
             )}
@@ -344,34 +290,23 @@ export default function MyMembership() {
             <Card withBorder shadow="sm" padding="lg" radius="md">
               <Stack gap="md">
                 <Group>
-                  <BiCreditCard
-                    size={24}
-                    color="var(--mantine-color-blue-6)"
-                  />
-                  <Text size="lg" fw={600}>
-                    Plan Actual
-                  </Text>
+                  <BiCreditCard size={24} color="var(--mantine-color-blue-6)" />
+                  <Text size="lg" fw={600}>Plan Actual</Text>
                 </Group>
                 <Divider />
                 <div>
                   <Text size="xl" fw={700} c="blue">
-                    {isTrial
-                      ? "Trial (Prueba Gratuita)"
-                      : membership.planId.displayName}
+                    {isTrial ? "Trial (Prueba Gratuita)" : membership.planId.displayName}
                   </Text>
                   <Text size="sm" c="dimmed">
                     {isTrial
                       ? `${trialInfo?.totalDays || 7} días de acceso completo`
-                      : membership.planId.billingCycle === "monthly"
-                        ? "Mensual"
-                        : "Anual"}
+                      : membership.planId.billingCycle === "monthly" ? "Mensual" : "Anual"}
                   </Text>
                 </div>
                 {!isTrial && (
                   <div>
-                    <Text size="xs" c="dimmed">
-                      Precio
-                    </Text>
+                    <Text size="xs" c="dimmed">Precio</Text>
                     <Text size="xl" fw={700}>
                       ${membership.planId.price} {membership.planId.currency}
                     </Text>
@@ -379,12 +314,8 @@ export default function MyMembership() {
                 )}
                 {isTrial && (
                   <div>
-                    <Text size="xs" c="dimmed">
-                      Precio
-                    </Text>
-                    <Text size="xl" fw={700} c="green">
-                      Gratis
-                    </Text>
+                    <Text size="xs" c="dimmed">Precio</Text>
+                    <Text size="xl" fw={700} c="green">Gratis</Text>
                   </div>
                 )}
               </Stack>
@@ -395,10 +326,7 @@ export default function MyMembership() {
             <Card withBorder shadow="sm" padding="lg" radius="md">
               <Stack gap="md">
                 <Group>
-                  <BiCalendar
-                    size={24}
-                    color="var(--mantine-color-green-6)"
-                  />
+                  <BiCalendar size={24} color="var(--mantine-color-green-6)" />
                   <Text size="lg" fw={600}>
                     {isTrial ? "Período de Prueba" : "Fechas"}
                   </Text>
@@ -406,19 +334,14 @@ export default function MyMembership() {
                 <Divider />
                 <div>
                   <Text size="xs" c="dimmed">
-                    {isTrial
-                      ? "Fecha de expiración del trial"
-                      : "Fecha de Vencimiento"}
+                    {isTrial ? "Fecha de expiración del trial" : "Fecha de Vencimiento"}
                   </Text>
                   <Text size="lg" fw={600}>
-                    {new Date(membership.currentPeriodEnd).toLocaleDateString(
-                      "es-CO",
-                      {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      }
-                    )}
+                    {new Date(membership.currentPeriodEnd).toLocaleDateString("es-CO", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
                   </Text>
                   {status?.membership?.daysUntilExpiration !== undefined && (
                     <Badge
@@ -439,14 +362,10 @@ export default function MyMembership() {
                 </div>
                 {!isTrial && (
                   <div>
-                    <Text size="xs" c="dimmed">
-                      Próximo Pago
-                    </Text>
+                    <Text size="xs" c="dimmed">Próximo Pago</Text>
                     <Text size="sm">
                       {membership.nextPaymentDue
-                        ? new Date(
-                            membership.nextPaymentDue
-                          ).toLocaleDateString("es-CO")
+                        ? new Date(membership.nextPaymentDue).toLocaleDateString("es-CO")
                         : "No programado"}
                     </Text>
                   </div>
@@ -462,9 +381,7 @@ export default function MyMembership() {
             <Stack gap="md">
               <div>
                 <Text size="lg" fw={600}>
-                  {isTrial
-                    ? "Elige tu plan para continuar"
-                    : "Reactiva tu cuenta"}
+                  {isTrial ? "Elige tu plan para continuar" : "Reactiva tu cuenta"}
                 </Text>
                 <Text size="sm" c="dimmed">
                   {isTrial
@@ -474,49 +391,22 @@ export default function MyMembership() {
               </div>
 
               {plansError ? (
-                <Alert
-                  icon={<IoAlertCircle size={18} />}
-                  title="Error al cargar planes"
-                  color="red"
-                >
+                <Alert icon={<IoAlertCircle size={18} />} title="Error al cargar planes" color="red">
                   <Stack gap="sm">
-                    <Text size="sm">
-                      No se pudieron cargar los planes disponibles.
-                    </Text>
-                    <Button size="xs" variant="light" onClick={loadPlans}>
-                      Reintentar
-                    </Button>
+                    <Text size="sm">No se pudieron cargar los planes disponibles.</Text>
+                    <Button size="xs" variant="light" onClick={loadPlans}>Reintentar</Button>
                   </Stack>
                 </Alert>
               ) : (
                 <Grid>
                   {paidPlans.map((p) => (
-                    <Grid.Col
-                      key={p._id}
-                      span={{ base: 12, md: 6, lg: 4 }}
-                    >
-                      <Card
-                        withBorder
-                        shadow="sm"
-                        radius="md"
-                        padding="lg"
-                      >
+                    <Grid.Col key={p._id} span={{ base: 12, md: 6, lg: 4 }}>
+                      <Card withBorder shadow="sm" radius="md" padding="lg">
                         <Stack gap="sm">
                           <Group justify="space-between">
-                            <Text size="lg" fw={700}>
-                              {p.displayName}
-                            </Text>
-                            <Badge
-                              variant="light"
-                              color={
-                                p.domainType === "custom_domain"
-                                  ? "grape"
-                                  : "blue"
-                              }
-                            >
-                              {p.domainType === "custom_domain"
-                                ? "Dominio propio"
-                                : "Subdominio"}
+                            <Text size="lg" fw={700}>{p.displayName}</Text>
+                            <Badge variant="light" color={p.domainType === "custom_domain" ? "grape" : "blue"}>
+                              {p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}
                             </Badge>
                           </Group>
 
@@ -524,10 +414,7 @@ export default function MyMembership() {
                             <Text size="xl" fw={700} c="blue">
                               ${p.price}{" "}
                               <Text span size="sm" c="dimmed" fw={400}>
-                                {p.currency} /{" "}
-                                {p.billingCycle === "monthly"
-                                  ? "mes"
-                                  : p.billingCycle}
+                                {p.currency} / {p.billingCycle === "monthly" ? "mes" : p.billingCycle}
                               </Text>
                             </Text>
                           </div>
@@ -539,20 +426,14 @@ export default function MyMembership() {
                                 size="sm"
                                 spacing="xs"
                                 icon={
-                                  <ThemeIcon
-                                    color="green"
-                                    size={18}
-                                    radius="xl"
-                                  >
+                                  <ThemeIcon color="green" size={18} radius="xl">
                                     <CheckIcon size={12} />
                                   </ThemeIcon>
                                 }
                               >
-                                {p.characteristics
-                                  .slice(0, 5)
-                                  .map((c: string, i: number) => (
-                                    <List.Item key={i}>{c}</List.Item>
-                                  ))}
+                                {p.characteristics.slice(0, 5).map((c: string, i: number) => (
+                                  <List.Item key={i}>{c}</List.Item>
+                                ))}
                                 {p.characteristics.length > 5 && (
                                   <Text size="xs" c="dimmed" mt={4}>
                                     +{p.characteristics.length - 5} más
@@ -562,18 +443,8 @@ export default function MyMembership() {
                             </>
                           )}
 
-                          <Button
-                            fullWidth
-                            mt="sm"
-                            onClick={() => {
-                              setTransferPlan({
-                                name: p.displayName,
-                                amount: p.price,
-                              });
-                              setTransferOpened(true);
-                            }}
-                          >
-                            Solicitar activación
+                          <Button fullWidth mt="sm" onClick={() => setActivatePlan(p)}>
+                            Activar mi plan
                           </Button>
                         </Stack>
                       </Card>
@@ -581,14 +452,6 @@ export default function MyMembership() {
                   ))}
                 </Grid>
               )}
-
-              <Alert color="gray" variant="light">
-                <Text size="sm">
-                  Realiza el pago por transferencia bancaria y nuestro equipo
-                  activará tu plan en menos de 24 horas. Recibirás una
-                  confirmación por WhatsApp.
-                </Text>
-              </Alert>
             </Stack>
           </Paper>
         )}
@@ -596,23 +459,16 @@ export default function MyMembership() {
         {/* Características del Plan (solo para planes activos, no trial) */}
         {!isTrial && (
           <Paper withBorder p="lg" radius="md">
-            <Text size="lg" fw={600} mb="md">
-              Características de tu Plan
-            </Text>
+            <Text size="lg" fw={600} mb="md">Características de tu Plan</Text>
             <Grid>
-              {membership.planId.characteristics.map(
-                (char: string, index: number) => (
-                  <Grid.Col key={index} span={{ base: 12, md: 6 }}>
-                    <Group gap="xs">
-                      <CheckIcon
-                        size={16}
-                        color="var(--mantine-color-green-6)"
-                      />
-                      <Text size="sm">{char}</Text>
-                    </Group>
-                  </Grid.Col>
-                )
-              )}
+              {membership.planId.characteristics.map((char: string, index: number) => (
+                <Grid.Col key={index} span={{ base: 12, md: 6 }}>
+                  <Group gap="xs">
+                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
+                    <Text size="sm">{char}</Text>
+                  </Group>
+                </Grid.Col>
+              ))}
             </Grid>
           </Paper>
         )}
@@ -620,38 +476,24 @@ export default function MyMembership() {
         {/* Límites del Plan (solo para planes activos, no trial) */}
         {!isTrial && (
           <Paper withBorder p="lg" radius="md">
-            <Text size="lg" fw={600} mb="md">
-              Límites y Restricciones
-            </Text>
+            <Text size="lg" fw={600} mb="md">Límites y Restricciones</Text>
             <Grid>
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <div>
-                  <Text size="xs" c="dimmed">
-                    Empleados Máximos
-                  </Text>
-                  <Text size="lg" fw={600}>
-                    {membership.planId.limits?.maxEmployees || "Ilimitado"}
-                  </Text>
+                  <Text size="xs" c="dimmed">Empleados Máximos</Text>
+                  <Text size="lg" fw={600}>{membership.planId.limits?.maxEmployees || "Ilimitado"}</Text>
                 </div>
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <div>
-                  <Text size="xs" c="dimmed">
-                    Servicios Máximos
-                  </Text>
-                  <Text size="lg" fw={600}>
-                    {membership.planId.limits?.maxServices || "Ilimitado"}
-                  </Text>
+                  <Text size="xs" c="dimmed">Servicios Máximos</Text>
+                  <Text size="lg" fw={600}>{membership.planId.limits?.maxServices || "Ilimitado"}</Text>
                 </div>
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <div>
-                  <Text size="xs" c="dimmed">
-                    Almacenamiento
-                  </Text>
-                  <Text size="lg" fw={600}>
-                    {membership.planId.limits?.maxStorageGB || "Ilimitado"} GB
-                  </Text>
+                  <Text size="xs" c="dimmed">Almacenamiento</Text>
+                  <Text size="lg" fw={600}>{membership.planId.limits?.maxStorageGB || "Ilimitado"} GB</Text>
                 </div>
               </Grid.Col>
             </Grid>
@@ -662,10 +504,7 @@ export default function MyMembership() {
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Group gap="xs">
                   {membership.planId.limits?.customBranding ? (
-                    <CheckIcon
-                      size={16}
-                      color="var(--mantine-color-green-6)"
-                    />
+                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
                   ) : (
                     <BiX size={16} color="var(--mantine-color-red-6)" />
                   )}
@@ -675,10 +514,7 @@ export default function MyMembership() {
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Group gap="xs">
                   {membership.planId.limits?.whatsappIntegration ? (
-                    <CheckIcon
-                      size={16}
-                      color="var(--mantine-color-green-6)"
-                    />
+                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
                   ) : (
                     <BiX size={16} color="var(--mantine-color-red-6)" />
                   )}
@@ -688,10 +524,7 @@ export default function MyMembership() {
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Group gap="xs">
                   {membership.planId.limits?.analyticsAdvanced ? (
-                    <CheckIcon
-                      size={16}
-                      color="var(--mantine-color-green-6)"
-                    />
+                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
                   ) : (
                     <BiX size={16} color="var(--mantine-color-red-6)" />
                   )}
@@ -701,10 +534,7 @@ export default function MyMembership() {
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Group gap="xs">
                   {membership.planId.limits?.prioritySupport ? (
-                    <CheckIcon
-                      size={16}
-                      color="var(--mantine-color-green-6)"
-                    />
+                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
                   ) : (
                     <BiX size={16} color="var(--mantine-color-red-6)" />
                   )}
@@ -716,20 +546,18 @@ export default function MyMembership() {
         )}
       </Stack>
 
-      {/* Modal de Pago (renovación) */}
+      {/* Modal de renovación (plan ya activo) */}
       <PaymentMethodsModal
         opened={paymentModalOpened}
         onClose={() => setPaymentModalOpened(false)}
         membership={membership}
       />
 
-      {/* Modal de Pago (activación de plan) */}
-      <PaymentMethodsModal
-        opened={transferOpened}
-        onClose={() => setTransferOpened(false)}
-        membership={null}
-        planName={transferPlan?.name}
-        planPrice={transferPlan?.amount}
+      {/* Modal de activación de plan (trial / suspended / etc.) */}
+      <ActivatePlanModal
+        opened={!!activatePlan}
+        onClose={() => setActivatePlan(null)}
+        plan={activatePlan}
       />
     </Container>
   );

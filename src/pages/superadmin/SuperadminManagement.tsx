@@ -39,7 +39,7 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
-import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiArrowBack, BiBuildings } from "react-icons/bi";
+import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiArrowBack, BiBuildings, BiPackage } from "react-icons/bi";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
@@ -347,7 +347,15 @@ export default function SuperadminManagement() {
             leftSection={<BiCreditCard size={16} />}
             size="sm"
           >
-            Gestión de membresías
+            Membresías
+          </Button>
+          <Button
+            variant="light"
+            leftSection={<BiPackage size={16} />}
+            size="sm"
+            onClick={() => navigate("/superadmin/planes")}
+          >
+            Planes
           </Button>
         </Group>
 
