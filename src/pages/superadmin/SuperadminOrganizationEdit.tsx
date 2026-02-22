@@ -91,7 +91,6 @@ const DEFAULT_VALUES: SuperadminFormValues = {
     end: "18:00",
     businessDays: [1, 2, 3, 4, 5],
     breaks: [],
-    stepMinutes: 5,
   },
   weeklySchedule: {
     enabled: false,
@@ -200,7 +199,6 @@ export default function SuperadminOrganizationEdit() {
               [1, 2, 3, 4, 5]
             ),
             breaks: ensureBreaks(response.openingHours?.breaks),
-            stepMinutes: response.openingHours?.stepMinutes ?? 5,
           },
           weeklySchedule: response.weeklySchedule ?? {
             enabled: false,
@@ -285,9 +283,9 @@ export default function SuperadminOrganizationEdit() {
       return;
     }
 
-    key === "logoUrl" && setUploadingLogo(true);
-    key === "faviconUrl" && setUploadingFavicon(true);
-    key === "pwaIcon" && setUploadingPwaIcon(true);
+    if (key === "logoUrl") setUploadingLogo(true);
+    if (key === "faviconUrl") setUploadingFavicon(true);
+    if (key === "pwaIcon") setUploadingPwaIcon(true);
 
     try {
       const url = await uploadImage(file);
@@ -312,9 +310,9 @@ export default function SuperadminOrganizationEdit() {
         color: "red",
       });
     } finally {
-      key === "logoUrl" && setUploadingLogo(false);
-      key === "faviconUrl" && setUploadingFavicon(false);
-      key === "pwaIcon" && setUploadingPwaIcon(false);
+      if (key === "logoUrl") setUploadingLogo(false);
+      if (key === "faviconUrl") setUploadingFavicon(false);
+      if (key === "pwaIcon") setUploadingPwaIcon(false);
     }
   };
 
