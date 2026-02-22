@@ -17,9 +17,6 @@ import {
 } from "@mantine/core";
 import {
   IconCheck,
-  IconScissors,
-  IconUsers,
-  IconCalendar,
   IconBrandWhatsapp,
   IconMessage,
   IconArrowRight,

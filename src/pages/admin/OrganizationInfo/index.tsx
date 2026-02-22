@@ -248,7 +248,7 @@ export default function OrganizationInfo() {
 
       <Tabs defaultValue="contact" keepMounted={false}>
         <ScrollArea>
-          <Tabs.List wrap="nowrap">
+          <Tabs.List>
             <Tabs.Tab value="contact" leftSection={<IconBuilding size={14} />}>
               Negocio
             </Tabs.Tab>
