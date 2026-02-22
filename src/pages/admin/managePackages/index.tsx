@@ -453,7 +453,7 @@ const AdminPackages: React.FC = () => {
         </Tabs.Panel>
 
         <Tabs.Panel value="assigned">
-          <ClientPackagesTab clients={clients} currency={currency} />
+          <ClientPackagesTab currency={currency} />
         </Tabs.Panel>
       </Tabs>
 

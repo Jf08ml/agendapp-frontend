@@ -204,6 +204,22 @@ export const deleteClientPackage = async (
   }
 };
 
+export const getAllOrgClientPackages = async (
+  organizationId: string,
+  status = ""
+): Promise<ClientPackage[]> => {
+  try {
+    const response = await apiPackage.get<Response<ClientPackage[]>>(
+      `/organization/${organizationId}/assigned`,
+      { params: status ? { status } : undefined }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener los paquetes asignados");
+    return [];
+  }
+};
+
 export const getActivePackagesForService = async (
   clientId: string,
   serviceId: string,
