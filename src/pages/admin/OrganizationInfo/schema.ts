@@ -74,11 +74,6 @@ export const schema = z.object({
         )
         .optional(),
 
-      stepMinutes: z.union([
-        z.number().int().min(1).max(60),
-        z.null(),
-        z.undefined()
-      ]).optional()
     })
     // Validación cruzada start < end (solo si ambos están presentes y no vacíos)
     .refine(
@@ -100,7 +95,7 @@ export const schema = z.object({
     .object({
       enabled: z.boolean().optional(),
       stepMinutes: z.union([
-        z.number().int().min(5).max(60),
+        z.number().int().min(1).max(1440),
         z.null(),
         z.undefined()
       ]).optional(),
@@ -109,13 +104,13 @@ export const schema = z.object({
           z.object({
             day: z.number().int().min(0).max(6),
             isOpen: z.boolean(),
-            start: hhmm.optional(),
-            end: hhmm.optional(),
+            start: hhmmOrEmpty.optional(),
+            end: hhmmOrEmpty.optional(),
             breaks: z
               .array(
                 z.object({
-                  start: hhmm.optional(),
-                  end: hhmm.optional(),
+                  start: hhmmOrEmpty.optional(),
+                  end: hhmmOrEmpty.optional(),
                   note: z.string().optional(),
                 })
               )

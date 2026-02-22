@@ -129,7 +129,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           canShow: can.onlineRes,
         },
         {
-          label: "Información del negocio",
+          label: "Configuración del negocio",
           to: "/informacion-negocio",
           icon: <MdOutlineLoyalty size={18} />,
           canShow: can.businessInfo,

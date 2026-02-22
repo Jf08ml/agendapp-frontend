@@ -1,16 +1,23 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Container, Divider, Tabs, rem } from "@mantine/core";
+import { useEffect, useRef, useState } from "react";
+import { Container, Divider, ScrollArea, Tabs, rem } from "@mantine/core";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
 import { showNotification } from "@mantine/notifications";
 import { IoAlertCircle } from "react-icons/io5";
-import { GrOrganization } from "react-icons/gr";
-import { RiGlobalLine } from "react-icons/ri";
-import { BiLocationPlus, BiCreditCard, BiCalendar } from "react-icons/bi";
-import { MdBrandingWatermark, MdBlock, MdNotifications } from "react-icons/md";
+import {
+  IconBuilding,
+  IconClock,
+  IconWorld,
+  IconMapPin,
+  IconStar,
+  IconPalette,
+  IconCreditCard,
+  IconBan,
+  IconBell,
+} from "@tabler/icons-react";
 
 import { RootState } from "../../../app/store";
 import {
@@ -34,15 +41,13 @@ import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
 import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
 import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
-import OnlineBookingTab from "./components/tabs/OnlineBookingTab";
 
 import { schema, FormValues } from "./schema";
-import { ensureBranding, ensureDomains } from "./utils";
+import { normalizeOrg } from "./utils";
 
 export default function OrganizationInfo() {
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
   const [org, setOrg] = useState<Organization | null>(null);
 
@@ -52,7 +57,7 @@ export default function OrganizationInfo() {
   const [uploadingPwaIcon, setUploadingPwaIcon] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // bloquear salida con cambios
+  // bloquear salida con cambios — actualizamos directo en render (ref siempre fresco)
   const isBlockingRef = useRef(false);
 
   const form = useForm<FormValues>({
@@ -61,75 +66,27 @@ export default function OrganizationInfo() {
     validateInputOnChange: true,
   });
 
+  // Calcular isDirty directamente en cada render (sin useMemo con [form] estable)
+  const isDirty = form.isDirty();
+  // Mantener la ref sincronizada para el beforeunload handler
+  isBlockingRef.current = isDirty;
+
   useEffect(() => {
     const fetchOrganization = async () => {
       try {
         if (!organizationId) return;
         const response = await getOrganizationById(organizationId);
         if (response) {
-          // OrganizationInfo.tsx (dentro de fetchOrganization)
-          const ensureArray = <T,>(arr: T[] | undefined, fallback: T[] = []) =>
-            Array.isArray(arr) ? [...arr] : [...fallback];
-
-          const ensureBreaks = (arr: any[] | undefined) =>
-            Array.isArray(arr) ? arr.map((b) => ({ ...b })) : [];
-
-          const normalized: Organization = {
-            ...response,
-            branding: ensureBranding(response.branding),
-            domains: ensureArray(response.domains, []),
-            default_country: response.default_country ?? "CO", // 🌍 País por defecto
-            timezone: response.timezone || undefined, // 🕐 Zona horaria - NO resetear a Colombia
-            showLoyaltyProgram: response.showLoyaltyProgram ?? true,
-            enableOnlineBooking: response.enableOnlineBooking ?? true,
-            blockHolidaysForReservations: response.blockHolidaysForReservations ?? false,
-            allowedHolidayDates: Array.isArray(response.allowedHolidayDates) ? [...response.allowedHolidayDates] : [],
-            welcomeTitle: response.welcomeTitle ?? "¡Hola! Bienvenido",
-            welcomeDescription: response.welcomeDescription ?? "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
-            homeLayout: response.homeLayout ?? "modern",
-            paymentMethods: ensureArray(response.paymentMethods, []),
-            requireReservationDeposit: response.requireReservationDeposit ?? false,
-            reservationDepositPercentage: response.reservationDepositPercentage ?? 50,
-            reminderSettings: {
-              enabled: response.reminderSettings?.enabled ?? true,
-              hoursBefore: response.reminderSettings?.hoursBefore ?? 24,
-              sendTimeStart: response.reminderSettings?.sendTimeStart ?? "07:00",
-              sendTimeEnd: response.reminderSettings?.sendTimeEnd ?? "20:00",
-              secondReminder: {
-                enabled: response.reminderSettings?.secondReminder?.enabled ?? false,
-                hoursBefore: response.reminderSettings?.secondReminder?.hoursBefore ?? 2,
-              },
-            },
-            openingHours: {
-              start: response.openingHours?.start ?? "",
-              end: response.openingHours?.end ?? "",
-              businessDays: ensureArray(
-                response.openingHours?.businessDays,
-                [1, 2, 3, 4, 5]
-              ),
-              breaks: ensureBreaks(response.openingHours?.breaks),
-              stepMinutes: response.openingHours?.stepMinutes ?? 5,
-            },
-            weeklySchedule: response.weeklySchedule ?? {
-              enabled: false,
-              schedule: [],
-              stepMinutes: 30,
-            },
-            currency: response.currency ?? "COP",
-            cancellationPolicy: {
-              minHoursBeforeAppointment: response.cancellationPolicy?.minHoursBeforeAppointment ?? 0,
-              preventCancellingConfirmed: response.cancellationPolicy?.preventCancellingConfirmed ?? false,
-            },
-          };
+          const normalized = normalizeOrg(response);
+          const clone = structuredClone
+            ? structuredClone(normalized as any)
+            : JSON.parse(JSON.stringify(normalized));
 
           setOrg(normalized);
-          // 👇 Muy importante: pasar COPIAS al form
-          form.setValues(
-            structuredClone
-              ? structuredClone(normalized as any)
-              : JSON.parse(JSON.stringify(normalized))
-          );
-          form.resetDirty();
+          form.setValues(clone);
+          // Pasar el clone explícitamente para evitar problemas de batching
+          // entre setValues y resetDirty en React 18
+          form.resetDirty(clone);
         }
       } catch (e) {
         console.error(e);
@@ -155,12 +112,6 @@ export default function OrganizationInfo() {
     return () => window.removeEventListener("beforeunload", beforeUnload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId]);
-
-  // Track dirty
-  const isDirty = useMemo(() => form.isDirty(), [form]);
-  useEffect(() => {
-    isBlockingRef.current = isEditing && isDirty;
-  }, [isEditing, isDirty]);
 
   // helper de upload con loaders por campo
   const onUpload = async (
@@ -220,28 +171,33 @@ export default function OrganizationInfo() {
   };
 
   const handleCancel = () => {
-    form.setValues((org || {}) as any);
-    form.resetDirty();
-    setIsEditing(false);
+    if (!org) return;
+    const clone = structuredClone
+      ? structuredClone(org as any)
+      : JSON.parse(JSON.stringify(org));
+    form.setValues(clone);
+    form.resetDirty(clone);
   };
 
   const handleSave = async () => {
     if (!organizationId) return;
-    
+
     // Validar usando Zod directamente para evitar problemas con zodResolver
     const validationResult = schema.safeParse(form.values);
-    
+
     if (!validationResult.success) {
       const errors = validationResult.error.flatten();
       console.error("Errores de validación:", errors);
       showNotification({
         title: "Revisa los campos",
-        message: Object.values(errors.fieldErrors).flat()[0] as string || "Hay errores de validación",
+        message:
+          (Object.values(errors.fieldErrors).flat()[0] as string) ||
+          "Hay errores de validación",
         color: "red",
       });
       return;
     }
-    
+
     try {
       setSaving(true);
       const payload = validationResult.data as Organization;
@@ -249,17 +205,19 @@ export default function OrganizationInfo() {
       if (!updated) throw new Error("Actualización vacía");
 
       dispatch(updateOrganizationState(updated));
-      const normalized: Organization = {
-        ...updated,
-        branding: ensureBranding(updated.branding),
-        domains: ensureDomains(updated.domains),
-        timezone: updated.timezone || undefined, // Preservar timezone del backend
-        currency: updated.currency || undefined,
-      };
+
+      // Normalización completa (igual que en fetchOrganization) para que todos
+      // los campos anidados tengan sus defaults y no queden como undefined.
+      const normalized = normalizeOrg(updated);
+      const clone = structuredClone
+        ? structuredClone(normalized as any)
+        : JSON.parse(JSON.stringify(normalized));
+
       setOrg(normalized);
-      form.setValues(normalized as any);
-      form.resetDirty();
-      setIsEditing(false);
+      form.setValues(clone);
+      // Pasar el clone explícitamente para que el dirty baseline sea el
+      // valor guardado, sin depender de que setValues ya haya sido procesado.
+      form.resetDirty(clone);
 
       showNotification({
         title: "Guardado",
@@ -282,142 +240,73 @@ export default function OrganizationInfo() {
     return <CustomLoader loadingText="Cargando organización..." />;
 
   return (
-    <Container size="md" py="md">
-      <HeaderBar
-        org={org}
-        isEditing={isEditing}
-        onEdit={() => setIsEditing(true)}
-        onSave={handleSave}
-        onCancel={handleCancel}
-        saving={saving}
-      />
+    // pb extra cuando el StickyActionBar está visible para que no tape inputs
+    <Container size="md" py="md" pb={isDirty ? rem(90) : "md"}>
+      <HeaderBar org={org} />
 
       <Divider my="sm" />
 
       <Tabs defaultValue="contact" keepMounted={false}>
-        <Tabs.List>
-          <Tabs.Tab
-            value="contact"
-            leftSection={
-              <GrOrganization style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Nombre y contacto
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="openingsHours"
-            leftSection={
-              <GrOrganization style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Horario de atención
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="socialMedia"
-            leftSection={
-              <RiGlobalLine style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Redes sociales
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="location"
-            leftSection={
-              <BiLocationPlus style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Ubicación
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="onlineBooking"
-            leftSection={
-              <BiCalendar style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Reserva en línea
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="fidelity"
-            leftSection={
-              <GrOrganization style={{ width: rem(12), height: rem(12) }} />
-            }
-          >
-            Fidelidad
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="branding"
-            leftSection={
-              <MdBrandingWatermark
-                style={{ width: rem(12), height: rem(12) }}
-              />
-            }
-          >
-            Branding
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="payments"
-            leftSection={
-              <BiCreditCard
-                style={{ width: rem(12), height: rem(12) }}
-              />
-            }
-          >
-            Métodos de Pago
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="cancellation"
-            leftSection={
-              <MdBlock
-                style={{ width: rem(12), height: rem(12) }}
-              />
-            }
-          >
-            Cancelación
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="reminders"
-            leftSection={
-              <MdNotifications
-                style={{ width: rem(12), height: rem(12) }}
-              />
-            }
-          >
-            Recordatorios
-          </Tabs.Tab>
-        </Tabs.List>
+        <ScrollArea>
+          <Tabs.List wrap="nowrap">
+            <Tabs.Tab value="contact" leftSection={<IconBuilding size={14} />}>
+              Negocio
+            </Tabs.Tab>
+            <Tabs.Tab value="openingsHours" leftSection={<IconClock size={14} />}>
+              Horario y reservas
+            </Tabs.Tab>
+            <Tabs.Tab value="socialMedia" leftSection={<IconWorld size={14} />}>
+              Redes sociales
+            </Tabs.Tab>
+            <Tabs.Tab value="location" leftSection={<IconMapPin size={14} />}>
+              Ubicación
+            </Tabs.Tab>
+            <Tabs.Tab value="fidelity" leftSection={<IconStar size={14} />}>
+              Fidelidad
+            </Tabs.Tab>
+            <Tabs.Tab value="branding" leftSection={<IconPalette size={14} />}>
+              Branding
+            </Tabs.Tab>
+            <Tabs.Tab value="payments" leftSection={<IconCreditCard size={14} />}>
+              Pagos
+            </Tabs.Tab>
+            <Tabs.Tab value="cancellation" leftSection={<IconBan size={14} />}>
+              Cancelación
+            </Tabs.Tab>
+            <Tabs.Tab value="reminders" leftSection={<IconBell size={14} />}>
+              Recordatorios
+            </Tabs.Tab>
+          </Tabs.List>
+        </ScrollArea>
 
         <Tabs.Panel value="contact" pt="md">
           <ContactTab
             form={form}
-            isEditing={isEditing}
+            isEditing={true}
             domains={org.domains || []}
           />
         </Tabs.Panel>
 
         <Tabs.Panel value="openingsHours" pt="md">
-          <OpeningHoursTab form={form} isEditing={isEditing} />
+          <OpeningHoursTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="socialMedia" pt="md">
-          <SocialMediaTab form={form} isEditing={isEditing} />
+          <SocialMediaTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="location" pt="md">
-          <LocationTab form={form} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="onlineBooking" pt="md">
-          <OnlineBookingTab form={form} isEditing={isEditing} />
+          <LocationTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="fidelity" pt="md">
-          <FidelityTab form={form} isEditing={isEditing} />
+          <FidelityTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="branding" pt="md">
           <BrandingTab
             form={form}
-            isEditing={isEditing}
+            isEditing={true}
             uploadingLogo={uploadingLogo}
             uploadingFavicon={uploadingFavicon}
             uploadingPwaIcon={uploadingPwaIcon}
@@ -426,22 +315,19 @@ export default function OrganizationInfo() {
         </Tabs.Panel>
 
         <Tabs.Panel value="payments" pt="md">
-          <PaymentMethodsTab
-            form={form}
-            isEditing={isEditing}
-          />
+          <PaymentMethodsTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="cancellation" pt="md">
-          <CancellationPolicyTab form={form} isEditing={isEditing} />
+          <CancellationPolicyTab form={form} isEditing={true} />
         </Tabs.Panel>
 
         <Tabs.Panel value="reminders" pt="md">
-          <ReminderSettingsTab form={form} isEditing={isEditing} />
+          <ReminderSettingsTab form={form} isEditing={true} />
         </Tabs.Panel>
       </Tabs>
 
-      {isEditing && (
+      {isDirty && (
         <StickyActionBar
           isDirty={isDirty}
           saving={saving}

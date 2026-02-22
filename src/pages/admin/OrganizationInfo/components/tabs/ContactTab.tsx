@@ -1,5 +1,16 @@
 import { SimpleGrid, Stack, TextInput, Textarea, Select } from "@mantine/core";
 import { useMemo } from "react";
+import {
+  IconBuilding,
+  IconMail,
+  IconPhone,
+  IconGlobe,
+  IconClock,
+  IconCurrencyDollar,
+  IconLink,
+  IconLayoutColumns,
+  IconWriting,
+} from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -23,31 +34,47 @@ export default function ContactTab({
     }
     return TIMEZONES_BY_COUNTRY[selectedCountry];
   }, [selectedCountry]);
+
+  const countryLabel: Record<string, string> = {
+    CO: "Colombia", MX: "México", PE: "Perú", EC: "Ecuador", VE: "Venezuela",
+    PA: "Panamá", CR: "Costa Rica", CL: "Chile", AR: "Argentina", BR: "Brasil",
+    US: "EE.UU.", CA: "Canadá", SV: "El Salvador", ES: "España", UY: "Uruguay",
+  };
+
   return (
     <Stack gap="md">
       <SectionCard
         title="Nombre y contacto"
-        description="Estos datos se usan en tu encabezado, recibos y comunicaciones."
+        description="Estos datos se usan en tu encabezado, recibos y comunicaciones con clientes."
+        icon={<IconBuilding size={16} />}
+        iconColor="blue"
       >
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <TextInput
-            label="Nombre"
+            label="Nombre del negocio"
+            placeholder="Mi Salón"
+            leftSection={<IconBuilding size={16} />}
             {...form.getInputProps("name")}
             disabled={!isEditing}
           />
           <TextInput
             label="Correo electrónico"
+            placeholder="contacto@minegocio.com"
+            leftSection={<IconMail size={16} />}
             {...form.getInputProps("email")}
             disabled={!isEditing}
           />
           <TextInput
             label="Teléfono"
+            placeholder="+57 300 000 0000"
+            leftSection={<IconPhone size={16} />}
             {...form.getInputProps("phoneNumber")}
             disabled={!isEditing}
           />
           <Select
             label="País por defecto"
             description="País para validar números telefónicos de nuevos clientes"
+            leftSection={<IconGlobe size={16} />}
             {...form.getInputProps("default_country")}
             disabled={!isEditing}
             data={[
@@ -70,13 +97,16 @@ export default function ContactTab({
           />
           <Select
             label="Zona horaria"
-            description={selectedCountry
-              ? `Zonas horarias disponibles en ${selectedCountry === 'CO' ? 'Colombia' : selectedCountry === 'MX' ? 'México' : selectedCountry === 'PE' ? 'Perú' : selectedCountry === 'EC' ? 'Ecuador' : selectedCountry === 'VE' ? 'Venezuela' : selectedCountry === 'PA' ? 'Panamá' : selectedCountry === 'CR' ? 'Costa Rica' : selectedCountry === 'CL' ? 'Chile' : selectedCountry === 'AR' ? 'Argentina' : selectedCountry === 'BR' ? 'Brasil' : selectedCountry === 'US' ? 'EE.UU.' : selectedCountry === 'CA' ? 'Canadá' : selectedCountry === 'ES' ? 'España' : selectedCountry === 'SV' ? 'El Salvador' : selectedCountry === 'UY' ? 'Uruguay' : 'el país seleccionado'}`
-              : "Selecciona un país primero"}
+            description={
+              selectedCountry
+                ? `Zonas horarias en ${countryLabel[selectedCountry] ?? "el país seleccionado"}`
+                : "Selecciona un país primero"
+            }
+            leftSection={<IconClock size={16} />}
             {...form.getInputProps("timezone")}
             disabled={!isEditing || !selectedCountry}
             searchable
-            data={availableTimezones.map(tz => ({
+            data={availableTimezones.map((tz) => ({
               value: tz.value,
               label: `${tz.label} ${tz.offset}`,
             }))}
@@ -84,6 +114,7 @@ export default function ContactTab({
           <Select
             label="Moneda"
             description="Moneda principal usada por la organización"
+            leftSection={<IconCurrencyDollar size={16} />}
             {...form.getInputProps("currency")}
             disabled={!isEditing}
             data={[
@@ -104,6 +135,8 @@ export default function ContactTab({
           />
           <TextInput
             label="Dominios"
+            description="Gestionados por el equipo de soporte"
+            leftSection={<IconLink size={16} />}
             value={(domains || []).join(", ")}
             disabled
           />
@@ -112,12 +145,15 @@ export default function ContactTab({
 
       <SectionCard
         title="Mensaje de bienvenida"
-        description="Personaliza el mensaje que verán tus clientes en la página de inicio."
+        description="Personaliza el mensaje que verán tus clientes en la página de inicio pública."
+        icon={<IconWriting size={16} />}
+        iconColor="violet"
       >
         <Stack gap="md">
           <Select
             label="Diseño de página de inicio"
             description="Elige cómo se mostrará la página principal a tus clientes"
+            leftSection={<IconLayoutColumns size={16} />}
             {...form.getInputProps("homeLayout")}
             disabled={!isEditing}
             data={[

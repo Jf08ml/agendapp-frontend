@@ -1,21 +1,7 @@
-import { Badge, Button, Group, Title } from "@mantine/core";
+import { Badge, Group, Title } from "@mantine/core";
 import { Organization } from "../../../../services/organizationService";
 
-export default function HeaderBar({
-  org,
-  isEditing,
-  onEdit,
-  onSave,
-  onCancel,
-  saving,
-}: {
-  org: Organization;
-  isEditing: boolean;
-  onEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  saving: boolean;
-}) {
+export default function HeaderBar({ org }: { org: Organization }) {
   return (
     <Group justify="space-between" align="center" mb="xs">
       <Group gap="sm">
@@ -24,24 +10,6 @@ export default function HeaderBar({
           {org.isActive ? "Activo" : "Inactivo"}
         </Badge>
       </Group>
-
-      {!isEditing ? (
-        <Button onClick={onEdit}>Editar</Button>
-      ) : (
-        <Group gap="xs">
-          <Button color="green" onClick={onSave} loading={saving}>
-            Guardar cambios
-          </Button>
-          <Button
-            variant="light"
-            color="gray"
-            onClick={onCancel}
-            disabled={saving}
-          >
-            Cancelar
-          </Button>
-        </Group>
-      )}
     </Group>
   );
 }
