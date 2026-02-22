@@ -14,7 +14,7 @@ import {
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
-import { TIMEZONES_BY_COUNTRY, getAllTimezones, type CountryCode } from "../../constants/timezoneByCountry";
+import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../../../../utils/geoData";
 
 export default function ContactTab({
   form,
@@ -25,21 +25,22 @@ export default function ContactTab({
   isEditing: boolean;
   domains: string[];
 }) {
-  const selectedCountry = form.values.default_country as CountryCode | undefined;
+  // Listas completas memoizadas (ya están memoizadas en geoData, pero useMemo
+  // evita recalcular el .map() del Select en cada render).
+  const countryData = useMemo(
+    () => getAllCountries().map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
 
-  // Filtrar timezones según el país seleccionado
-  const availableTimezones = useMemo(() => {
-    if (!selectedCountry || !TIMEZONES_BY_COUNTRY[selectedCountry]) {
-      return getAllTimezones();
-    }
-    return TIMEZONES_BY_COUNTRY[selectedCountry];
-  }, [selectedCountry]);
+  const timezoneData = useMemo(
+    () => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })),
+    []
+  );
 
-  const countryLabel: Record<string, string> = {
-    CO: "Colombia", MX: "México", PE: "Perú", EC: "Ecuador", VE: "Venezuela",
-    PA: "Panamá", CR: "Costa Rica", CL: "Chile", AR: "Argentina", BR: "Brasil",
-    US: "EE.UU.", CA: "Canadá", SV: "El Salvador", ES: "España", UY: "Uruguay",
-  };
+  const currencyData = useMemo(
+    () => getAllCurrencies().map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
 
   return (
     <Stack gap="md">
@@ -77,39 +78,17 @@ export default function ContactTab({
             leftSection={<IconGlobe size={16} />}
             {...form.getInputProps("default_country")}
             disabled={!isEditing}
-            data={[
-              { value: "CO", label: "🇨🇴 Colombia" },
-              { value: "MX", label: "🇲🇽 México" },
-              { value: "PE", label: "🇵🇪 Perú" },
-              { value: "EC", label: "🇪🇨 Ecuador" },
-              { value: "VE", label: "🇻🇪 Venezuela" },
-              { value: "PA", label: "🇵🇦 Panamá" },
-              { value: "CR", label: "🇨🇷 Costa Rica" },
-              { value: "CL", label: "🇨🇱 Chile" },
-              { value: "AR", label: "🇦🇷 Argentina" },
-              { value: "BR", label: "🇧🇷 Brasil" },
-              { value: "US", label: "🇺🇸 Estados Unidos" },
-              { value: "CA", label: "🇨🇦 Canadá" },
-              { value: "SV", label: "🇸🇻 El Salvador" },
-              { value: "ES", label: "🇪🇸 España" },
-              { value: "UY", label: "🇺🇾 Uruguay" },
-            ]}
+            searchable
+            data={countryData}
           />
           <Select
             label="Zona horaria"
-            description={
-              selectedCountry
-                ? `Zonas horarias en ${countryLabel[selectedCountry] ?? "el país seleccionado"}`
-                : "Selecciona un país primero"
-            }
+            description="Busca tu zona horaria (ej: America/Bogota, Europe/Madrid)"
             leftSection={<IconClock size={16} />}
             {...form.getInputProps("timezone")}
-            disabled={!isEditing || !selectedCountry}
+            disabled={!isEditing}
             searchable
-            data={availableTimezones.map((tz) => ({
-              value: tz.value,
-              label: `${tz.label} ${tz.offset}`,
-            }))}
+            data={timezoneData}
           />
           <Select
             label="Moneda"
@@ -117,21 +96,8 @@ export default function ContactTab({
             leftSection={<IconCurrencyDollar size={16} />}
             {...form.getInputProps("currency")}
             disabled={!isEditing}
-            data={[
-              { value: "COP", label: "COP - Peso colombiano" },
-              { value: "MXN", label: "MXN - Peso mexicano" },
-              { value: "USD", label: "USD - Dólar americano" },
-              { value: "EUR", label: "EUR - Euro" },
-              { value: "CLP", label: "CLP - Peso chileno" },
-              { value: "CRC", label: "CRC - Colón costarricense" },
-              { value: "ARS", label: "ARS - Peso argentino" },
-              { value: "BRL", label: "BRL - Real brasileño" },
-              { value: "PEN", label: "PEN - Sol peruano" },
-              { value: "VES", label: "VES - Bolívar venezolano" },
-              { value: "PAB", label: "PAB - Balboa panameño" },
-              { value: "CAD", label: "CAD - Dólar canadiense" },
-              { value: "UYU", label: "UYU - Peso uruguayo" },
-            ]}
+            searchable
+            data={currencyData}
           />
           <TextInput
             label="Dominios"

@@ -1,6 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // utils/phoneUtils.ts
-import { parsePhoneNumber, isValidPhoneNumber, CountryCode } from 'libphonenumber-js';
+import {
+  parsePhoneNumber,
+  isValidPhoneNumber,
+  getCountries,
+  getCountryCallingCode,
+  type CountryCode,
+} from "libphonenumber-js";
 
 export interface PhoneValidationResult {
   phone_e164: string | null;
@@ -15,132 +21,139 @@ export interface PhoneValidationResult {
  * Normaliza un número de teléfono a formato E.164
  */
 export function normalizePhoneNumber(
-  phone: string, 
-  defaultCountry: CountryCode = 'CO'
+  phone: string,
+  defaultCountry: CountryCode = "CO"
 ): PhoneValidationResult {
   if (!phone?.trim()) {
-    return { 
-      phone_e164: null, 
-      phone_country: null, 
-      phone_national: null, 
-      calling_code: null, 
-      isValid: false, 
-      error: 'Teléfono requerido' 
+    return {
+      phone_e164: null,
+      phone_country: null,
+      phone_national: null,
+      calling_code: null,
+      isValid: false,
+      error: "Teléfono requerido",
     };
   }
 
   try {
-    let cleanPhone = phone.trim().replace(/[^\d+]/g, '');
-    
+    let cleanPhone = phone.trim().replace(/[^\d+]/g, "");
+
     // 🇸🇻 VALIDACIÓN TEMPRANA para El Salvador (7-8 dígitos)
-    if (defaultCountry === 'SV') {
-      const digitsOnly = cleanPhone.replace(/[^\d]/g, '');
+    if (defaultCountry === "SV") {
+      const digitsOnly = cleanPhone.replace(/[^\d]/g, "");
       // Si tiene exactamente 7 u 8 dígitos (sin código de país)
       if (digitsOnly.length === 7 || digitsOnly.length === 8) {
         const phoneE164 = `+503${digitsOnly}`;
-        console.log('[normalizePhoneNumber] Número SV de 7-8 dígitos aceptado:', phoneE164);
+        console.log("[normalizePhoneNumber] Número SV de 7-8 dígitos aceptado:", phoneE164);
         return {
           phone_e164: phoneE164,
-          phone_country: 'SV',
+          phone_country: "SV",
           phone_national: digitsOnly,
-          calling_code: '503',
+          calling_code: "503",
           isValid: true,
-          error: null
+          error: null,
         };
       }
       // Si tiene +503 seguido de 7-8 dígitos
-      if (digitsOnly.length >= 10 && digitsOnly.length <= 11 && digitsOnly.startsWith('503')) {
+      if (
+        digitsOnly.length >= 10 &&
+        digitsOnly.length <= 11 &&
+        digitsOnly.startsWith("503")
+      ) {
         const nationalNumber = digitsOnly.slice(3);
         if (nationalNumber.length === 7 || nationalNumber.length === 8) {
           const phoneE164 = `+${digitsOnly}`;
-          console.log('[normalizePhoneNumber] Número SV con código aceptado:', phoneE164);
+          console.log("[normalizePhoneNumber] Número SV con código aceptado:", phoneE164);
           return {
             phone_e164: phoneE164,
-            phone_country: 'SV',
+            phone_country: "SV",
             phone_national: nationalNumber,
-            calling_code: '503',
+            calling_code: "503",
             isValid: true,
-            error: null
+            error: null,
           };
         }
       }
     }
-    
+
     // Si empieza con 00, reemplazar por +
-    if (cleanPhone.startsWith('00')) {
-      cleanPhone = '+' + cleanPhone.slice(2);
+    if (cleanPhone.startsWith("00")) {
+      cleanPhone = "+" + cleanPhone.slice(2);
     }
-    
+
     // Si no tiene + y no parece internacional, añadir país por defecto
-    if (!cleanPhone.startsWith('+') && !looksLikeInternational(cleanPhone)) {
-      const countryCode = getCountryCallingCode(defaultCountry);
-      cleanPhone = `+${countryCode}${cleanPhone}`;
+    if (!cleanPhone.startsWith("+") && !looksLikeInternational(cleanPhone)) {
+      const code = getCallingCode(defaultCountry);
+      cleanPhone = `+${code}${cleanPhone}`;
     }
 
     const isValid = isValidPhoneNumber(cleanPhone, defaultCountry);
-    
+
     if (!isValid) {
-      return { 
-        phone_e164: null, 
-        phone_country: null, 
-        phone_national: null, 
-        calling_code: null, 
-        isValid: false, 
-        error: 'Número de teléfono inválido. Verifica el prefijo y la longitud.' 
+      return {
+        phone_e164: null,
+        phone_country: null,
+        phone_national: null,
+        calling_code: null,
+        isValid: false,
+        error: "Número de teléfono inválido. Verifica el prefijo y la longitud.",
       };
     }
 
     const phoneNumber = parsePhoneNumber(cleanPhone, defaultCountry);
-    
+
     return {
-      phone_e164: phoneNumber.format('E.164'),
+      phone_e164: phoneNumber.format("E.164"),
       phone_country: phoneNumber.country || null,
       phone_national: phoneNumber.formatNational(),
       calling_code: phoneNumber.countryCallingCode,
       isValid: true,
-      error: null
+      error: null,
     };
-
   } catch (error) {
-    console.error('[normalizePhoneNumber] Error:', error, 'Input:', phone);
-    
+    console.error("[normalizePhoneNumber] Error:", error, "Input:", phone);
+
     // 🇸🇻 FALLBACK para El Salvador
-    if (defaultCountry === 'SV') {
-      const digitsOnly = phone.replace(/\D/g, '');
+    if (defaultCountry === "SV") {
+      const digitsOnly = phone.replace(/\D/g, "");
       if (digitsOnly.length === 7 || digitsOnly.length === 8) {
         const phoneE164 = `+503${digitsOnly}`;
-        console.log('[normalizePhoneNumber] Usando fallback SV:', phoneE164);
+        console.log("[normalizePhoneNumber] Usando fallback SV:", phoneE164);
         return {
           phone_e164: phoneE164,
-          phone_country: 'SV',
+          phone_country: "SV",
           phone_national: digitsOnly,
-          calling_code: '503',
+          calling_code: "503",
           isValid: true,
-          error: null
+          error: null,
         };
       }
-      if (digitsOnly.length >= 10 && digitsOnly.length <= 11 && digitsOnly.startsWith('503')) {
+      if (
+        digitsOnly.length >= 10 &&
+        digitsOnly.length <= 11 &&
+        digitsOnly.startsWith("503")
+      ) {
         const nationalNumber = digitsOnly.slice(3);
         const phoneE164 = `+${digitsOnly}`;
-        console.log('[normalizePhoneNumber] Usando fallback SV con código:', phoneE164);
+        console.log("[normalizePhoneNumber] Usando fallback SV con código:", phoneE164);
         return {
           phone_e164: phoneE164,
-          phone_country: 'SV',
+          phone_country: "SV",
           phone_national: nationalNumber,
-          calling_code: '503',
+          calling_code: "503",
           isValid: true,
-          error: null
+          error: null,
         };
       }
     }
-    
-    return { 
-      phone_e164: null, 
-      phone_country: null, 
-      phone_national: null, 
-      calling_code: null, 
-      isValid: false, 
-      error: 'Formato de teléfono inválido' 
+
+    return {
+      phone_e164: null,
+      phone_country: null,
+      phone_national: null,
+      calling_code: null,
+      isValid: false,
+      error: "Formato de teléfono inválido",
     };
   }
 }
@@ -153,80 +166,97 @@ function looksLikeInternational(phone: string): boolean {
 }
 
 /**
- * Obtiene el código de llamada para un país
+ * Obtiene el código de llamada para cualquier país usando libphonenumber-js.
+ * Fallback a "57" (Colombia) si el código no es válido.
  */
-function getCountryCallingCode(countryCode: CountryCode): string {
-  const codes: Record<string, string> = {
-    'CO': '57',   // Colombia
-    'MX': '52',   // México
-    'PE': '51',   // Perú
-    'EC': '593',  // Ecuador
-    'VE': '58',   // Venezuela
-    'PA': '507',  // Panamá
-    'CR': '506',  // Costa Rica
-    'CL': '56',   // Chile
-    'AR': '54',   // Argentina
-    'BR': '55',   // Brasil
-    'US': '1',    // Estados Unidos
-    'CA': '1',    // Canadá
-    'SV': '503',  // El Salvador
-    'ES': '34',   // España
-    'UY': '598',  // Uruguay
-  };
-  return codes[countryCode] || '57'; // Default CO si no encuentra
+function getCallingCode(countryCode: CountryCode): string {
+  try {
+    return getCountryCallingCode(countryCode);
+  } catch {
+    return "57";
+  }
 }
 
 /**
- * Detecta país por IP/locale del navegador
+ * Verifica si un código de país es válido según libphonenumber-js (~250 países).
+ */
+export function isValidCountryCode(code: string): code is CountryCode {
+  return (getCountries() as string[]).includes(code);
+}
+
+/**
+ * Detecta país por locale del navegador o zona horaria.
+ * Funciona con cualquier código de país soportado por libphonenumber-js.
  */
 export function detectUserCountry(): CountryCode {
   try {
-    // 1. Intentar por locale del navegador
+    // 1. Por locale del navegador
     const locale = navigator.language || (navigator as any).userLanguage;
     if (locale) {
-      const countryFromLocale = locale.split('-')[1]?.toUpperCase() as CountryCode;
+      const countryFromLocale = locale.split("-")[1]?.toUpperCase();
       if (countryFromLocale && isValidCountryCode(countryFromLocale)) {
         return countryFromLocale;
       }
     }
-    
-    // 2. Por timezone (aproximado)
+
+    // 2. Por zona horaria (heurística)
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const countryFromTimezone = getCountryFromTimezone(timezone);
     if (countryFromTimezone) {
       return countryFromTimezone;
     }
-    
-    return 'CO'; // Fallback
+
+    return "CO"; // Fallback
   } catch (error) {
-    console.warn('[detectUserCountry] Error:', error);
-    return 'CO'; // Fallback
+    console.warn("[detectUserCountry] Error:", error);
+    return "CO";
   }
 }
 
-function isValidCountryCode(code: string): code is CountryCode {
-  const validCodes = ['CO', 'MX', 'PE', 'EC', 'VE', 'PA', 'CR', 'CL', 'AR', 'BR', 'US', 'CA', 'SV', 'ES', 'UY'];
-  return validCodes.includes(code);
-}
-
+/**
+ * Mapa de zonas horarias comunes a país (heurística para detectUserCountry).
+ * No necesita ser exhaustivo; es solo un fallback cuando el locale falla.
+ */
 function getCountryFromTimezone(timezone: string): CountryCode | null {
   const timezoneMap: Record<string, CountryCode> = {
-    'America/Bogota': 'CO',
-    'America/Mexico_City': 'MX',
-    'America/Lima': 'PE',
-    'America/Guayaquil': 'EC',
-    'America/Caracas': 'VE',
-    'America/Panama': 'PA',
-    'America/Costa_Rica': 'CR',
-    'America/Santiago': 'CL',
-    'America/Buenos_Aires': 'AR',
-    'America/Sao_Paulo': 'BR',
-    'America/New_York': 'US',
-    'America/Toronto': 'CA',
-    'America/El_Salvador': 'SV',
-    'Europe/Madrid': 'ES',
-    'Atlantic/Canary': 'ES',
-    'America/Montevideo': 'UY',
+    "America/Bogota": "CO",
+    "America/Mexico_City": "MX",
+    "America/Cancun": "MX",
+    "America/Chihuahua": "MX",
+    "America/Tijuana": "MX",
+    "America/Lima": "PE",
+    "America/Guayaquil": "EC",
+    "America/Caracas": "VE",
+    "America/Panama": "PA",
+    "America/Costa_Rica": "CR",
+    "America/El_Salvador": "SV",
+    "America/Santiago": "CL",
+    "America/Punta_Arenas": "CL",
+    "America/Argentina/Buenos_Aires": "AR",
+    "America/Argentina/Mendoza": "AR",
+    "America/Sao_Paulo": "BR",
+    "America/Bahia": "BR",
+    "America/Manaus": "BR",
+    "America/New_York": "US",
+    "America/Chicago": "US",
+    "America/Denver": "US",
+    "America/Los_Angeles": "US",
+    "America/Anchorage": "US",
+    "America/Toronto": "CA",
+    "America/Edmonton": "CA",
+    "America/Vancouver": "CA",
+    "America/Montevideo": "UY",
+    "Europe/Madrid": "ES",
+    "Atlantic/Canary": "ES",
+    "Europe/London": "GB",
+    "Europe/Paris": "FR",
+    "Europe/Berlin": "DE",
+    "Europe/Rome": "IT",
+    "Europe/Lisbon": "PT",
+    "Asia/Tokyo": "JP",
+    "Asia/Shanghai": "CN",
+    "Asia/Kolkata": "IN",
+    "Australia/Sydney": "AU",
   };
 
   return timezoneMap[timezone] || null;
@@ -237,7 +267,7 @@ function getCountryFromTimezone(timezone: string): CountryCode | null {
  */
 export function extractCountryFromE164(phone_e164: string): CountryCode | null {
   try {
-    if (!phone_e164?.startsWith('+')) return null;
+    if (!phone_e164?.startsWith("+")) return null;
     const phoneNumber = parsePhoneNumber(phone_e164);
     return phoneNumber.country || null;
   } catch {

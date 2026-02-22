@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 import {
   Container,
@@ -20,6 +20,7 @@ import {
   ThemeIcon,
   List,
   ActionIcon,
+  Select,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "mantine-form-zod-resolver";
@@ -36,7 +37,12 @@ import {
   IconLink,
   IconBrandWhatsapp,
   IconMessage2,
+  IconGlobe,
+  IconClock,
+  IconCurrencyDollar,
 } from "@tabler/icons-react";
+import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
+import { detectUserCountry } from "../../utils/phoneUtils";
 import { notifications } from "@mantine/notifications";
 import {
   checkSlugAvailability,
@@ -58,7 +64,30 @@ const signupSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Mínimo 6 caracteres"),
   phone: z.string().min(7, "Teléfono inválido"),
+  default_country: z.string().optional(),
+  timezone: z.string().optional(),
+  currency: z.string().optional(),
 });
+
+/** Moneda por defecto según país ISO2 */
+const COUNTRY_CURRENCY_MAP: Record<string, string> = {
+  AR: "ARS", BO: "BOB", BR: "BRL", CL: "CLP", CO: "COP",
+  CR: "CRC", CU: "CUP", DO: "DOP", EC: "USD", GT: "GTQ",
+  HN: "HNL", MX: "MXN", NI: "NIO", PA: "PAB", PE: "PEN",
+  PY: "PYG", SV: "USD", UY: "UYU", VE: "VES",
+  CA: "CAD", US: "USD",
+  AT: "EUR", BE: "EUR", CY: "EUR", DE: "EUR", EE: "EUR",
+  ES: "EUR", FI: "EUR", FR: "EUR", GR: "EUR", HR: "EUR",
+  IE: "EUR", IT: "EUR", LT: "EUR", LU: "EUR", LV: "EUR",
+  MT: "EUR", NL: "EUR", PT: "EUR", SI: "EUR", SK: "EUR",
+  GB: "GBP", CH: "CHF", SE: "SEK", NO: "NOK", DK: "DKK",
+  PL: "PLN", CZ: "CZK", HU: "HUF", RO: "RON",
+  JP: "JPY", CN: "CNY", KR: "KRW", IN: "INR", SG: "SGD",
+  HK: "HKD", TW: "TWD", TH: "THB", MY: "MYR", PH: "PHP",
+  ID: "IDR", AE: "AED", SA: "SAR", IL: "ILS", TR: "TRY",
+  AU: "AUD", NZ: "NZD", ZA: "ZAR", NG: "NGN", KE: "KES",
+  EG: "EGP", GH: "GHS",
+};
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -67,6 +96,33 @@ const SUPPORT_WA_TEXT = "+57 318 434 5284";
 
 // ✅ 1) tiempo reducido a 3s
 const SUPPORT_AUTO_COLLAPSE_MS = 3000;
+
+// Estilos compartidos para inputs sobre fondo oscuro
+const INPUT_STYLES = {
+  input: {
+    background: "rgba(255,255,255,0.07)",
+    color: "rgba(255,255,255,0.92)",
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  label: { marginBottom: 6 },
+} as const;
+
+const SELECT_STYLES = {
+  input: {
+    background: "rgba(255,255,255,0.07)",
+    color: "rgba(255,255,255,0.92)",
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  label: { marginBottom: 6 },
+  dropdown: {
+    background: "#0e1825",
+    border: "1px solid rgba(255,255,255,0.14)",
+    color: "rgba(255,255,255,0.9)",
+  },
+  option: {
+    color: "rgba(255,255,255,0.88)",
+  },
+} as const;
 
 function RequiredLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -79,6 +135,20 @@ function RequiredLabel({ children }: { children: React.ReactNode }) {
       </Text>
     </Group>
   );
+}
+
+/** Auto-detecta timezone, país y moneda del navegador */
+function detectRegionalDefaults() {
+  const timezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Bogota";
+    } catch {
+      return "America/Bogota";
+    }
+  })();
+  const country = detectUserCountry();
+  const currency = COUNTRY_CURRENCY_MAP[country] ?? "USD";
+  return { timezone, country, currency };
 }
 
 export default function SignupPage() {
@@ -100,6 +170,23 @@ export default function SignupPage() {
   >("expanded");
   const supportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Listas de selects (memoizadas)
+  const countryData = useMemo(
+    () => getAllCountries().map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
+  const timezoneData = useMemo(
+    () => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })),
+    []
+  );
+  const currencyData = useMemo(
+    () => getAllCurrencies().map((c) => ({ value: c.value, label: c.label })),
+    []
+  );
+
+  // Defaults regionales detectados una sola vez
+  const regionalDefaults = useMemo(() => detectRegionalDefaults(), []);
+
   const form = useForm<SignupFormValues>({
     validate: zodResolver(signupSchema),
     initialValues: {
@@ -109,8 +196,19 @@ export default function SignupPage() {
       email: "",
       password: "",
       phone: "",
+      default_country: regionalDefaults.country,
+      timezone: regionalDefaults.timezone,
+      currency: regionalDefaults.currency,
     },
   });
+
+  // Cuando el usuario cambia de país, sugerir la moneda correspondiente
+  const handleCountryChange = (value: string | null) => {
+    form.setFieldValue("default_country", value ?? "");
+    if (value && COUNTRY_CURRENCY_MAP[value] && !form.isDirty("currency")) {
+      form.setFieldValue("currency", COUNTRY_CURRENCY_MAP[value]);
+    }
+  };
 
   const checkSlug = useCallback(async (slug: string) => {
     if (!slug || slug.length < 3) {
@@ -227,6 +325,9 @@ export default function SignupPage() {
         password: values.password,
         phone: values.phone,
         turnstileToken: token,
+        default_country: values.default_country || undefined,
+        timezone: values.timezone || undefined,
+        currency: values.currency || undefined,
       });
 
       notifications.show({
@@ -568,7 +669,15 @@ export default function SignupPage() {
                   <Divider my="md" opacity={0.25} />
 
                   <form onSubmit={form.onSubmit(handleSubmit)}>
-                    <Stack gap="md">
+                    <Stack
+                      gap="md"
+                      style={
+                        {
+                          "--mantine-color-placeholder":
+                            "rgba(255,255,255,0.35)",
+                        } as React.CSSProperties
+                      }
+                    >
                       {error && (
                         <Alert
                           icon={<IconAlertCircle size={16} />}
@@ -601,10 +710,7 @@ export default function SignupPage() {
                           handleBusinessNameChange(e.currentTarget.value)
                         }
                         error={form.errors.businessName}
-                        styles={{
-                          input: { background: "rgba(255,255,255,0.06)" },
-                          label: { marginBottom: 6 },
-                        }}
+                        styles={INPUT_STYLES}
                       />
 
                       <Box>
@@ -623,10 +729,7 @@ export default function SignupPage() {
                               "Solo letras minúsculas, sin números ni guiones")
                           }
                           rightSection={slugRightSection()}
-                          styles={{
-                            input: { background: "rgba(255,255,255,0.06)" },
-                            label: { marginBottom: 6 },
-                          }}
+                          styles={INPUT_STYLES}
                         />
 
                         {slugHelpText && (
@@ -724,6 +827,52 @@ export default function SignupPage() {
                         fw={800}
                         tt="uppercase"
                       >
+                        Región
+                      </Text>
+
+                      <Select
+                        label={<RequiredLabel>País</RequiredLabel>}
+                        placeholder="Selecciona tu país"
+                        leftSection={<IconGlobe size={16} />}
+                        value={form.values.default_country ?? null}
+                        onChange={handleCountryChange}
+                        error={form.errors.default_country}
+                        data={countryData}
+                        searchable
+                        comboboxProps={{ zIndex: 10001 }}
+                        styles={SELECT_STYLES}
+                      />
+
+                      <Select
+                        label={<RequiredLabel>Zona horaria</RequiredLabel>}
+                        placeholder="Busca tu zona horaria..."
+                        leftSection={<IconClock size={16} />}
+                        {...form.getInputProps("timezone")}
+                        data={timezoneData}
+                        searchable
+                        comboboxProps={{ zIndex: 10001 }}
+                        styles={SELECT_STYLES}
+                      />
+
+                      <Select
+                        label={<RequiredLabel>Moneda</RequiredLabel>}
+                        placeholder="Selecciona la moneda..."
+                        leftSection={<IconCurrencyDollar size={16} />}
+                        {...form.getInputProps("currency")}
+                        data={currencyData}
+                        searchable
+                        comboboxProps={{ zIndex: 10001 }}
+                        styles={SELECT_STYLES}
+                      />
+
+                      <Divider my={4} opacity={0.25} />
+
+                      <Text
+                        size="xs"
+                        c="rgba(255,255,255,0.65)"
+                        fw={800}
+                        tt="uppercase"
+                      >
                         Administrador
                       </Text>
 
@@ -732,40 +881,28 @@ export default function SignupPage() {
                         label={<RequiredLabel>Tu nombre</RequiredLabel>}
                         placeholder="Juan Pérez"
                         {...form.getInputProps("ownerName")}
-                        styles={{
-                          input: { background: "rgba(255,255,255,0.06)" },
-                          label: { marginBottom: 6 },
-                        }}
+                        styles={INPUT_STYLES}
                       />
 
                       <TextInput
                         label={<RequiredLabel>Email</RequiredLabel>}
                         placeholder="tu@email.com"
                         {...form.getInputProps("email")}
-                        styles={{
-                          input: { background: "rgba(255,255,255,0.06)" },
-                          label: { marginBottom: 6 },
-                        }}
+                        styles={INPUT_STYLES}
                       />
 
                       <TextInput
                         label={<RequiredLabel>Teléfono</RequiredLabel>}
                         placeholder="+57 300 123 4567"
                         {...form.getInputProps("phone")}
-                        styles={{
-                          input: { background: "rgba(255,255,255,0.06)" },
-                          label: { marginBottom: 6 },
-                        }}
+                        styles={INPUT_STYLES}
                       />
 
                       <PasswordInput
                         label={<RequiredLabel>Contraseña</RequiredLabel>}
                         placeholder="Mínimo 6 caracteres"
                         {...form.getInputProps("password")}
-                        styles={{
-                          input: { background: "rgba(255,255,255,0.06)" },
-                          label: { marginBottom: 6 },
-                        }}
+                        styles={INPUT_STYLES}
                       />
 
                       <Box>

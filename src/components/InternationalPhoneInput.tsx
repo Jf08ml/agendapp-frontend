@@ -1,37 +1,14 @@
 // components/InternationalPhoneInput.tsx
 import React, { useState, useEffect } from "react";
 import { TextInput, Select, Group, Text, Box } from "@mantine/core";
-import { CountryCode } from "libphonenumber-js";
+import { type CountryCode } from "libphonenumber-js";
 import {
   normalizePhoneNumber,
   detectUserCountry,
   extractCountryFromE164,
+  isValidCountryCode,
 } from "../utils/phoneUtils";
-
-interface Country {
-  value: CountryCode;
-  label: string;
-  code: string;
-  flag: string;
-}
-
-const COUNTRIES: Country[] = [
-  { value: "CO", label: "Colombia", code: "+57", flag: "🇨🇴" },
-  { value: "MX", label: "México", code: "+52", flag: "🇲🇽" },
-  { value: "PE", label: "Perú", code: "+51", flag: "🇵🇪" },
-  { value: "EC", label: "Ecuador", code: "+593", flag: "🇪🇨" },
-  { value: "VE", label: "Venezuela", code: "+58", flag: "🇻🇪" },
-  { value: "PA", label: "Panamá", code: "+507", flag: "🇵🇦" },
-  { value: "CR", label: "Costa Rica", code: "+506", flag: "🇨🇷" },
-  { value: "CL", label: "Chile", code: "+56", flag: "🇨🇱" },
-  { value: "AR", label: "Argentina", code: "+54", flag: "🇦🇷" },
-  { value: "BR", label: "Brasil", code: "+55", flag: "🇧🇷" },
-  { value: "US", label: "Estados Unidos", code: "+1", flag: "🇺🇸" },
-  { value: "CA", label: "Canadá", code: "+1", flag: "🇨🇦" },
-  { value: "SV", label: "El Salvador", code: "+503", flag: "🇸🇻" },
-  { value: "ES", label: "España", code: "+34", flag: "🇪🇸" },
-  { value: "UY", label: "Uruguay", code: "+598", flag: "🇺🇾" },
-];
+import { getAllCountries } from "../utils/geoData";
 
 interface InternationalPhoneInputProps {
   value?: string;
@@ -65,6 +42,16 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>("CO");
   const [nationalNumber, setNationalNumber] = useState("");
   const [previewE164, setPreviewE164] = useState<string>("");
+
+  // Datos de países (~250) memoizados desde geoData
+  const countrySelectData = React.useMemo(
+    () =>
+      getAllCountries().map((c) => ({
+        value: c.value,
+        label: `${c.flag} ${c.name} ${c.callingCode}`,
+      })),
+    []
+  );
 
   // Determinar país inicial
   useEffect(() => {
@@ -123,7 +110,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
       onChange?.(result.phone_e164, result.phone_country, true);
     } else {
       setPreviewE164(
-        `${getCountryCode(selectedCountry)}${nationalNumber} (inválido)`
+        `${getCallingCodeDisplay(selectedCountry)}${nationalNumber} (inválido)`
       );
       onChange?.(null, null, false);
     }
@@ -164,22 +151,12 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
     }
   };
 
-  const getCountryCode = (country: CountryCode): string => {
-    const countryObj = COUNTRIES.find((c) => c.value === country);
-    return countryObj?.code.replace("+", "") || "57";
+  const getCallingCodeDisplay = (country: CountryCode): string => {
+    const info = getAllCountries().find((c) => c.value === country);
+    return info?.callingCode ?? "+57";
   };
 
-  const isValidCountryCode = (code: string): code is CountryCode => {
-    return COUNTRIES.some((c) => c.value === code);
-  };
-
-  const countrySelectData = COUNTRIES.map((country) => ({
-    value: country.value,
-    label: `${country.flag} ${country.label} ${country.code}`,
-  }));
-
-  const selectedCountryObj = COUNTRIES.find((c) => c.value === selectedCountry);
-  const countryCode = selectedCountryObj?.code || "+57";
+  const callingCode = getCallingCodeDisplay(selectedCountry);
 
   return (
     <Box>
@@ -212,7 +189,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
           disabled={disabled}
           leftSection={
             <Text size="sm" c="dimmed">
-              {countryCode}
+              {callingCode}
             </Text>
           }
         />

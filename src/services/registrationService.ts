@@ -16,6 +16,9 @@ export interface RegisterData {
   password: string;
   phone: string;
   turnstileToken?: string;
+  default_country?: string;
+  timezone?: string;
+  currency?: string;
 }
 
 export interface RegisterResponse {
