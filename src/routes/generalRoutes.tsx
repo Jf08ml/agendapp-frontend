@@ -35,6 +35,7 @@ import SignupPage from "../pages/public/SignupPage";
 import ExchangePage from "../pages/public/ExchangePage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
+import HelpPage from "../pages/admin/HelpPage";
 
 const generalRoutes = [
   {
@@ -188,6 +189,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Paquetes",
       description: "Gestiona los paquetes de sesiones.",
+    },
+  },
+  {
+    path: "/instrucciones",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <HelpPage {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Instrucciones y ayuda",
+      description: "Guía de uso y preguntas frecuentes de la plataforma.",
     },
   },
   {

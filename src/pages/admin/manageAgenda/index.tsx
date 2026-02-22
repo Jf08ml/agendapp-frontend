@@ -43,6 +43,7 @@ import { sendOrgReminders } from "../../../services/reminderService";
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import WhatsappStatusIcon from "./components/WhatsappStatusIcon";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
+import SetupGuide from "./components/SetupGuide";
 
 // 🚀 Lazy loading de modales para mejorar carga inicial
 const AppointmentModal = lazy(() => import("./components/AppointmentModal"));
@@ -1034,6 +1035,11 @@ const ScheduleView: React.FC = () => {
           />
         </Group>
       </Paper>
+
+      {/* Guía de configuración inicial — se muestra solo si no hay empleados */}
+      {employees.length === 0 && (
+        <SetupGuide employees={employees} />
+      )}
 
       {/* Calendario principal */}
       <CustomCalendar

@@ -16,7 +16,7 @@ import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
 import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
-import { BsChatText } from "react-icons/bs";
+import { BsChatText, BsQuestionCircle } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
 import { IconPackage } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
@@ -139,6 +139,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/informacion-empleado",
           icon: <MdOutlineLoyalty size={18} />,
           canShow: can.employeeInfo,
+        },
+        {
+          label: "Instrucciones y ayuda",
+          to: "/instrucciones",
+          icon: <BsQuestionCircle size={18} />,
+          canShow: true,
         },
       ],
     },
