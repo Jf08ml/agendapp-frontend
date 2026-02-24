@@ -121,6 +121,9 @@ export default function StepMultiServiceSummary({
     return acc + toNumber(svc?.price);
   }, 0);
 
+  // Si algún servicio tiene precio oculto, no mostrar precios ni total
+  const anyHidePrice = times.intervals.some((iv) => svcMap[iv.serviceId]?.hidePrice);
+
   return (
     <Stack>
       <Group justify="space-between" align="center">
@@ -198,9 +201,11 @@ export default function StepMultiServiceSummary({
                       <Text fw={600} size="sm">
                         {svc?.name ?? "Servicio"}
                       </Text>
-                      <Text fw={600} size="sm" c={price === 0 ? "green" : undefined}>
-                        {price === 0 ? "Gratis" : formatCurrency(price, currency)}
-                      </Text>
+                      {!svc?.hidePrice && (
+                        <Text fw={600} size="sm" c={price === 0 ? "green" : undefined}>
+                          {price === 0 ? "Gratis" : formatCurrency(price, currency)}
+                        </Text>
+                      )}
                     </Group>
                     <Text c="dimmed" size="sm">
                       {fromText} - {toText}
@@ -234,25 +239,27 @@ export default function StepMultiServiceSummary({
         </Paper>
       )}
 
-      <Paper p="md" shadow="sm" radius="md" withBorder>
-        <Group justify="space-between">
-          <Text fw={700} size="md">
-            {recurrencePattern?.type === 'weekly' && seriesPreview
-              ? `Total estimado (${seriesPreview.availableCount} citas)`
-              : 'Total a pagar'
-            }
-          </Text>
-          <Text fw={800} size="lg" c="green">
-            {(() => {
-              const multiplier = recurrencePattern?.type === 'weekly' && seriesPreview
-                ? seriesPreview.availableCount
-                : 1;
-              const total = grandTotal * multiplier;
-              return total === 0 ? "Gratis" : formatCurrency(total, currency);
-            })()}
-          </Text>
-        </Group>
-      </Paper>
+      {!anyHidePrice && (
+        <Paper p="md" shadow="sm" radius="md" withBorder>
+          <Group justify="space-between">
+            <Text fw={700} size="md">
+              {recurrencePattern?.type === 'weekly' && seriesPreview
+                ? `Total estimado (${seriesPreview.availableCount} citas)`
+                : 'Total a pagar'
+              }
+            </Text>
+            <Text fw={800} size="lg" c="green">
+              {(() => {
+                const multiplier = recurrencePattern?.type === 'weekly' && seriesPreview
+                  ? seriesPreview.availableCount
+                  : 1;
+                const total = grandTotal * multiplier;
+                return total === 0 ? "Gratis" : formatCurrency(total, currency);
+              })()}
+            </Text>
+          </Group>
+        </Paper>
+      )}
     </Stack>
   );
 }

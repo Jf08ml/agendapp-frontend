@@ -135,10 +135,12 @@ export default function SuperadminOrganizations() {
 
   // Map orgId → membership for quick lookup
   const membershipByOrg = new Map<string, Membership>(
-    memberships.map((m) => [
-      typeof m.organizationId === "string" ? m.organizationId : (m.organizationId as unknown as { _id: string })._id,
-      m,
-    ])
+    memberships
+      .filter((m) => m.organizationId != null)
+      .map((m) => [
+        typeof m.organizationId === "string" ? m.organizationId : (m.organizationId as unknown as { _id: string })._id,
+        m,
+      ])
   );
 
   const membershipBadge = (orgId?: string) => {

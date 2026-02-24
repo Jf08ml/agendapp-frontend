@@ -144,7 +144,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Instrucciones y ayuda",
           to: "/instrucciones",
           icon: <BsQuestionCircle size={18} />,
-          canShow: true,
+          canShow: can.businessInfo,
         },
       ],
     },
