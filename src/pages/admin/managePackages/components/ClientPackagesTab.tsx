@@ -19,6 +19,10 @@ import {
   Tooltip,
   ThemeIcon,
   Avatar,
+  NumberInput,
+  Select,
+  Box,
+  SimpleGrid,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { openConfirmModal } from "@mantine/modals";
@@ -29,8 +33,6 @@ import {
   IconUser,
   IconChevronDown,
   IconChevronUp,
-  IconCalendar,
-  IconCreditCard,
   IconRefresh,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
@@ -39,8 +41,11 @@ import {
   getAllOrgClientPackages,
   cancelClientPackage,
   deleteClientPackage,
+  addClientPackagePayment,
+  removeClientPackagePayment,
   ClientPackage,
   ClientPackageService,
+  PackagePaymentRecord,
 } from "../../../../services/packageService";
 import { formatCurrency } from "../../../../utils/formatCurrency";
 
@@ -49,18 +54,28 @@ interface ClientPackagesTabProps {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: "Activo", color: "green" },
-  expired: { label: "Expirado", color: "gray" },
-  exhausted: { label: "Agotado", color: "orange" },
-  cancelled: { label: "Cancelado", color: "red" },
+  active:    { label: "Activo",    color: "green"  },
+  expired:   { label: "Expirado", color: "gray"   },
+  exhausted: { label: "Agotado",  color: "orange" },
+  cancelled: { label: "Cancelado", color: "red"   },
+};
+
+const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
+  paid:    { label: "Pagado",     color: "green"  },
+  partial: { label: "Abono",      color: "yellow" },
+  unpaid:  { label: "Sin pagar",  color: "red"    },
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia", other: "Otro",
 };
 
 const STATUS_FILTER_OPTIONS = [
-  { label: "Todos", value: "all" },
-  { label: "Activos", value: "active" },
-  { label: "Expirados", value: "expired" },
-  { label: "Agotados", value: "exhausted" },
-  { label: "Cancelados", value: "cancelled" },
+  { label: "Todos",     value: "all"       },
+  { label: "Activos",   value: "active"    },
+  { label: "Expirados", value: "expired"   },
+  { label: "Agotados",  value: "exhausted" },
+  { label: "Cancelados",value: "cancelled" },
 ];
 
 const PAGE_SIZE = 10;
@@ -73,18 +88,13 @@ const getServiceName = (svc: ClientPackageService): string => {
 };
 
 const getPackageName = (pkg: ClientPackage): string => {
-  if (
-    typeof pkg.servicePackageId === "object" &&
-    pkg.servicePackageId !== null
-  ) {
+  if (typeof pkg.servicePackageId === "object" && pkg.servicePackageId !== null) {
     return (pkg.servicePackageId as any).name || "Paquete";
   }
   return "Paquete";
 };
 
-const getClientInfo = (
-  pkg: ClientPackage
-): { name: string; phone: string } => {
+const getClientInfo = (pkg: ClientPackage): { name: string; phone: string } => {
   if (typeof pkg.clientId === "object" && pkg.clientId !== null) {
     const c = pkg.clientId as any;
     return { name: c.name || "—", phone: c.phoneNumber || "" };
@@ -92,14 +102,9 @@ const getClientInfo = (
   return { name: "—", phone: "" };
 };
 
-const getTotalSessionsSummary = (
-  pkg: ClientPackage
-): { remaining: number; total: number } => {
-  const total = pkg.services.reduce((s, svc) => s + svc.sessionsIncluded, 0);
-  const remaining = pkg.services.reduce(
-    (s, svc) => s + svc.sessionsRemaining,
-    0
-  );
+const getTotalSessionsSummary = (pkg: ClientPackage): { remaining: number; total: number } => {
+  const total     = pkg.services.reduce((s, svc) => s + svc.sessionsIncluded,  0);
+  const remaining = pkg.services.reduce((s, svc) => s + svc.sessionsRemaining, 0);
   return { remaining, total };
 };
 
@@ -111,6 +116,7 @@ function PackageCard({
   deletingId,
   onCancel,
   onDelete,
+  onUpdate,
 }: {
   pkg: ClientPackage;
   currency: string;
@@ -118,192 +124,356 @@ function PackageCard({
   deletingId: string | null;
   onCancel: (pkg: ClientPackage) => void;
   onDelete: (pkg: ClientPackage) => void;
+  onUpdate: (updated: ClientPackage) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded,      setExpanded]      = useState(false);
+  const [payments,      setPayments]      = useState<PackagePaymentRecord[]>(pkg.payments || []);
+  const [paymentStatus, setPaymentStatus] = useState(pkg.paymentStatus || "unpaid");
+  const [newPayment,    setNewPayment]    = useState({ amount: 0, method: "cash", note: "" });
+  const [savingPayment, setSavingPayment] = useState(false);
 
-  const statusInfo = STATUS_MAP[pkg.status] || STATUS_MAP.active;
-  const pkgName = getPackageName(pkg);
+  const statusInfo        = STATUS_MAP[pkg.status]         || STATUS_MAP.active;
+  const paymentStatusInfo = PAYMENT_STATUS_MAP[paymentStatus] || PAYMENT_STATUS_MAP.unpaid;
+  const pkgName           = getPackageName(pkg);
   const { name: clientName, phone: clientPhone } = getClientInfo(pkg);
   const { remaining, total } = getTotalSessionsSummary(pkg);
-  const canCancel = pkg.status === "active";
+  const canCancel         = pkg.status === "active";
 
-  const purchaseStr = new Date(pkg.purchaseDate).toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-  const expirationStr = new Date(pkg.expirationDate).toLocaleDateString(
-    "es-ES",
-    { day: "2-digit", month: "short", year: "numeric" }
-  );
+  const totalPaid     = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const pendingAmount = Math.max(0, (pkg.totalPrice || 0) - totalPaid);
+  const sessionPct    = total > 0 ? ((total - remaining) / total) * 100 : 0;
+  const clientInitial = clientName && clientName !== "—" ? clientName.charAt(0).toUpperCase() : null;
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleFullPayment = async () => {
+    if (pendingAmount <= 0) return;
+    setSavingPayment(true);
+    try {
+      const updated = await addClientPackagePayment(pkg._id, {
+        amount: pendingAmount,
+        method: newPayment.method as PackagePaymentRecord["method"],
+        date:   new Date().toISOString(),
+        note:   "",
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        onUpdate(updated);
+        showNotification({ title: "Pago completo registrado", message: "Se registró el saldo pendiente como pagado", color: "green", autoClose: 3000, position: "top-right" });
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleAddPayment = async () => {
+    if (!newPayment.amount || newPayment.amount <= 0) return;
+    setSavingPayment(true);
+    try {
+      const updated = await addClientPackagePayment(pkg._id, {
+        amount: newPayment.amount,
+        method: newPayment.method as PackagePaymentRecord["method"],
+        date:   new Date().toISOString(),
+        note:   newPayment.note,
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setNewPayment({ amount: 0, method: "cash", note: "" });
+        onUpdate(updated);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleRemovePayment = async (paymentId: string) => {
+    try {
+      const updated = await removeClientPackagePayment(pkg._id, paymentId);
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        onUpdate(updated);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // ── Dates ─────────────────────────────────────────────────────────────────
+  const purchaseStr   = new Date(pkg.purchaseDate).toLocaleDateString("es-ES",   { day: "2-digit", month: "short", year: "numeric" });
+  const expirationStr = new Date(pkg.expirationDate).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
   const isExpiredDate = new Date(pkg.expirationDate) < new Date();
 
   return (
-    <Paper withBorder radius="md" p="md">
-      {/* ── Header row ── */}
-      <Group justify="space-between" align="flex-start" wrap="nowrap">
-        <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-          <Avatar size="md" radius="xl" color="blue" variant="light">
-            <IconUser size={18} />
-          </Avatar>
-          <div style={{ minWidth: 0 }}>
-            <Text fw={600} size="sm" truncate>
-              {clientName}
-            </Text>
-            {clientPhone && (
-              <Text size="xs" c="dimmed">
-                {clientPhone}
-              </Text>
-            )}
-            <Group gap={6} mt={2} wrap="nowrap">
-              <IconPackage size={12} color="gray" style={{ flexShrink: 0 }} />
-              <Text size="xs" c="dimmed" truncate>
-                {pkgName}
-              </Text>
-            </Group>
-          </div>
+    <Paper
+      withBorder
+      radius="md"
+      style={{ borderLeft: `4px solid var(--mantine-color-${statusInfo.color}-5)`, overflow: "hidden" }}
+    >
+      {/* ── Header section ─────────────────────────────────────────── */}
+      <Box p="md">
+        <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+            <Avatar size="md" radius="xl" color={statusInfo.color} variant="light">
+              {clientInitial ?? <IconUser size={18} />}
+            </Avatar>
+            <Box style={{ minWidth: 0 }}>
+              <Text fw={700} size="sm" truncate>{clientName}</Text>
+              {clientPhone && <Text size="xs" c="dimmed">{clientPhone}</Text>}
+              <Group gap={4} mt={2}>
+                <IconPackage size={11} color="gray" style={{ flexShrink: 0 }} />
+                <Text size="xs" c="dimmed" truncate>{pkgName}</Text>
+              </Group>
+            </Box>
+          </Group>
+          <Stack gap={4} align="flex-end" style={{ flexShrink: 0 }}>
+            <Badge variant="light"  color={statusInfo.color}        size="sm">{statusInfo.label}</Badge>
+            <Badge variant="filled" color={paymentStatusInfo.color} size="sm">{paymentStatusInfo.label}</Badge>
+          </Stack>
         </Group>
 
-        <Badge
-          variant="light"
-          color={statusInfo.color}
-          size="sm"
-          style={{ flexShrink: 0 }}
-        >
-          {statusInfo.label}
-        </Badge>
-      </Group>
-
-      <Divider my="xs" />
-
-      {/* ── Stats row ── */}
-      <Group gap="xl" wrap="wrap">
-        <div>
-          <Text size="xs" c="dimmed" mb={2}>
-            Sesiones restantes
-          </Text>
-          <Text
-            size="sm"
-            fw={600}
-            c={
-              remaining > 0
-                ? "teal"
-                : pkg.status === "active"
-                ? "red"
-                : "dimmed"
-            }
-          >
-            {remaining} de {total}
-          </Text>
-        </div>
-
-        <div>
-          <Text size="xs" c="dimmed" mb={2}>
-            Precio total
-          </Text>
-          <Text size="sm" fw={500}>
-            {formatCurrency(pkg.totalPrice, currency)}
-          </Text>
-        </div>
-
-        <div>
-          <Group gap={4} mb={2}>
-            <IconCalendar size={11} color="gray" />
-            <Text size="xs" c="dimmed">
-              Vigencia
+        {/* ── Overall sessions progress ── */}
+        <Box mb="sm">
+          <Group justify="space-between" mb={4}>
+            <Text size="xs" c="dimmed" fw={500}>Sesiones</Text>
+            <Text size="xs" fw={700} c={remaining > 0 ? "teal" : "red"}>
+              {remaining} de {total} disponibles
             </Text>
           </Group>
-          <Text size="xs">
-            {purchaseStr} →{" "}
+          <Progress value={sessionPct} color={remaining > 0 ? "teal" : "red"} size="sm" radius="xl" />
+        </Box>
+
+        {/* ── Financial stats ── */}
+        <SimpleGrid cols={3} spacing="xs" mb="sm">
+          <Box
+            p="xs"
+            style={{ background: "var(--mantine-color-gray-0)", borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)" }}
+          >
+            <Text size="xs" c="dimmed">Precio</Text>
+            <Text size="sm" fw={700}>{formatCurrency(pkg.totalPrice, currency)}</Text>
+          </Box>
+          <Box
+            p="xs"
+            style={{
+              background: totalPaid > 0 ? "var(--mantine-color-teal-0)" : "var(--mantine-color-gray-0)",
+              borderRadius: 8,
+              border: `1px solid ${totalPaid > 0 ? "var(--mantine-color-teal-2)" : "var(--mantine-color-gray-2)"}`,
+            }}
+          >
+            <Text size="xs" c="dimmed">Cobrado</Text>
+            <Text size="sm" fw={700} c={totalPaid > 0 ? "teal" : "dimmed"}>{formatCurrency(totalPaid, currency)}</Text>
+          </Box>
+          <Box
+            p="xs"
+            style={{
+              background: pendingAmount > 0 ? "var(--mantine-color-red-0)" : "var(--mantine-color-gray-0)",
+              borderRadius: 8,
+              border: `1px solid ${pendingAmount > 0 ? "var(--mantine-color-red-2)" : "var(--mantine-color-gray-2)"}`,
+            }}
+          >
+            <Text size="xs" c={pendingAmount > 0 ? "red" : "dimmed"}>Pendiente</Text>
+            <Text size="sm" fw={700} c={pendingAmount > 0 ? "red" : "dimmed"}>{formatCurrency(pendingAmount, currency)}</Text>
+          </Box>
+        </SimpleGrid>
+
+        {/* ── Dates & method ── */}
+        <Group gap="xl" mb="sm" wrap="wrap">
+          <Box>
+            <Text size="xs" c="dimmed">Compra</Text>
+            <Text size="xs" fw={500}>{purchaseStr}</Text>
+          </Box>
+          <Box>
+            <Text size="xs" c="dimmed">Vence</Text>
             <Text
-              component="span"
               size="xs"
+              fw={isExpiredDate && pkg.status === "active" ? 700 : 500}
               c={isExpiredDate && pkg.status === "active" ? "red" : undefined}
-              fw={isExpiredDate && pkg.status === "active" ? 600 : undefined}
             >
               {expirationStr}
             </Text>
-          </Text>
-        </div>
+          </Box>
+          {pkg.paymentMethod && (
+            <Box>
+              <Text size="xs" c="dimmed">Método inicial</Text>
+              <Text size="xs" fw={500}>{pkg.paymentMethod}{pkg.paymentNotes ? ` · ${pkg.paymentNotes}` : ""}</Text>
+            </Box>
+          )}
+        </Group>
 
-        {pkg.paymentMethod && (
-          <div>
-            <Group gap={4} mb={2}>
-              <IconCreditCard size={11} color="gray" />
-              <Text size="xs" c="dimmed">
-                Pago
-              </Text>
-            </Group>
-            <Text size="xs">
-              {pkg.paymentMethod}
-              {pkg.paymentNotes ? ` · ${pkg.paymentNotes}` : ""}
-            </Text>
-          </div>
-        )}
-      </Group>
-
-      {/* ── Expand/collapse toggle ── */}
-      <Group justify="flex-end" mt="xs">
-        <Tooltip
-          label={expanded ? "Ocultar servicios" : "Ver sesiones por servicio"}
+        {/* ── Expand toggle ── */}
+        <Button
+          variant={expanded ? "light" : "subtle"}
+          color="blue"
+          size="xs"
+          fullWidth
+          leftSection={expanded ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />}
+          onClick={() => setExpanded((v) => !v)}
         >
-          <ActionIcon
-            variant="subtle"
-            size="sm"
-            onClick={() => setExpanded((v) => !v)}
-            color="blue"
-          >
-            {expanded ? (
-              <IconChevronUp size={14} />
-            ) : (
-              <IconChevronDown size={14} />
-            )}
-          </ActionIcon>
-        </Tooltip>
-      </Group>
+          {expanded ? "Ocultar detalles" : "Ver sesiones y pagos"}
+        </Button>
+      </Box>
 
-      {/* ── Per-service progress bars ── */}
+      {/* ── Collapse: session breakdown + payment management ── */}
       <Collapse in={expanded}>
-        <Stack gap="xs" mt="xs">
-          {pkg.services.map((svc, idx) => {
-            const svcName = getServiceName(svc);
-            const svcTotal = svc.sessionsIncluded;
-            const svcUsed = svc.sessionsUsed;
-            const svcRemaining = svc.sessionsRemaining;
-            const pct = svcTotal > 0 ? (svcUsed / svcTotal) * 100 : 0;
+        <Divider />
+        <Box p="md" pt="sm">
+          <Stack gap="md">
 
-            return (
-              <Paper key={idx} p="xs" radius="sm" bg="gray.0">
-                <Group justify="space-between" mb={4}>
-                  <Text size="xs" fw={500}>
-                    {svcName}
-                  </Text>
-                  <Text
+            {/* Per-service progress */}
+            <Box>
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
+                Sesiones por servicio
+              </Text>
+              <Stack gap="xs">
+                {pkg.services.map((svc, idx) => {
+                  const svcName      = getServiceName(svc);
+                  const svcTotal     = svc.sessionsIncluded;
+                  const svcUsed      = svc.sessionsUsed;
+                  const svcRemaining = svc.sessionsRemaining;
+                  const pct          = svcTotal > 0 ? (svcUsed / svcTotal) * 100 : 0;
+                  return (
+                    <Box
+                      key={idx}
+                      p="xs"
+                      style={{ background: "var(--mantine-color-gray-0)", borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)" }}
+                    >
+                      <Group justify="space-between" mb={4}>
+                        <Text size="xs" fw={600}>{svcName}</Text>
+                        <Badge size="xs" color={svcRemaining > 0 ? "teal" : "red"} variant="light">
+                          {svcRemaining}/{svcTotal} restantes
+                        </Badge>
+                      </Group>
+                      <Progress value={pct} color={svcRemaining > 0 ? "teal" : "red"} size="xs" radius="xl" />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            {/* Payment history */}
+            <Box>
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
+                Historial de pagos
+              </Text>
+              {payments.length === 0 ? (
+                <Text size="xs" c="dimmed" ta="center" py={8}>Sin pagos registrados</Text>
+              ) : (
+                <Stack gap={6}>
+                  {payments.map((p) => (
+                    <Group
+                      key={p._id}
+                      justify="space-between"
+                      align="center"
+                      px={10}
+                      py={6}
+                      style={{ borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)", background: "white" }}
+                    >
+                      <Box>
+                        <Group gap="xs">
+                          <Text size="sm" fw={600}>{formatCurrency(p.amount, currency)}</Text>
+                          <Badge size="xs" variant="outline" color="gray">
+                            {PAYMENT_METHOD_LABELS[p.method] || p.method}
+                          </Badge>
+                        </Group>
+                        <Group gap={4} mt={2}>
+                          <Text size="xs" c="dimmed">
+                            {new Date(p.date).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                          </Text>
+                          {p.note && <Text size="xs" c="dimmed">· {p.note}</Text>}
+                        </Group>
+                      </Box>
+                      <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleRemovePayment(p._id)}>
+                        <Text size="xs" fw={700}>×</Text>
+                      </ActionIcon>
+                    </Group>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            {/* Payment form */}
+            {paymentStatus !== "paid" && (
+              <Box style={{ border: "1px solid var(--mantine-color-gray-2)", borderRadius: 10, padding: 12, background: "var(--mantine-color-gray-0)" }}>
+                <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm" style={{ letterSpacing: "0.05em" }}>
+                  Registrar pago
+                </Text>
+
+                {/* Quick action */}
+                <Group gap="xs" align="flex-end" mb={8}>
+                  <Select
                     size="xs"
-                    c={svcRemaining > 0 ? "teal" : "red"}
-                    fw={600}
+                    label="Método de pago"
+                    value={newPayment.method}
+                    onChange={(v) => setNewPayment({ ...newPayment, method: v || "cash" })}
+                    data={[
+                      { value: "cash",     label: "Efectivo"      },
+                      { value: "card",     label: "Tarjeta"       },
+                      { value: "transfer", label: "Transferencia" },
+                      { value: "other",    label: "Otro"          },
+                    ]}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    size="xs"
+                    color="teal"
+                    variant="filled"
+                    loading={savingPayment}
+                    disabled={pendingAmount <= 0}
+                    onClick={handleFullPayment}
+                    style={{ flex: 1 }}
                   >
-                    {svcRemaining}/{svcTotal} restantes
-                  </Text>
+                    Pago completo ({formatCurrency(pendingAmount, currency)})
+                  </Button>
                 </Group>
-                <Progress
-                  value={pct}
-                  color={svcRemaining > 0 ? "teal" : "red"}
-                  size="sm"
-                  radius="xl"
+
+                <Divider label="o ingresa un monto parcial" labelPosition="center" mb={8} size="xs" />
+
+                <NumberInput
+                  size="xs"
+                  label="Monto parcial"
+                  prefix="$ "
+                  thousandSeparator=","
+                  value={newPayment.amount || ""}
+                  onChange={(v) => setNewPayment({ ...newPayment, amount: Number(v) || 0 })}
+                  min={0}
                 />
-              </Paper>
-            );
-          })}
-        </Stack>
+                <TextInput
+                  size="xs"
+                  label="Nota (opcional)"
+                  value={newPayment.note}
+                  onChange={(e) => setNewPayment({ ...newPayment, note: e.target.value })}
+                  mt={6}
+                />
+                <Button
+                  fullWidth
+                  mt={8}
+                  size="xs"
+                  variant="light"
+                  loading={savingPayment}
+                  disabled={!newPayment.amount || newPayment.amount <= 0}
+                  onClick={handleAddPayment}
+                >
+                  Registrar monto parcial
+                </Button>
+              </Box>
+            )}
+
+          </Stack>
+        </Box>
       </Collapse>
 
       {/* ── Action buttons ── */}
-      <Group mt="sm" gap="xs">
+      <Divider />
+      <Group px="md" py="xs" gap="xs" justify="flex-end">
         {canCancel && (
           <Button
-            variant="light"
+            variant="subtle"
             color="red"
             size="xs"
             loading={cancellingId === pkg._id}
@@ -328,20 +498,18 @@ function PackageCard({
 
 // ─── Main component ────────────────────────────────────────────────────────────
 const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
-  const organizationId = useSelector(
-    (state: RootState) => state.auth.organizationId
-  );
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
   const [allPackages, setAllPackages] = useState<ClientPackage[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading,     setLoading]     = useState(false);
 
-  const [search, setSearch] = useState("");
-  const [debouncedSearch] = useDebouncedValue(search, 250);
-  const [statusFilter, setStatusFilter] = useState("active");
-  const [page, setPage] = useState(1);
+  const [search,          setSearch]          = useState("");
+  const [debouncedSearch]                     = useDebouncedValue(search, 250);
+  const [statusFilter,    setStatusFilter]    = useState("active");
+  const [page,            setPage]            = useState(1);
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId,   setDeletingId]   = useState<string | null>(null);
 
   const load = () => {
     if (!organizationId) return;
@@ -360,42 +528,26 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
   // ── Client-side filtering ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let data = allPackages;
-
-    if (statusFilter !== "all") {
-      data = data.filter((p) => p.status === statusFilter);
-    }
-
+    if (statusFilter !== "all") data = data.filter((p) => p.status === statusFilter);
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       data = data.filter((p) => {
         const { name, phone } = getClientInfo(p);
         const pkgName = getPackageName(p);
-        return (
-          name.toLowerCase().includes(q) ||
-          phone.includes(q) ||
-          pkgName.toLowerCase().includes(q)
-        );
+        return name.toLowerCase().includes(q) || phone.includes(q) || pkgName.toLowerCase().includes(q);
       });
     }
-
     return data;
   }, [allPackages, statusFilter, debouncedSearch]);
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, statusFilter]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter]);
 
-  // ── Pagination ─────────────────────────────────────────────────────────────
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // ── Count badges per status ────────────────────────────────────────────────
   const countByStatus = useMemo(() => {
     const counts: Record<string, number> = { all: allPackages.length };
-    allPackages.forEach((p) => {
-      counts[p.status] = (counts[p.status] || 0) + 1;
-    });
+    allPackages.forEach((p) => { counts[p.status] = (counts[p.status] || 0) + 1; });
     return counts;
   }, [allPackages]);
 
@@ -406,8 +558,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       title: "Cancelar paquete",
       children: (
         <Text size="sm">
-          ¿Seguro que deseas cancelar &quot;{pkgName}&quot;? Las sesiones
-          restantes no podrán usarse.
+          ¿Seguro que deseas cancelar &quot;{pkgName}&quot;? Las sesiones restantes no podrán usarse.
         </Text>
       ),
       labels: { confirm: "Cancelar paquete", cancel: "Volver" },
@@ -417,24 +568,10 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         setCancellingId(pkg._id);
         try {
           await cancelClientPackage(pkg._id, organizationId!);
-          setAllPackages((prev) =>
-            prev.map((p) =>
-              p._id === pkg._id
-                ? { ...p, status: "cancelled" as const }
-                : p
-            )
-          );
-          showNotification({
-            title: "Paquete cancelado",
-            message: `"${pkgName}" cancelado`,
-            color: "green",
-          });
+          setAllPackages((prev) => prev.map((p) => p._id === pkg._id ? { ...p, status: "cancelled" as const } : p));
+          showNotification({ title: "Paquete cancelado", message: `"${pkgName}" cancelado`, color: "green" });
         } catch {
-          showNotification({
-            title: "Error",
-            message: "No se pudo cancelar",
-            color: "red",
-          });
+          showNotification({ title: "Error", message: "No se pudo cancelar", color: "red" });
         } finally {
           setCancellingId(null);
         }
@@ -448,8 +585,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       title: "Eliminar paquete",
       children: (
         <Text size="sm">
-          ¿Seguro que deseas eliminar permanentemente &quot;{pkgName}&quot;?
-          Esta acción no se puede deshacer.
+          ¿Seguro que deseas eliminar permanentemente &quot;{pkgName}&quot;? Esta acción no se puede deshacer.
         </Text>
       ),
       labels: { confirm: "Eliminar", cancel: "Volver" },
@@ -460,17 +596,9 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         try {
           await deleteClientPackage(pkg._id, organizationId!);
           setAllPackages((prev) => prev.filter((p) => p._id !== pkg._id));
-          showNotification({
-            title: "Paquete eliminado",
-            message: `"${pkgName}" eliminado`,
-            color: "green",
-          });
+          showNotification({ title: "Paquete eliminado", message: `"${pkgName}" eliminado`, color: "green" });
         } catch {
-          showNotification({
-            title: "Error",
-            message: "No se pudo eliminar",
-            color: "red",
-          });
+          showNotification({ title: "Error", message: "No se pudo eliminar", color: "red" });
         } finally {
           setDeletingId(null);
         }
@@ -492,12 +620,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
           disabled={loading}
         />
         <Tooltip label="Recargar lista">
-          <ActionIcon
-            variant="light"
-            size="lg"
-            onClick={load}
-            loading={loading}
-          >
+          <ActionIcon variant="light" size="lg" onClick={load} loading={loading}>
             <IconRefresh size={16} />
           </ActionIcon>
         </Tooltip>
@@ -526,29 +649,17 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
             <ThemeIcon size="xl" radius="xl" color="gray" variant="light">
               <IconPackage size={24} />
             </ThemeIcon>
-            <Text c="dimmed" ta="center">
-              No hay paquetes asignados aún.
-            </Text>
+            <Text c="dimmed" ta="center">No hay paquetes asignados aún.</Text>
             <Text size="xs" c="dimmed" ta="center">
-              Asigna un paquete a un cliente desde la pestaña
-              &quot;Plantillas de paquetes&quot;.
+              Asigna un paquete a un cliente desde la pestaña &quot;Plantillas de paquetes&quot;.
             </Text>
           </Stack>
         </Center>
       ) : filtered.length === 0 ? (
         <Center mih={150}>
           <Stack align="center" gap="xs">
-            <Text c="dimmed" ta="center">
-              No se encontraron paquetes con los filtros aplicados.
-            </Text>
-            <Button
-              variant="light"
-              size="xs"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-              }}
-            >
+            <Text c="dimmed" ta="center">No se encontraron paquetes con los filtros aplicados.</Text>
+            <Button variant="light" size="xs" onClick={() => { setSearch(""); setStatusFilter("all"); }}>
               Limpiar filtros
             </Button>
           </Stack>
@@ -556,8 +667,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       ) : (
         <>
           <Text size="xs" c="dimmed">
-            Mostrando {paginated.length} de {filtered.length} paquete
-            {filtered.length !== 1 ? "s" : ""}
+            Mostrando {paginated.length} de {filtered.length} paquete{filtered.length !== 1 ? "s" : ""}
           </Text>
 
           <Stack gap="sm">
@@ -570,18 +680,14 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
                 deletingId={deletingId}
                 onCancel={handleCancel}
                 onDelete={handleDelete}
+                onUpdate={(updated) => setAllPackages((prev) => prev.map((p) => p._id === updated._id ? updated : p))}
               />
             ))}
           </Stack>
 
           {totalPages > 1 && (
             <Group justify="center" mt="sm">
-              <Pagination
-                value={page}
-                onChange={setPage}
-                total={totalPages}
-                size="sm"
-              />
+              <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
             </Group>
           )}
         </>

@@ -158,6 +158,23 @@ function CustomPriceBadge({ isMobile }: { isMobile: boolean }) {
   );
 }
 
+const PAYMENT_STATUS_META: Record<string, { label: string; color: string }> = {
+  paid:    { label: "Pagado",   color: "green" },
+  partial: { label: "Abono",   color: "yellow" },
+  unpaid:  { label: "Sin pagar", color: "red" },
+  free:    { label: "Gratis",  color: "blue" },
+};
+
+function PaymentBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const meta = PAYMENT_STATUS_META[status] || { label: status, color: "gray" };
+  return (
+    <Badge variant="light" color={meta.color} size="sm">
+      {meta.label}
+    </Badge>
+  );
+}
+
 const DailyCashbox: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -434,10 +451,11 @@ const DailyCashbox: React.FC = () => {
   }, [appointments, selectedServices]);
 
   // Totales + resumen por servicio calculados sobre filteredAppointments
-  const { totalIncome, totalCount, avgTicket, servicesSummary } =
+  const { totalIncome, totalCount, avgTicket, servicesSummary, totalCollected, totalPending } =
     useMemo(() => {
       const summary: Record<string, { count: number; total: number }> = {};
       let total = 0;
+      let collected = 0;
 
       for (const appt of filteredAppointments) {
         const basePrice = appt.service?.price || 0;
@@ -457,6 +475,10 @@ const DailyCashbox: React.FC = () => {
         const lineTotal = usedPrice + additionalTotal;
         total += lineTotal;
 
+        const advance = appt.advancePayment || 0;
+        const paymentsSum = (appt.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
+        collected += advance + paymentsSum;
+
         const serviceName = appt.service?.name || "Otro";
         if (!summary[serviceName])
           summary[serviceName] = { count: 0, total: 0 };
@@ -471,6 +493,8 @@ const DailyCashbox: React.FC = () => {
         totalCount: count,
         avgTicket: count > 0 ? total / count : 0,
         servicesSummary: summary,
+        totalCollected: collected,
+        totalPending: Math.max(0, total - collected),
       };
     }, [filteredAppointments]);
 
@@ -647,6 +671,20 @@ const DailyCashbox: React.FC = () => {
                   Ingresos
                 </Text>
                 <Text fw={900}>{formatCurrency(totalIncome, currency)}</Text>
+              </div>
+              <Divider orientation="vertical" />
+              <div style={{ textAlign: isMobile ? "left" : "right" }}>
+                <Text size="xs" c="dimmed">
+                  Cobrado
+                </Text>
+                <Text fw={900} c="green">{formatCurrency(totalCollected, currency)}</Text>
+              </div>
+              <Divider orientation="vertical" />
+              <div style={{ textAlign: isMobile ? "left" : "right" }}>
+                <Text size="xs" c="dimmed">
+                  Pendiente
+                </Text>
+                <Text fw={900} c={totalPending > 0 ? "orange" : "dimmed"}>{formatCurrency(totalPending, currency)}</Text>
               </div>
               <Divider orientation="vertical" />
               <div style={{ textAlign: isMobile ? "left" : "right" }}>
@@ -830,6 +868,7 @@ const DailyCashbox: React.FC = () => {
                       {appointment.client?.name || "—"}
                     </Text>
                     <StatusBadge status={status} />
+                    <PaymentBadge status={appointment.paymentStatus} />
                   </Group>
 
                   <Text size="sm" c="dimmed" lineClamp={1}>
@@ -922,6 +961,7 @@ const DailyCashbox: React.FC = () => {
             <Table.Th>Servicio</Table.Th>
             <Table.Th>Precio</Table.Th>
             <Table.Th>Estado</Table.Th>
+            <Table.Th>Cobro</Table.Th>
             <Table.Th style={{ width: 90, textAlign: "center" }}>
               Acción
             </Table.Th>
@@ -1022,6 +1062,10 @@ const DailyCashbox: React.FC = () => {
 
                   <Table.Td>
                     <StatusBadge status={status} />
+                  </Table.Td>
+
+                  <Table.Td>
+                    <PaymentBadge status={appointment.paymentStatus} />
                   </Table.Td>
 
                   <Table.Td style={{ textAlign: "center" }}>

@@ -10,6 +10,15 @@ export interface AdditionalItem {
   price: number;
 }
 
+export interface PaymentRecord {
+  _id: string;
+  amount: number;
+  method: 'cash' | 'card' | 'transfer' | 'other';
+  date: string;
+  note?: string;
+  registeredBy?: string;
+}
+
 export interface Appointment {
   _id: string;
   client: Client;
@@ -26,6 +35,8 @@ export interface Appointment {
   customPrice?: number | null; // Precio personalizado definido por el usuario
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos
   totalPrice: number; // Precio total calculado para la cita
+  payments?: PaymentRecord[];
+  paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'free';
   reminderSent?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -397,6 +408,37 @@ export const deleteAppointment = async (
     await apiAppointment.delete<Response<void>>(`/${appointmentId}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar la cita");
+  }
+};
+
+// 💰 Registrar un pago en una cita
+export const addAppointmentPayment = async (
+  appointmentId: string,
+  payment: Omit<PaymentRecord, '_id'>
+): Promise<Appointment | undefined> => {
+  try {
+    const response = await apiAppointment.post<Response<Appointment>>(
+      `/${appointmentId}/payments`,
+      payment
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, 'Error al registrar el pago');
+  }
+};
+
+// 💰 Eliminar un pago de una cita
+export const removeAppointmentPayment = async (
+  appointmentId: string,
+  paymentId: string
+): Promise<Appointment | undefined> => {
+  try {
+    const response = await apiAppointment.delete<Response<Appointment>>(
+      `/${appointmentId}/payments/${paymentId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, 'Error al eliminar el pago');
   }
 };
 

@@ -39,6 +39,15 @@ export interface ConsumptionHistoryItem {
   date: string;
 }
 
+export interface PackagePaymentRecord {
+  _id: string;
+  amount: number;
+  method: "cash" | "card" | "transfer" | "other";
+  date: string;
+  note?: string;
+  registeredBy?: string;
+}
+
 export interface ClientPackage {
   _id: string;
   clientId: string;
@@ -53,6 +62,8 @@ export interface ClientPackage {
   totalPrice: number;
   paymentMethod: string;
   paymentNotes: string;
+  payments?: PackagePaymentRecord[];
+  paymentStatus?: "unpaid" | "partial" | "paid";
   consumptionHistory: ConsumptionHistoryItem[];
   createdAt: string;
   updatedAt: string;
@@ -237,6 +248,39 @@ export const getActivePackagesForService = async (
       "Error al verificar paquetes activos para el servicio"
     );
     return [];
+  }
+};
+
+// =============================================
+// Pagos de ClientPackage
+// =============================================
+
+export const addClientPackagePayment = async (
+  clientPackageId: string,
+  payment: Omit<PackagePaymentRecord, "_id">
+): Promise<ClientPackage | undefined> => {
+  try {
+    const response = await apiPackage.post<Response<ClientPackage>>(
+      `/client-package/${clientPackageId}/payments`,
+      payment
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al registrar el pago");
+  }
+};
+
+export const removeClientPackagePayment = async (
+  clientPackageId: string,
+  paymentId: string
+): Promise<ClientPackage | undefined> => {
+  try {
+    const response = await apiPackage.delete<Response<ClientPackage>>(
+      `/client-package/${clientPackageId}/payments/${paymentId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al eliminar el pago");
   }
 };
 

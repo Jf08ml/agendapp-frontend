@@ -17,6 +17,8 @@ import {
   NumberInput,
   Tabs,
   ScrollArea,
+  Select,
+  Divider,
 } from "@mantine/core";
 import {
   BiEdit,
@@ -31,7 +33,10 @@ import {
 } from "react-icons/bi";
 import {
   Appointment,
+  PaymentRecord,
   updateAppointment,
+  addAppointmentPayment,
+  removeAppointmentPayment,
 } from "../../../services/appointmentService";
 import { usePermissions } from "../../../hooks/usePermissions";
 import dayjs from "dayjs";
@@ -128,6 +133,12 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const [newItem, setNewItem] = useState({ name: "", price: 0 });
   const [updatingReminder, setUpdatingReminder] = useState(false);
 
+  // 💰 Estado de pagos
+  const [payments, setPayments] = useState<PaymentRecord[]>(appointment.payments || []);
+  const [paymentStatus, setPaymentStatus] = useState(appointment.paymentStatus || "unpaid");
+  const [newPayment, setNewPayment] = useState({ amount: 0, method: "cash", note: "" });
+  const [savingPayment, setSavingPayment] = useState(false);
+
   const handleAddItem = () => {
     if (newItem.name && newItem.price > 0) {
       setAdditionalItems([...additionalItems, newItem]);
@@ -184,6 +195,81 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     }
   };
 
+  const handleFullPayment = async () => {
+    if (pending <= 0) return;
+    setSavingPayment(true);
+    try {
+      const updated = await addAppointmentPayment(appointment._id, {
+        amount: pending,
+        method: newPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: "",
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments((prev) => prev.map((a) =>
+          a._id === appointment._id
+            ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+            : a
+        ));
+        showNotification({ title: "Pago completo registrado", message: "Se registró el saldo pendiente como pagado", color: "green", autoClose: 3000, position: "top-right" });
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleAddPayment = async () => {
+    if (!newPayment.amount || newPayment.amount <= 0) return;
+    setSavingPayment(true);
+    try {
+      const updated = await addAppointmentPayment(appointment._id, {
+        amount: newPayment.amount,
+        method: newPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: newPayment.note,
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments((prev) => prev.map((a) =>
+          a._id === appointment._id
+            ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+            : a
+        ));
+        setNewPayment({ amount: 0, method: "cash", note: "" });
+        showNotification({ title: "Pago registrado", message: "El pago fue registrado correctamente", color: "green", autoClose: 3000, position: "top-right" });
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleRemovePayment = async (paymentId: string) => {
+    try {
+      const updated = await removeAppointmentPayment(appointment._id, paymentId);
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments((prev) => prev.map((a) =>
+          a._id === appointment._id
+            ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+            : a
+        ));
+      }
+    } catch (err) {
+      console.error(err);
+      showNotification({ title: "Error", message: "No se pudo eliminar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    }
+  };
+
   const getIsBirthday = (
     birthDate: string | number | dayjs.Dayjs | Date | null | undefined
   ): boolean => {
@@ -224,6 +310,26 @@ ${clientServices}`;
 
   const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
   const isBirthday = getIsBirthday(appointment.client.birthDate);
+
+  // 💰 Cálculos de cobro para esta cita
+  // Usar || en lugar de ?? porque customPrice se inicializa como 0 cuando no hay precio personalizado
+  const thisTotal = (customPrice || appointment.totalPrice || 0) +
+    additionalItems.reduce((s, i) => s + (i.price || 0), 0);
+  const totalPaid = (appointment.advancePayment || 0) +
+    payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = Math.max(0, thisTotal - totalPaid);
+
+  const paymentStatusConfig = {
+    paid:    { color: "green",  label: "Pagado" },
+    partial: { color: "yellow", label: "Abono" },
+    unpaid:  { color: "red",    label: "Sin pagar" },
+    free:    { color: "blue",   label: "Incluido en paquete" },
+  };
+  const psConfig = paymentStatusConfig[paymentStatus as keyof typeof paymentStatusConfig] ?? paymentStatusConfig.unpaid;
+
+  const methodLabels: Record<string, string> = {
+    cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia", other: "Otro",
+  };
 
   return (
     <>
@@ -749,6 +855,160 @@ ${clientServices}`;
                       )}
                     </Text>
                   </Flex>
+
+                  <Divider my="sm" label="Cobro de esta cita" labelPosition="center" />
+
+                  {/* ESTADO DE PAGO */}
+                  <Flex align="center" justify="space-between">
+                    <Text size="sm" fw={700}>Estado de cobro</Text>
+                    <Badge color={psConfig.color} size="md" variant="filled">
+                      {psConfig.label}
+                    </Badge>
+                  </Flex>
+
+                  {/* RESUMEN COBRO */}
+                  <Box
+                    style={{
+                      border: "1px solid var(--mantine-color-gray-2)",
+                      borderRadius: 10,
+                      padding: "10px 12px",
+                      background: "var(--mantine-color-gray-0)",
+                    }}
+                  >
+                    <Flex justify="space-between" mb={2}>
+                      <Text size="sm" c="dimmed">Total esta cita</Text>
+                      <Text size="sm" fw={600}>{formatCurrency(thisTotal, organization?.currency || "COP")}</Text>
+                    </Flex>
+                    <Flex justify="space-between" mb={2}>
+                      <Text size="sm" c="dimmed">Abono inicial</Text>
+                      <Text size="sm">{formatCurrency(appointment.advancePayment || 0, organization?.currency || "COP")}</Text>
+                    </Flex>
+                    {payments.length > 0 && (
+                      <Flex justify="space-between" mb={2}>
+                        <Text size="sm" c="dimmed">Pagos adicionales</Text>
+                        <Text size="sm">{formatCurrency(payments.reduce((s, p) => s + (p.amount || 0), 0), organization?.currency || "COP")}</Text>
+                      </Flex>
+                    )}
+                    <Flex justify="space-between" pt={4} style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}>
+                      <Text size="sm" fw={700}>Saldo pendiente</Text>
+                      <Text size="sm" fw={700} c={pending > 0 ? "red" : "green"}>
+                        {formatCurrency(pending, organization?.currency || "COP")}
+                      </Text>
+                    </Flex>
+                  </Box>
+
+                  {/* HISTORIAL DE PAGOS */}
+                  {payments.length > 0 && (
+                    <Box>
+                      <Text size="sm" fw={700} mb={6}>Historial de pagos</Text>
+                      <Flex direction="column" gap={4}>
+                        {payments.map((p) => (
+                          <Flex
+                            key={p._id}
+                            justify="space-between"
+                            align="center"
+                            px={10}
+                            py={6}
+                            style={{
+                              borderRadius: 8,
+                              border: "1px solid var(--mantine-color-gray-2)",
+                              background: "var(--mantine-color-gray-0)",
+                            }}
+                          >
+                            <Box>
+                              <Text size="sm" fw={600}>
+                                {formatCurrency(p.amount, organization?.currency || "COP")}
+                                {" · "}{methodLabels[p.method] || p.method}
+                              </Text>
+                              {p.note && <Text size="xs" c="dimmed">{p.note}</Text>}
+                              <Text size="xs" c="dimmed">
+                                {dayjs(p.date).locale("es").format("D MMM YYYY")}
+                              </Text>
+                            </Box>
+                            <ActionIcon
+                              color="red"
+                              variant="subtle"
+                              size="sm"
+                              onClick={() => handleRemovePayment(p._id)}
+                            >
+                              <BiX size={14} />
+                            </ActionIcon>
+                          </Flex>
+                        ))}
+                      </Flex>
+                    </Box>
+                  )}
+
+                  {/* FORMULARIO AGREGAR PAGO */}
+                  {paymentStatus !== "paid" && paymentStatus !== "free" && (
+                    <Box
+                      style={{
+                        border: "1px solid var(--mantine-color-gray-2)",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <Text size="sm" fw={700} mb={8}>Registrar pago</Text>
+
+                      {/* Acción rápida */}
+                      <Flex gap="xs" align="flex-end" mb="sm">
+                        <Select
+                          label="Método de pago"
+                          value={newPayment.method}
+                          onChange={(v) => setNewPayment({ ...newPayment, method: v || "cash" })}
+                          data={[
+                            { value: "cash", label: "Efectivo" },
+                            { value: "card", label: "Tarjeta" },
+                            { value: "transfer", label: "Transferencia" },
+                            { value: "other", label: "Otro" },
+                          ]}
+                          style={{ flex: 1 }}
+                        />
+                        <Button
+                          size="sm"
+                          color="teal"
+                          variant="filled"
+                          loading={savingPayment}
+                          disabled={pending <= 0}
+                          onClick={handleFullPayment}
+                          style={{ flex: 1 }}
+                        >
+                          Pago completo ({formatCurrency(pending, organization?.currency || "COP")})
+                        </Button>
+                      </Flex>
+
+                      <Divider label="o ingresa un monto parcial" labelPosition="center" mb="sm" />
+
+                      <Flex gap="xs" align="flex-end">
+                        <NumberInput
+                          label="Monto parcial"
+                          prefix="$ "
+                          thousandSeparator=","
+                          value={newPayment.amount || ""}
+                          onChange={(v) => setNewPayment({ ...newPayment, amount: Number(v) || 0 })}
+                          style={{ flex: 1 }}
+                          min={0}
+                        />
+                      </Flex>
+                      <TextInput
+                        label="Nota (opcional)"
+                        value={newPayment.note}
+                        onChange={(e) => setNewPayment({ ...newPayment, note: e.target.value })}
+                        mt="xs"
+                      />
+                      <Button
+                        fullWidth
+                        mt="sm"
+                        size="sm"
+                        variant="light"
+                        loading={savingPayment}
+                        disabled={!newPayment.amount || newPayment.amount <= 0}
+                        onClick={handleAddPayment}
+                      >
+                        Registrar monto parcial
+                      </Button>
+                    </Box>
+                  )}
                 </Flex>
               </Tabs.Panel>
             </Tabs>
@@ -786,7 +1046,7 @@ ${clientServices}`;
             : isPastAppointment
             ? "#ffffff"
             : employeeColor, // ❌ Gris si cancelada
-          color: isCancelled ? "#868e96" : textColor, // ❌ Texto gris si cancelada
+          color: isCancelled ? "#868e96" : isPastAppointment ? "#495057" : textColor,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -995,7 +1255,7 @@ ${clientServices}`;
         {/* Cliente */}
         <Text
           style={{
-            color: textColor,
+            color: isPastAppointment ? "#495057" : textColor,
             fontSize: 10,
           }}
         >
