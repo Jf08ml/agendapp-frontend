@@ -283,6 +283,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           label="Teléfono"
           placeholder="300 000 0000"
           required
+          compact
         />
         {isCheckingPhone && (
           <Group gap="xs">

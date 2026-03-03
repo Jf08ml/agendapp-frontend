@@ -1,6 +1,6 @@
 // components/InternationalPhoneInput.tsx
 import React, { useState, useEffect } from "react";
-import { TextInput, Select, Group, Text, Box } from "@mantine/core";
+import { TextInput, Select, Group, Text, Box, ComboboxItem } from "@mantine/core";
 import { type CountryCode } from "libphonenumber-js";
 import {
   normalizePhoneNumber,
@@ -25,6 +25,8 @@ interface InternationalPhoneInputProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Muestra solo bandera + código al seleccionar; el nombre aparece solo en el dropdown */
+  compact?: boolean;
 }
 
 const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
@@ -38,6 +40,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
   placeholder,
   required = false,
   disabled = false,
+  compact = false,
 }) => {
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>("CO");
   const [nationalNumber, setNationalNumber] = useState("");
@@ -48,9 +51,13 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
     () =>
       getAllCountries().map((c) => ({
         value: c.value,
-        label: `${c.flag} ${c.name} ${c.callingCode}`,
+        // En modo compact el label es solo bandera + código; en normal incluye el nombre
+        label: compact ? `${c.flag} ${c.callingCode}` : `${c.flag} ${c.name} ${c.callingCode}`,
+        // Guardamos el nombre para poder buscarlo en modo compact
+        name: c.name,
+        fullLabel: `${c.flag} ${c.name} ${c.callingCode}`,
       })),
-    []
+    [compact]
   );
 
   // Determinar país inicial
@@ -169,7 +176,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
         )}
       </Text>
 
-      <Group align="flex-start">
+      <Group align="flex-start" style={{ width: "100%" }}>
         <Select
           data={countrySelectData}
           value={selectedCountry}
@@ -177,7 +184,27 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
           searchable
           placeholder="País"
           disabled={disabled}
-          comboboxProps={{ zIndex: 10000 }}
+          comboboxProps={{ zIndex: 10000, width: compact ? 260 : undefined }}
+          w={compact ? 90 : undefined}
+          {...(compact && {
+            // En modo compact: filtrar también por nombre del país
+            filter: ({ options, search }: { options: ComboboxItem[]; search: string }) => {
+              const q = search.toLowerCase();
+              return options.filter(
+                (o) =>
+                  o.label.toLowerCase().includes(q) ||
+                  ((o as ComboboxItem & { name?: string }).name ?? "").toLowerCase().includes(q)
+              );
+            },
+            // En el dropdown mostrar bandera + nombre + código para facilitar búsqueda
+            renderOption: ({ option }: { option: ComboboxItem }) => (
+              <Group gap="xs" wrap="nowrap">
+                <Text size="sm">
+                  {(option as ComboboxItem & { fullLabel?: string }).fullLabel ?? option.label}
+                </Text>
+              </Group>
+            ),
+          })}
         />
 
         <TextInput

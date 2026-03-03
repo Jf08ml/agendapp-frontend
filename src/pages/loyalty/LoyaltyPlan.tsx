@@ -1,12 +1,14 @@
 import React from "react";
-import { Box, Text, Progress, Center, Stack, useMantineTheme, Card } from "@mantine/core";
+import { Box, Text, Progress, Center, Stack, useMantineTheme, Card, Divider, Badge, Group } from "@mantine/core";
 import { FaMedal } from "react-icons/fa";
+import { RewardHistoryEntry } from "../../services/clientService";
 
 interface LoyaltyPlanProps {
   servicesTaken: number;
   totalServices: number;
   serviceReward: string;
   primaryColor?: string;
+  rewardHistory?: RewardHistoryEntry[];
 }
 
 const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({
@@ -14,6 +16,7 @@ const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({
   totalServices,
   serviceReward,
   primaryColor,
+  rewardHistory = [],
 }) => {
   const theme = useMantineTheme();
   const colorProgress =
@@ -24,6 +27,8 @@ const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({
   const completed = totalServices > 0 && servicesTaken >= totalServices;
   const safeTotal = totalServices > 0 ? totalServices : 1;
   const progress = Math.min(100, (servicesTaken / safeTotal) * 100);
+
+  const lastFive = rewardHistory.slice(-5).reverse();
 
   return (
     <Card
@@ -117,6 +122,29 @@ const LoyaltyPlan: React.FC<LoyaltyPlanProps> = ({
             </Text>
           )}
         </Box>
+
+        {lastFive.length > 0 && (
+          <>
+            <Divider w="90%" label="Historial de premios" labelPosition="center" mt="xs" />
+            <Stack gap={4} w="100%">
+              {lastFive.map((entry) => (
+                <Group key={entry._id} justify="space-between" px="xs" wrap="nowrap">
+                  <Text size="xs" c="dimmed" style={{ flex: 1 }} truncate="end">
+                    🏅 {entry.reward}
+                  </Text>
+                  <Group gap={4} wrap="nowrap">
+                    <Text size="xs" c="dimmed">
+                      {new Date(entry.earnedAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                    </Text>
+                    <Badge size="xs" color={entry.redeemed ? "green" : "orange"} variant="light">
+                      {entry.redeemed ? "Canjeado" : "Pendiente"}
+                    </Badge>
+                  </Group>
+                </Group>
+              ))}
+            </Stack>
+          </>
+        )}
       </Stack>
     </Card>
   );

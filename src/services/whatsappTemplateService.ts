@@ -17,6 +17,8 @@ export interface WhatsappTemplates {
   clientConfirmationAck: WhatsappTemplate;
   clientCancellationAck: WhatsappTemplate;
   clientNoShowAck: WhatsappTemplate;
+  loyaltyServiceReward: WhatsappTemplate;
+  loyaltyReferralReward: WhatsappTemplate;
 }
 
 export interface TemplatesResponse {
@@ -32,6 +34,8 @@ export interface TemplatesResponse {
     clientConfirmationAck: string;
     clientCancellationAck: string;
     clientNoShowAck: string;
+    loyaltyServiceReward: string;
+    loyaltyReferralReward: string;
   };
 }
 
@@ -46,6 +50,8 @@ export interface WhatsappTemplateSettings {
   clientConfirmationAck?: boolean;
   clientCancellationAck?: boolean;
   clientNoShowAck?: boolean;
+  loyaltyServiceReward?: boolean;
+  loyaltyReferralReward?: boolean;
 }
 
 const whatsappTemplateService = {

@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { TextInput, Button, Checkbox, Box, Text, Flex, Paper, useMantineTheme } from "@mantine/core";
+import { Button, Checkbox, Box, Text, Flex, Paper, useMantineTheme } from "@mantine/core";
 import { getClientByPhoneNumberAndOrganization } from "../../services/clientService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { useNavigate } from "react-router-dom";
 import { FaUserCheck } from "react-icons/fa";
+import InternationalPhoneInput from "../../components/InternationalPhoneInput";
+import { type CountryCode } from "libphonenumber-js";
 
 const SearchClient: React.FC = () => {
   const theme = useMantineTheme();
-  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [phoneE164, setPhoneE164] = useState<string | null>(null);
   const [rememberClient, setRememberClient] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [searching, setSearching] = useState<boolean>(false);
 
   const navigate = useNavigate();
   const organization = useSelector(
@@ -52,10 +55,15 @@ const SearchClient: React.FC = () => {
       setError("Organización no encontrada.");
       return;
     }
+    if (!phoneE164) {
+      setError("Ingresa un número de teléfono válido.");
+      return;
+    }
 
+    setSearching(true);
     try {
       const client = await getClientByPhoneNumberAndOrganization(
-        phoneNumber,
+        phoneE164,
         organization._id as string
       );
       if (client) {
@@ -80,6 +88,8 @@ const SearchClient: React.FC = () => {
       } else {
         setError("Ocurrió un error desconocido.");
       }
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -119,18 +129,15 @@ const SearchClient: React.FC = () => {
           </Text>
         </Flex>
 
-        <TextInput
-          label="Número de Teléfono"
-          placeholder="Ej: 3111234567"
-          mt="xs"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
-          required
-          maxLength={12}
-          inputMode="numeric"
-          radius="md"
-          size="md"
-        />
+        <Box mt="xs" style={{ textAlign: "left" }}>
+          <InternationalPhoneInput
+            label="Número de Teléfono"
+            organizationDefaultCountry={(organization?.default_country as CountryCode) || "CO"}
+            onChange={(e164) => setPhoneE164(e164)}
+            required
+            compact
+          />
+        </Box>
 
         <Checkbox
           mt="sm"
@@ -154,6 +161,8 @@ const SearchClient: React.FC = () => {
           radius="xl"
           size="md"
           onClick={handleSearch}
+          loading={searching}
+          disabled={!phoneE164}
           style={{ fontWeight: 700, letterSpacing: 1 }}
         >
           Buscar

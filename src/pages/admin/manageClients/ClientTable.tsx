@@ -18,16 +18,20 @@ import {
 } from "@mantine/core";
 import { openConfirmModal } from "@mantine/modals";
 import { useMediaQuery } from "@mantine/hooks";
-import { Client as ClientType } from "../../../services/clientService";
+import { Client as ClientType, RewardHistoryEntry, redeemReward } from "../../../services/clientService";
 import {
   Appointment,
   getAppointmentsByClient,
 } from "../../../services/appointmentService";
+import { showNotification } from "@mantine/notifications";
 import ClientRow from "./ClientRow";
 
 interface ClientTableProps {
   clients: ClientType[];
   handleDeleteClient: (id: string) => void;
+  handleForceDeleteClient: (id: string) => void;
+  handleMergeClient: (client: ClientType) => void;
+  handleResetClientLoyalty: (clientId: string) => void;
   handleRegisterService: (clientId: string) => void;
   handleReferral: (clientId: string) => void;
   handleEditClient: (client: ClientType) => void;
@@ -68,6 +72,9 @@ const getStatusBadge = (status: string) => {
 const ClientTable: React.FC<ClientTableProps> = ({
   clients,
   handleDeleteClient,
+  handleForceDeleteClient,
+  handleMergeClient,
+  handleResetClientLoyalty,
   handleRegisterService,
   handleReferral,
   handleEditClient,
@@ -83,6 +90,12 @@ const ClientTable: React.FC<ClientTableProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [currentClientId, setCurrentClientId] = useState<string | null>(null);
   const [currentClientName, setCurrentClientName] = useState<string>("");
+
+  // Modal de premios
+  const [rewardsOpened, setRewardsOpened] = useState(false);
+  const [selectedClientForRewards, setSelectedClientForRewards] = useState<ClientType | null>(null);
+  const [rewardsList, setRewardsList] = useState<RewardHistoryEntry[]>([]);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -132,6 +145,29 @@ const ClientTable: React.FC<ClientTableProps> = ({
     }
   };
 
+  const handleViewRewards = (client: ClientType) => {
+    setSelectedClientForRewards(client);
+    setRewardsList(client.rewardHistory || []);
+    setRewardsOpened(true);
+  };
+
+  const handleRedeem = async (rewardId: string) => {
+    if (!selectedClientForRewards) return;
+    setRedeemingId(rewardId);
+    try {
+      const updated = await redeemReward(selectedClientForRewards._id, rewardId);
+      if (updated) {
+        setRewardsList(updated.rewardHistory || []);
+        setSelectedClientForRewards(updated);
+      }
+      showNotification({ title: "Recompensa canjeada", message: "La recompensa fue marcada como canjeada.", color: "green", autoClose: 3000, position: "top-right" });
+    } catch (err) {
+      showNotification({ title: "Error", message: (err as Error).message || "No se pudo canjear.", color: "red", autoClose: 4000, position: "top-right" });
+    } finally {
+      setRedeemingId(null);
+    }
+  };
+
   const confirmAction = (
     action: () => void,
     title: string,
@@ -153,12 +189,13 @@ const ClientTable: React.FC<ClientTableProps> = ({
     if (appointments.length === 0) return "—";
     const typeCount: Record<string, number> = {};
     appointments.forEach((appointment) => {
+      if (!appointment.service) return;
       const type = appointment.service.type;
       typeCount[type] = (typeCount[type] || 0) + 1;
     });
-    const most = Object.entries(typeCount).reduce((a, b) =>
-      b[1] > a[1] ? b : a
-    );
+    const entries = Object.entries(typeCount);
+    if (entries.length === 0) return "—";
+    const most = entries.reduce((a, b) => b[1] > a[1] ? b : a);
     return most[0];
   };
 
@@ -235,6 +272,10 @@ const ClientTable: React.FC<ClientTableProps> = ({
                   handleReferral={handleReferral}
                   handleEditClient={handleEditClient}
                   handleDeleteClient={handleDeleteClient}
+                  handleViewRewards={handleViewRewards}
+                  handleMergeClient={handleMergeClient}
+                  handleForceDeleteClient={handleForceDeleteClient}
+                  handleResetClientLoyalty={handleResetClientLoyalty}
                 />
               ))}
               {displayedClients.length === 0 && (
@@ -322,10 +363,41 @@ const ClientTable: React.FC<ClientTableProps> = ({
                 </Button>
                 <Button
                   size="xs"
+                  variant="light"
+                  color="yellow"
+                  onClick={() => handleViewRewards(c)}
+                >
+                  Ver premios
+                </Button>
+                <Button
+                  size="xs"
                   variant="default"
                   onClick={() => handleEditClient(c)}
                 >
                   Editar
+                </Button>
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="orange"
+                  onClick={() => handleMergeClient(c)}
+                >
+                  Fusionar
+                </Button>
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="teal"
+                  onClick={() =>
+                    confirmAction(
+                      () => handleResetClientLoyalty(c._id),
+                      "Restablecer contadores",
+                      "¿Deseas reiniciar los servicios tomados y referidos a 0 para este cliente?",
+                      "register"
+                    )
+                  }
+                >
+                  Restablecer
                 </Button>
                 <Button
                   size="xs"
@@ -341,6 +413,21 @@ const ClientTable: React.FC<ClientTableProps> = ({
                   }
                 >
                   Eliminar
+                </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  color="red"
+                  onClick={() =>
+                    confirmAction(
+                      () => handleForceDeleteClient(c._id),
+                      "Eliminar con citas",
+                      "⚠️ Se eliminarán el cliente Y TODAS SUS CITAS. Esta acción no se puede deshacer.",
+                      "delete"
+                    )
+                  }
+                >
+                  Eliminar con citas
                 </Button>
               </Group>
             </Card>
@@ -406,8 +493,8 @@ const ClientTable: React.FC<ClientTableProps> = ({
                     const statusBadge = getStatusBadge(a.status);
                     return (
                       <Table.Tr key={a._id}>
-                        <Table.Td>{a.service.name}</Table.Td>
-                        <Table.Td>{a.employee.names}</Table.Td>
+                        <Table.Td>{a.service?.name ?? "—"}</Table.Td>
+                        <Table.Td>{a.employee?.names ?? "—"}</Table.Td>
                         <Table.Td>
                           {new Date(a.startDate).toLocaleString("es-ES")}
                         </Table.Td>
@@ -429,6 +516,61 @@ const ClientTable: React.FC<ClientTableProps> = ({
               ? "No hay citas con el estado seleccionado"
               : "No hay citas registradas"}
           </Text>
+        )}
+      </Modal>
+
+      {/* Modal historial de premios */}
+      <Modal
+        opened={rewardsOpened}
+        onClose={() => setRewardsOpened(false)}
+        title={`Premios de ${selectedClientForRewards?.name || ""}`}
+        centered
+        size="md"
+      >
+        {rewardsList.length === 0 ? (
+          <Text c="dimmed" ta="center" py="md">
+            Este cliente aún no ha ganado ningún premio.
+          </Text>
+        ) : (
+          <Stack gap="sm">
+            {[...rewardsList].reverse().map((entry) => (
+              <Card key={entry._id} withBorder radius="md" p="sm">
+                <Group justify="space-between" wrap="nowrap">
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap={6} mb={2}>
+                      <Text size="lg">{entry.type === 'service' ? '🏆' : '🎁'}</Text>
+                      <Badge size="xs" color={entry.type === 'service' ? 'blue' : 'grape'} variant="light">
+                        {entry.type === 'service' ? 'Fidelidad' : 'Referidos'}
+                      </Badge>
+                      <Badge size="xs" color={entry.redeemed ? 'green' : 'orange'} variant="filled">
+                        {entry.redeemed ? 'Canjeado' : 'Pendiente'}
+                      </Badge>
+                    </Group>
+                    <Text size="sm" fw={500} lineClamp={2}>{entry.reward}</Text>
+                    <Text size="xs" c="dimmed">
+                      Ganado el {new Date(entry.earnedAt).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" })}
+                    </Text>
+                    {entry.redeemed && entry.redeemedAt && (
+                      <Text size="xs" c="green">
+                        Canjeado el {new Date(entry.redeemedAt).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" })}
+                      </Text>
+                    )}
+                  </Box>
+                  {!entry.redeemed && (
+                    <Button
+                      size="xs"
+                      color="green"
+                      variant="light"
+                      loading={redeemingId === entry._id}
+                      onClick={() => handleRedeem(entry._id)}
+                    >
+                      Canjear
+                    </Button>
+                  )}
+                </Group>
+              </Card>
+            ))}
+          </Stack>
         )}
       </Modal>
 

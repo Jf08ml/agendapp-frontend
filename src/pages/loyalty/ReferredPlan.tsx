@@ -8,24 +8,32 @@ import {
   rem,
   Center,
   Stack,
+  Divider,
+  Badge,
+  Group,
 } from "@mantine/core";
 import { FaCheckCircle } from "react-icons/fa";
+import { RewardHistoryEntry } from "../../services/clientService";
 
 interface ReferredPlanProps {
   referralsMade: number;
   totalReferrals: number;
   referredReward: string;
+  rewardHistory?: RewardHistoryEntry[];
 }
 
 const ReferredPlan: React.FC<ReferredPlanProps> = ({
   referralsMade,
   totalReferrals,
   referredReward,
+  rewardHistory = [],
 }) => {
   const theme = useMantineTheme();
   const completed = totalReferrals > 0 && referralsMade >= totalReferrals;
   const safeTotal = totalReferrals > 0 ? totalReferrals : 1;
   const percent = Math.min(100, (referralsMade / safeTotal) * 100);
+
+  const lastFive = rewardHistory.slice(-5).reverse();
 
   return (
     <Card
@@ -120,6 +128,29 @@ const ReferredPlan: React.FC<ReferredPlanProps> = ({
             </Text>
           )}
         </Box>
+
+        {lastFive.length > 0 && (
+          <>
+            <Divider w="90%" label="Historial de premios" labelPosition="center" mt="xs" />
+            <Stack gap={4} w="100%">
+              {lastFive.map((entry) => (
+                <Group key={entry._id} justify="space-between" px="xs" wrap="nowrap">
+                  <Text size="xs" c="dimmed" style={{ flex: 1 }} truncate="end">
+                    🎁 {entry.reward}
+                  </Text>
+                  <Group gap={4} wrap="nowrap">
+                    <Text size="xs" c="dimmed">
+                      {new Date(entry.earnedAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                    </Text>
+                    <Badge size="xs" color={entry.redeemed ? "green" : "orange"} variant="light">
+                      {entry.redeemed ? "Canjeado" : "Pendiente"}
+                    </Badge>
+                  </Group>
+                </Group>
+              ))}
+            </Stack>
+          </>
+        )}
       </Stack>
     </Card>
   );

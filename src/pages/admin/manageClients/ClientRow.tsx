@@ -3,7 +3,8 @@ import { Client } from "../../../services/clientService";
 import { ActionIcon, Badge, Menu, Table, Text, Tooltip } from "@mantine/core";
 import { BiTrash } from "react-icons/bi";
 import { CgAdd, CgOptions, CgUserAdd } from "react-icons/cg";
-import { MdEdit, MdVisibility } from "react-icons/md";
+import { MdEdit, MdMerge, MdVisibility, MdRestartAlt } from "react-icons/md";
+import { FaTrophy } from "react-icons/fa";
 import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 
 const ClientRow = React.memo(
@@ -17,6 +18,10 @@ const ClientRow = React.memo(
     handleReferral,
     handleEditClient,
     handleDeleteClient,
+    handleViewRewards,
+    handleMergeClient,
+    handleResetClientLoyalty,
+    handleForceDeleteClient,
   }: {
     client: Client;
     loadingClientId: string | null;
@@ -32,6 +37,10 @@ const ClientRow = React.memo(
     handleReferral: (clientId: string) => void;
     handleEditClient: (client: Client) => void;
     handleDeleteClient: (id: string) => void;
+    handleViewRewards: (client: Client) => void;
+    handleMergeClient: (client: Client) => void;
+    handleResetClientLoyalty: (clientId: string) => void;
+    handleForceDeleteClient: (id: string) => void;
   }) => (
     <Table.Tr key={client._id}>
       <Table.Td>
@@ -121,12 +130,38 @@ const ClientRow = React.memo(
               Registrar referido
             </Menu.Item>
             <Menu.Item
+              leftSection={<FaTrophy />}
+              onClick={() => handleViewRewards(client)}
+            >
+              Ver premios
+            </Menu.Item>
+            <Menu.Item
               leftSection={<MdEdit />}
               onClick={() => handleEditClient(client)}
             >
               Editar cliente
             </Menu.Item>
             <Menu.Divider />
+            <Menu.Item
+              leftSection={<MdMerge />}
+              onClick={() => handleMergeClient(client)}
+            >
+              Fusionar con...
+            </Menu.Item>
+            <Menu.Item
+              color="teal"
+              leftSection={<MdRestartAlt />}
+              onClick={() =>
+                confirmAction(
+                  () => handleResetClientLoyalty(client._id),
+                  "Restablecer contadores",
+                  "¿Deseas reiniciar los servicios tomados y referidos a 0 para este cliente?",
+                  "register"
+                )
+              }
+            >
+              Restablecer contadores
+            </Menu.Item>
             <Menu.Item
               color="red"
               leftSection={<BiTrash />}
@@ -140,6 +175,20 @@ const ClientRow = React.memo(
               }
             >
               Eliminar cliente
+            </Menu.Item>
+            <Menu.Item
+              color="red"
+              leftSection={<BiTrash />}
+              onClick={() =>
+                confirmAction(
+                  () => handleForceDeleteClient(client._id),
+                  "Eliminar con citas",
+                  "⚠️ Se eliminarán el cliente Y TODAS SUS CITAS. Esta acción no se puede deshacer.",
+                  "delete"
+                )
+              }
+            >
+              Eliminar con citas
             </Menu.Item>
           </Menu.Dropdown>
         </Menu>

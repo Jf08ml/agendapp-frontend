@@ -104,6 +104,7 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
                 servicesTaken={client.servicesTaken || 0}
                 totalServices={totalServices}
                 serviceReward={serviceReward}
+                rewardHistory={(client.rewardHistory || []).filter(r => r.type === 'service')}
               />
             </Card.Section>
 
@@ -113,6 +114,7 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
                 referralsMade={client.referralsMade || 0}
                 totalReferrals={totalReferrals}
                 referredReward={referredReward}
+                rewardHistory={(client.rewardHistory || []).filter(r => r.type === 'referral')}
               />
             </Card.Section>
 

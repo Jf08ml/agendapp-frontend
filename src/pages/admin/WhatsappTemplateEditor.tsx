@@ -162,6 +162,24 @@ const templateInfo = {
       { name: "{{organization}}", desc: "Nombre del negocio" },
     ],
   },
+  loyaltyServiceReward: {
+    title: "🏆 Premio de Fidelidad (Servicios)",
+    description: "Mensaje enviado al cliente cuando completa su meta de servicios y gana una recompensa",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+    ],
+  },
+  loyaltyReferralReward: {
+    title: "🎁 Premio de Referidos",
+    description: "Mensaje enviado al cliente cuando completa su meta de referidos y gana una recompensa",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+    ],
+  },
 };
 
 type TemplateType = keyof WhatsappTemplates;
@@ -219,6 +237,9 @@ export default function WhatsappTemplateEditor() {
     statusReservationRejected: false,
     clientConfirmationAck: true,
     clientCancellationAck: true,
+    clientNoShowAck: true,
+    loyaltyServiceReward: true,
+    loyaltyReferralReward: true,
   });
 
   const loadTemplates = useCallback(async () => {
@@ -803,6 +824,54 @@ export default function WhatsappTemplateEditor() {
                           setTemplateSettings(prev => ({
                             ...prev,
                             clientNoShowAck: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  <Divider label="Plan de Fidelidad" labelPosition="center" />
+
+                  {/* Premio de Fidelidad - Servicios */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>🏆 Premio de Fidelidad (Servicios)</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando el cliente completa su meta de servicios
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.loyaltyServiceReward ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            loyaltyServiceReward: checked
+                          }));
+                        }}
+                        size="lg"
+                      />
+                    </Group>
+                  </Paper>
+
+                  {/* Premio de Referidos */}
+                  <Paper withBorder p="md" radius="md">
+                    <Group justify="space-between">
+                      <Box>
+                        <Text fw={600}>🎁 Premio de Referidos</Text>
+                        <Text size="sm" c="dimmed">
+                          Se envía cuando el cliente completa su meta de referidos
+                        </Text>
+                      </Box>
+                      <Switch
+                        checked={templateSettings.loyaltyReferralReward ?? true}
+                        onChange={(e) => {
+                          const checked = e.currentTarget.checked;
+                          setTemplateSettings(prev => ({
+                            ...prev,
+                            loyaltyReferralReward: checked
                           }));
                         }}
                         size="lg"

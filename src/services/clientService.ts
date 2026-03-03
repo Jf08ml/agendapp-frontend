@@ -1,6 +1,16 @@
 import { apiClient } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 
+// Entrada del historial de recompensas
+export interface RewardHistoryEntry {
+  _id: string;
+  type: 'service' | 'referral';
+  reward: string;
+  earnedAt: string;
+  redeemed: boolean;
+  redeemedAt?: string;
+}
+
 // Definir la estructura de un cliente
 export interface Client {
   _id: string;
@@ -11,6 +21,9 @@ export interface Client {
   email?: string;
   servicesTaken: number;
   referralsMade: number;
+  hasServiceDiscount?: boolean;
+  hasReferralBenefit?: boolean;
+  rewardHistory?: RewardHistoryEntry[];
   organizationId: string;
   birthDate: Date | null;
 }
@@ -157,6 +170,59 @@ export const registerReferral = async (clientId: string): Promise<void> => {
     await apiClient.post<Response<void>>(`/${clientId}/register-referral`);
   } catch (error) {
     handleAxiosError(error, "Error al registrar el referido");
+  }
+};
+
+// Fusionar cliente origen (sourceId) en cliente destino (targetId)
+export const mergeClient = async (targetId: string, sourceId: string): Promise<Client> => {
+  try {
+    const response = await apiClient.post<Response<Client>>(`/${targetId}/merge/${sourceId}`);
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al fusionar clientes");
+    throw error;
+  }
+};
+
+// Eliminar un cliente y todos sus registros relacionados
+export const forceDeleteClient = async (clientId: string): Promise<void> => {
+  try {
+    await apiClient.delete<Response<void>>(`/${clientId}/force`);
+  } catch (error) {
+    handleAxiosError(error, "Error al eliminar el cliente");
+    throw error;
+  }
+};
+
+// Restablecer contadores de fidelidad de un cliente
+export const resetClientLoyalty = async (clientId: string): Promise<Client | undefined> => {
+  try {
+    const response = await apiClient.post<Response<Client>>(`/${clientId}/reset`);
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al restablecer los contadores");
+    throw error;
+  }
+};
+
+// Restablecer contadores de fidelidad de todos los clientes de la organización
+export const resetAllClientsLoyalty = async (): Promise<{ modifiedCount: number } | undefined> => {
+  try {
+    const response = await apiClient.post<Response<{ modifiedCount: number }>>("/reset-all");
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al restablecer los contadores");
+    throw error;
+  }
+};
+
+// Marcar una recompensa como canjeada
+export const redeemReward = async (clientId: string, rewardId: string): Promise<Client | undefined> => {
+  try {
+    const response = await apiClient.put<Response<Client>>(`/${clientId}/rewards/${rewardId}/redeem`);
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al canjear la recompensa");
   }
 };
 
