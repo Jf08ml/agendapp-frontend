@@ -26,6 +26,7 @@ interface EmployeeColumnProps {
   hasPermission: (permission: string) => boolean;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   timezone?: string; // 🌍 Timezone de la organización
+  timeFormat?: string;
 }
 
 interface DraggedItem {
@@ -57,6 +58,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   hasPermission,
   onOpenModal,
   timezone = 'America/Bogota', // 🌍 Default timezone
+  timeFormat,
 }) => {
   const columnRef = useRef<HTMLDivElement | null>(null);
 
@@ -184,6 +186,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
             isExpanded={isExpanded}
             handleToggleExpand={handleToggleExpand}
             timezone={timezone}
+            timeFormat={timeFormat}
           />
         </Box>
       );

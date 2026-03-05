@@ -44,6 +44,7 @@ import { showNotification } from "@mantine/notifications";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { getTimeFormatStr } from "../../../utils/timeFormatUtils";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -712,7 +713,7 @@ const ReservationsList: React.FC = () => {
         <Stack gap={8}>
           <Group gap={6} align="center" wrap="wrap">
             <Badge size="xs" variant="outline" radius="lg">
-              {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format("DD/MM HH:mm")}
+              {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format(`DD/MM ${getTimeFormatStr(organization?.timeFormat)}`)}
             </Badge>
 
             <Badge
@@ -992,7 +993,7 @@ const ReservationsList: React.FC = () => {
                             </Badge>
                           </Group>
                           <Text size="sm" c="dimmed">
-                            {dayjs(res.startDate).tz(organization?.timezone || 'America/Bogota').format("DD/MM/YYYY HH:mm")}
+                            {dayjs(res.startDate).tz(organization?.timezone || 'America/Bogota').format(`DD/MM/YYYY ${getTimeFormatStr(organization?.timeFormat)}`)}
                           </Text>
                           <Group gap="xs">
                             <Text size="sm" c="dimmed">
@@ -1511,7 +1512,7 @@ const ReservationsList: React.FC = () => {
                       >
                         <Table.Td>
                           {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format(
-                            "DD/MM/YYYY HH:mm"
+                            `DD/MM/YYYY ${getTimeFormatStr(organization?.timeFormat)}`
                           )}
                           {isPartOfGroup && (
                             <Tooltip label={`Grupo de ${groupReservations.length} reservas`}>

@@ -36,6 +36,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { formatInTimezone } from "../../utils/timezoneUtils";
 import { startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
 import dayjs from "dayjs";
 import localeData from "dayjs/plugin/localeData";
@@ -196,6 +197,9 @@ const DailyCashbox: React.FC = () => {
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const currency = org?.currency || "COP";
+  const timezone = org?.timezone || "America/Bogota";
+  const timeFormat = org?.timeFormat || "12h";
+  const timeFmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
 
   const calculateDates = (intervalValue: Interval, day?: Date | null) => {
     const now = new Date();
@@ -873,7 +877,7 @@ const DailyCashbox: React.FC = () => {
 
                   <Text size="sm" c="dimmed" lineClamp={1}>
                     {appointment.service?.name || "—"} •{" "}
-                    {dayjs(appointment.startDate).format("DD/MM/YYYY")}
+                    {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
                   </Text>
 
                   {/* Precio en una línea */}
@@ -1007,7 +1011,7 @@ const DailyCashbox: React.FC = () => {
                   style={getRowStylesSoft(status)}
                 >
                   <Table.Td>
-                    {dayjs(appointment.startDate).format("DD/MM/YYYY")}
+                    {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
                   </Table.Td>
 
                   <Table.Td>{appointment.client?.name || "—"}</Table.Td>

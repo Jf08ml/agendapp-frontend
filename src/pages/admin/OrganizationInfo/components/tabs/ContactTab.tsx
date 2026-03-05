@@ -10,6 +10,7 @@ import {
   IconLink,
   IconLayoutColumns,
   IconWriting,
+  IconClockHour3,
 } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
@@ -98,6 +99,17 @@ export default function ContactTab({
             disabled={!isEditing}
             searchable
             data={currencyData}
+          />
+          <Select
+            label="Formato de hora"
+            description="Cómo se muestran las horas a tus clientes"
+            leftSection={<IconClockHour3 size={16} />}
+            {...form.getInputProps("timeFormat")}
+            disabled={!isEditing}
+            data={[
+              { value: "12h", label: "12 horas (ej: 2:30 PM)" },
+              { value: "24h", label: "24 horas (ej: 14:30)" },
+            ]}
           />
           <TextInput
             label="Dominios"

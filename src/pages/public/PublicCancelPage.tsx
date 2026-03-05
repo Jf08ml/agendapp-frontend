@@ -48,6 +48,7 @@ interface CancellationInfo {
   customerName: string;
   organizationName: string;
   timezone?: string;
+  timeFormat?: string;
   isGroup?: boolean;
   appointments?: AppointmentInfo[];
   allBlockedByPolicy?: boolean;
@@ -419,13 +420,13 @@ export const PublicCancelPage: React.FC = () => {
                               {formatInTimezone(
                                 apt.startDate,
                                 info?.timezone || "America/Bogota",
-                                "HH:mm"
+                                info?.timeFormat === "24h" ? "HH:mm" : "h:mm A"
                               )}{" "}
                               -{" "}
                               {formatInTimezone(
                                 apt.endDate,
                                 info?.timezone || "America/Bogota",
-                                "HH:mm"
+                                info?.timeFormat === "24h" ? "HH:mm" : "h:mm A"
                               )}
                             </Text>
                             {apt.policyBlocked && apt.policyBlockedReason && (

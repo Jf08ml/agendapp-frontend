@@ -73,6 +73,7 @@ const DayModal: FC<DayModalProps> = ({
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+  const timeFormat = organization?.timeFormat || "12h";
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)");
   const [currentDay, setCurrentDay] = useState<Date>(selectedDay || new Date());
@@ -335,6 +336,7 @@ const DayModal: FC<DayModalProps> = ({
             appointments={appointments}
             onEditAppointment={onEditAppointment}
             timezone={timezone}
+            timeFormat={timeFormat}
           />
         ) : (
           /* Vista de calendario */
@@ -365,7 +367,7 @@ const DayModal: FC<DayModalProps> = ({
                   backgroundColor: "white",
                 }}
               >
-                <TimeColumn timeIntervals={timeIntervals} />
+                <TimeColumn timeIntervals={timeIntervals} timeFormat={timeFormat} />
               </Box>
               <Box style={{ flex: 1, position: "relative" }}>
                 {currentLinePosition !== null && (
@@ -428,6 +430,7 @@ const DayModal: FC<DayModalProps> = ({
                       hasPermission={hasPermission}
                       onOpenModal={onOpenModal}
                       timezone={timezone}
+                      timeFormat={timeFormat}
                     />
                   ))}
                 </Box>
@@ -507,7 +510,7 @@ const DayModal: FC<DayModalProps> = ({
                     onClick={() => onEditAppointment(apt)}
                   >
                     <Text size="sm" fw={600} style={{ textDecoration: 'line-through' }}>
-                      {formatInTimezone(apt.startDate, timezone, 'HH:mm')} - {formatInTimezone(apt.endDate, timezone, 'HH:mm')}
+                      {formatInTimezone(apt.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")} - {formatInTimezone(apt.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
                     </Text>
                     <Text size="xs" c="dimmed">
                       {apt.client.name} • {apt.employee.names}

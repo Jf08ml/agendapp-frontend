@@ -126,6 +126,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   );
   const organizationId = organization?._id;
   const timezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la organización
+  const timeFormat = organization?.timeFormat || "12h";
 
   // 🚀 Búsqueda asíncrona de clientes con debounce
   useEffect(() => {
@@ -870,6 +871,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <TimeSelector
                     label="Hora"
                     date={newAppointment.startDate}
+                    timeFormat={timeFormat}
                     onChange={(date) => {
                       // En modo edición, recalcular endDate basado en la duración del servicio
                       if (appointment && newAppointment.services && newAppointment.services.length > 0) {
@@ -911,6 +913,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     <TimeSelector
                       label="Hora"
                       date={newAppointment.endDate}
+                      timeFormat={timeFormat}
                       onChange={(date) =>
                         setNewAppointment({ ...newAppointment, endDate: date })
                       }
@@ -1036,8 +1039,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                               <Text size="xs" c="dimmed" ta="right">
                                 {serviceStartTime && serviceEndTime ? (
                                   <>
-                                    {dayjs(serviceStartTime).format("h:mm A")} →{" "}
-                                    {dayjs(serviceEndTime).format("h:mm A")}
+                                    {dayjs(serviceStartTime).format(timeFormat === "24h" ? "HH:mm" : "h:mm A")} →{" "}
+                                    {dayjs(serviceEndTime).format(timeFormat === "24h" ? "HH:mm" : "h:mm A")}
                                   </>
                                 ) : (
                                   "Selecciona hora de inicio"
@@ -1074,10 +1077,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                               <Text span size="xs" c="dimmed" ml="xs">
                                 (
                                 {dayjs(newAppointment.startDate).format(
-                                  "h:mm A",
+                                  timeFormat === "24h" ? "HH:mm" : "h:mm A",
                                 )}{" "}
                                 →{" "}
-                                {dayjs(newAppointment.endDate).format("h:mm A")}
+                                {dayjs(newAppointment.endDate).format(timeFormat === "24h" ? "HH:mm" : "h:mm A")}
                                 )
                               </Text>
                             )}
@@ -1177,7 +1180,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
               {seriesPreview && (
                 <Box mt="lg">
-                  <SeriesPreview preview={seriesPreview} />
+                  <SeriesPreview preview={seriesPreview} timeFormat={timeFormat} />
                 </Box>
               )}
             </Box>
@@ -1382,7 +1385,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                           ? appointment.startDate
                           : newAppointment.startDate!,
                         timezone,
-                        "h:mm A",
+                        timeFormat === "24h" ? "HH:mm" : "h:mm A",
                       )}{" "}
                       -{" "}
                       {formatInTimezone(
@@ -1390,7 +1393,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                           ? appointment.endDate
                           : newAppointment.endDate!,
                         timezone,
-                        "h:mm A",
+                        timeFormat === "24h" ? "HH:mm" : "h:mm A",
                       )}
                     </Text>
                   </Box>

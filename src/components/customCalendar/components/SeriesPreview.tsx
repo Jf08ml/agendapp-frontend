@@ -1,4 +1,5 @@
 import { FC } from 'react';
+import dayjs from 'dayjs';
 import {
   Stack,
   Paper,
@@ -17,6 +18,7 @@ import { SeriesPreview as SeriesPreviewType } from '../../../services/appointmen
 interface SeriesPreviewProps {
   preview: SeriesPreviewType;
   loading?: boolean;
+  timeFormat?: string;
 }
 
 const STATUS_CONFIG = {
@@ -46,7 +48,8 @@ const STATUS_CONFIG = {
   }
 };
 
-const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false }) => {
+const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false, timeFormat }) => {
+  const timeFmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
   const { occurrences, totalOccurrences, availableCount } = preview;
 
   if (loading) {
@@ -148,14 +151,8 @@ const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false }) => 
                           })}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          {new Date(occurrence.startDate).toLocaleTimeString('es-ES', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                          {occurrence.endDate && ` - ${new Date(occurrence.endDate).toLocaleTimeString('es-ES', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}`}
+                          {dayjs(occurrence.startDate).format(timeFmt)}
+                          {occurrence.endDate && ` - ${dayjs(occurrence.endDate).format(timeFmt)}`}
                         </Text>
                       </Box>
                     </Group>

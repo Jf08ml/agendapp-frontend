@@ -7,6 +7,7 @@ interface DayModalCompactViewProps {
   appointments: Appointment[];
   onEditAppointment: (appointment: Appointment) => void;
   timezone?: string; // 🌍 Timezone de la organización
+  timeFormat?: string;
 }
 
 const HOUR_PX = 48; // más legible que 30
@@ -27,6 +28,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   appointments,
   onEditAppointment,
   timezone = 'America/Bogota', // 🌍 Default timezone
+  timeFormat,
 }) => {
   const getClientName = (appointment: Appointment) => appointment.client?.name || "Sin cliente";
   
@@ -190,7 +192,9 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                   }}
                 >
                   <Text size="xs" c="dimmed">
-                    {String(h).padStart(2, "0")}:00
+                    {timeFormat === "24h"
+                      ? `${String(h).padStart(2, "0")}:00`
+                      : h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
                   </Text>
                 </Box>
               ))}
@@ -289,7 +293,7 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                     {getClientName(appointment)}
                   </Text>
                   <Text size="xs" fw={600} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
-                    {formatInTimezone(startTime, timezone, "HH:mm")} - {formatInTimezone(endTime, timezone, "HH:mm")}
+                    {formatInTimezone(startTime, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")} - {formatInTimezone(endTime, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
                   </Text>
                 </Box>
               );

@@ -68,6 +68,7 @@ interface AppointmentCardProps {
   isExpanded?: (appointment: Appointment) => boolean;
   handleToggleExpand?: (appointmentId: string) => void;
   timezone?: string; // 🌍 Timezone de la organización
+  timeFormat?: string;
 }
 
 // Función para calcular el contraste del color
@@ -104,6 +105,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   isExpanded,
   handleToggleExpand,
   timezone = "America/Bogota", // 🌍 Default timezone
+  timeFormat,
 }) => {
   // const { borderColor } = getStatusStyles(appointment.status);
   const { hasPermission } = usePermissions();
@@ -301,8 +303,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 📅 *Horario:* ${formatFullDateInTimezone(
       appointment.startDate,
       timezone,
-      "dddd, D MMMM YYYY, h:mm A"
-    )} - ${formatInTimezone(appointment.endDate, timezone, "h:mm A")}
+      `dddd, D MMMM YYYY, ${timeFormat === "24h" ? "HH:mm" : "h:mm A"}`
+    )} - ${formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
 💵 *Abono:* ${appointment.advancePayment}
 
 ${clientServices}`;
@@ -368,10 +370,10 @@ ${clientServices}`;
                 {formatFullDateInTimezone(
                   appointment.startDate,
                   timezone,
-                  "ddd, D MMM • h:mm A"
+                  `ddd, D MMM • ${timeFormat === "24h" ? "HH:mm" : "h:mm A"}`
                 )}
                 {" - "}
-                {formatInTimezone(appointment.endDate, timezone, "h:mm A")}
+                {formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
               </Text>
             </Box>
 
@@ -1247,9 +1249,9 @@ ${clientServices}`;
 
         {/* Horario */}
         <Text fw={700} style={{ fontSize: 10, marginTop: 6 }}>
-          {formatInTimezone(appointment.startDate, timezone, "h:mm")}
+          {formatInTimezone(appointment.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm")}
           {" - "}
-          {formatInTimezone(appointment.endDate, timezone, "h:mm a")}
+          {formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm a")}
         </Text>
 
         {/* Cliente */}

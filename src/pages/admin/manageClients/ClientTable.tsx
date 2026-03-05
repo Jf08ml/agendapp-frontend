@@ -18,12 +18,16 @@ import {
 } from "@mantine/core";
 import { openConfirmModal } from "@mantine/modals";
 import { useMediaQuery } from "@mantine/hooks";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
+import { selectOrganization } from "../../../features/organization/sliceOrganization";
 import { Client as ClientType, RewardHistoryEntry, redeemReward } from "../../../services/clientService";
 import {
   Appointment,
   getAppointmentsByClient,
 } from "../../../services/appointmentService";
 import { showNotification } from "@mantine/notifications";
+import { formatInTimezone } from "../../../utils/timezoneUtils";
 import ClientRow from "./ClientRow";
 
 interface ClientTableProps {
@@ -81,6 +85,10 @@ const ClientTable: React.FC<ClientTableProps> = ({
   error,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
+  const organization = useSelector((state: RootState) => selectOrganization(state));
+  const timezone = organization?.timezone || "America/Bogota";
+  const timeFormat = organization?.timeFormat || "12h";
+  const timeFmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
 
   const [opened, setOpened] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -496,7 +504,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
                         <Table.Td>{a.service?.name ?? "—"}</Table.Td>
                         <Table.Td>{a.employee?.names ?? "—"}</Table.Td>
                         <Table.Td>
-                          {new Date(a.startDate).toLocaleString("es-ES")}
+                          {formatInTimezone(a.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
                         </Table.Td>
                         <Table.Td>
                           <Badge color={statusBadge.color} variant="light">

@@ -64,6 +64,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
     stepMinutes: 30,
   },
   currency: response.currency ?? "COP",
+  timeFormat: response.timeFormat ?? "12h",
   cancellationPolicy: {
     minHoursBeforeAppointment:
       response.cancellationPolicy?.minHoursBeforeAppointment ?? 0,

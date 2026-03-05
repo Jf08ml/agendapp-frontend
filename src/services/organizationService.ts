@@ -112,6 +112,7 @@ export interface Organization {
   reminderSettings?: ReminderSettings;
   cancellationPolicy?: CancellationPolicy;
   currency?: string;
+  timeFormat?: '12h' | '24h'; // 🕐 Formato de hora para display
   // Sistema de membresías
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "past_due" | "suspended" | "cancelled" | "none";

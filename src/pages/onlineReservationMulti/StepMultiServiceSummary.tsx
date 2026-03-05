@@ -20,6 +20,7 @@ import type { RecurrencePattern, SeriesPreview } from "../../services/appointmen
 import { IconRepeat } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
 
 dayjs.locale("es");
 
@@ -63,6 +64,7 @@ interface Props {
   currency?: string;
   recurrencePattern?: RecurrencePattern;
   seriesPreview?: SeriesPreview | null;
+  timeFormat?: string;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -84,6 +86,7 @@ export default function StepMultiServiceSummary({
   currency,
   recurrencePattern,
   seriesPreview,
+  timeFormat,
 }: Props) {
   if (!times) return null;
 
@@ -100,19 +103,11 @@ export default function StepMultiServiceSummary({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if ((times as any).startTimeStr) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isoStr = (times as any).startTimeStr;
-    const match = isoStr.match(/T(\d{2}):(\d{2})/);
-    if (match) {
-      const hour = parseInt(match[1]);
-      const min = match[2];
-      const period = hour >= 12 ? "PM" : "AM";
-      const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      startText = `${hour12}:${min} ${period}`;
-    }
+    startText = formatTimeFromISO((times as any).startTimeStr, timeFormat);
   } else if (times.startTime) {
-    startText = safeFormat(times.startTime, "h:mm A", "-");
+    startText = formatTime(times.startTime, timeFormat);
   } else if (times.intervals?.[0]) {
-    startText = safeFormat(times.intervals[0].from, "h:mm A", "-");
+    startText = formatTime(times.intervals[0].from, timeFormat);
   }
 
   // Total del bloque
@@ -168,9 +163,12 @@ export default function StepMultiServiceSummary({
               // Usar strings originales si existen
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const ivAny = iv as any;
-              const fromText =
-                ivAny.startStr || safeFormat(iv.from, "h:mm A", "-");
-              const toText = ivAny.endStr || safeFormat(iv.to, "h:mm A", "-");
+              const fromText = ivAny.startStr
+                ? formatTimeFromISO(ivAny.startStr, timeFormat)
+                : formatTime(iv.from, timeFormat);
+              const toText = ivAny.endStr
+                ? formatTimeFromISO(ivAny.endStr, timeFormat)
+                : formatTime(iv.to, timeFormat);
 
               return (
                 <Group

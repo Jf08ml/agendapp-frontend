@@ -6,20 +6,29 @@ interface TimeSelectorProps {
   label: string;
   date?: Date;
   onChange: (date: Date) => void;
+  timeFormat?: string;
 }
 
 const TimeSelector: React.FC<TimeSelectorProps> = ({
   label,
   date,
   onChange,
+  timeFormat,
 }) => {
-  const hours = Array.from({ length: 12 }, (_, i) => i + 1).map((h) => ({
-    value: h.toString(),
-    label: h.toString(),
-  }));
+  const is24h = timeFormat === "24h";
+
+  const hours = is24h
+    ? Array.from({ length: 24 }, (_, i) => ({
+        value: i.toString(),
+        label: i.toString().padStart(2, "0"),
+      }))
+    : Array.from({ length: 12 }, (_, i) => i + 1).map((h) => ({
+        value: h.toString(),
+        label: h.toString(),
+      }));
 
   const minutes = Array.from({ length: 60 }, (_, i) => ({
-    value: i.toString().padStart(2, "0"), // Asegura que '00' se muestre como texto
+    value: i.toString().padStart(2, "0"),
     label: i.toString().padStart(2, "0"),
   }));
 
@@ -31,20 +40,62 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
   const handleTimeChange = (
     hour: number,
     minute: number,
-    ampmValue: string
+    ampmValue?: string
   ) => {
-    const adjustedHour =
-      ampmValue === "PM" && hour < 12
-        ? hour + 12
-        : ampmValue === "AM" && hour === 12
-        ? 0
-        : hour;
+    let adjustedHour = hour;
+    if (!is24h && ampmValue) {
+      adjustedHour =
+        ampmValue === "PM" && hour < 12
+          ? hour + 12
+          : ampmValue === "AM" && hour === 12
+          ? 0
+          : hour;
+    }
     const updatedDate = set(date || new Date(), {
       hours: adjustedHour,
       minutes: minute,
     });
     onChange(updatedDate);
   };
+
+  if (is24h) {
+    const currentHour24 = date ? date.getHours() : 0;
+    return (
+      <div>
+        <Text>{label}</Text>
+        <Flex>
+          <Select
+            data={hours}
+            comboboxProps={{ zIndex: 1000 }}
+            placeholder="Hora"
+            size="sm"
+            value={date ? currentHour24.toString() : ""}
+            onChange={(value) =>
+              handleTimeChange(
+                parseInt(value || "0"),
+                date?.getMinutes() || 0,
+              )
+            }
+            searchable
+          />
+          <Select
+            data={minutes}
+            comboboxProps={{ zIndex: 1000 }}
+            placeholder="Minutos"
+            size="sm"
+            value={date ? format(date, "mm") : ""}
+            onChange={(value) =>
+              handleTimeChange(
+                currentHour24,
+                parseInt(value || "0"),
+              )
+            }
+            searchable
+          />
+        </Flex>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -88,7 +139,6 @@ const TimeSelector: React.FC<TimeSelectorProps> = ({
         size="sm"
         value={date && date.getHours() >= 12 ? "PM" : "AM"}
         onChange={(value) => {
-          // Convert 24h hour to 12h format before passing to handleTimeChange
           const hour24 = date?.getHours() || 0;
           const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
           handleTimeChange(hour12, date?.getMinutes() || 0, value || "");

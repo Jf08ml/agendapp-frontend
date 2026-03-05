@@ -17,6 +17,7 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import {
@@ -43,6 +44,7 @@ interface StepMultiServiceTimeProps {
   onRecurrenceChange: (pattern: RecurrencePattern) => void;
   seriesPreview: SeriesPreviewType | null;
   onSeriesPreviewChange: (preview: SeriesPreviewType | null) => void;
+  timeFormat?: string;
 }
 
 const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
@@ -57,6 +59,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   onRecurrenceChange,
   seriesPreview,
   onSeriesPreviewChange,
+  timeFormat,
 }) => {
   const [loading, setLoading] = useState(false);
 
@@ -170,15 +173,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
         };
 
         // Helper para formatear hora desde ISO string sin conversión de timezone
-        const formatTimeFromISO = (isoStr: string): string => {
-          const match = isoStr.match(/T(\d{2}):(\d{2})/);
-          if (!match) return isoStr;
-          const hour = parseInt(match[1]);
-          const min = match[2];
-          const period = hour >= 12 ? "PM" : "AM";
-          const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-          return `${hour12}:${min} ${period}`;
-        };
+        const formatTimeFromISOLocal = (isoStr: string): string =>
+          formatTimeFromISO(isoStr, timeFormat);
 
         // Mapear respuesta del backend
         const mapped = response.blocks.map((block) => ({
@@ -200,7 +196,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
           start: new Date(block.start),
           end: new Date(block.end),
           startStr: block.start,
-          rangeLabel: `${formatTimeFromISO(block.start)} - ${formatTimeFromISO(block.end)}`,
+          rangeLabel: `${formatTimeFromISOLocal(block.start)} - ${formatTimeFromISOLocal(block.end)}`,
         }));
 
         setBlockOptions(mapped);
@@ -354,8 +350,9 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
                     typeof svc?.duration === "number" ? svc.duration : null;
 
                   const startTime =
-                    i.startStr || dayjs(i.from).format("h:mm A");
-                  const endTime = i.endStr || dayjs(i.to).format("h:mm A");
+                    i.startStr ? formatTimeFromISO(i.startStr, timeFormat) : formatTime(i.from, timeFormat);
+                  const endTime =
+                    i.endStr ? formatTimeFromISO(i.endStr, timeFormat) : formatTime(i.to, timeFormat);
 
                   return (
                     <Stack key={`${i.serviceId}-${idx}`} gap={2}>

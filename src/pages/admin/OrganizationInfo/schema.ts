@@ -212,6 +212,8 @@ export const schema = z.object({
   ]).optional(),
   // Moneda de la organización (ISO 4217)
   currency: z.string().length(3, "Código de moneda inválido (ISO 4217)").optional(),
+  // Formato de hora
+  timeFormat: z.enum(['12h', '24h']).optional(),
 });
 
 export type FormValues = z.infer<typeof schema>;

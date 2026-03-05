@@ -42,6 +42,7 @@ import {
 } from "../../services/reservationService";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
 import dayjs from "dayjs";
+import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
@@ -230,7 +231,13 @@ export default function MultiBookingWizard() {
       const start =
         (times as MultiServiceBlockSelection).startTime ??
         (times as MultiServiceBlockSelection).intervals[0]?.from;
-      const firstDateText = start ? dayjs(start).format("DD/MM/YYYY HH:mm") : "";
+      const tf = organization?.timeFormat;
+      const timeStr = (times as any).startTimeStr
+        ? formatTimeFromISO((times as any).startTimeStr, tf)
+        : start
+        ? dayjs(start).format(getTimeFormatStr(tf))
+        : "";
+      const firstDateText = start ? `${dayjs(start).format("DD/MM/YYYY")} ${timeStr}` : "";
 
       setFinishInfo({
         count,
@@ -317,6 +324,7 @@ export default function MultiBookingWizard() {
             onRecurrenceChange={setRecurrencePattern}
             seriesPreview={seriesPreview}
             onSeriesPreviewChange={setSeriesPreview}
+            timeFormat={organization?.timeFormat}
           />
         );
       case 3:
@@ -357,6 +365,7 @@ export default function MultiBookingWizard() {
             currency={organization?.currency}
             recurrencePattern={recurrencePattern}
             seriesPreview={seriesPreview}
+            timeFormat={organization?.timeFormat}
           />
         );
       default:
@@ -485,9 +494,12 @@ export default function MultiBookingWizard() {
                       : ""
                   }
                   appointmentTime={(() => {
+                    const tf = organization?.timeFormat;
+                    if ((times as any)?.startTimeStr)
+                      return formatTimeFromISO((times as any).startTimeStr, tf);
                     if (!times?.startTime) return undefined;
                     return times.startTime instanceof Date
-                      ? dayjs(times.startTime).format("HH:mm")
+                      ? dayjs(times.startTime).format(getTimeFormatStr(tf))
                       : String(times.startTime);
                   })()}
                 />

@@ -5,9 +5,10 @@ import { HOUR_HEIGHT } from "../DayModal";
 
 interface TimeColumnProps {
   timeIntervals: Date[];
+  timeFormat?: string;
 }
 
-const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals }) => {
+const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals, timeFormat }) => {
   const marks = [0, 15, 30, 45];
 
   return (
@@ -69,7 +70,7 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals }) => {
                     borderRadius: 999,
                   }}
                 >
-                  {format(date, "h:mm a")}
+                  {format(date, timeFormat === "24h" ? "HH:mm" : "h:mm a")}
                 </Text>
               </Box>
             );
