@@ -1,6 +1,6 @@
 // components/InternationalPhoneInput.tsx
 import React, { useState, useEffect } from "react";
-import { TextInput, Select, Group, Text, Box, ComboboxItem } from "@mantine/core";
+import { TextInput, Select, Group, Text, Box, ComboboxItem, ComboboxParsedItem } from "@mantine/core";
 import { type CountryCode } from "libphonenumber-js";
 import {
   normalizePhoneNumber,
@@ -185,15 +185,17 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
           placeholder="País"
           disabled={disabled}
           comboboxProps={{ zIndex: 10000, width: compact ? 260 : undefined }}
-          w={compact ? 90 : undefined}
           {...(compact && {
+            w: 90,
             // En modo compact: filtrar también por nombre del país
-            filter: ({ options, search }: { options: ComboboxItem[]; search: string }) => {
+            filter: ({ options, search }: { options: ComboboxParsedItem[]; search: string }) => {
               const q = search.toLowerCase();
               return options.filter(
                 (o) =>
-                  o.label.toLowerCase().includes(q) ||
-                  ((o as ComboboxItem & { name?: string }).name ?? "").toLowerCase().includes(q)
+                  "label" in o && (
+                    o.label.toLowerCase().includes(q) ||
+                    ((o as ComboboxItem & { name?: string }).name ?? "").toLowerCase().includes(q)
+                  )
               );
             },
             // En el dropdown mostrar bandera + nombre + código para facilitar búsqueda
