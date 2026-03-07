@@ -8,7 +8,17 @@ import React, {
   Suspense,
   lazy,
 } from "react";
-import { Badge, Box, Button, Checkbox, Group, Loader, Paper, Stack, Text } from "@mantine/core";
+import {
+  Badge,
+  Box,
+  Button,
+  Checkbox,
+  Group,
+  Loader,
+  Paper,
+  Stack,
+  Text,
+} from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -48,10 +58,10 @@ import SetupGuide from "./components/SetupGuide";
 // 🚀 Lazy loading de modales para mejorar carga inicial
 const AppointmentModal = lazy(() => import("./components/AppointmentModal"));
 const SearchAppointmentsModal = lazy(
-  () => import("./components/SearchAppointmentsModal")
+  () => import("./components/SearchAppointmentsModal"),
 );
 const ReorderEmployeesModal = lazy(
-  () => import("./components/ReorderEmployeesModal")
+  () => import("./components/ReorderEmployeesModal"),
 );
 
 export interface CreateAppointmentPayload {
@@ -104,19 +114,19 @@ const ScheduleView: React.FC = () => {
   // organizationId del auth slice: se setea junto con los permisos en useAuthInitializer,
   // así que su presencia garantiza que los permisos ya están cargados.
   const authOrgId = useSelector(
-    (state: RootState) => state.auth.organizationId
+    (state: RootState) => state.auth.organizationId,
   );
 
   // Datos de la organización
   const organization = useSelector(
-    (state: RootState) => state.organization.organization
+    (state: RootState) => state.organization.organization,
   );
   const organizationId = organization?._id;
   const organizationTimezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la org
 
   const initialClientId = useMemo(
     () => organization?.clientIdWhatsapp || organization?._id || "",
-    [organization?._id, organization?.clientIdWhatsapp]
+    [organization?._id, organization?.clientIdWhatsapp],
   );
 
   // ✅ Hook centralizado de WA: es la ÚNICA fuente de la UI de WhatsApp aquí
@@ -132,7 +142,9 @@ const ScheduleView: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canViewAll = hasPermission("appointments:view_all");
   const readyForScopedFetch =
-    Boolean(organizationId) && Boolean(authOrgId) && (canViewAll || Boolean(userId));
+    Boolean(organizationId) &&
+    Boolean(authOrgId) &&
+    (canViewAll || Boolean(userId));
 
   const normalizeAppointmentDates = (apts: Appointment[]): Appointment[] =>
     apts.map((a) => ({
@@ -153,7 +165,7 @@ const ScheduleView: React.FC = () => {
   useEffect(() => {
     if (newAppointment.employee) {
       const selectedEmployee = employees.find(
-        (employee) => employee._id === newAppointment.employee?._id
+        (employee) => employee._id === newAppointment.employee?._id,
       );
       if (selectedEmployee) {
         setFilteredServices(selectedEmployee.services as unknown as Service[]);
@@ -224,7 +236,7 @@ const ScheduleView: React.FC = () => {
           const prepared = results.reduce(
             (sum: number, it: { prepared: any }) =>
               sum + Number(it?.prepared ?? 0),
-            0
+            0,
           );
 
           showNotification({
@@ -256,7 +268,7 @@ const ScheduleView: React.FC = () => {
     setLoadingAgenda(true);
     try {
       const response = await getClientsByOrganizationId(
-        organizationId as string
+        organizationId as string,
       );
       setClients(response);
     } catch (error) {
@@ -271,7 +283,7 @@ const ScheduleView: React.FC = () => {
     setLoadingAgenda(true);
     try {
       const response = await getEmployeesByOrganizationId(
-        organizationId as string
+        organizationId as string,
       );
       let activeEmployees = response.filter((e) => e.isActive);
 
@@ -297,21 +309,21 @@ const ScheduleView: React.FC = () => {
         const response = await getAppointmentsByOrganizationId(
           organizationId as string,
           start,
-          end
+          end,
         );
 
         const scoped = canViewAll
           ? response
           : userId
-          ? response.filter((a) => a.employee._id === userId)
-          : [];
+            ? response.filter((a) => a.employee._id === userId)
+            : [];
 
         setAppointments(normalizeAppointmentDates(scoped));
       } finally {
         setLoadingMonth(false);
       }
     },
-    [readyForScopedFetch, organizationId, canViewAll, userId]
+    [readyForScopedFetch, organizationId, canViewAll, userId],
   );
 
   const fetchAppointmentsForDay = useCallback(
@@ -323,14 +335,14 @@ const ScheduleView: React.FC = () => {
         const response = await getAppointmentsByOrganizationId(
           organizationId as string,
           start,
-          end
+          end,
         );
 
         const scoped = canViewAll
           ? response
           : userId
-          ? response.filter((a) => a.employee._id === userId)
-          : [];
+            ? response.filter((a) => a.employee._id === userId)
+            : [];
 
         return normalizeAppointmentDates(scoped);
       } catch {
@@ -338,7 +350,7 @@ const ScheduleView: React.FC = () => {
         return [];
       }
     },
-    [readyForScopedFetch, organizationId, canViewAll, userId]
+    [readyForScopedFetch, organizationId, canViewAll, userId],
   );
   /**
    * MANEJO DE SERVICIO
@@ -364,7 +376,7 @@ const ScheduleView: React.FC = () => {
         setFilteredServices([]);
       }
     },
-    [employees]
+    [employees],
   );
 
   /**
@@ -375,7 +387,7 @@ const ScheduleView: React.FC = () => {
       const selectedClient = clients.find((client) => client._id === clientId);
       setNewAppointment((prev) => ({ ...prev, client: selectedClient }));
     },
-    [clients]
+    [clients],
   );
 
   /**
@@ -391,7 +403,7 @@ const ScheduleView: React.FC = () => {
       combinedDate.setMilliseconds(dateHour.getMilliseconds());
       return combinedDate;
     },
-    []
+    [],
   );
 
   /**
@@ -423,7 +435,7 @@ const ScheduleView: React.FC = () => {
         });
       }
     },
-    [employees, combineDateAndTime]
+    [employees, combineDateAndTime],
   );
 
   /**
@@ -465,7 +477,8 @@ const ScheduleView: React.FC = () => {
         centered: true,
         children: (
           <Text size="sm">
-            ¿Estás seguro de que deseas eliminar esta cita definitivamente? Esta acción no se puede deshacer.
+            ¿Estás seguro de que deseas eliminar esta cita definitivamente? Esta
+            acción no se puede deshacer.
           </Text>
         ),
         labels: { confirm: "Eliminar", cancel: "Cancelar" },
@@ -494,7 +507,7 @@ const ScheduleView: React.FC = () => {
         },
       });
     },
-    [currentDate, fetchAppointmentsForMonth]
+    [currentDate, fetchAppointmentsForMonth],
   );
 
   /**
@@ -513,7 +526,7 @@ const ScheduleView: React.FC = () => {
             modals.closeAll();
             showNotification({
               title: "Éxito",
-              message: notifyClient 
+              message: notifyClient
                 ? "La cita ha sido cancelada y se ha notificado al cliente."
                 : "La cita ha sido cancelada y se mantiene en el historial.",
               color: "green",
@@ -565,7 +578,9 @@ const ScheduleView: React.FC = () => {
             {loading && (
               <Group justify="center" py="md">
                 <Loader size="sm" />
-                <Text size="sm" c="dimmed">Procesando...</Text>
+                <Text size="sm" c="dimmed">
+                  Procesando...
+                </Text>
               </Group>
             )}
             {!loading && (
@@ -589,7 +604,8 @@ const ScheduleView: React.FC = () => {
                   Cancelar cita (mantener en historial)
                 </Button>
                 <Text size="xs" c="dimmed" ta="center">
-                  La cita quedará marcada como cancelada pero visible en el historial del cliente.
+                  La cita quedará marcada como cancelada pero visible en el
+                  historial del cliente.
                 </Text>
                 <Button
                   color="red"
@@ -601,7 +617,8 @@ const ScheduleView: React.FC = () => {
                   Eliminar definitivamente
                 </Button>
                 <Text size="xs" c="dimmed" ta="center">
-                  La cita se eliminará por completo del sistema. Útil para citas creadas por error.
+                  La cita se eliminará por completo del sistema. Útil para citas
+                  creadas por error.
                 </Text>
                 <Button
                   variant="subtle"
@@ -627,7 +644,7 @@ const ScheduleView: React.FC = () => {
         children: <CancelModalContent />,
       });
     },
-    [currentDate, fetchAppointmentsForMonth]
+    [currentDate, fetchAppointmentsForMonth],
   );
 
   /**
@@ -698,7 +715,7 @@ const ScheduleView: React.FC = () => {
         },
       });
     },
-    [appointments, fetchAppointmentsForMonth, currentDate]
+    [appointments, fetchAppointmentsForMonth, currentDate],
   );
 
   /**
@@ -782,7 +799,9 @@ const ScheduleView: React.FC = () => {
             {loading ? (
               <Group justify="center" py="md">
                 <Loader size="sm" />
-                <Text size="sm" c="dimmed">Procesando...</Text>
+                <Text size="sm" c="dimmed">
+                  Procesando...
+                </Text>
               </Group>
             ) : (
               <>
@@ -826,7 +845,7 @@ const ScheduleView: React.FC = () => {
         children: <NoShowModalContent />,
       });
     },
-    [fetchAppointmentsForMonth, currentDate]
+    [fetchAppointmentsForMonth, currentDate],
   );
 
   /**
@@ -942,7 +961,7 @@ const ScheduleView: React.FC = () => {
         }));
 
         await Promise.all(
-          updates.map((employee) => updateEmployee(employee._id, employee))
+          updates.map((employee) => updateEmployee(employee._id, employee)),
         );
 
         setEmployees(updates);
@@ -964,7 +983,7 @@ const ScheduleView: React.FC = () => {
         });
       }
     },
-    []
+    [],
   );
 
   // Loader inicial
@@ -973,7 +992,17 @@ const ScheduleView: React.FC = () => {
   }
 
   return (
-    <Box pos="relative" p="md">
+    <Box
+      pos="relative"
+      style={{
+        height: "calc(100dvh - 66px)", // 50px AppShell header + 16px AppShell.Main padding-top
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        padding: "8px 8px 0",
+        gap: 8,
+      }}
+    >
       {sendingReminders && (
         <CustomLoader loadingText="Enviando recordatorios.." overlay />
       )}
@@ -1025,7 +1054,7 @@ const ScheduleView: React.FC = () => {
             sendingReminders={sendingReminders}
             reasonForDisabled={reason}
             canSearchAppointments={hasPermission(
-              "appointments:search_schedule"
+              "appointments:search_schedule",
             )}
             canCreate={hasPermission("appointments:create")}
             canSendReminders={hasPermission("appointments:send_reminders")}
@@ -1037,28 +1066,28 @@ const ScheduleView: React.FC = () => {
       </Paper>
 
       {/* Guía de configuración inicial — se muestra solo si no hay empleados */}
-      {employees.length === 0 && (
-        <SetupGuide employees={employees} />
-      )}
+      {employees.length === 0 && <SetupGuide employees={employees} />}
 
-      {/* Calendario principal */}
-      <CustomCalendar
-        employees={employees}
-        appointments={appointments}
-        currentDate={currentDate}
-        setCurrentDate={setCurrentDate}
-        setAppointments={setAppointments}
-        onOpenModal={openModal}
-        onEditAppointment={handleEditAppointment}
-        onCancelAppointment={handleCancelAppointment}
-        onConfirmAppointment={handleConfirmAppointment}
-        onMarkAttendance={handleMarkAttendance}
-        onDeleteAppointment={handleDeleteAppointment}
-        fetchAppointmentsForMonth={fetchAppointmentsForMonth}
-        loadingMonth={loadingMonth}
-        fetchAppointmentsForDay={fetchAppointmentsForDay}
-        timezone={organizationTimezone}
-      />
+      {/* Calendario principal — ocupa todo el alto restante */}
+      <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>
+        <CustomCalendar
+          employees={employees}
+          appointments={appointments}
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+          setAppointments={setAppointments}
+          onOpenModal={openModal}
+          onEditAppointment={handleEditAppointment}
+          onCancelAppointment={handleCancelAppointment}
+          onConfirmAppointment={handleConfirmAppointment}
+          onMarkAttendance={handleMarkAttendance}
+          onDeleteAppointment={handleDeleteAppointment}
+          fetchAppointmentsForMonth={fetchAppointmentsForMonth}
+          loadingMonth={loadingMonth}
+          fetchAppointmentsForDay={fetchAppointmentsForDay}
+          timezone={organizationTimezone}
+        />
+      </Box>
 
       {/* 🚀 Modales con Suspense para lazy loading */}
       <Suspense fallback={<CustomLoader overlay />}>

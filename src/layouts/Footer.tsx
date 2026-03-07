@@ -130,6 +130,7 @@ export default function Footer() {
     <Box
       component="footer"
       style={{
+        height: "100%",
         background: `linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06)), ${footerColor}`,
         color: textColor,
       }}

@@ -112,7 +112,7 @@ const MonthView: React.FC<MonthViewProps> = ({
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        height: isMobile ? "auto" : calendarHeight,
+        height: isMobile ? "auto" : "100%",
         overflow: "hidden",
       }}
     >

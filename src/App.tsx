@@ -166,7 +166,7 @@ function AppContent() {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey,
+        applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
       });
 
       await createSubscription({
@@ -203,6 +203,8 @@ function AppContent() {
           collapsed: { desktop: !opened, mobile: !opened },
         }}
         header={{ height: 50 }}
+        footer={{ height: 30 }}
+        styles={{ footer: { borderTop: "none" } }}
       >
         <AppShell.Header bg={color}>
           <Flex align="center" style={{ height: 50 }}>
