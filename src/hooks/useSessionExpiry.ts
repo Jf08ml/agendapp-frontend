@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { logout } from "../features/auth/sliceAuth";
 import { AppDispatch, RootState } from "../app/store";
 
@@ -18,17 +18,18 @@ const isPublicPath = (pathname: string) =>
 export function useSessionExpiry() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const location = useLocation();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasExpiredRef = useRef(false); // evitar disparar múltiples veces
 
-  const handleExpiredSession = (pathname: string) => {
-    if (isPublicPath(pathname)) return;
+  const handleExpiredSession = () => {
+    // Usar window.location para tener siempre el pathname actual (no stale closure)
+    if (isPublicPath(window.location.pathname)) return;
+    if (hasExpiredRef.current) return;
+    hasExpiredRef.current = true;
 
-    // Limpiar estado de Redux y localStorage
     dispatch(logout());
 
-    // Notificar para que el listener en App.tsx muestre la notificación
     window.dispatchEvent(
       new CustomEvent("session-expired", {
         detail: {
@@ -43,37 +44,33 @@ export function useSessionExpiry() {
     }, 2000);
   };
 
-  const checkExpiry = (pathname: string) => {
+  const checkExpiry = () => {
     const token = localStorage.getItem("app_token");
-    if (!token) return; // No hay sesión activa
+    if (!token) return;
 
     const expiresAtStr = localStorage.getItem("app_token_expires_at");
-    if (!expiresAtStr) return; // Sin fecha de expiración → no podemos verificar
+    if (!expiresAtStr) return;
 
     const expiresAt = new Date(expiresAtStr).getTime();
     if (Date.now() >= expiresAt) {
-      handleExpiredSession(pathname);
+      handleExpiredSession();
     }
   };
 
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const pathname = location.pathname;
+    hasExpiredRef.current = false;
 
-    // Verificar inmediatamente (cubre el caso de PWA que regresa al foco con token expirado)
-    checkExpiry(pathname);
+    // Verificar inmediatamente (cubre PWA que regresa al foco con token expirado)
+    checkExpiry();
 
-    // Revisar cada 60 segundos (cubre usuario idle)
-    intervalRef.current = setInterval(() => {
-      checkExpiry(location.pathname);
-    }, 60_000);
+    // Revisar cada 60 segundos (cubre usuario idle sin requests)
+    intervalRef.current = setInterval(checkExpiry, 60_000);
 
-    // Revisar al regresar al foco (tab/PWA)
+    // Revisar al regresar al foco (tab o PWA en segundo plano)
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        checkExpiry(location.pathname);
-      }
+      if (document.visibilityState === "visible") checkExpiry();
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
