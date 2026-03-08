@@ -22,6 +22,9 @@ import {
   Divider,
   Drawer,
   Select,
+  TextInput,
+  NumberInput,
+  Paper,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
@@ -52,7 +55,16 @@ import {
   IconFilter,
   IconChecks,
   IconCircleCheck,
+  IconTrash,
+  IconPlus,
+  IconReceipt,
 } from "@tabler/icons-react";
+import {
+  Expense,
+  getExpenses,
+  createExpense,
+  deleteExpense as deleteExpenseApi,
+} from "../../services/expenseService";
 
 dayjs.extend(localeData);
 dayjs.locale("es");
@@ -190,6 +202,11 @@ const DailyCashbox: React.FC = () => {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [filtersOpened, setFiltersOpened] = useState(false);
 
+  // Gastos generales
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [newExpense, setNewExpense] = useState({ concept: "", category: "", amount: 0 });
+  const [addingExpense, setAddingExpense] = useState(false);
+
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
@@ -266,9 +283,12 @@ const DailyCashbox: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay]);
 
-  // Trae citas cuando hay org + rango
+  // Trae citas y gastos cuando hay org + rango
   useEffect(() => {
-    if (organizationId && startDate && endDate) fetchAppointments();
+    if (organizationId && startDate && endDate) {
+      fetchAppointments();
+      fetchExpenses();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, startDate, endDate]);
 
@@ -310,6 +330,58 @@ const DailyCashbox: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchExpenses = async () => {
+    if (!startDate || !endDate) return;
+    try {
+      const data = await getExpenses(startDate.toISOString(), endDate.toISOString());
+      setExpenses(data);
+    } catch (error) {
+      console.error("Error al obtener gastos:", error);
+    }
+  };
+
+  const handleAddExpense = async () => {
+    if (!newExpense.concept.trim() || newExpense.amount <= 0) return;
+    setAddingExpense(true);
+    try {
+      const date = selectedDay ?? new Date();
+      const created = await createExpense({
+        concept: newExpense.concept.trim(),
+        category: newExpense.category.trim(),
+        amount: newExpense.amount,
+        date: date.toISOString(),
+      });
+      if (created) {
+        setExpenses((prev) => [created, ...prev]);
+        setNewExpense({ concept: "", category: "", amount: 0 });
+        showNotification({ title: "Gasto registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAddingExpense(false);
+    }
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    openConfirmModal({
+      title: "Eliminar gasto",
+      children: <p>¿Eliminar este gasto?</p>,
+      centered: true,
+      labels: { confirm: "Eliminar", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        try {
+          await deleteExpenseApi(id);
+          setExpenses((prev) => prev.filter((e) => e._id !== id));
+          showNotification({ title: "Gasto eliminado", message: "", color: "green", autoClose: 2000, position: "top-right" });
+        } catch (error) {
+          console.error(error);
+        }
+      },
+    });
   };
 
   const handleConfirmAppointment = (
@@ -454,12 +526,19 @@ const DailyCashbox: React.FC = () => {
     );
   }, [appointments, selectedServices]);
 
+  const totalGeneralExpenses = useMemo(
+    () => expenses.reduce((s, e) => s + e.amount, 0),
+    [expenses]
+  );
+
   // Totales + resumen por servicio calculados sobre filteredAppointments
-  const { totalIncome, totalCount, avgTicket, servicesSummary, totalCollected, totalPending } =
+  const { totalIncome, totalCount, avgTicket, servicesSummary, totalCollected, totalPending, totalCosts, netMargin } =
     useMemo(() => {
-      const summary: Record<string, { count: number; total: number }> = {};
+      const summary: Record<string, { count: number; total: number; costs: number }> = {};
       let total = 0;
       let collected = 0;
+      let costsTotal = 0;
+      let completedIncome = 0;
 
       for (const appt of filteredAppointments) {
         const basePrice = appt.service?.price || 0;
@@ -485,9 +564,19 @@ const DailyCashbox: React.FC = () => {
 
         const serviceName = appt.service?.name || "Otro";
         if (!summary[serviceName])
-          summary[serviceName] = { count: 0, total: 0 };
+          summary[serviceName] = { count: 0, total: 0, costs: 0 };
         summary[serviceName].count += 1;
         summary[serviceName].total += lineTotal;
+
+        // Gastos: solo para citas confirmadas o asistidas
+        const isCompleted = appt.status === "confirmed" || appt.status === "attended";
+        if (isCompleted) {
+          completedIncome += lineTotal;
+          const serviceCosts = (appt.service as any)?.costs ?? [];
+          const apptCost = serviceCosts.reduce((s: number, c: any) => s + (c.amount || 0), 0);
+          costsTotal += apptCost;
+          summary[serviceName].costs += apptCost;
+        }
       }
 
       const count = filteredAppointments.length;
@@ -499,8 +588,10 @@ const DailyCashbox: React.FC = () => {
         servicesSummary: summary,
         totalCollected: collected,
         totalPending: Math.max(0, total - collected),
+        totalCosts: costsTotal,
+        netMargin: completedIncome - costsTotal - totalGeneralExpenses,
       };
-    }, [filteredAppointments]);
+    }, [filteredAppointments, totalGeneralExpenses]);
 
   const formattedRangeLabel =
     startDate && endDate
@@ -704,6 +795,24 @@ const DailyCashbox: React.FC = () => {
                 </Text>
                 <Text fw={900}>{formatCurrency(avgTicket, currency)}</Text>
               </div>
+              {(totalCosts > 0 || totalGeneralExpenses > 0) && (
+                <>
+                  <Divider orientation="vertical" />
+                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
+                    <Text size="xs" c="dimmed">
+                      Gastos
+                    </Text>
+                    <Text fw={900} c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
+                  </div>
+                  <Divider orientation="vertical" />
+                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
+                    <Text size="xs" c="dimmed">
+                      Margen neto
+                    </Text>
+                    <Text fw={900} c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
+                  </div>
+                </>
+              )}
             </Group>
           </Grid.Col>
 
@@ -1125,9 +1234,16 @@ const DailyCashbox: React.FC = () => {
                         wrap="nowrap"
                       >
                         <Text lineClamp={1}>{serviceName}</Text>
-                        <Text fw={800}>
-                          {data.count} • {formatCurrency(data.total, currency)}
-                        </Text>
+                        <Group gap="xs" wrap="nowrap">
+                          <Text fw={800}>
+                            {data.count} • {formatCurrency(data.total, currency)}
+                          </Text>
+                          {data.costs > 0 && (
+                            <Text size="sm" c="dimmed">
+                              (Gastos: {formatCurrency(data.costs, currency)} · Margen: {formatCurrency(data.total - data.costs, currency)})
+                            </Text>
+                          )}
+                        </Group>
                       </Group>
                     )
                   )}
@@ -1140,6 +1256,90 @@ const DailyCashbox: React.FC = () => {
             </Accordion.Panel>
           </Accordion.Item>
         </Accordion>
+      </Card>
+
+      <Card shadow="sm" radius="md" withBorder my="md">
+        <Group justify="space-between" align="center" mb="md">
+          <Group gap="xs">
+            <IconReceipt size={18} />
+            <Title order={4}>Gastos generales</Title>
+            {totalGeneralExpenses > 0 && (
+              <Badge color="red" variant="light">
+                {formatCurrency(totalGeneralExpenses, currency)}
+              </Badge>
+            )}
+          </Group>
+        </Group>
+
+        {/* Formulario para agregar gasto */}
+        <Paper withBorder p="sm" radius="md" mb="md">
+          <Text size="sm" fw={600} mb="xs">Registrar gasto</Text>
+          <Group gap="sm" align="flex-end" wrap="wrap">
+            <TextInput
+              placeholder="Concepto (ej: arriendo, suministros)"
+              value={newExpense.concept}
+              onChange={(e) => setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))}
+              style={{ flex: "1 1 200px", minWidth: 140 }}
+            />
+            <TextInput
+              placeholder="Categoría (opcional)"
+              value={newExpense.category}
+              onChange={(e) => setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))}
+              style={{ flex: "0 1 150px", minWidth: 110 }}
+            />
+            <NumberInput
+              placeholder="$ monto"
+              prefix="$ "
+              thousandSeparator="."
+              decimalSeparator=","
+              value={newExpense.amount}
+              onChange={(v) => setNewExpense((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))}
+              min={0}
+              w={130}
+            />
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={handleAddExpense}
+              loading={addingExpense}
+              disabled={!newExpense.concept.trim() || newExpense.amount <= 0}
+            >
+              Agregar
+            </Button>
+          </Group>
+        </Paper>
+
+        {/* Lista de gastos */}
+        {expenses.length === 0 ? (
+          <Text c="dimmed" ta="center" size="sm" py="sm">
+            No hay gastos registrados para este período.
+          </Text>
+        ) : (
+          <Stack gap="xs">
+            {expenses.map((expense) => (
+              <Group key={expense._id} justify="space-between" wrap="nowrap" style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Group gap="xs" wrap="nowrap">
+                    <Text size="sm" fw={600} lineClamp={1}>{expense.concept}</Text>
+                    {expense.category && (
+                      <Badge size="xs" variant="light" color="gray">{expense.category}</Badge>
+                    )}
+                  </Group>
+                  <Text size="xs" c="dimmed">
+                    {formatInTimezone(expense.date, timezone, "DD/MM/YYYY")}
+                  </Text>
+                </div>
+                <Group gap="xs" wrap="nowrap">
+                  <Text fw={800} c="red" size="sm">{formatCurrency(expense.amount, currency)}</Text>
+                  <Tooltip label="Eliminar" withArrow>
+                    <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleDeleteExpense(expense._id)}>
+                      <IconTrash size={14} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
+              </Group>
+            ))}
+          </Stack>
+        )}
       </Card>
 
       <Card shadow="lg" radius="md" withBorder my="md">

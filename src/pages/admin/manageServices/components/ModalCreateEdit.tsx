@@ -23,11 +23,12 @@ import {
   Tooltip,
   Center,
   ThemeIcon,
+  SegmentedControl,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
-import { BsImage, BsArrowLeft, BsArrowRight } from "react-icons/bs";
-import { Service } from "../../../../services/serviceService";
+import { BsImage, BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle } from "react-icons/bs";
+import { Service, ServiceCost } from "../../../../services/serviceService";
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -59,12 +60,25 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
   const [isFreeService, setIsFreeService] = useState(false);
+  const [hasCosts, setHasCosts] = useState(false);
+  const [costsMode, setCostsMode] = useState<"simple" | "detailed">("simple");
+  const [costs, setCosts] = useState<ServiceCost[]>([{ concept: "", amount: 0 }]);
 
   useEffect(() => {
     if (service) {
       setEditingService(service);
       setImageFiles(service.images || []);
       setIsFreeService(service.price === 0);
+      const existingCosts = service.costs ?? [];
+      if (existingCosts.length > 0) {
+        setHasCosts(true);
+        setCostsMode(existingCosts.length === 1 && existingCosts[0].concept === "" ? "simple" : "detailed");
+        setCosts(existingCosts);
+      } else {
+        setHasCosts(false);
+        setCostsMode("simple");
+        setCosts([{ concept: "", amount: 0 }]);
+      }
     } else {
       setEditingService({
         _id: "",
@@ -80,6 +94,9 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
       });
       setImageFiles([]);
       setIsFreeService(false);
+      setHasCosts(false);
+      setCostsMode("simple");
+      setCosts([{ concept: "", amount: 0 }]);
     }
   }, [service]);
 
@@ -129,7 +146,8 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     if (!canSave) return;
     setSaving(true);
     try {
-      await onSave({ ...editingService, images: imageFiles as any });
+      const finalCosts = hasCosts ? costs.filter((c) => c.amount > 0) : [];
+      await onSave({ ...editingService, images: imageFiles as any, costs: finalCosts });
       onClose();
     } finally {
       setSaving(false);
@@ -276,6 +294,109 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                     ))}
                   </Group>
                 </Box>
+
+                <Divider />
+                <Switch
+                  label="💸 Registrar gastos del servicio"
+                  description="Insumos, materiales o costos internos por servicio prestado"
+                  checked={hasCosts}
+                  onChange={(e) => {
+                    setHasCosts(e.currentTarget.checked);
+                    if (!e.currentTarget.checked) {
+                      setCosts([{ concept: "", amount: 0 }]);
+                      setCostsMode("simple");
+                    }
+                  }}
+                />
+
+                {hasCosts && (
+                  <Box>
+                    <Group justify="space-between" align="center" mb="xs">
+                      <Text size="sm" fw={500}>Tipo de registro</Text>
+                      <SegmentedControl
+                        size="xs"
+                        value={costsMode}
+                        onChange={(v) => {
+                          setCostsMode(v as "simple" | "detailed");
+                          if (v === "simple") {
+                            const total = costs.reduce((s, c) => s + c.amount, 0);
+                            setCosts([{ concept: "", amount: total }]);
+                          } else if (costs.length === 1) {
+                            setCosts([{ concept: costs[0].concept || "Insumos", amount: costs[0].amount }]);
+                          }
+                        }}
+                        data={[
+                          { label: "Simple", value: "simple" },
+                          { label: "Detallado", value: "detailed" },
+                        ]}
+                      />
+                    </Group>
+
+                    {costsMode === "simple" ? (
+                      <NumberInput
+                        label="Gasto total por servicio"
+                        description="Costo interno en insumos o materiales"
+                        prefix="$ "
+                        thousandSeparator="."
+                        decimalSeparator=","
+                        value={costs[0]?.amount ?? 0}
+                        onChange={(v) => setCosts([{ concept: "", amount: typeof v === "number" ? v : 0 }])}
+                        min={0}
+                      />
+                    ) : (
+                      <Stack gap="xs">
+                        {costs.map((cost, idx) => (
+                          <Group key={idx} gap="xs" align="flex-end" wrap="nowrap">
+                            <TextInput
+                              placeholder="Concepto (ej: tinte, guantes)"
+                              value={cost.concept}
+                              onChange={(e) => {
+                                const next = [...costs];
+                                next[idx] = { ...next[idx], concept: e.currentTarget.value };
+                                setCosts(next);
+                              }}
+                              style={{ flex: 1 }}
+                            />
+                            <NumberInput
+                              placeholder="$ monto"
+                              prefix="$ "
+                              thousandSeparator="."
+                              decimalSeparator=","
+                              value={cost.amount}
+                              onChange={(v) => {
+                                const next = [...costs];
+                                next[idx] = { ...next[idx], amount: typeof v === "number" ? v : 0 };
+                                setCosts(next);
+                              }}
+                              min={0}
+                              w={130}
+                            />
+                            {costs.length > 1 && (
+                              <ActionIcon
+                                color="red"
+                                variant="light"
+                                onClick={() => setCosts(costs.filter((_, i) => i !== idx))}
+                              >
+                                <BsTrash size={14} />
+                              </ActionIcon>
+                            )}
+                          </Group>
+                        ))}
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<BsPlusCircle size={14} />}
+                          onClick={() => setCosts([...costs, { concept: "", amount: 0 }])}
+                        >
+                          Agregar ítem
+                        </Button>
+                        <Text size="xs" c="dimmed" ta="right">
+                          Total gastos: $ {costs.reduce((s, c) => s + c.amount, 0).toLocaleString()}
+                        </Text>
+                      </Stack>
+                    )}
+                  </Box>
+                )}
             </Stack>
           </Paper>
 

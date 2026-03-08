@@ -1,6 +1,11 @@
 import { apiService, apiServicePublic } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 
+export interface ServiceCost {
+  concept: string;
+  amount: number;
+}
+
 // Definir la estructura de un servicio
 export interface Service {
   _id: string;
@@ -14,6 +19,7 @@ export interface Service {
   hidePrice?: boolean;
   maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un empleado (default: 1)
   recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
+  costs?: ServiceCost[]; // 💸 Gastos por insumos/materiales
 }
 
 interface CreateServicePayload {
@@ -25,6 +31,7 @@ interface CreateServicePayload {
   duration: number;
   maxConcurrentAppointments?: number;
   recommendations?: string;
+  costs?: ServiceCost[];
 }
 
 interface Response<T> {
