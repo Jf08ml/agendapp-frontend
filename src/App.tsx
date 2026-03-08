@@ -17,6 +17,7 @@ import Footer from "./layouts/Footer";
 import NavbarLinks from "./layouts/NavbarLinks";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
+import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
@@ -99,6 +100,9 @@ function AppContent() {
 
   // Inicializa autenticación en el cliente
   useAuthInitializer();
+
+  // Detecta proactivamente sesión expirada (idle + PWA en segundo plano)
+  useSessionExpiry();
 
   // Sistema de actualización automática del Service Worker
   const { currentVersion } = useServiceWorkerUpdate();

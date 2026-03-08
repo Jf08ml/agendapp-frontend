@@ -103,7 +103,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   }, [daysInMonth, getAppointmentsForDay]);
 
   // Desktop: llenamos viewport. Mobile: dejamos que la altura sea natural.
-  const calendarHeight = "calc(100vh - 180px)";
+  // const calendarHeight = "calc(100vh - 180px)";
   const weekdayLabels = isMobile ? daysOfWeekShort : daysOfWeekFull;
 
   return (
