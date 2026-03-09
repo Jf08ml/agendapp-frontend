@@ -143,7 +143,7 @@ export const PublicCancelPage: React.FC = () => {
     }
 
     // Ejecutar cancelación si ya está confirmada la acción
-    if (selectedAppointments.length === 0) {
+    if (info?.isGroup && (info?.appointments?.length ?? 0) > 1 && selectedAppointments.length === 0) {
       setError("Debes seleccionar al menos una cita para cancelar");
       return;
     }
@@ -182,7 +182,7 @@ export const PublicCancelPage: React.FC = () => {
     }
 
     // Ejecutar confirmación si ya está confirmada la acción
-    if (selectedAppointments.length === 0) {
+    if (info?.isGroup && (info?.appointments?.length ?? 0) > 1 && selectedAppointments.length === 0) {
       setError("Debes seleccionar al menos una cita para confirmar");
       return;
     }
@@ -371,7 +371,7 @@ export const PublicCancelPage: React.FC = () => {
           info.appointments.length > 1 ? (
             <Stack gap="md">
               <Group justify="space-between">
-                <Text fw={600}>Selecciona las citas a cancelar:</Text>
+                <Text fw={600}>Selecciona las citas:</Text>
                 <Button size="xs" variant="subtle" onClick={toggleAll}>
                   {selectedAppointments.length ===
                   info.appointments.filter(
