@@ -17,6 +17,8 @@ import {
   Box,
   ColorInput,
   LoadingOverlay,
+  SegmentedControl,
+  NumberInput,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useMediaQuery } from "@mantine/hooks";
@@ -61,7 +63,8 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     isActive: true,
     profileImage: "",
     color: "",
-    commissionPercentage: 0,
+    commissionType: "percentage",
+    commissionValue: 0,
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -87,7 +90,8 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         isActive: employee.isActive ?? true,
         profileImage: employee.profileImage || "",
         color: employee.color || "",
-        commissionPercentage: employee.commissionPercentage ?? 0,
+        commissionType: employee.commissionType ?? "percentage",
+        commissionValue: employee.commissionValue ?? 0,
       });
     } else {
       resetForm();
@@ -151,7 +155,8 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
       isActive: true,
       profileImage: "",
       color: "",
-      commissionPercentage: 0,
+      commissionType: "percentage",
+      commissionValue: 0,
     });
   };
 
@@ -318,22 +323,53 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
                 swatchesPerRow={5}
               />
 
-              <TextInput
-                label="% de Comisión"
-                placeholder="Ej: 30"
-                description="Porcentaje de comisión sobre ventas (0-100)"
-                type="number"
-                min={0}
-                max={100}
-                value={editingEmployee.commissionPercentage ?? 0}
-                onChange={(e) => {
-                  const value = parseFloat(e.currentTarget.value) || 0;
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    commissionPercentage: Math.min(100, Math.max(0, value)),
-                  });
-                }}
-              />
+              <Box>
+                <Text size="sm" fw={500} mb={4}>
+                  Tipo de comisión
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  value={editingEmployee.commissionType ?? "percentage"}
+                  onChange={(value) =>
+                    setEditingEmployee({
+                      ...editingEmployee,
+                      commissionType: value as "percentage" | "fixed",
+                      commissionValue: 0,
+                    })
+                  }
+                  data={[
+                    { label: "Porcentaje (%)", value: "percentage" },
+                    { label: "Valor fijo", value: "fixed" },
+                  ]}
+                />
+                <NumberInput
+                  mt="xs"
+                  placeholder={
+                    editingEmployee.commissionType === "percentage"
+                      ? "Ej: 30"
+                      : "Ej: 15000"
+                  }
+                  description={
+                    editingEmployee.commissionType === "percentage"
+                      ? "Porcentaje sobre el valor de cada cita (0-100)"
+                      : "Monto fijo por cada cita confirmada"
+                  }
+                  min={0}
+                  max={editingEmployee.commissionType === "percentage" ? 100 : undefined}
+                  value={editingEmployee.commissionValue ?? 0}
+                  onChange={(val) =>
+                    setEditingEmployee({
+                      ...editingEmployee,
+                      commissionValue: typeof val === "number" ? val : 0,
+                    })
+                  }
+                  rightSection={
+                    <Text size="xs" c="dimmed" pr={4}>
+                      {editingEmployee.commissionType === "percentage" ? "%" : "$"}
+                    </Text>
+                  }
+                />
+              </Box>
             </Stack>
           </Grid.Col>
 

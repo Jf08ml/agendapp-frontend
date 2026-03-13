@@ -44,11 +44,12 @@ interface EmployeeDetailsModalProps {
 
 interface PayrollSummary {
   totalAppointments: number;
-  totalRevenue: number; // Total facturado
-  commissionPercentage: number; // % de comisión
-  commissionAmount: number; // Monto de comisión calculado
+  totalRevenue: number;
+  commissionType: "percentage" | "fixed";
+  commissionValue: number;
+  commissionAmount: number;
   totalAdvances: number;
-  finalEarnings: number; // Comisión - Avances
+  finalEarnings: number;
 }
 
 const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
@@ -64,7 +65,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   const [interval, setInterval] = useState<string>("daily");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
-  const [customCommission, setCustomCommission] = useState<number | undefined>(undefined);
+  const [customCommissionValue, setCustomCommissionValue] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (employee && isOpen) {
@@ -83,7 +84,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     if (appointments.length > 0 || advances.length > 0) {
       calculatePayroll(appointments, advances);
     }
-  }, [customCommission, appointments, advances]);
+  }, [customCommissionValue, appointments, advances]);
 
   const calculateDates = (interval: string) => {
     const now = new Date();
@@ -179,12 +180,19 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     appointments: Appointment[],
     advances: Advance[]
   ) => {
-    const totalRevenue = appointments
-      .filter((a) => a.status === "confirmed") // Solo confirmadas cuentan para comisión
-      .reduce((total, appointment) => total + (appointment.service?.price || 0), 0);
+    const confirmedAppointments = appointments.filter((a) => a.status === "confirmed");
+    const totalRevenue = confirmedAppointments.reduce(
+      (total, appointment) => total + (appointment.service?.price || 0),
+      0
+    );
 
-    const commissionPercentage = customCommission ?? employee?.commissionPercentage ?? 0;
-    const commissionAmount = (totalRevenue * commissionPercentage) / 100;
+    const commissionType = employee?.commissionType ?? "percentage";
+    const commissionValue = customCommissionValue ?? employee?.commissionValue ?? 0;
+
+    const commissionAmount =
+      commissionType === "percentage"
+        ? (totalRevenue * commissionValue) / 100
+        : confirmedAppointments.length * commissionValue;
 
     const totalAdvances = advances.reduce(
       (total, advance) => total + advance.amount,
@@ -194,7 +202,8 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     setPayroll({
       totalAppointments: appointments.length,
       totalRevenue,
-      commissionPercentage,
+      commissionType,
+      commissionValue,
       commissionAmount,
       totalAdvances,
       finalEarnings: commissionAmount - totalAdvances,
@@ -256,14 +265,22 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
 
                   <Grid.Col span={{ base: 12, md: 6 }}>
                     <NumberInput
-                      label="% Comisión personalizado"
-                      description="Deja vacío para usar el del empleado"
-                      placeholder={`Por defecto: ${employee?.commissionPercentage ?? 0}%`}
+                      label="Comisión personalizada"
+                      description="Deja vacío para usar la del empleado"
+                      placeholder={
+                        employee?.commissionType === "fixed"
+                          ? `Por defecto: $${employee?.commissionValue ?? 0} por cita`
+                          : `Por defecto: ${employee?.commissionValue ?? 0}%`
+                      }
                       min={0}
-                      max={100}
-                      value={customCommission}
-                      onChange={(val) => setCustomCommission(val as number | undefined)}
-                      rightSection={<Text size="xs" c="dimmed">%</Text>}
+                      max={employee?.commissionType === "percentage" ? 100 : undefined}
+                      value={customCommissionValue}
+                      onChange={(val) => setCustomCommissionValue(val as number | undefined)}
+                      rightSection={
+                        <Text size="xs" c="dimmed" pr={4}>
+                          {employee?.commissionType === "fixed" ? "$" : "%"}
+                        </Text>
+                      }
                     />
                   </Grid.Col>
                 </Grid>
@@ -322,7 +339,10 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                       </ThemeIcon>
                       <div>
                         <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                          Comisión ({payroll?.commissionPercentage || 0}%)
+                          Comisión{" "}
+                          {payroll?.commissionType === "fixed"
+                            ? `($${payroll?.commissionValue ?? 0}/cita)`
+                            : `(${payroll?.commissionValue ?? 0}%)`}
                         </Text>
                         <Text size="xl" fw={700} c="teal">
                           {formatCurrency(payroll?.commissionAmount || 0)}

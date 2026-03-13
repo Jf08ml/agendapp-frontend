@@ -19,6 +19,10 @@ import {
   getAppointmentsByEmployee,
 } from "../../services/appointmentService";
 import { Advance, getAdvancesByEmployee } from "../../services/advanceService";
+import {
+  Employee,
+  getEmployeeById,
+} from "../../services/employeeService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
@@ -42,8 +46,15 @@ const EmployeeInfo: React.FC = () => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [interval, setInterval] = useState<string>("daily");
+  const [employeeData, setEmployeeData] = useState<Employee | undefined>(undefined);
 
   const userId = useSelector((state: RootState) => state.auth.userId);
+
+  useEffect(() => {
+    if (userId) {
+      getEmployeeById(userId).then((data) => setEmployeeData(data));
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (userId && interval !== "custom") {
@@ -57,6 +68,13 @@ const EmployeeInfo: React.FC = () => {
       fetchAdvances();
     }
   }, [userId, startDate, endDate]);
+
+  useEffect(() => {
+    if (appointments.length > 0 || advances.length > 0) {
+      calculatePayroll(appointments, advances);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeData]);
 
   const calculateDates = (interval: string) => {
     const now = new Date();
@@ -143,10 +161,20 @@ const EmployeeInfo: React.FC = () => {
     appointments: Appointment[],
     advances: Advance[]
   ) => {
-    const totalEarnings = appointments.reduce(
+    const confirmedAppointments = appointments.filter((a) => a.status === "confirmed");
+    const totalRevenue = confirmedAppointments.reduce(
       (total, appointment) => total + (appointment.service?.price || 0),
       0
     );
+
+    const commissionType = employeeData?.commissionType ?? "percentage";
+    const commissionValue = employeeData?.commissionValue ?? 0;
+
+    const totalEarnings =
+      commissionType === "percentage"
+        ? (totalRevenue * commissionValue) / 100
+        : confirmedAppointments.length * commissionValue;
+
     const totalAdvances = advances.reduce(
       (total, advance) => total + advance.amount,
       0
