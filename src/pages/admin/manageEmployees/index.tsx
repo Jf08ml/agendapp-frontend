@@ -134,7 +134,7 @@ const AdminEmployees: React.FC = () => {
 
   // Acciones CRUD
   const handleSaveEmployee = async (employee: Employee) => {
-    const commission = employee.commissionPercentage ?? 0;
+    const commission = employee.commissionValue ?? 0;
 
     // Validation: check for duplicate email or phone (excluding current employee)
     const duplicateEmail = employees.find(
@@ -175,7 +175,7 @@ const AdminEmployees: React.FC = () => {
       if (employee._id) {
         await updateEmployee(employee._id, {
           ...employee,
-          commissionPercentage: commission,
+          commissionValue: commission,
         });
       } else {
         if (!organizationId) {
@@ -190,7 +190,7 @@ const AdminEmployees: React.FC = () => {
           ...employee,
           organizationId,
           password: employee.password || "",
-          commissionPercentage: commission,
+          commissionValue: commission,
         } as any);
       }
       await loadAll();
