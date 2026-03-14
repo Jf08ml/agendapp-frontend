@@ -221,9 +221,16 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       case "pending":
         return <Badge color="yellow" variant="light">Pendiente</Badge>;
       case "cancelled":
-        return <Badge color="red" variant="light">Cancelado</Badge>;
+      case "cancelled_by_customer":
+        return <Badge color="red" variant="light">Cancelado por cliente</Badge>;
+      case "cancelled_by_admin":
+        return <Badge color="orange" variant="light">Cancelado por admin</Badge>;
+      case "attended":
+        return <Badge color="teal" variant="light">Asistió</Badge>;
+      case "no_show":
+        return <Badge color="pink" variant="light">No asistió</Badge>;
       default:
-        return <Badge color="gray" variant="light">Sin estado</Badge>;
+        return <Badge color="gray" variant="light">{status || "Sin estado"}</Badge>;
     }
   };
 
