@@ -304,3 +304,57 @@ export const checkDaysAvailability = async (
   }
 };
 
+// ============ EXCEPCIONES DE HORARIO ============
+
+export interface ScheduleException {
+  _id?: string;
+  startDate: string;  // "YYYY-MM-DD"
+  endDate: string;    // "YYYY-MM-DD"
+  allDay: boolean;
+  startTime?: string; // "HH:mm" - solo si !allDay
+  endTime?: string;   // "HH:mm" - solo si !allDay
+  reason?: string;
+  createdAt?: string;
+}
+
+export const getEmployeeExceptions = async (
+  employeeId: string
+): Promise<ScheduleException[] | undefined> => {
+  try {
+    const response = await apiGeneral.get<Response<ScheduleException[]>>(
+      `/schedule/employee/${employeeId}/exceptions`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener las excepciones del empleado");
+  }
+};
+
+export const addEmployeeException = async (
+  employeeId: string,
+  exception: Omit<ScheduleException, "_id" | "createdAt">
+): Promise<ScheduleException[] | undefined> => {
+  try {
+    const response = await apiGeneral.post<Response<ScheduleException[]>>(
+      `/schedule/employee/${employeeId}/exceptions`,
+      exception
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al agregar la excepción");
+  }
+};
+
+export const removeEmployeeException = async (
+  employeeId: string,
+  exceptionId: string
+): Promise<ScheduleException[] | undefined> => {
+  try {
+    const response = await apiGeneral.delete<Response<ScheduleException[]>>(
+      `/schedule/employee/${employeeId}/exceptions/${exceptionId}`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al eliminar la excepción");
+  }
+};
