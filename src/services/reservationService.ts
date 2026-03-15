@@ -142,7 +142,9 @@ export const updateReservation = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al actualizar la reserva");
+    // Re-lanzar el error original (con response.data intacto) para que el caller
+    // pueda inspeccionar códigos específicos como CONCURRENCY_LIMIT_REACHED
+    throw error;
   }
 };
 

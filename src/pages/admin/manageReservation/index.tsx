@@ -124,6 +124,14 @@ const ReservationsList: React.FC = () => {
   const [showOnlyFuture, setShowOnlyFuture] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
+  // Modal de advertencia cuando el cupo máximo ya está alcanzado al aprobar
+  const [concurrencyWarning, setConcurrencyWarning] = useState<{
+    message: string;
+    reservationId?: string;
+    isGroup?: boolean;
+    groupId?: string;
+  } | null>(null);
+
   useEffect(() => {
     // En mobile, empezamos con filtros colapsados; en desktop, abiertos
     setFiltersOpen(!isMobile);
@@ -414,9 +422,16 @@ const ReservationsList: React.FC = () => {
       if (organization?._id) await loadPage(organization._id);
     } catch (err: any) {
       console.error(err);
+      if (err?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+        setConcurrencyWarning({
+          message: err.response.data.message,
+          reservationId,
+        });
+        return;
+      }
       showNotification({
         title: "Error",
-        message: `${err?.message || err}`,
+        message: err?.response?.data?.message || `${err?.message || err}`,
         color: "red",
         autoClose: 4000,
       });
@@ -584,10 +599,20 @@ const ReservationsList: React.FC = () => {
       if (organization?._id) await loadPage(organization._id);
     } catch (err: any) {
       console.error(err);
-      
+
+      if (err?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+        setConcurrencyWarning({
+          message: err.response.data.message,
+          isGroup: true,
+          groupId,
+        });
+        if (organization?._id) await loadPage(organization._id);
+        return;
+      }
+
       // Extraer mensaje de error específico
       const errorMessage = err?.response?.data?.message || err?.message || "Error al aprobar el grupo de reservas";
-      
+
       showNotification({
         title: "Error al Aprobar",
         message: errorMessage,
@@ -595,13 +620,55 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 5000,
       });
-      
+
       // Recargar para mostrar el estado revertido
       if (organization?._id) await loadPage(organization._id);
     } finally {
       group.forEach(r => {
         if (r._id) setRowBusy(r._id, null);
       });
+    }
+  };
+
+  const handleForceApprove = async () => {
+    if (!concurrencyWarning) return;
+    const warning = concurrencyWarning;
+    setConcurrencyWarning(null);
+
+    if (warning.isGroup && warning.groupId) {
+      const group = groupsMap.get(warning.groupId);
+      if (!group) return;
+      try {
+        group.forEach(r => { if (r._id) setRowBusy(r._id, "approve"); });
+        const pendingReservations = group.filter(r => r._id && r.status === "pending");
+        for (let i = 0; i < pendingReservations.length; i++) {
+          const r = pendingReservations[i];
+          const isLast = i === pendingReservations.length - 1;
+          await updateReservation(r._id!, {
+            status: "approved",
+            skipNotification: !isLast,
+            forceApprove: true,
+          } as any);
+        }
+        showNotification({ title: "Grupo Aprobado", message: "Reservas aprobadas correctamente", color: "green", position: "top-right" });
+        if (organization?._id) await loadPage(organization._id);
+      } catch (err: any) {
+        showNotification({ title: "Error", message: err?.response?.data?.message || err?.message, color: "red", position: "top-right" });
+        if (organization?._id) await loadPage(organization._id);
+      } finally {
+        group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
+      }
+    } else if (warning.reservationId) {
+      try {
+        setRowBusy(warning.reservationId, "approve");
+        await updateReservation(warning.reservationId, { status: "approved", forceApprove: true } as any);
+        showNotification({ title: "Aprobada", message: "Cita creada correctamente", color: "green" });
+        if (organization?._id) await loadPage(organization._id);
+      } catch (err: any) {
+        showNotification({ title: "Error", message: err?.response?.data?.message || err?.message, color: "red" });
+      } finally {
+        setRowBusy(warning.reservationId, null);
+      }
     }
   };
 
@@ -1190,6 +1257,32 @@ const ReservationsList: React.FC = () => {
             <Text c="dimmed" ta="center">No hay información disponible</Text>
           )}
         </div>
+      </Modal>
+
+      {/* Modal: cupo máximo alcanzado — permite forzar la aprobación */}
+      <Modal
+        opened={!!concurrencyWarning}
+        onClose={() => setConcurrencyWarning(null)}
+        title="Cupo máximo alcanzado"
+        centered
+        size="sm"
+      >
+        <Stack>
+          <Alert color="orange" title="Límite de concurrencia">
+            {concurrencyWarning?.message}
+          </Alert>
+          <Text size="sm">
+            ¿Deseas crear la cita de igual forma ampliando el cupo manualmente?
+          </Text>
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setConcurrencyWarning(null)}>
+              Cancelar
+            </Button>
+            <Button color="orange" onClick={handleForceApprove}>
+              Crear de igual forma
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       <Card shadow="sm" radius="lg" withBorder style={{ position: "relative" }}>
