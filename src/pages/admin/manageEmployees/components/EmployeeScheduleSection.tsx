@@ -676,12 +676,10 @@ export default function EmployeeScheduleSection({
             label="Todo el día"
             description="Si está desactivado, solo se bloqueará la franja horaria indicada"
             checked={exceptionForm.allDay}
-            onChange={(e) =>
-              setExceptionForm((f) => ({
-                ...f,
-                allDay: e.currentTarget.checked,
-              }))
-            }
+            onChange={(e) => {
+              const checked = e.currentTarget.checked;
+              setExceptionForm((f) => ({ ...f, allDay: checked }));
+            }}
           />
 
           <Collapse in={!exceptionForm.allDay}>
@@ -689,22 +687,18 @@ export default function EmployeeScheduleSection({
               <TimeInput
                 label="Hora inicio"
                 value={exceptionForm.startTime}
-                onChange={(e) =>
-                  setExceptionForm((f) => ({
-                    ...f,
-                    startTime: e.currentTarget.value,
-                  }))
-                }
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setExceptionForm((f) => ({ ...f, startTime: val }));
+                }}
               />
               <TimeInput
                 label="Hora fin"
                 value={exceptionForm.endTime}
-                onChange={(e) =>
-                  setExceptionForm((f) => ({
-                    ...f,
-                    endTime: e.currentTarget.value,
-                  }))
-                }
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setExceptionForm((f) => ({ ...f, endTime: val }));
+                }}
               />
             </Group>
           </Collapse>
@@ -713,9 +707,10 @@ export default function EmployeeScheduleSection({
             label="Motivo (opcional)"
             placeholder="Vacaciones, Permiso médico, Capacitación..."
             value={exceptionForm.reason}
-            onChange={(e) =>
-              setExceptionForm((f) => ({ ...f, reason: e.currentTarget.value }))
-            }
+            onChange={(e) => {
+              const val = e.currentTarget.value;
+              setExceptionForm((f) => ({ ...f, reason: val }));
+            }}
           />
 
           <Group justify="flex-end" mt="sm">
