@@ -89,7 +89,7 @@ const EmployeeInfo: React.FC = () => {
   // Recalculate payroll whenever any of its inputs change
   useEffect(() => {
     const confirmedAppointments = appointments.filter(
-      (a) => a.status === "confirmed"
+      (a) => a.status === "confirmed" || a.status === "attended"
     );
     const totalRevenue = confirmedAppointments.reduce(
       (total, appointment) => total + (appointment.service?.price || 0),
@@ -197,9 +197,15 @@ const EmployeeInfo: React.FC = () => {
     switch (status) {
       case "confirmed":
         return { label: "Confirmado", color: "green" as const, bg: "#d4edda", text: "#28a745" };
+      case "attended":
+        return { label: "Asistió", color: "teal" as const, bg: "#d0f0ec", text: "#0d7a6b" };
+      case "no_show":
+        return { label: "No asistió", color: "orange" as const, bg: "#fde8d0", text: "#c05c00" };
       case "pending":
         return { label: "Pendiente", color: "yellow" as const, bg: "#fff3cd", text: "#856404" };
       case "cancelled":
+      case "cancelled_by_customer":
+      case "cancelled_by_admin":
         return { label: "Cancelado", color: "red" as const, bg: "#f8d7da", text: "#dc3545" };
       default:
         return { label: "Sin estado", color: "blue" as const, bg: "#e2e3e5", text: "#007bff" };
@@ -211,7 +217,9 @@ const EmployeeInfo: React.FC = () => {
       ? `${formatCurrency(employeeData?.commissionValue ?? 0)} por cita`
       : `${employeeData?.commissionValue ?? 0}% de comisión`;
 
-  const confirmedCount = appointments.filter((a) => a.status === "confirmed").length;
+  const confirmedCount = appointments.filter(
+    (a) => a.status === "confirmed" || a.status === "attended"
+  ).length;
 
   return (
     <Container size="md" pb="xl">

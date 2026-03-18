@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Container, Divider, ScrollArea, Tabs, rem } from "@mantine/core";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "@mantine/form";
-import { zodResolver } from "mantine-form-zod-resolver";
+import { zodResolver } from "../../../utils/zodResolver";
 import { showNotification } from "@mantine/notifications";
 import { IoAlertCircle } from "react-icons/io5";
 import {

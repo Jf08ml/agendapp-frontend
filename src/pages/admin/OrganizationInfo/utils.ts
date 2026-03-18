@@ -26,6 +26,8 @@ export const normalizeOrg = (response: Organization): Organization => ({
   default_country: response.default_country ?? "CO",
   timezone: response.timezone || undefined,
   showLoyaltyProgram: response.showLoyaltyProgram ?? true,
+  serviceTiers: Array.isArray(response.serviceTiers) ? [...response.serviceTiers] : [],
+  referralTiers: Array.isArray(response.referralTiers) ? [...response.referralTiers] : [],
   enableOnlineBooking: response.enableOnlineBooking ?? true,
   blockHolidaysForReservations: response.blockHolidaysForReservations ?? false,
   allowedHolidayDates: Array.isArray(response.allowedHolidayDates)

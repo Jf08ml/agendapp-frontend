@@ -135,6 +135,8 @@ export const schema = z.object({
   referredReward: optionalString,
   serviceCount: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
   serviceReward: optionalString,
+  serviceTiers: z.array(z.object({ threshold: z.number().min(1), reward: z.string() })).optional(),
+  referralTiers: z.array(z.object({ threshold: z.number().min(1), reward: z.string() })).optional(),
   showLoyaltyProgram: z.boolean().optional(),
   enableOnlineBooking: z.boolean().optional(),
   blockHolidaysForReservations: z.boolean().optional(),

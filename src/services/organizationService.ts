@@ -93,6 +93,8 @@ export interface Organization {
   referredReward?: string;
   serviceCount?: number;
   serviceReward?: string;
+  serviceTiers?: { threshold: number; reward: string }[];
+  referralTiers?: { threshold: number; reward: string }[];
   openingHours?: OpeningHours;
   weeklySchedule?: WeeklySchedule;
   clientIdWhatsapp?: string | null;

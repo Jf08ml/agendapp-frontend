@@ -41,7 +41,7 @@ const SearchClient: React.FC = () => {
         organizationId
       );
       if (updatedClient) {
-        navigate("/plan-viewer", { state: { client: updatedClient } });
+        navigate("/plan-viewer", { state: { client: updatedClient, organization } });
       }
     } catch (error) {
       console.error("Error fetching updated client:", error);

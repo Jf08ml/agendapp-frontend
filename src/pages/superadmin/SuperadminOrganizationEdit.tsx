@@ -12,7 +12,7 @@ import {
   Stack,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { zodResolver } from "mantine-form-zod-resolver";
+import { zodResolver } from "../../utils/zodResolver";
 import { notifications } from "@mantine/notifications";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -116,6 +116,8 @@ const DEFAULT_VALUES: SuperadminFormValues = {
   referredReward: "",
   serviceCount: 0,
   serviceReward: "",
+  serviceTiers: [],
+  referralTiers: [],
 };
 
 export default function SuperadminOrganizationEdit() {

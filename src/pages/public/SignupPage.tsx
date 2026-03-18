@@ -23,7 +23,7 @@ import {
   Select,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { zodResolver } from "mantine-form-zod-resolver";
+import { zodResolver } from "../../utils/zodResolver";
 import { z } from "zod";
 import {
   IconAlertCircle,

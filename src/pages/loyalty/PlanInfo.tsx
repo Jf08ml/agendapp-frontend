@@ -16,7 +16,10 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
   organization,
   onLogout,
 }) => {
-  // Defaults para evitar NaN/undefined en props de componentes hijos
+  // Tiers nuevos (pueden ser arrays vacíos si la org usa config legacy)
+  const serviceTiers = organization?.serviceTiers ?? [];
+  const referralTiers = organization?.referralTiers ?? [];
+  // Legacy (fallback si no hay tiers nuevos)
   const totalServices = organization?.serviceCount ?? 0;
   const serviceReward = organization?.serviceReward ?? "Sin recompensa";
   const totalReferrals = organization?.referredCount ?? 0;
@@ -102,6 +105,7 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
             <Card.Section inheritPadding>
               <LoyaltyPlan
                 servicesTaken={client.servicesTaken || 0}
+                serviceTiers={serviceTiers}
                 totalServices={totalServices}
                 serviceReward={serviceReward}
                 rewardHistory={(client.rewardHistory || []).filter(r => r.type === 'service')}
@@ -112,6 +116,7 @@ const PlanInfo: React.FC<PlanInfoProps> = ({
             <Card.Section inheritPadding>
               <ReferredPlan
                 referralsMade={client.referralsMade || 0}
+                referralTiers={referralTiers}
                 totalReferrals={totalReferrals}
                 referredReward={referredReward}
                 rewardHistory={(client.rewardHistory || []).filter(r => r.type === 'referral')}
