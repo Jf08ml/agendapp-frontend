@@ -103,7 +103,7 @@ export interface CreateSeriesResponse {
 export interface CreateAppointmentPayload {
   service: Service | string; // ID del servicio
   client: Client | string; // ID del cliente
-  employee: Employee | string; // ID del empleado
+  employee: Employee | string; // ID del profesional
   startDate: Date;
   endDate: Date;
   status: string; // Puede ser "pending", "confirmed", "cancelled", "cancelled_by_customer", "cancelled_by_admin"

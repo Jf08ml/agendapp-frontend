@@ -4,8 +4,8 @@
  * ScheduleOverviewHeatmap (HOURLY + COMPACT)
  * - Días como columnas
  * - Filas por HORA
- * - Disponibilidad REAL = (Org ∩ Empleado) - breaks
- * - Muestra huecos (slots vacíos) cuando los empleados están en descanso
+ * - Disponibilidad REAL = (Org ∩ Profesional) - breaks
+ * - Muestra huecos (slots vacíos) cuando los profesionales están en descanso
  * - Drawer: Disponibles + En descanso + resumen de horario aplicado (Org/Personalizado)
  */
 
@@ -195,9 +195,9 @@ function subtractBreaks(range: Range, breaks: Break[]): Range[] {
 }
 
 /**
- * Bloques efectivos de trabajo para el empleado ese día:
+ * Bloques efectivos de trabajo para el profesional ese día:
  * 1) intersección org vs emp
- * 2) restar breaks del empleado
+ * 2) restar breaks del profesional
  * 3) opcional: restar breaks de la org (si el negocio realmente NO atiende ahí)
  */
 function getEffectiveWorkBlocksForEmployeeDay(params: {

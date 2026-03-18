@@ -92,7 +92,7 @@ const AdminEmployees: React.FC = () => {
       console.error(error);
       showNotification({
         title: "Error",
-        message: "No se pudo cargar empleados/servicios",
+        message: "No se pudo cargar profesionales/servicios",
         color: "red",
       });
     } finally {
@@ -143,7 +143,7 @@ const AdminEmployees: React.FC = () => {
     if (duplicateEmail) {
       showNotification({
         title: "Validación",
-        message: "Ya existe un empleado con ese correo electrónico",
+        message: "Ya existe un profesional con ese correo electrónico",
         color: "orange",
       });
       throw new Error("Duplicate email");
@@ -155,7 +155,7 @@ const AdminEmployees: React.FC = () => {
     if (duplicatePhone) {
       showNotification({
         title: "Validación",
-        message: "Ya existe un empleado con ese número de teléfono",
+        message: "Ya existe un profesional con ese número de teléfono",
         color: "orange",
       });
       throw new Error("Duplicate phone");
@@ -165,7 +165,7 @@ const AdminEmployees: React.FC = () => {
     if (!employee.services || employee.services.length === 0) {
       showNotification({
         title: "Validación",
-        message: "Debes seleccionar al menos un servicio para el empleado",
+        message: "Debes seleccionar al menos un servicio para el profesional",
         color: "orange",
       });
       throw new Error("No services selected");
@@ -197,13 +197,13 @@ const AdminEmployees: React.FC = () => {
       setIsModalOpen(false);
       setEditingEmployee(null);
       showNotification({
-        title: employee._id ? "Empleado actualizado" : "Empleado agregado",
+        title: employee._id ? "Profesional actualizado" : "Profesional agregado",
         message: "Guardado correctamente",
         color: "green",
       });
     } catch (error: any) {
       console.error(error);
-      const message = error.response?.data?.message || error.message || "No se pudo guardar el empleado";
+      const message = error.response?.data?.message || error.message || "No se pudo guardar el profesional";
       showNotification({
         title: "Error",
         message,
@@ -215,9 +215,9 @@ const AdminEmployees: React.FC = () => {
 
   const handleDeleteEmployee = async (employeeId: string) => {
     openConfirmModal({
-      title: "Eliminar empleado",
+      title: "Eliminar profesional",
       centered: true,
-      children: <Text>¿Seguro que deseas eliminar este empleado?</Text>,
+      children: <Text>¿Seguro que deseas eliminar este profesional?</Text>,
       labels: { confirm: "Eliminar", cancel: "Cancelar" },
       confirmProps: { color: "red" },
       onConfirm: async () => {
@@ -226,7 +226,7 @@ const AdminEmployees: React.FC = () => {
           await loadAll();
           showNotification({
             title: "Eliminado",
-            message: "Empleado eliminado",
+            message: "Profesional eliminado",
             color: "green",
           });
         } catch (error) {
@@ -234,7 +234,7 @@ const AdminEmployees: React.FC = () => {
           // fallback a desactivar
           showNotification({
             title: "No se pudo eliminar",
-            message: "Se intentará desactivar el empleado.",
+            message: "Se intentará desactivar el profesional.",
             color: "yellow",
           });
           await handleActiveEmployee(employeeId, false);
@@ -245,7 +245,7 @@ const AdminEmployees: React.FC = () => {
 
   const handleActiveEmployee = async (employeeId: string, next = true) => {
     openConfirmModal({
-      title: next ? "Activar empleado" : "Desactivar empleado",
+      title: next ? "Activar profesional" : "Desactivar profesional",
       centered: true,
       children: (
         <Text>
@@ -261,7 +261,7 @@ const AdminEmployees: React.FC = () => {
           await updateEmployee(employeeId, { isActive: next } as any);
           await loadAll();
           showNotification({
-            title: next ? "Empleado activado" : "Empleado desactivado",
+            title: next ? "Profesional activado" : "Profesional desactivado",
             message: "Cambio aplicado",
             color: "green",
           });
@@ -304,13 +304,13 @@ const AdminEmployees: React.FC = () => {
       {/* Header */}
       <Card mb="md">
         <Group justify="space-between" align="center" mb="md">
-          <Title order={isMobile ? 3 : 2}>Administrar Empleados</Title>
+          <Title order={isMobile ? 3 : 2}>Administrar Profesionales</Title>
         </Group>
 
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="employees" leftSection={<BiGroup size={16} />}>
-              Empleados
+              Profesionales
             </Tabs.Tab>
             <Tabs.Tab value="schedules" leftSection={<BiCalendar size={16} />}>
               Vista de Horarios
@@ -351,7 +351,7 @@ const AdminEmployees: React.FC = () => {
                         setEditingEmployee(null);
                       }}
                     >
-                      Agregar empleado
+                      Agregar profesional
                     </Button>
                   </Group>
                 </Group>
@@ -378,7 +378,7 @@ const AdminEmployees: React.FC = () => {
               <Center mih={240}>
                 <Stack align="center" gap="xs">
                   <Text c="dimmed">
-                    No hay empleados para los filtros aplicados.
+                    No hay profesionales para los filtros aplicados.
                   </Text>
                   <Button
                     variant="light"

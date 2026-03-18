@@ -99,7 +99,7 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
   }, []);
 
   /**
-   * Obtener días disponibles del empleado
+   * Obtener días disponibles del profesional
    */
   const fetchEmployeeAvailableDays = useCallback(async (empId: string) => {
     try {

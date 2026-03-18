@@ -193,7 +193,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     <Modal
       opened={isOpen}
       onClose={handleClose}
-      title={employee ? "Editar Empleado" : "Agregar Empleado"}
+      title={employee ? "Editar Profesional" : "Agregar Profesional"}
       size="xl"
       centered
     >
@@ -206,7 +206,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
               <Stack align="center" gap="xs">
                 <Loader size="lg" />
                 <Text size="sm" c="dimmed">
-                  Guardando empleado...
+                  Guardando profesional...
                 </Text>
               </Stack>
             ),
@@ -482,7 +482,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             disabled={isUploading || !canSave || isSaving}
             loading={isSaving}
           >
-            {employee ? "Guardar Cambios" : "Agregar Empleado"}
+            {employee ? "Guardar Cambios" : "Agregar Profesional"}
           </Button>
         </Flex>
       </Box>

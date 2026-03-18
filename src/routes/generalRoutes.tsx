@@ -168,15 +168,15 @@ const generalRoutes = [
     },
   },
   {
-    path: "/gestionar-empleados",
+    path: "/gestionar-profesionales",
     component: (props: JSX.IntrinsicAttributes) => (
       <ProtectedRoute>
         <AdminEmployees {...props} />
       </ProtectedRoute>
     ),
     MediaMetadata: {
-      title: "Gestionar Empleados",
-      description: "Gestiona los empleados de Galaxia Glamour.",
+      title: "Gestionar Profesionales",
+      description: "Gestiona los profesionales de Galaxia Glamour.",
     },
   },
   {
@@ -212,7 +212,7 @@ const generalRoutes = [
     ),
   },
   {
-    path: "/informacion-empleado",
+    path: "/informacion-profesional",
     component: (props: JSX.IntrinsicAttributes) => (
       <ProtectedRoute>
         <EmployeeInfo {...props} />
@@ -235,8 +235,8 @@ const generalRoutes = [
       </ProtectedRoute>
     ),
     MediaMetadata: {
-      title: "Gestionar Empleados",
-      description: "Gestiona los empleados de Galaxia Glamour.",
+      title: "Gestionar Profesionales",
+      description: "Gestiona los profesionales de Galaxia Glamour.",
     },
   },
   {

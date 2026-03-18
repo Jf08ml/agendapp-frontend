@@ -78,7 +78,7 @@ export const getAdvanceById = async (
   }
 };
 
-// Obtener los avances de un empleado
+// Obtener los avances de un profesional
 export const getAdvancesByEmployee = async (
   employeeId: string
 ): Promise<Advance[]> => {

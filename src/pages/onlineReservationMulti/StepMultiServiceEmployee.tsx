@@ -27,7 +27,7 @@ interface StepMultiServiceEmployeeProps {
   value: SelectedService[];
   onChange: (selected: SelectedService[]) => void;
 
-  /** Si true (modo automático), el empleado es obligatorio por servicio */
+  /** Si true (modo automático), el profesional es obligatorio por servicio */
   employeeRequired?: boolean;
 }
 
@@ -44,14 +44,14 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
   const [opened, setOpened] = useState(false);
   const msRef = useRef<HTMLInputElement | null>(null);
 
-  // Card en modo edición (para cambiar empleado)
+  // Card en modo edición (para cambiar profesional)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
 
   // === Errores por servicio cuando employeeRequired === true
   // clave: serviceId, valor: mensaje de error (o null)
   const [errors, setErrors] = useState<Record<string, string | null>>({});
 
-  // Solo empleados activos
+  // Solo profesionales activos
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.isActive),
     [employees]
@@ -113,7 +113,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
     }
   };
 
-  // Cambio/Quitar empleado
+  // Cambio/Quitar profesional
   const handleEmployeeChange = (
     serviceId: string,
     employeeId: string | null
@@ -121,11 +121,11 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
     onChange(
       value.map((s) => (s.serviceId === serviceId ? { ...s, employeeId } : s))
     );
-    // limpiar error si ahora sí hay empleado
+    // limpiar error si ahora sí hay profesional
     setErrors((prev) => ({
       ...prev,
       [serviceId]:
-        employeeRequired && !employeeId ? "Selecciona un empleado." : null,
+        employeeRequired && !employeeId ? "Selecciona un profesional." : null,
     }));
     setEditingServiceId(null);
   };
@@ -135,7 +135,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
       // no permitir limpiar si es obligatorio
       setErrors((prev) => ({
         ...prev,
-        [serviceId]: "Selecciona un empleado.",
+        [serviceId]: "Selecciona un profesional.",
       }));
       return;
     }
@@ -147,26 +147,26 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
     setEditingServiceId(null);
   };
 
-  // Auto-seleccionar cuando sólo hay 1 empleado disponible para ese servicio
+  // Auto-seleccionar cuando sólo hay 1 profesional disponible para ese servicio
   useEffect(() => {
     if (!employeeRequired) return;
 
-    // Por cada servicio seleccionado sin empleado, si sólo hay 1 disponible => asignarlo
+    // Por cada servicio seleccionado sin profesional, si sólo hay 1 disponible => asignarlo
     const next = [...value];
     let changed = false;
 
     for (const sel of value) {
       if (sel.employeeId) continue;
 
-      const empleadosServicio = activeEmployees.filter((e) => {
+      const profesionalesServicio = activeEmployees.filter((e) => {
         const svcIds = (e.services || []).map((svc: any) =>
           typeof svc === "string" ? svc : svc._id
         );
         return svcIds.includes(sel.serviceId);
       });
 
-      if (empleadosServicio.length === 1) {
-        const unico = empleadosServicio[0];
+      if (profesionalesServicio.length === 1) {
+        const unico = profesionalesServicio[0];
         const idx = next.findIndex((x) => x.serviceId === sel.serviceId);
         if (idx >= 0) {
           next[idx] = { ...next[idx], employeeId: unico._id };
@@ -174,10 +174,10 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
           setErrors((prev) => ({ ...prev, [sel.serviceId]: null }));
         }
       } else if (!errors[sel.serviceId]) {
-        // marca error si sigue sin empleado
+        // marca error si sigue sin profesional
         setErrors((prev) => ({
           ...prev,
-          [sel.serviceId]: "Selecciona un empleado.",
+          [sel.serviceId]: "Selecciona un profesional.",
         }));
       }
     }
@@ -219,7 +219,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
           <Group gap="xs">
             {employeeRequired && (
               <Badge color="green" variant="filled" size="sm">
-                Empleado obligatorio (automático)
+                Profesional obligatorio (automático)
               </Badge>
             )}
             <Badge variant="light" size="sm">
@@ -257,7 +257,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
           variant="light"
           icon={<IoAlertCircle size={16} />}
         >
-          En agendamiento automático, cada servicio debe tener un empleado
+          En agendamiento automático, cada servicio debe tener un profesional
           asignado.
         </Alert>
       )}
@@ -275,8 +275,8 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
           {value.map((sel) => {
             const service = services.find((s) => s._id === sel.serviceId);
 
-            // Empleados activos que prestan este servicio
-            const empleadosServicio = activeEmployees.filter((e) => {
+            // Profesionales activos que prestan este servicio
+            const profesionalesServicio = activeEmployees.filter((e) => {
               const svcIds = (e.services || []).map((svc: any) =>
                 typeof svc === "string" ? svc : svc._id
               );
@@ -292,7 +292,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
               ...(employeeRequired
                 ? []
                 : [{ value: "none", label: "Sin preferencia" }]),
-              ...empleadosServicio.map((e) => ({
+              ...profesionalesServicio.map((e) => ({
                 value: e._id,
                 label: e.names,
               })),
@@ -301,7 +301,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
             // Select con avatares (modo edición)
             const employeeSelect = (
               <Select
-                label={isMobile ? "Empleado" : undefined}
+                label={isMobile ? "Profesional" : undefined}
                 placeholder="Sin preferencia"
                 data={selectData}
                 value={sel.employeeId || "none"}
@@ -310,8 +310,8 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
                 }
                 searchable
                 nothingFoundMessage={
-                  empleadosServicio.length === 0
-                    ? "No hay empleados activos para este servicio"
+                  profesionalesServicio.length === 0
+                    ? "No hay profesionales activos para este servicio"
                     : "Sin resultados"
                 }
                 w={isMobile ? "100%" : 340}
@@ -319,7 +319,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
                 // ✅ Avatares en el dropdown
                 renderOption={renderEmployeeOption as any}
                 // ✅ Avatar junto al valor seleccionado:
-                //    usamos leftSection dinámico con el empleado elegido
+                //    usamos leftSection dinámico con el profesional elegido
                 leftSection={
                   sel.employeeId && selectedEmp ? (
                     <Avatar

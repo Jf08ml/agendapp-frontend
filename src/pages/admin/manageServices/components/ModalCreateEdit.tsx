@@ -273,7 +273,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 <Box>
                   <NumberInput
                     label="👥 Citas simultáneas que puede atender"
-                    description="Número de clientes que el empleado puede atender en el mismo horario (ej: doctor con 2 pacientes)"
+                    description="Número de clientes que el profesional puede atender en el mismo horario (ej: doctor con 2 pacientes)"
                     value={editingService.maxConcurrentAppointments ?? 1}
                     onChange={(value) => setEditingService({ ...editingService, maxConcurrentAppointments: typeof value === "number" ? value : 1 })}
                     min={1}

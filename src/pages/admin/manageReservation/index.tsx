@@ -213,7 +213,7 @@ const ReservationsList: React.FC = () => {
       const data = await getEmployeesByOrganizationId(organizationId);
       setEmployees(data);
     } catch (err) {
-      console.error("Error al cargar los empleados:", err);
+      console.error("Error al cargar los profesionales:", err);
     }
   };
 
@@ -322,7 +322,7 @@ const ReservationsList: React.FC = () => {
       list = list.filter((r) => r.status === statusFilter);
     }
 
-    // 3) Filtro por empleado
+    // 3) Filtro por profesional
     if (employeeFilter !== "all") {
       list = list.filter((r) => r.employeeId === employeeFilter);
     }
@@ -456,7 +456,7 @@ const ReservationsList: React.FC = () => {
       });
       showNotification({
         title: "Asignado",
-        message: "Empleado asignado correctamente",
+        message: "Profesional asignado correctamente",
         color: "green",
       });
       setAssignModalOpen(false);
@@ -467,7 +467,7 @@ const ReservationsList: React.FC = () => {
       console.error(err);
       showNotification({
         title: "Error",
-        message: "Error al asignar empleado",
+        message: "Error al asignar profesional",
         color: "red",
         autoClose: 3000,
       });
@@ -830,7 +830,7 @@ const ReservationsList: React.FC = () => {
         <CustomLoader overlay loadingText="Actualizando política..." />
       )}
 
-      {/* Modal Asignar empleado */}
+      {/* Modal Asignar profesional */}
       <Modal
         opened={assignModalOpen}
         onClose={() => {
@@ -840,14 +840,14 @@ const ReservationsList: React.FC = () => {
             setSelectedEmployee(null);
           }
         }}
-        title="Asignar empleado"
+        title="Asignar profesional"
         centered
       >
         <div style={{ position: "relative" }}>
           <LoadingOverlay visible={assignModalLoading} zIndex={1000} />
           <Select
-            label="Selecciona un empleado"
-            placeholder="Empleado"
+            label="Selecciona un profesional"
+            placeholder="Profesional"
             data={employeesSelectData}
             value={selectedEmployee}
             onChange={setSelectedEmployee}
@@ -1064,7 +1064,7 @@ const ReservationsList: React.FC = () => {
                           </Text>
                           <Group gap="xs">
                             <Text size="sm" c="dimmed">
-                              Empleado:
+                              Profesional:
                             </Text>
                             {hasEmp ? (
                               <Badge variant="light" color="grape" size="sm">
@@ -1121,7 +1121,7 @@ const ReservationsList: React.FC = () => {
                             }}
                             loading={isRowBusy(res._id!)}
                           >
-                            Empleado
+                            Profesional
                           </Button>
                         </Group>
                       )}
@@ -1354,7 +1354,7 @@ const ReservationsList: React.FC = () => {
                 Filtros
               </Text>
               <Text size="xs" c="dimmed">
-                Ajusta la vista según estado, empleado, servicio o cliente.
+                Ajusta la vista según estado, profesional, servicio o cliente.
               </Text>
             </Group>
 
@@ -1396,7 +1396,7 @@ const ReservationsList: React.FC = () => {
                 />
 
                 <Select
-                  label="Empleado"
+                  label="Profesional"
                   placeholder="Todos"
                   value={employeeFilter}
                   onChange={(val) =>
@@ -1469,7 +1469,7 @@ const ReservationsList: React.FC = () => {
           {orgPolicy === "auto_if_available" ? (
             <Text size="sm">
               Al crear una <strong>reserva</strong>, si existe cupo inmediato
-              según el servicio, empleado (si aplica) y horario, se{" "}
+              según el servicio, profesional (si aplica) y horario, se{" "}
               <strong>confirma</strong> y se crea la <strong>cita</strong>{" "}
               automáticamente. Si no hay disponibilidad (por conflictos de horario), 
               la reserva quedará <em>pendiente</em> y deberás aprobarla manualmente.

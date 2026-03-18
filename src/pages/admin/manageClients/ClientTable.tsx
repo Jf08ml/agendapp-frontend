@@ -491,7 +491,7 @@ const ClientTable: React.FC<ClientTableProps> = ({
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Servicio</Table.Th>
-                    <Table.Th>Empleado</Table.Th>
+                    <Table.Th>Profesional</Table.Th>
                     <Table.Th>Fecha</Table.Th>
                     <Table.Th>Estado</Table.Th>
                   </Table.Tr>

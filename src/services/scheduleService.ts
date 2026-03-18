@@ -11,7 +11,7 @@ export interface BreakPeriod {
 export interface DaySchedule {
   day: number;
   isOpen?: boolean; // Para organización
-  isAvailable?: boolean; // Para empleado
+  isAvailable?: boolean; // Para profesional
   start: string;
   end: string;
   breaks: BreakPeriod[];
@@ -94,7 +94,7 @@ export const getOrganizationOpenDays = async (
 
 // ============ EMPLEADO ============
 
-// Obtener horario de un empleado
+// Obtener horario de un profesional
 export const getEmployeeSchedule = async (
   employeeId: string
 ): Promise<WeeklySchedule | undefined> => {
@@ -104,11 +104,11 @@ export const getEmployeeSchedule = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al obtener el horario del empleado");
+    handleAxiosError(error, "Error al obtener el horario del profesional");
   }
 };
 
-// Actualizar horario de un empleado
+// Actualizar horario de un profesional
 export const updateEmployeeSchedule = async (
   employeeId: string,
   schedule: WeeklySchedule
@@ -120,11 +120,11 @@ export const updateEmployeeSchedule = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al actualizar el horario del empleado");
+    handleAxiosError(error, "Error al actualizar el horario del profesional");
   }
 };
 
-// Obtener días disponibles de un empleado en un rango de fechas
+// Obtener días disponibles de un profesional en un rango de fechas
 export const getEmployeeAvailableDays = async (
   employeeId: string,
   startDate: string,
@@ -141,14 +141,14 @@ export const getEmployeeAvailableDays = async (
   } catch (error) {
     handleAxiosError(
       error,
-      "Error al obtener los días disponibles del empleado"
+      "Error al obtener los días disponibles del profesional"
     );
   }
 };
 
 // ============ VALIDACIÓN Y SLOTS ============
 
-// Validar si una fecha/hora es válida para el empleado
+// Validar si una fecha/hora es válida para el profesional
 export const validateDateTime = async (
   employeeId: string,
   datetime: string
@@ -166,7 +166,7 @@ export const validateDateTime = async (
   }
 };
 
-// Obtener slots de tiempo disponibles para un empleado en una fecha
+// Obtener slots de tiempo disponibles para un profesional en una fecha
 export const getAvailableSlots = async (
   employeeId: string,
   date: string,
@@ -326,7 +326,7 @@ export const getEmployeeExceptions = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al obtener las excepciones del empleado");
+    handleAxiosError(error, "Error al obtener las excepciones del profesional");
   }
 };
 

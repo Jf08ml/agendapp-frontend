@@ -513,7 +513,7 @@ export default function SuperadminPlans() {
               <Group gap="xs">
                 <TextInput
                   style={{ flex: 1 }}
-                  placeholder="Ej: Hasta 5 empleados"
+                  placeholder="Ej: Hasta 5 profesionales"
                   value={newChar}
                   onChange={(e) => setNewChar(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addCharacteristic()}
@@ -535,7 +535,7 @@ export default function SuperadminPlans() {
 
               <Group grow>
                 <NumberInput
-                  label="Máx. empleados"
+                  label="Máx. profesionales"
                   description="null = ilimitado"
                   placeholder="Ilimitado"
                   min={0}

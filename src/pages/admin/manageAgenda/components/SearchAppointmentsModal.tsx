@@ -60,7 +60,7 @@ const SearchAppointmentsModal: FC<SearchAppointmentsModalProps> = ({
                 {appt.client?.name} - {appt.service?.name}
               </Text>
               <Text size="sm" c="dimmed">
-                Empleado: {appt.employee?.names} <br />
+                Profesional: {appt.employee?.names} <br />
                 {new Date(appt.startDate).toLocaleString()} -{" "}
                 {new Date(appt.endDate).toLocaleString()}
               </Text>

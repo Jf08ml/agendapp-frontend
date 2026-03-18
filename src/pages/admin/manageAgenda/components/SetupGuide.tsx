@@ -158,26 +158,26 @@ export default function SetupGuide({ employees }: SetupGuideProps) {
 
           <Step
             number={2}
-            title="Crea tu primer empleado o colaborador"
-            description="Necesitas al menos un empleado activo para poder mostrar columnas en la agenda y asignarle citas."
+            title="Crea tu primer profesional o profesional"
+            description="Necesitas al menos un profesional activo para poder mostrar columnas en la agenda y asignarle citas."
             done={hasEmployees}
-            ctaLabel="Ir a Empleados"
-            ctaHref="/gestionar-empleados"
+            ctaLabel="Ir a Profesionales"
+            ctaHref="/gestionar-profesionales"
           />
 
           <Step
             number={3}
-            title="Asigna servicios al empleado"
-            description='En la página de empleados, haz clic sobre el empleado y abre la pestaña "Servicios" para asignarle los servicios que él realiza.'
+            title="Asigna servicios al profesional"
+            description='En la página de profesionales, haz clic sobre el profesional y abre la pestaña "Servicios" para asignarle los servicios que él realiza.'
             done={hasServicesAssigned}
-            ctaLabel="Gestionar empleados"
-            ctaHref="/gestionar-empleados"
+            ctaLabel="Gestionar profesionales"
+            ctaHref="/gestionar-profesionales"
           />
 
           <Step
             number={4}
             title="¡Crea tu primera cita!"
-            description="Ahora puedes usar la agenda. Haz clic en un día del calendario para abrir la vista de ese día. Luego, haz clic sobre la columna de un empleado en la línea de tiempo para crear una cita en ese horario."
+            description="Ahora puedes usar la agenda. Haz clic en un día del calendario para abrir la vista de ese día. Luego, haz clic sobre la columna de un profesional en la línea de tiempo para crear una cita en ese horario."
             done={allCoreStepsDone}
           >
             {allCoreStepsDone && (
@@ -189,7 +189,7 @@ export default function SetupGuide({ employees }: SetupGuideProps) {
               >
                 <Text size="xs">
                   Clic en un día del calendario → clic en la columna del
-                  empleado y la línea de tiempo → se abre el modal de nueva
+                  profesional y la línea de tiempo → se abre el modal de nueva
                   cita con el horario preseleccionado.
                 </Text>
               </Alert>

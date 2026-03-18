@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Componente para configurar horarios de disponibilidad de empleados
+ * Componente para configurar horarios de disponibilidad de profesionales
  * Adaptado para Mantine UI
  */
 import { useState, useEffect } from "react";
@@ -115,7 +115,7 @@ export default function EmployeeScheduleSection({
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(DEFAULT_EXCEPTION_FORM);
   const [savingException, setSavingException] = useState(false);
 
-  // Cargar horario del empleado
+  // Cargar horario del profesional
   const loadSchedule = async () => {
     setLoading(true);
     try {
@@ -418,14 +418,14 @@ export default function EmployeeScheduleSection({
         mb="md"
       >
         <Text size="sm">
-          Configura los días y horarios en que este empleado estará disponible para atender
+          Configura los días y horarios en que este profesional estará disponible para atender
           clientes. Si no se activa, seguirá el horario general de la organización.
         </Text>
       </Alert>
 
       <Group mb="lg" justify="space-between">
         <Switch
-          label="Activar horario personalizado para este empleado"
+          label="Activar horario personalizado para este profesional"
           description="Si está desactivado, usará el horario de la organización"
           checked={schedule.enabled}
           onChange={(e) => handleToggleEnabled(e.currentTarget.checked)}
@@ -574,7 +574,7 @@ export default function EmployeeScheduleSection({
               Bloqueos Temporales
             </Text>
             <Text size="sm" c="dimmed">
-              Fechas u horas específicas donde el empleado no estará disponible para reservas online
+              Fechas u horas específicas donde el profesional no estará disponible para reservas online
             </Text>
           </div>
           <Button

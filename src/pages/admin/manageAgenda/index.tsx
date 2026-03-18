@@ -108,7 +108,7 @@ const ScheduleView: React.FC = () => {
 
   const [reminderDate, setReminderDate] = useState<Date | null>(null);
 
-  // Identificador del usuario actual, con su "empleado" asociado
+  // Identificador del usuario actual, con su "profesional" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
 
   // organizationId del auth slice: se setea junto con los permisos en useAuthInitializer,
@@ -161,7 +161,7 @@ const ScheduleView: React.FC = () => {
     fetchAppointmentsForMonth(currentDate);
   }, [readyForScopedFetch]);
 
-  // ---------- Ajuste de servicios según empleado ----------
+  // ---------- Ajuste de servicios según profesional ----------
   useEffect(() => {
     if (newAppointment.employee) {
       const selectedEmployee = employees.find(
@@ -262,7 +262,7 @@ const ScheduleView: React.FC = () => {
     });
   };
 
-  // ---------- DATA: Clientes/Empleados/Citas ----------
+  // ---------- DATA: Clientes/Profesionales/Citas ----------
   const fetchClients = useCallback(async () => {
     if (!organizationId) return;
     setLoadingAgenda(true);
@@ -428,7 +428,7 @@ const ScheduleView: React.FC = () => {
         showNotification({
           title: "Error",
           message:
-            "Debes tener al menos un empleado activo para agendar citas.",
+            "Debes tener al menos un profesional activo para agendar citas.",
           color: "red",
           autoClose: 3000,
           position: "top-right",
@@ -680,7 +680,7 @@ const ScheduleView: React.FC = () => {
                 {new Date(appointment.startDate).toLocaleString("es-CO")}
               </Text>
               <Text size="sm">
-                Empleado: {appointment.employee?.names || "No asignado"}
+                Profesional: {appointment.employee?.names || "No asignado"}
               </Text>
               <Text size="sm">
                 Abono: ${appointment.advancePayment?.toLocaleString("es-CO")}
@@ -967,7 +967,7 @@ const ScheduleView: React.FC = () => {
         setEmployees(updates);
         showNotification({
           title: "Éxito",
-          message: "Empleados reordenados correctamente.",
+          message: "Profesionales reordenados correctamente.",
           color: "green",
           autoClose: 3000,
           position: "top-right",
@@ -976,7 +976,7 @@ const ScheduleView: React.FC = () => {
         console.error(error);
         showNotification({
           title: "Error",
-          message: "No se pudo guardar el nuevo orden de los empleados.",
+          message: "No se pudo guardar el nuevo orden de los profesionales.",
           color: "red",
           autoClose: 3000,
           position: "top-right",
@@ -1065,7 +1065,7 @@ const ScheduleView: React.FC = () => {
         </Group>
       </Paper>
 
-      {/* Guía de configuración inicial — se muestra solo si no hay empleados */}
+      {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
       {employees.length === 0 && <SetupGuide employees={employees} />}
 
       {/* Calendario principal — ocupa todo el alto restante */}

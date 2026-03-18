@@ -80,7 +80,7 @@ const ReorderEmployeesModal: React.FC<ReorderEmployeesModalProps> = ({
   return (
     <Modal opened={opened} onClose={onClose} withCloseButton={false}>
       <Group justify="space-between" mb="md">
-        <Title order={4}>Re ordenar empleados</Title>
+        <Title order={4}>Re ordenar profesionales</Title>
         <Button variant="light" size="xs" onClick={() => onFetchEmployees()}>
           Refrescar
         </Button>

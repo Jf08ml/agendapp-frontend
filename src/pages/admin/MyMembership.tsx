@@ -480,7 +480,7 @@ export default function MyMembership() {
             <Grid>
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <div>
-                  <Text size="xs" c="dimmed">Empleados Máximos</Text>
+                  <Text size="xs" c="dimmed">Profesionales Máximos</Text>
                   <Text size="lg" fw={600}>{membership.planId.limits?.maxEmployees || "Ilimitado"}</Text>
                 </div>
               </Grid.Col>

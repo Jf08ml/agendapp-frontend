@@ -287,7 +287,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
       {blockOptions.length === 0 ? (
         <Notification color="red" title="Sin bloques disponibles">
           No hay bloques disponibles para la combinación seleccionada (verifica
-          empleados y duración).
+          profesionales y duración).
         </Notification>
       ) : (
         <Paper withBorder p="sm">

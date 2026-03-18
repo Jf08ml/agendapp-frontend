@@ -17,7 +17,7 @@ export interface Service {
   duration: number;
   isActive?: boolean;
   hidePrice?: boolean;
-  maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un empleado (default: 1)
+  maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un profesional (default: 1)
   recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
   costs?: ServiceCost[]; // 💸 Gastos por insumos/materiales
 }

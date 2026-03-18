@@ -166,7 +166,7 @@ const DayModal: FC<DayModalProps> = ({
     );
   }, [employeesSorted, hiddenEmployeeIds]);
 
-  // 📏 Ancho dinámico por empleado según capas simultáneas
+  // 📏 Ancho dinámico por profesional según capas simultáneas
   const columnWidthMap = useMemo(() => {
     const map = new Map<string, number>();
     const baseWidth = CARD_WIDTH;

@@ -168,7 +168,7 @@ const EmployeeInfo: React.FC = () => {
       });
       setAppointments(filteredAppointments);
     } catch (error) {
-      console.error("Error al cargar citas del empleado", error);
+      console.error("Error al cargar citas del profesional", error);
     } finally {
       setLoadingAppointments(false);
     }
@@ -186,7 +186,7 @@ const EmployeeInfo: React.FC = () => {
       });
       setAdvances(filteredAdvances);
     } catch (error) {
-      console.error("Error al cargar avances del empleado", error);
+      console.error("Error al cargar avances del profesional", error);
     } finally {
       setLoadingAdvances(false);
     }
@@ -215,7 +215,7 @@ const EmployeeInfo: React.FC = () => {
 
   return (
     <Container size="md" pb="xl">
-      {/* Header del empleado */}
+      {/* Header del profesional */}
       <Card shadow="sm" radius="md" withBorder mb="md">
         <Flex align="center" gap="md">
           <Avatar size={56} radius="xl" color="blue">

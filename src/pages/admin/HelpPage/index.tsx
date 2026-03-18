@@ -137,7 +137,7 @@ export default function HelpPage() {
               icon={<IconScissors size={16} />}
               iconColor="violet"
               title="Crea tus servicios"
-              description="Los servicios son los tratamientos o trabajos que ofrece tu negocio. Debes definirlos antes de asignarlos a un empleado."
+              description="Los servicios son los tratamientos o trabajos que ofrece tu negocio. Debes definirlos antes de asignarlos a un profesional."
               tips={[
                 "Agrega el nombre, duración y precio de cada servicio",
                 "Puedes marcarlo como activo o inactivo",
@@ -151,29 +151,29 @@ export default function HelpPage() {
               number={2}
               icon={<IconUsers size={16} />}
               iconColor="teal"
-              title="Crea tu primer empleado"
-              description="Los empleados son quienes aparecen como columnas en la agenda. Necesitas al menos uno activo para poder crear citas."
+              title="Crea tu primer profesional"
+              description="Los profesionales son quienes aparecen como columnas en la agenda. Necesitas al menos uno activo para poder crear citas."
               tips={[
-                "Cada empleado tiene su propio color en la agenda",
+                "Cada profesional tiene su propio color en la agenda",
                 "Puedes asignarles un rol con permisos específicos",
-                "Si eres tú solo quien trabaja, créate como empleado",
+                "Si eres tú solo quien trabaja, créate como profesional",
               ]}
-              ctaLabel="Ir a Empleados"
-              ctaHref="/gestionar-empleados"
+              ctaLabel="Ir a Profesionales"
+              ctaHref="/gestionar-profesionales"
             />
 
             <StepCard
               number={3}
               icon={<IconSettings size={16} />}
               iconColor="orange"
-              title="Asigna servicios al empleado"
-              description='En la página de empleados, haz clic sobre un empleado para abrir su detalle. Luego busca la pestaña "Servicios" y selecciona cuáles puede realizar ese empleado.'
+              title="Asigna servicios al profesional"
+              description='En la página de profesionales, haz clic sobre un profesional para abrir su detalle. Luego busca la pestaña "Servicios" y selecciona cuáles puede realizar ese profesional.'
               tips={[
                 "Solo los servicios asignados aparecerán disponibles al crear una cita",
-                "Puedes asignarle servicios distintos a cada empleado",
+                "Puedes asignarle servicios distintos a cada profesional",
               ]}
-              ctaLabel="Gestionar empleados"
-              ctaHref="/gestionar-empleados"
+              ctaLabel="Gestionar profesionales"
+              ctaHref="/gestionar-profesionales"
             />
 
             <StepCard
@@ -184,9 +184,9 @@ export default function HelpPage() {
               description="Una vez configurado el paso anterior, ya puedes usar la agenda para crear citas manualmente."
               tips={[
                 "Haz clic en un día del calendario mensual para abrir la vista de ese día",
-                "Dentro del día, verás una columna por cada empleado activo",
-                "Haz clic en la línea de tiempo (la hora que deseas) en la columna del empleado",
-                "Se abrirá el formulario de nueva cita con la hora y empleado preseleccionados",
+                "Dentro del día, verás una columna por cada profesional activo",
+                "Haz clic en la línea de tiempo (la hora que deseas) en la columna del profesional",
+                "Se abrirá el formulario de nueva cita con la hora y profesional preseleccionados",
               ]}
               ctaLabel="Ir a la Agenda"
               ctaHref="/gestionar-agenda"
@@ -343,8 +343,8 @@ export default function HelpPage() {
               variant="light"
             >
               <Text size="xs">
-                También puedes configurar un horario distinto por empleado. Abre
-                el empleado y busca la sección de horario. Esto tiene prioridad
+                También puedes configurar un horario distinto por profesional. Abre
+                el profesional y busca la sección de horario. Esto tiene prioridad
                 sobre el horario general de la organización.
               </Text>
             </Alert>
@@ -372,9 +372,9 @@ export default function HelpPage() {
                   <Text size="sm">Para poder crear citas necesitas:</Text>
                   <List size="sm" spacing={4}>
                     <List.Item>Tener al menos un <strong>servicio</strong> creado</List.Item>
-                    <List.Item>Tener al menos un <strong>empleado activo</strong></List.Item>
+                    <List.Item>Tener al menos un <strong>profesional activo</strong></List.Item>
                     <List.Item>
-                      Tener al menos un servicio <strong>asignado al empleado</strong>
+                      Tener al menos un servicio <strong>asignado al profesional</strong>
                     </List.Item>
                   </List>
                   <Text size="sm">
@@ -387,7 +387,7 @@ export default function HelpPage() {
 
             <Accordion.Item value="asignar-servicios">
               <Accordion.Control>
-                ¿Cómo asigno servicios a un empleado?
+                ¿Cómo asigno servicios a un profesional?
               </Accordion.Control>
               <Accordion.Panel>
                 <Text size="sm">
@@ -397,14 +397,14 @@ export default function HelpPage() {
                     size="sm"
                     c="blue"
                     style={{ cursor: "pointer", textDecoration: "underline" }}
-                    onClick={() => navigate("/gestionar-empleados")}
+                    onClick={() => navigate("/gestionar-profesionales")}
                   >
-                    Gestionar empleados
+                    Gestionar profesionales
                   </Text>
-                  , haz clic sobre el nombre o la tarjeta del empleado para
+                  , haz clic sobre el nombre o la tarjeta del profesional para
                   abrir su detalle. Dentro del modal, busca la pestaña{" "}
                   <strong>"Servicios"</strong> y selecciona los servicios que
-                  ese empleado puede realizar. Guarda los cambios.
+                  ese profesional puede realizar. Guarda los cambios.
                 </Text>
               </Accordion.Panel>
             </Accordion.Item>

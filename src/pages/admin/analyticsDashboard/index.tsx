@@ -327,7 +327,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     void load();
   }, [organization?._id, range[0], range[1], granularity, filtered, services]);
 
-  // Por empleado (TODAS las citas)
+  // Por profesional (TODAS las citas)
   const byEmployee = useMemo(() => {
     const map = new Map<string, { emp: EmployeeLite; citas: number; ingresos: number }>();
     filtered.forEach((a) => {
@@ -509,7 +509,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
               dropdownType="modal"
             />
             <Select
-              label="Empleado"
+              label="Profesional"
               data={employeeOptions}
               value={employeeId ?? ""}
               onChange={(v) => setEmployeeId(v || null)}
@@ -823,17 +823,17 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
         </Card>
       </SimpleGrid>
 
-      {/* Rendimiento por empleado */}
+      {/* Rendimiento por profesional */}
       <Card withBorder radius="md" p="md">
         <Text fw={700} size="lg" mb="xs">
-          Rendimiento por empleado
+          Rendimiento por profesional
         </Text>
         <Divider mb="sm" />
         <ScrollArea>
           <Table withTableBorder striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Empleado</Table.Th>
+                <Table.Th>Profesional</Table.Th>
                 <Table.Th>Citas</Table.Th>
                 <Table.Th>Ingresos</Table.Th>
               </Table.Tr>

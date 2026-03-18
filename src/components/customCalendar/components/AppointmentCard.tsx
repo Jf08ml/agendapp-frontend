@@ -293,8 +293,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       .filter((appt) => appt.client._id === appointment.client._id)
       .map((appt) =>
         appt.service
-          ? `⭐ *Servicio:* ${appt.service.name}\n👤 *Empleado:* ${appt.employee.names}`
-          : `⭐ *Servicio:* [Eliminado]\n👤 *Empleado:* ${appt.employee.names}`
+          ? `⭐ *Servicio:* ${appt.service.name}\n👤 *Profesional:* ${appt.employee.names}`
+          : `⭐ *Servicio:* [Eliminado]\n👤 *Profesional:* ${appt.employee.names}`
       )
       .join("\n\n");
 
@@ -576,7 +576,7 @@ ${clientServices}`;
                                   </Text>
 
                                   <Text size="xs" c="dimmed">
-                                    Empleado:{" "}
+                                    Profesional:{" "}
                                     {appt.employeeRequestedByClient ? (
                                       <strong style={{ color: "purple" }}>
                                         {appt.employee.names} (solicitado)

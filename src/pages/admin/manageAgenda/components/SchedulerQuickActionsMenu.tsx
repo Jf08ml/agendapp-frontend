@@ -119,7 +119,7 @@ const SchedulerQuickActionsMenu: React.FC<SchedulerQuickActionsMenuProps> = ({
           onClick={onReorderEmployees}
           disabled={!canReorderEmployees}
         >
-          Reordenar empleados
+          Reordenar profesionales
         </Menu.Item>
 
         {canSendReminders && (

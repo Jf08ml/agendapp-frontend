@@ -135,8 +135,8 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           canShow: can.businessInfo,
         },
         {
-          label: "Información del empleado",
-          to: "/informacion-empleado",
+          label: "Información del profesional",
+          to: "/informacion-profesional",
           icon: <MdOutlineLoyalty size={18} />,
           canShow: can.employeeInfo,
         },
@@ -167,8 +167,8 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           canShow: can.servicesRead,
         },
         {
-          label: "Gestionar empleados",
-          to: "/gestionar-empleados",
+          label: "Gestionar profesionales",
+          to: "/gestionar-profesionales",
           icon: <FaUsers size={18} />,
           canShow: can.employeesRead,
         },

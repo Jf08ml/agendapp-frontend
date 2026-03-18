@@ -54,7 +54,7 @@ export default function MultiBookingWizard() {
   // Paso actual (0..4) + finish (5)
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Paso 1: selección servicios/empleados
+  // Paso 1: selección servicios/profesionales
   const [selected, setSelected] = useState<SelectedService[]>([]);
   // Paso 2: fechas
   const [dates, setDates] = useState<ServiceWithDate[]>([]);
@@ -267,7 +267,7 @@ export default function MultiBookingWizard() {
   };
 
   if (loading) {
-    return <CustomLoader loadingText="Cargando servicios y empleados" />;
+    return <CustomLoader loadingText="Cargando servicios y profesionales" />;
   }
 
   const NextBtn = (props: any) => <Button fullWidth={isMobile} {...props} />;
@@ -277,7 +277,7 @@ export default function MultiBookingWizard() {
 
   // ======= Header y contenido compactos en móvil =======
   const steps = [
-    { key: 0, label: "Servicios y Empleados" },
+    { key: 0, label: "Servicios y Profesionales" },
     { key: 1, label: "Fechas" },
     { key: 2, label: "Horarios" },
     { key: 3, label: "Tus datos" },

@@ -39,7 +39,7 @@ const DayModalHeader: FC<HeaderProps> = ({
       {/* Espacio reservado para la columna de horas */}
       <Box style={{ width: "80px" }} />
 
-      {/* Encabezados de cada empleado */}
+      {/* Encabezados de cada profesional */}
       {employees.map((employee) => {
         const color = employee.color || "#dee2e6";
         const textColor = getTextColor(color);
@@ -72,7 +72,7 @@ const DayModalHeader: FC<HeaderProps> = ({
               transition: "all 120ms ease",
             }}
           >
-            {/* Nombre completo del empleado */}
+            {/* Nombre completo del profesional */}
             <Text
               size="xs"
               fw={600}
@@ -90,7 +90,7 @@ const DayModalHeader: FC<HeaderProps> = ({
             {/* Ícono de visibilidad */}
             <Box style={{ position: "absolute", top: -4, right: 0 }}>
               <Tooltip
-                label={isHidden ? "Mostrar empleado" : "Ocultar empleado"}
+                label={isHidden ? "Mostrar profesional" : "Ocultar profesional"}
                 withArrow
               >
                 <ActionIcon

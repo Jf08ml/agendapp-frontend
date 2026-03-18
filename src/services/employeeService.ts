@@ -7,7 +7,7 @@ interface Role {
   permissions: string[];
 }
 
-// Definir la estructura de un empleado
+// Definir la estructura de un profesional
 export interface Employee {
   _id: string;
   names: string;
@@ -48,18 +48,18 @@ interface Response<T> {
   message: string;
 }
 
-// Obtener todos los empleados
+// Obtener todos los profesionales
 export const getEmployees = async (): Promise<Employee[]> => {
   try {
     const response = await apiEmployee.get<Response<Employee[]>>("/");
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al obtener los empleados");
+    handleAxiosError(error, "Error al obtener los profesionales");
     return [];
   }
 };
 
-// Obtener empleados por organizationId
+// Obtener profesionales por organizationId
 export const getEmployeesByOrganizationId = async (
   organizationId: string
 ): Promise<Employee[]> => {
@@ -69,12 +69,12 @@ export const getEmployeesByOrganizationId = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al obtener los empleados por organización");
+    handleAxiosError(error, "Error al obtener los profesionales por organización");
     return [];
   }
 };
 
-// Obtener un empleado por ID
+// Obtener un profesional por ID
 export const getEmployeeById = async (
   employeeId: string
 ): Promise<Employee | undefined> => {
@@ -84,11 +84,11 @@ export const getEmployeeById = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al obtener el empleado");
+    handleAxiosError(error, "Error al obtener el profesional");
   }
 };
 
-// Crear un nuevo empleado
+// Crear un nuevo profesional
 export const createEmployee = async (
   employeeData: CreateEmployeePayload
 ): Promise<Employee | undefined> => {
@@ -99,11 +99,11 @@ export const createEmployee = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al crear el empleado");
+    handleAxiosError(error, "Error al crear el profesional");
   }
 };
 
-// Actualizar un empleado
+// Actualizar un profesional
 export const updateEmployee = async (
   employeeId: string,
   updatedData: Partial<Employee>
@@ -115,15 +115,15 @@ export const updateEmployee = async (
     );
     return response.data.data;
   } catch (error) {
-    handleAxiosError(error, "Error al actualizar el empleado");
+    handleAxiosError(error, "Error al actualizar el profesional");
   }
 };
 
-// Eliminar un empleado
+// Eliminar un profesional
 export const deleteEmployee = async (employeeId: string): Promise<void> => {
   try {
     await apiEmployee.delete<Response<void>>(`/${employeeId}`);
   } catch (error) {
-    handleAxiosError(error, "Error al eliminar el empleado");
+    handleAxiosError(error, "Error al eliminar el profesional");
   }
 };

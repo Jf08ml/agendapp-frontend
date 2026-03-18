@@ -149,7 +149,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       setAppointments(filteredAppointments);
       calculatePayroll(filteredAppointments, advances);
     } catch (error) {
-      console.error("Error al cargar citas del empleado", error);
+      console.error("Error al cargar citas del profesional", error);
     } finally {
       setLoadingAppointments(false);
     }
@@ -170,7 +170,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       setAdvances(filteredAdvances);
       calculatePayroll(appointments, filteredAdvances);
     } catch (error) {
-      console.error("Error al cargar avances del empleado", error);
+      console.error("Error al cargar avances del profesional", error);
     } finally {
       setLoadingAdvances(false);
     }
@@ -238,7 +238,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={`Detalles - ${employee?.names || "Empleado"}`}
+      title={`Detalles - ${employee?.names || "Profesional"}`}
       size="xl"
       centered
     >
@@ -273,7 +273,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                   <Grid.Col span={{ base: 12, md: 6 }}>
                     <NumberInput
                       label="Comisión personalizada"
-                      description="Deja vacío para usar la del empleado"
+                      description="Deja vacío para usar la del profesional"
                       placeholder={
                         employee?.commissionType === "fixed"
                           ? `Por defecto: $${employee?.commissionValue ?? 0} por cita`

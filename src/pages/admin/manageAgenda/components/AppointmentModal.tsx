@@ -282,7 +282,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     const employee = employees.find((e) => e._id === option.value);
 
     if (!employee) {
-      return null; // Si no se encuentra el empleado, no renderizar nada
+      return null; // Si no se encuentra el profesional, no renderizar nada
     }
 
     return (
@@ -309,7 +309,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     ) {
       notifications.show({
         title: "⚠️ Campos requeridos",
-        message: "Por favor completa empleado, cliente, servicios y fecha",
+        message: "Por favor completa profesional, cliente, servicios y fecha",
         color: "yellow",
       });
       return;
@@ -342,7 +342,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
       if (!employeeId || !clientId || serviceIds.length === 0) {
         const missing = [];
-        if (!employeeId) missing.push("empleado");
+        if (!employeeId) missing.push("profesional");
         if (!clientId) missing.push("cliente");
         if (serviceIds.length === 0) missing.push("servicios");
 
@@ -485,7 +485,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }}
       >
         <Box>
-          {/* Sección: Cliente y Empleado */}
+          {/* Sección: Cliente y Profesional */}
           <Box
             mb="xl"
             p="md"
@@ -576,9 +576,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             />
 
             <Select
-              label="Empleado"
+              label="Profesional"
               size="md"
-              placeholder="Selecciona un empleado"
+              placeholder="Selecciona un profesional"
               renderOption={renderMultiSelectOption}
               data={employees.map((employee) => ({
                 value: employee._id,
@@ -598,7 +598,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             <Checkbox
               size="sm"
               mt="sm"
-              label="Empleado solicitado por el cliente"
+              label="Profesional solicitado por el cliente"
               checked={!!newAppointment.employeeRequestedByClient}
               onChange={(event) =>
                 setNewAppointment({

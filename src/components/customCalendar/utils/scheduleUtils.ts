@@ -75,7 +75,7 @@ export const calculateAppointmentPosition = (
   };
 };
 
-// Agrupar citas por empleado
+// Agrupar citas por profesional
 export const organizeAppointmentsByEmployee = (appointments: Appointment[]) => {
   const appointmentsByEmployee: { [employeeId: string]: Appointment[] } = {};
 
