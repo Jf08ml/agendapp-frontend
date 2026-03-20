@@ -116,7 +116,7 @@ const ReservationsList: React.FC = () => {
 
   // ------- FILTROS -------
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "pending" | "approved" | "rejected" | "auto_approved"
+    "all" | "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted"
   >("all");
   const [employeeFilter, setEmployeeFilter] = useState<string | "all">("all");
   const [serviceFilter, setServiceFilter] = useState<string | "all">("all");
@@ -219,7 +219,7 @@ const ReservationsList: React.FC = () => {
 
   // ------- HELPERS UI -------
   const translateStatus = (
-    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
+    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted"
   ) => {
     switch (status) {
       case "pending":
@@ -234,13 +234,15 @@ const ReservationsList: React.FC = () => {
         return "Cancelada por Cliente";
       case "cancelled_by_admin":
         return "Cancelada por Admin";
+      case "appointment_deleted":
+        return "Cita eliminada";
       default:
         return "Desconocido";
     }
   };
 
   const getBadgeColor = (
-    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin"
+    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted"
   ): string => {
     switch (status) {
       case "pending":
@@ -255,9 +257,18 @@ const ReservationsList: React.FC = () => {
         return "gray";
       case "auto_approved":
         return "teal";
+      case "appointment_deleted":
+        return "red";
       default:
         return "gray";
     }
+  };
+
+  // Reserva aprobada/auto_aprobada cuya cita no existe (populate devolvió null o no es objeto)
+  const isApprovedWithoutAppointment = (r: Reservation): boolean => {
+    const isApproved = r.status === "approved" || r.status === "auto_approved";
+    if (!isApproved) return false;
+    return typeof r.appointmentId !== "object" || r.appointmentId === null;
   };
 
   const employeesSelectData = useMemo(
@@ -634,6 +645,51 @@ const ReservationsList: React.FC = () => {
     }
   };
 
+  const handleRecreateGroupAppointments = async (groupId: string): Promise<"success" | "error" | "concurrency"> => {
+    const group = groupsMap.get(groupId);
+    if (!group) return "error";
+
+    // Tomar cualquier reserva del grupo sin cita para disparar el batch
+    const target = group.find(r => r._id && isApprovedWithoutAppointment(r));
+    if (!target?._id) return "error";
+
+    try {
+      group.forEach(r => { if (r._id) setRowBusy(r._id, "approve"); });
+      await updateReservation(target._id, { status: "approved" } as any);
+      showNotification({
+        title: "Citas recreadas",
+        message: "Las citas faltantes del grupo fueron creadas exitosamente",
+        color: "green",
+        position: "top-right",
+        autoClose: 3000,
+      });
+      if (organization?._id) await loadPage(organization._id);
+      return "success";
+    } catch (err: any) {
+      console.error(err);
+      if (err?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+        setConcurrencyWarning({
+          message: err.response.data.message,
+          isGroup: true,
+          groupId,
+        });
+        if (organization?._id) await loadPage(organization._id);
+        return "concurrency";
+      }
+      showNotification({
+        title: "Error",
+        message: err?.response?.data?.message || err?.message || "Error al recrear las citas",
+        color: "red",
+        position: "top-right",
+        autoClose: 4000,
+      });
+      if (organization?._id) await loadPage(organization._id);
+      return "error";
+    } finally {
+      group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
+    }
+  };
+
   const handleForceApprove = async () => {
     if (!concurrencyWarning) return;
     const warning = concurrencyWarning;
@@ -799,6 +855,13 @@ const ReservationsList: React.FC = () => {
             {isGroup && (
               <Badge size="xs" variant="dot" color="blue" radius="lg">
                 Grupo
+              </Badge>
+            )}
+            {(isGroup
+              ? (groupReservations || [reservation]).some(isApprovedWithoutAppointment)
+              : isApprovedWithoutAppointment(reservation)) && (
+              <Badge size="xs" color="orange" variant="outline" radius="lg">
+                ⚠ Sin cita
               </Badge>
             )}
           </Group>
@@ -1020,6 +1083,7 @@ const ReservationsList: React.FC = () => {
         centered
       >
         <div style={{ position: "relative" }}>
+          <p>{selectedReservation?._id}</p>
           <LoadingOverlay visible={detailModalLoading} zIndex={1000} />
           {selectedReservation ? (
           <Stack gap="md">
@@ -1062,6 +1126,11 @@ const ReservationsList: React.FC = () => {
                             <Badge size="sm" color={getBadgeColor(res.status)}>
                               {translateStatus(res.status)}
                             </Badge>
+                            {isApprovedWithoutAppointment(res) && (
+                              <Badge size="sm" color="orange" variant="outline">
+                                ⚠ Sin cita
+                              </Badge>
+                            )}
                           </Group>
                           <Text size="sm" c="dimmed">
                             {dayjs(res.startDate).tz(organization?.timezone || 'America/Bogota').format(`DD/MM/YYYY ${getTimeFormatStr(organization?.timeFormat)}`)}
@@ -1085,6 +1154,28 @@ const ReservationsList: React.FC = () => {
                           ${servicePrice}
                         </Text>
                       </Group>
+
+                      {/* Recrear cita individual */}
+                      {isApprovedWithoutAppointment(res) && (
+                        <Group mt="sm">
+                          <Button
+                            size="xs"
+                            color="orange"
+                            variant="light"
+                            leftSection={<BiCheck />}
+                            onClick={async () => {
+                              setDetailModalLoading(true);
+                              const result = await handleUpdateStatus(res._id!, "approved");
+                              setDetailModalLoading(false);
+                              if (result === "success") handleCloseDetail();
+                            }}
+                            loading={isRowBusy(res._id!) || detailModalLoading}
+                            disabled={detailModalLoading}
+                          >
+                            Recrear cita
+                          </Button>
+                        </Group>
+                      )}
 
                       {/* Acciones Individuales */}
                       {res.status === "pending" && (
@@ -1196,6 +1287,34 @@ const ReservationsList: React.FC = () => {
               )}
 
             <Divider />
+
+            {/* Recrear citas faltantes del grupo */}
+            {selectedGroupReservations.length > 1 &&
+              selectedGroupReservations.some(isApprovedWithoutAppointment) &&
+              !selectedGroupReservations.every(r => r.status === "pending") && (
+                <Alert color="orange" variant="light" icon={<BiInfoCircle />}>
+                  <Text size="sm" mb="xs">
+                    {selectedGroupReservations.filter(isApprovedWithoutAppointment).length} reserva(s) del grupo no tienen cita creada.
+                  </Text>
+                  <Button
+                    size="xs"
+                    color="orange"
+                    leftSection={<BiCheck />}
+                    onClick={async () => {
+                      if (selectedReservation.groupId) {
+                        setDetailModalLoading(true);
+                        const result = await handleRecreateGroupAppointments(selectedReservation.groupId);
+                        setDetailModalLoading(false);
+                        if (result === "success") handleCloseDetail();
+                      }
+                    }}
+                    loading={detailModalLoading}
+                    disabled={detailModalLoading}
+                  >
+                    Recrear citas faltantes
+                  </Button>
+                </Alert>
+            )}
 
             {/* Acciones Grupales */}
             {selectedGroupReservations.length > 1 &&
@@ -1401,6 +1520,9 @@ const ReservationsList: React.FC = () => {
                     { value: "approved", label: "Aprobada" },
                     { value: "auto_approved", label: "Auto-aprobada" },
                     { value: "rejected", label: "Rechazada" },
+                    { value: "cancelled_by_customer", label: "Cancelada por Cliente" },
+                    { value: "cancelled_by_admin", label: "Cancelada por Admin" },
+                    { value: "appointment_deleted", label: "Cita eliminada" },
                   ]}
                   w={170}
                 />
@@ -1491,6 +1613,15 @@ const ReservationsList: React.FC = () => {
             </Text>
           )}
         </Alert>
+
+        {/* Banner: reservas aprobadas sin cita válida */}
+        {!initialLoading && reservations.some(isApprovedWithoutAppointment) && (
+          <Alert color="orange" variant="light" icon={<BiInfoCircle />} mb="md">
+            <Text size="sm">
+              Hay reservas <strong>aprobadas sin cita creada</strong>. Pueden haber ocurrido por un error al aprobar o porque la cita fue eliminada manualmente. Se muestran con el indicador <strong>⚠ Sin cita</strong>.
+            </Text>
+          </Alert>
+        )}
 
         {error && (
           <Stack align="center" mb="md">
@@ -1649,12 +1780,21 @@ const ReservationsList: React.FC = () => {
                         </Table.Td>
 
                         <Table.Td>
-                          <Badge
-                            fullWidth
-                            color={getBadgeColor(reservation.status)}
-                          >
-                            {translateStatus(reservation.status)}
-                          </Badge>
+                          <Stack gap={4}>
+                            <Badge
+                              fullWidth
+                              color={getBadgeColor(reservation.status)}
+                            >
+                              {translateStatus(reservation.status)}
+                            </Badge>
+                            {(isPartOfGroup
+                              ? groupReservations.some(isApprovedWithoutAppointment)
+                              : isApprovedWithoutAppointment(reservation)) && (
+                              <Badge fullWidth color="orange" variant="outline" size="xs">
+                                ⚠ Sin cita
+                              </Badge>
+                            )}
+                          </Stack>
                         </Table.Td>
                       </Table.Tr>
                     </React.Fragment>

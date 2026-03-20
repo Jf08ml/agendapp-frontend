@@ -18,9 +18,9 @@ export interface Reservation {
     birthDate: Date | null;
   };
   organizationId: string | undefined;
-  status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin";
+  status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted";
   groupId?: string; // 👥 ID de grupo para reservas múltiples
-  appointmentId?: string | null; // 🔗 Cita vinculada (cuando fue aprobada)
+  appointmentId?: string | { _id: string; [key: string]: unknown } | null; // 🔗 Cita vinculada (cuando fue aprobada); objeto si está poblada, null si no existe
   errorMessage?: string; // ⚠️ Mensaje de error cuando falla la creación automática
 }
 
