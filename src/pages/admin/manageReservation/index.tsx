@@ -645,6 +645,50 @@ const ReservationsList: React.FC = () => {
     }
   };
 
+  const handleReapproveGroup = async (groupId: string): Promise<"success" | "error" | "concurrency"> => {
+    const group = groupsMap.get(groupId);
+    if (!group) return "error";
+
+    const target = group.find(r => r._id && r.status === "appointment_deleted");
+    if (!target?._id) return "error";
+
+    try {
+      group.forEach(r => { if (r._id) setRowBusy(r._id, "approve"); });
+      await updateReservation(target._id, { status: "approved" } as any);
+      showNotification({
+        title: "Citas re-creadas",
+        message: "Las citas del grupo fueron re-aprobadas exitosamente",
+        color: "green",
+        position: "top-right",
+        autoClose: 3000,
+      });
+      if (organization?._id) await loadPage(organization._id);
+      return "success";
+    } catch (err: any) {
+      console.error(err);
+      if (err?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+        setConcurrencyWarning({
+          message: err.response.data.message,
+          isGroup: true,
+          groupId,
+        });
+        if (organization?._id) await loadPage(organization._id);
+        return "concurrency";
+      }
+      showNotification({
+        title: "Error",
+        message: err?.response?.data?.message || err?.message || "Error al re-aprobar el grupo",
+        color: "red",
+        position: "top-right",
+        autoClose: 4000,
+      });
+      if (organization?._id) await loadPage(organization._id);
+      return "error";
+    } finally {
+      group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
+    }
+  };
+
   const handleRecreateGroupAppointments = async (groupId: string): Promise<"success" | "error" | "concurrency"> => {
     const group = groupsMap.get(groupId);
     if (!group) return "error";
@@ -1155,6 +1199,28 @@ const ReservationsList: React.FC = () => {
                         </Text>
                       </Group>
 
+                      {/* Re-aprobar cita eliminada */}
+                      {res.status === "appointment_deleted" && (
+                        <Group mt="sm">
+                          <Button
+                            size="xs"
+                            color="blue"
+                            variant="light"
+                            leftSection={<BiCheck />}
+                            onClick={async () => {
+                              setDetailModalLoading(true);
+                              const result = await handleUpdateStatus(res._id!, "approved");
+                              setDetailModalLoading(false);
+                              if (result === "success") handleCloseDetail();
+                            }}
+                            loading={isRowBusy(res._id!) || detailModalLoading}
+                            disabled={detailModalLoading}
+                          >
+                            Re-aprobar
+                          </Button>
+                        </Group>
+                      )}
+
                       {/* Recrear cita individual */}
                       {isApprovedWithoutAppointment(res) && (
                         <Group mt="sm">
@@ -1287,6 +1353,33 @@ const ReservationsList: React.FC = () => {
               )}
 
             <Divider />
+
+            {/* Re-aprobar citas eliminadas del grupo */}
+            {selectedGroupReservations.length > 1 &&
+              selectedGroupReservations.some(r => r.status === "appointment_deleted") && (
+                <Alert color="blue" variant="light" icon={<BiInfoCircle />}>
+                  <Text size="sm" mb="xs">
+                    {selectedGroupReservations.filter(r => r.status === "appointment_deleted").length} reserva(s) del grupo tienen su cita eliminada.
+                  </Text>
+                  <Button
+                    size="xs"
+                    color="blue"
+                    leftSection={<BiCheck />}
+                    onClick={async () => {
+                      if (selectedReservation.groupId) {
+                        setDetailModalLoading(true);
+                        const result = await handleReapproveGroup(selectedReservation.groupId);
+                        setDetailModalLoading(false);
+                        if (result === "success") handleCloseDetail();
+                      }
+                    }}
+                    loading={detailModalLoading}
+                    disabled={detailModalLoading}
+                  >
+                    Re-aprobar grupo
+                  </Button>
+                </Alert>
+            )}
 
             {/* Recrear citas faltantes del grupo */}
             {selectedGroupReservations.length > 1 &&
