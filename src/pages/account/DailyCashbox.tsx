@@ -658,41 +658,41 @@ const DailyCashbox: React.FC = () => {
     (selectedAppt?.advancePayment || 0) + drawerPayments.reduce((s, p) => s + (p.amount || 0), 0);
   const drawerPending = Math.max(0, drawerTotal - drawerTotalPaid);
 
-  const handleConfirmAppointment = (
-    appointmentId: string,
-    clientId: string
-  ) => {
-    openConfirmModal({
-      title: "Confirmar cita",
-      children: <p>¿Estás seguro de que deseas confirmar esta cita?</p>,
-      centered: true,
-      labels: { confirm: "Confirmar", cancel: "Cancelar" },
-      confirmProps: { color: "green" },
-      onConfirm: async () => {
-        try {
-          await updateAppointment(appointmentId, { status: "confirmed" });
-          await registerService(clientId);
-          showNotification({
-            title: "Éxito",
-            message: "Cita confirmada y servicio registrado exitosamente",
-            color: "green",
-            autoClose: 2500,
-            position: "top-right",
-          });
-          fetchAppointments();
-        } catch (error) {
-          showNotification({
-            title: "Error",
-            message: "No se pudo confirmar la cita.",
-            color: "red",
-            autoClose: 3000,
-            position: "top-right",
-          });
-          console.error(error);
-        }
-      },
-    });
-  };
+  // const handleConfirmAppointment = (
+  //   appointmentId: string,
+  //   clientId: string
+  // ) => {
+  //   openConfirmModal({
+  //     title: "Confirmar cita",
+  //     children: <p>¿Estás seguro de que deseas confirmar esta cita?</p>,
+  //     centered: true,
+  //     labels: { confirm: "Confirmar", cancel: "Cancelar" },
+  //     confirmProps: { color: "green" },
+  //     onConfirm: async () => {
+  //       try {
+  //         await updateAppointment(appointmentId, { status: "confirmed" });
+  //         await registerService(clientId);
+  //         showNotification({
+  //           title: "Éxito",
+  //           message: "Cita confirmada y servicio registrado exitosamente",
+  //           color: "green",
+  //           autoClose: 2500,
+  //           position: "top-right",
+  //         });
+  //         fetchAppointments();
+  //       } catch (error) {
+  //         showNotification({
+  //           title: "Error",
+  //           message: "No se pudo confirmar la cita.",
+  //           color: "red",
+  //           autoClose: 3000,
+  //           position: "top-right",
+  //         });
+  //         console.error(error);
+  //       }
+  //     },
+  //   });
+  // };
 
   const handleConfirmAllPending = () => {
     // Filtrar solo las citas pendientes que se pueden confirmar
