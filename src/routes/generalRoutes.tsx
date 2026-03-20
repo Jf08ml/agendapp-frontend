@@ -36,6 +36,7 @@ import ExchangePage from "../pages/public/ExchangePage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import HelpPage from "../pages/admin/HelpPage";
+import AuditLogPage from "../pages/admin/auditLog";
 
 const generalRoutes = [
   {
@@ -336,6 +337,19 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Pago exitoso",
       description: "Tu pago fue procesado correctamente",
+    },
+  },
+
+  {
+    path: "/historial-eliminaciones",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <AuditLogPage {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Historial de eliminaciones",
+      description: "Registro de eliminaciones realizadas en la plataforma",
     },
   },
 

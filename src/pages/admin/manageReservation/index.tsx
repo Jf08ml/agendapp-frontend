@@ -387,7 +387,7 @@ const ReservationsList: React.FC = () => {
   const handleUpdateStatus = async (
     reservationId: string,
     newStatus: "approved" | "rejected"
-  ) => {
+  ): Promise<"success" | "error" | "concurrency"> => {
     const reservation = reservations.find((r) => r._id === reservationId);
     if (!reservation) {
       showNotification({
@@ -397,13 +397,13 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 3000,
       });
-      return;
+      return "error";
     }
 
     if (newStatus === "approved" && !hasEmployeeAssigned(reservation)) {
       setAssigningReservationId(reservationId);
       setAssignModalOpen(true);
-      return;
+      return "error";
     }
 
     try {
@@ -420,6 +420,7 @@ const ReservationsList: React.FC = () => {
         color: "green",
       });
       if (organization?._id) await loadPage(organization._id);
+      return "success";
     } catch (err: any) {
       console.error(err);
       if (err?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
@@ -427,7 +428,7 @@ const ReservationsList: React.FC = () => {
           message: err.response.data.message,
           reservationId,
         });
-        return;
+        return "concurrency";
       }
       showNotification({
         title: "Error",
@@ -435,6 +436,7 @@ const ReservationsList: React.FC = () => {
         color: "red",
         autoClose: 4000,
       });
+      return "error";
     } finally {
       setRowBusy(reservationId, null);
     }
@@ -565,9 +567,9 @@ const ReservationsList: React.FC = () => {
   };
 
   // 👥 ACCIONES GRUPALES
-  const handleApproveGroup = async (groupId: string) => {
+  const handleApproveGroup = async (groupId: string): Promise<"success" | "error" | "concurrency"> => {
     const group = groupsMap.get(groupId);
-    if (!group) return;
+    if (!group) return "error";
 
     try {
       for (const reservation of group) {
@@ -597,6 +599,7 @@ const ReservationsList: React.FC = () => {
       });
 
       if (organization?._id) await loadPage(organization._id);
+      return "success";
     } catch (err: any) {
       console.error(err);
 
@@ -607,7 +610,7 @@ const ReservationsList: React.FC = () => {
           groupId,
         });
         if (organization?._id) await loadPage(organization._id);
-        return;
+        return "concurrency";
       }
 
       // Extraer mensaje de error específico
@@ -623,6 +626,7 @@ const ReservationsList: React.FC = () => {
 
       // Recargar para mostrar el estado revertido
       if (organization?._id) await loadPage(organization._id);
+      return "error";
     } finally {
       group.forEach(r => {
         if (r._id) setRowBusy(r._id, null);
@@ -1090,11 +1094,14 @@ const ReservationsList: React.FC = () => {
                             variant="light"
                             color="green"
                             leftSection={<BiCheck />}
-                            onClick={() => {
-                              handleUpdateStatus(res._id!, "approved");
-                              handleCloseDetail();
+                            onClick={async () => {
+                              setDetailModalLoading(true);
+                              const result = await handleUpdateStatus(res._id!, "approved");
+                              setDetailModalLoading(false);
+                              if (result === "success") handleCloseDetail();
                             }}
-                            loading={isRowBusy(res._id!)}
+                            loading={isRowBusy(res._id!) || detailModalLoading}
+                            disabled={detailModalLoading}
                           >
                             Aprobar
                           </Button>
@@ -1103,11 +1110,14 @@ const ReservationsList: React.FC = () => {
                             variant="light"
                             color="red"
                             leftSection={<BiXCircle />}
-                            onClick={() => {
-                              handleUpdateStatus(res._id!, "rejected");
-                              handleCloseDetail();
+                            onClick={async () => {
+                              setDetailModalLoading(true);
+                              const result = await handleUpdateStatus(res._id!, "rejected");
+                              setDetailModalLoading(false);
+                              if (result === "success") handleCloseDetail();
                             }}
-                            loading={isRowBusy(res._id!)}
+                            loading={isRowBusy(res._id!) || detailModalLoading}
+                            disabled={detailModalLoading}
                           >
                             Rechazar
                           </Button>
@@ -1197,9 +1207,9 @@ const ReservationsList: React.FC = () => {
                     onClick={async () => {
                       if (selectedReservation.groupId) {
                         setDetailModalLoading(true);
-                        await handleApproveGroup(selectedReservation.groupId);
+                        const result = await handleApproveGroup(selectedReservation.groupId);
                         setDetailModalLoading(false);
-                        handleCloseDetail();
+                        if (result === "success") handleCloseDetail();
                       }
                     }}
                     loading={detailModalLoading}

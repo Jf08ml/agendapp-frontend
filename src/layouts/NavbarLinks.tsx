@@ -18,7 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText, BsQuestionCircle } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage } from "@tabler/icons-react";
+import { IconPackage, IconShieldCheck } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -207,6 +207,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/my-membership",
           icon: <FaCrown size={18} />,
           canShow: can.businessInfo, // Solo admins ven esto
+        },
+        {
+          label: "Historial de eliminaciones",
+          to: "/historial-eliminaciones",
+          icon: <IconShieldCheck size={18} />,
+          canShow: can.businessInfo, // Solo admins
         },
       ],
     },
