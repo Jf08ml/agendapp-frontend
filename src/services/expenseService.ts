@@ -8,6 +8,7 @@ export interface Expense {
   concept: string;
   amount: number;
   category?: string;
+  type?: "expense" | "income";
   registeredBy?: string;
   createdAt: string;
 }

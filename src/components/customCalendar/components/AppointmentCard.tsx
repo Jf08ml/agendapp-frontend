@@ -138,7 +138,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   // 💰 Estado de pagos
   const [payments, setPayments] = useState<PaymentRecord[]>(appointment.payments || []);
   const [paymentStatus, setPaymentStatus] = useState(appointment.paymentStatus || "unpaid");
-  const [newPayment, setNewPayment] = useState({ amount: 0, method: "cash", note: "" });
+  const [newPayment, setNewPayment] = useState({ amount: 0, method: "cash", note: "", otherLabel: "" });
   const [savingPayment, setSavingPayment] = useState(false);
 
   const handleAddItem = () => {
@@ -205,7 +205,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         amount: pending,
         method: newPayment.method as PaymentRecord["method"],
         date: new Date().toISOString(),
-        note: "",
+        note: newPayment.method === "other" && newPayment.otherLabel ? newPayment.otherLabel : "",
       });
       if (updated) {
         setPayments(updated.payments || []);
@@ -229,11 +229,14 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     if (!newPayment.amount || newPayment.amount <= 0) return;
     setSavingPayment(true);
     try {
+      const noteValue = newPayment.method === "other" && newPayment.otherLabel
+        ? newPayment.otherLabel + (newPayment.note ? ` - ${newPayment.note}` : "")
+        : newPayment.note;
       const updated = await addAppointmentPayment(appointment._id, {
         amount: newPayment.amount,
         method: newPayment.method as PaymentRecord["method"],
         date: new Date().toISOString(),
-        note: newPayment.note,
+        note: noteValue,
       });
       if (updated) {
         setPayments(updated.payments || []);
@@ -243,7 +246,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
             : a
         ));
-        setNewPayment({ amount: 0, method: "cash", note: "" });
+        setNewPayment({ amount: 0, method: "cash", note: "", otherLabel: "" });
         showNotification({ title: "Pago registrado", message: "El pago fue registrado correctamente", color: "green", autoClose: 3000, position: "top-right" });
       }
     } catch (err) {
@@ -957,7 +960,7 @@ ${clientServices}`;
                         <Select
                           label="Método de pago"
                           value={newPayment.method}
-                          onChange={(v) => setNewPayment({ ...newPayment, method: v || "cash" })}
+                          onChange={(v) => setNewPayment({ ...newPayment, method: v || "cash", otherLabel: "" })}
                           data={[
                             { value: "cash", label: "Efectivo" },
                             { value: "card", label: "Tarjeta" },
@@ -966,6 +969,15 @@ ${clientServices}`;
                           ]}
                           style={{ flex: 1 }}
                         />
+                        {newPayment.method === "other" && (
+                          <TextInput
+                            label="¿Cuál? (opcional)"
+                            placeholder="Ej: Nequi, Daviplata..."
+                            value={newPayment.otherLabel}
+                            onChange={(e) => setNewPayment({ ...newPayment, otherLabel: e.target.value })}
+                            style={{ flex: 1 }}
+                          />
+                        )}
                         <Button
                           size="sm"
                           color="teal"

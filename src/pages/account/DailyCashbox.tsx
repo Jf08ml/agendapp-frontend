@@ -58,13 +58,26 @@ import {
   IconTrash,
   IconPlus,
   IconReceipt,
+  IconUserCheck,
+  IconUserX,
+  IconBan,
 } from "@tabler/icons-react";
+
 import {
   Expense,
   getExpenses,
   createExpense,
   deleteExpense as deleteExpenseApi,
 } from "../../services/expenseService";
+import {
+  PaymentRecord,
+  cancelAppointment,
+  markAttendance,
+  addAppointmentPayment,
+  removeAppointmentPayment,
+} from "../../services/appointmentService";
+
+const IconArrowRight = IconChevronRight;
 
 dayjs.extend(localeData);
 dayjs.locale("es");
@@ -188,6 +201,37 @@ function PaymentBadge({ status }: { status?: string }) {
   );
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  cash: "Efectivo",
+  card: "Tarjeta",
+  transfer: "Transferencia",
+  other: "Otro",
+};
+
+function PaymentMethods({ payments }: { payments?: any[] }) {
+  if (!payments || payments.length === 0) return null;
+  // Agrupar métodos únicos con sus labels (incluyendo note para "other")
+  const seen = new Set<string>();
+  const tags: { label: string; key: string }[] = [];
+  for (const p of payments) {
+    const base = METHOD_LABELS[p.method] || p.method;
+    const label = p.method === "other" && p.note ? `${base}: ${p.note.split(" - ")[0]}` : base;
+    if (!seen.has(label)) {
+      seen.add(label);
+      tags.push({ label, key: label });
+    }
+  }
+  return (
+    <Group gap={4} mt={2} wrap="wrap">
+      {tags.map((t) => (
+        <Badge key={t.key} variant="outline" color="gray" size="xs">
+          {t.label}
+        </Badge>
+      ))}
+    </Group>
+  );
+}
+
 const DailyCashbox: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -206,6 +250,27 @@ const DailyCashbox: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [newExpense, setNewExpense] = useState({ concept: "", category: "", amount: 0 });
   const [addingExpense, setAddingExpense] = useState(false);
+
+  // Ingresos generales
+  const [incomes, setIncomes] = useState<Expense[]>([]);
+  const [newIncome, setNewIncome] = useState({ concept: "", category: "", amount: 0 });
+  const [addingIncome, setAddingIncome] = useState(false);
+
+  // Tipo de movimiento activo en el formulario unificado
+  const [movementType, setMovementType] = useState<"expense" | "income">("expense");
+
+  // Drawer de detalle de cita
+  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
+  const [apptDrawerOpened, setApptDrawerOpened] = useState(false);
+  const [drawerPayments, setDrawerPayments] = useState<PaymentRecord[]>([]);
+  const [drawerPaymentStatus, setDrawerPaymentStatus] = useState<string>("unpaid");
+  const [drawerNewPayment, setDrawerNewPayment] = useState({ amount: 0, method: "cash", note: "", otherLabel: "" });
+  const [drawerSavingPayment, setDrawerSavingPayment] = useState(false);
+  const [drawerActionLoading, setDrawerActionLoading] = useState(false);
+  const [drawerCustomPrice, setDrawerCustomPrice] = useState<number | null>(null);
+  const [drawerAdditionalItems, setDrawerAdditionalItems] = useState<{ name: string; price: number }[]>([]);
+  const [drawerNewItem, setDrawerNewItem] = useState({ name: "", price: 0 });
+  const [drawerSavingPrice, setDrawerSavingPrice] = useState(false);
 
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
@@ -336,7 +401,8 @@ const DailyCashbox: React.FC = () => {
     if (!startDate || !endDate) return;
     try {
       const data = await getExpenses(startDate.toISOString(), endDate.toISOString());
-      setExpenses(data);
+      setExpenses(data.filter((e) => e.type !== "income"));
+      setIncomes(data.filter((e) => e.type === "income"));
     } catch (error) {
       console.error("Error al obtener gastos:", error);
     }
@@ -352,6 +418,7 @@ const DailyCashbox: React.FC = () => {
         category: newExpense.category.trim(),
         amount: newExpense.amount,
         date: date.toISOString(),
+        type: "expense",
       });
       if (created) {
         setExpenses((prev) => [created, ...prev]);
@@ -383,6 +450,213 @@ const DailyCashbox: React.FC = () => {
       },
     });
   };
+
+  const handleAddIncome = async () => {
+    if (!newIncome.concept.trim() || newIncome.amount <= 0) return;
+    setAddingIncome(true);
+    try {
+      const date = selectedDay ?? new Date();
+      const created = await createExpense({
+        concept: newIncome.concept.trim(),
+        category: newIncome.category.trim(),
+        amount: newIncome.amount,
+        date: date.toISOString(),
+        type: "income",
+      });
+      if (created) {
+        setIncomes((prev) => [created, ...prev]);
+        setNewIncome({ concept: "", category: "", amount: 0 });
+        showNotification({ title: "Ingreso registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setAddingIncome(false);
+    }
+  };
+
+  const handleDeleteIncome = (id: string) => {
+    openConfirmModal({
+      title: "Eliminar ingreso",
+      children: <p>¿Eliminar este ingreso?</p>,
+      centered: true,
+      labels: { confirm: "Eliminar", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        try {
+          await deleteExpenseApi(id);
+          setIncomes((prev) => prev.filter((e) => e._id !== id));
+          showNotification({ title: "Ingreso eliminado", message: "", color: "green", autoClose: 2000, position: "top-right" });
+        } catch (error) {
+          console.error(error);
+        }
+      },
+    });
+  };
+
+  // ---- Drawer de detalle de cita ----
+  const handleOpenApptDetail = (appt: Appointment) => {
+    setSelectedAppt(appt);
+    setDrawerPayments(appt.payments || []);
+    setDrawerPaymentStatus(appt.paymentStatus || "unpaid");
+    setDrawerNewPayment({ amount: 0, method: "cash", note: "", otherLabel: "" });
+    setDrawerCustomPrice(appt.customPrice ?? appt.totalPrice ?? 0);
+    setDrawerAdditionalItems(appt.additionalItems || []);
+    setDrawerNewItem({ name: "", price: 0 });
+    setApptDrawerOpened(true);
+  };
+
+  const syncApptInState = (updated: Appointment) => {
+    setSelectedAppt(updated);
+    setAppointments((prev) => prev.map((a) => (a._id === updated._id ? updated : a)));
+  };
+
+  const handleDrawerConfirm = async () => {
+    if (!selectedAppt) return;
+    setDrawerActionLoading(true);
+    try {
+      await updateAppointment(selectedAppt._id, { status: "confirmed" });
+      await registerService(selectedAppt.client?._id || "");
+      const updated = { ...selectedAppt, status: "confirmed" };
+      syncApptInState(updated as Appointment);
+      showNotification({ title: "Cita confirmada", message: "Servicio registrado exitosamente", color: "green", autoClose: 2500, position: "top-right" });
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo confirmar la cita", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerActionLoading(false);
+    }
+  };
+
+  const handleDrawerMarkAttendance = async (status: "attended" | "no_show") => {
+    if (!selectedAppt) return;
+    setDrawerActionLoading(true);
+    try {
+      await markAttendance(selectedAppt._id, status);
+      const updated = { ...selectedAppt, status };
+      syncApptInState(updated as Appointment);
+      showNotification({ title: status === "attended" ? "Marcado: Asistió" : "Marcado: No asistió", message: "", color: status === "attended" ? "teal" : "pink", autoClose: 2000, position: "top-right" });
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo actualizar la asistencia", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerActionLoading(false);
+    }
+  };
+
+  const handleDrawerCancel = () => {
+    if (!selectedAppt) return;
+    openConfirmModal({
+      title: "Cancelar cita",
+      children: <p>¿Estás seguro de que deseas cancelar esta cita?</p>,
+      centered: true,
+      labels: { confirm: "Cancelar cita", cancel: "Volver" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        setDrawerActionLoading(true);
+        try {
+          await cancelAppointment(selectedAppt._id);
+          const updated = { ...selectedAppt, status: "cancelled" };
+          syncApptInState(updated as Appointment);
+          showNotification({ title: "Cita cancelada", message: "", color: "orange", autoClose: 2000, position: "top-right" });
+        } catch {
+          showNotification({ title: "Error", message: "No se pudo cancelar la cita", color: "red", autoClose: 3000, position: "top-right" });
+        } finally {
+          setDrawerActionLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleDrawerFullPayment = async () => {
+    if (!selectedAppt || drawerPending <= 0) return;
+    setDrawerSavingPayment(true);
+    try {
+      const updated = await addAppointmentPayment(selectedAppt._id, {
+        amount: drawerPending,
+        method: drawerNewPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: drawerNewPayment.method === "other" && drawerNewPayment.otherLabel ? drawerNewPayment.otherLabel : "",
+      });
+      if (updated) {
+        setDrawerPayments(updated.payments || []);
+        setDrawerPaymentStatus(updated.paymentStatus || "unpaid");
+        syncApptInState({ ...selectedAppt, payments: updated.payments, paymentStatus: updated.paymentStatus });
+        showNotification({ title: "Pago completo registrado", message: "", color: "green", autoClose: 2500, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerSavingPayment(false);
+    }
+  };
+
+  const handleDrawerAddPayment = async () => {
+    if (!selectedAppt || !drawerNewPayment.amount || drawerNewPayment.amount <= 0) return;
+    setDrawerSavingPayment(true);
+    try {
+      const noteValue = drawerNewPayment.method === "other" && drawerNewPayment.otherLabel
+        ? drawerNewPayment.otherLabel + (drawerNewPayment.note ? ` - ${drawerNewPayment.note}` : "")
+        : drawerNewPayment.note;
+      const updated = await addAppointmentPayment(selectedAppt._id, {
+        amount: drawerNewPayment.amount,
+        method: drawerNewPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: noteValue,
+      });
+      if (updated) {
+        setDrawerPayments(updated.payments || []);
+        setDrawerPaymentStatus(updated.paymentStatus || "unpaid");
+        setDrawerNewPayment({ amount: 0, method: "cash", note: "", otherLabel: "" });
+        syncApptInState({ ...selectedAppt, payments: updated.payments, paymentStatus: updated.paymentStatus });
+        showNotification({ title: "Pago registrado", message: "", color: "green", autoClose: 2500, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerSavingPayment(false);
+    }
+  };
+
+  const handleDrawerRemovePayment = async (paymentId: string) => {
+    if (!selectedAppt) return;
+    try {
+      const updated = await removeAppointmentPayment(selectedAppt._id, paymentId);
+      if (updated) {
+        setDrawerPayments(updated.payments || []);
+        setDrawerPaymentStatus(updated.paymentStatus || "unpaid");
+        syncApptInState({ ...selectedAppt, payments: updated.payments, paymentStatus: updated.paymentStatus });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo eliminar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    }
+  };
+
+  const handleDrawerSavePrice = async () => {
+    if (!selectedAppt) return;
+    setDrawerSavingPrice(true);
+    try {
+      const updated = await updateAppointment(selectedAppt._id, {
+        customPrice: drawerCustomPrice,
+        additionalItems: drawerAdditionalItems,
+      });
+      if (updated) {
+        syncApptInState(updated);
+        showNotification({ title: "Precio actualizado", message: "", color: "green", autoClose: 2000, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo actualizar el precio", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerSavingPrice(false);
+    }
+  };
+
+  // Cálculos del drawer (usan estados locales de precio para reflejar cambios antes de guardar)
+  const drawerTotal = selectedAppt
+    ? (drawerCustomPrice ?? selectedAppt.totalPrice ?? 0) +
+      drawerAdditionalItems.reduce((s, i) => s + (i?.price || 0), 0)
+    : 0;
+  const drawerTotalPaid =
+    (selectedAppt?.advancePayment || 0) + drawerPayments.reduce((s, p) => s + (p.amount || 0), 0);
+  const drawerPending = Math.max(0, drawerTotal - drawerTotalPaid);
 
   const handleConfirmAppointment = (
     appointmentId: string,
@@ -531,6 +805,11 @@ const DailyCashbox: React.FC = () => {
     [expenses]
   );
 
+  const totalGeneralIncomes = useMemo(
+    () => incomes.reduce((s, e) => s + e.amount, 0),
+    [incomes]
+  );
+
   // Totales + resumen por servicio calculados sobre filteredAppointments
   const { totalIncome, totalCount, avgTicket, servicesSummary, totalCollected, totalPending, totalCosts, netMargin } =
     useMemo(() => {
@@ -589,9 +868,9 @@ const DailyCashbox: React.FC = () => {
         totalCollected: collected,
         totalPending: Math.max(0, total - collected),
         totalCosts: costsTotal,
-        netMargin: completedIncome - costsTotal - totalGeneralExpenses,
+        netMargin: completedIncome + totalGeneralIncomes - costsTotal - totalGeneralExpenses,
       };
-    }, [filteredAppointments, totalGeneralExpenses]);
+    }, [filteredAppointments, totalGeneralExpenses, totalGeneralIncomes]);
 
   const formattedRangeLabel =
     startDate && endDate
@@ -795,6 +1074,17 @@ const DailyCashbox: React.FC = () => {
                 </Text>
                 <Text fw={900}>{formatCurrency(avgTicket, currency)}</Text>
               </div>
+              {totalGeneralIncomes > 0 && (
+                <>
+                  <Divider orientation="vertical" />
+                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
+                    <Text size="xs" c="dimmed">
+                      Ingresos extra
+                    </Text>
+                    <Text fw={900} c="teal">{formatCurrency(totalGeneralIncomes, currency)}</Text>
+                  </div>
+                </>
+              )}
               {(totalCosts > 0 || totalGeneralExpenses > 0) && (
                 <>
                   <Divider orientation="vertical" />
@@ -972,16 +1262,16 @@ const DailyCashbox: React.FC = () => {
               withBorder
               radius="md"
               p="sm"
-              style={getCardAccentStyle(status)}
+              style={{ ...getCardAccentStyle(status), cursor: "pointer" }}
+              onClick={() => handleOpenApptDetail(appointment)}
             >
               <Group justify="space-between" align="flex-start" wrap="nowrap">
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <Group gap="xs" wrap="nowrap">
+                  <Group gap="xs" wrap="nowrap" mb={2}>
                     <Text fw={900} lineClamp={1}>
                       {appointment.client?.name || "—"}
                     </Text>
                     <StatusBadge status={status} />
-                    <PaymentBadge status={appointment.paymentStatus} />
                   </Group>
 
                   <Text size="sm" c="dimmed" lineClamp={1}>
@@ -989,72 +1279,22 @@ const DailyCashbox: React.FC = () => {
                     {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
                   </Text>
 
-                  {/* Precio en una línea */}
-                  <Group gap="xs" mt={6} align="center">
+                  <Group gap="xs" mt={6} align="center" wrap="wrap">
                     <Badge variant="light" size="md">
                       {formatCurrency(total, currency)}
                     </Badge>
+                    <PaymentBadge status={appointment.paymentStatus} />
+                    <PaymentMethods payments={appointment.payments} />
+                    {isCustom && <CustomPriceBadge isMobile={true} />}
+                    {additionalTotal > 0 && (
+                      <Badge variant="light" color="blue" size="sm">+ Adicionales</Badge>
+                    )}
                   </Group>
-
-                  {/* ✅ Personalizado SIEMPRE visible en su propia línea */}
-                  {isCustom && (
-                    <Group mt={6} gap="xs">
-                      <Tooltip
-                        label={
-                          <div>
-                            <div>
-                              Precio base: {formatCurrency(basePrice, currency)}
-                            </div>
-                            <div>
-                              Precio personalizado:{" "}
-                              {formatCurrency(
-                                appointment.customPrice!,
-                                currency
-                              )}
-                            </div>
-                            {additionalTotal > 0 && (
-                              <div>
-                                Adicionales:{" "}
-                                {formatCurrency(additionalTotal, currency)}
-                              </div>
-                            )}
-                            <div style={{ marginTop: 6, fontWeight: 900 }}>
-                              Total: {formatCurrency(total, currency)}
-                            </div>
-                          </div>
-                        }
-                        withArrow
-                      >
-                        <div>
-                          <CustomPriceBadge isMobile={true} />
-                        </div>
-                      </Tooltip>
-
-                      {additionalTotal > 0 && (
-                        <Badge variant="light" color="blue" size="sm">
-                          + Adicionales
-                        </Badge>
-                      )}
-                    </Group>
-                  )}
                 </div>
 
-                {canConfirm(status) && (
-                  <ActionIcon
-                    color="green"
-                    variant="filled"
-                    onClick={() =>
-                      handleConfirmAppointment(
-                        appointment._id,
-                        appointment.client?._id || ""
-                      )
-                    }
-                    aria-label="Confirmar"
-                    size="lg"
-                  >
-                    <IconCircleCheck size={20} stroke={2} />
-                  </ActionIcon>
-                )}
+                <ActionIcon variant="subtle" color="gray" size="md" mt={4}>
+                  <IconArrowRight size={16} />
+                </ActionIcon>
               </Group>
             </Card>
           );
@@ -1075,9 +1315,7 @@ const DailyCashbox: React.FC = () => {
             <Table.Th>Precio</Table.Th>
             <Table.Th>Estado</Table.Th>
             <Table.Th>Cobro</Table.Th>
-            <Table.Th style={{ width: 90, textAlign: "center" }}>
-              Acción
-            </Table.Th>
+            <Table.Th style={{ width: 40 }} />
           </Table.Tr>
         </Table.Thead>
 
@@ -1117,7 +1355,8 @@ const DailyCashbox: React.FC = () => {
               return (
                 <Table.Tr
                   key={appointment._id}
-                  style={getRowStylesSoft(status)}
+                  style={{ ...getRowStylesSoft(status), cursor: "pointer" }}
+                  onClick={() => handleOpenApptDetail(appointment)}
                 >
                   <Table.Td>
                     {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
@@ -1179,25 +1418,13 @@ const DailyCashbox: React.FC = () => {
 
                   <Table.Td>
                     <PaymentBadge status={appointment.paymentStatus} />
+                    <PaymentMethods payments={appointment.payments} />
                   </Table.Td>
 
                   <Table.Td style={{ textAlign: "center" }}>
-                    {canConfirm(status) && (
-                      <ActionIcon
-                        color="green"
-                        variant="light"
-                        onClick={() =>
-                          handleConfirmAppointment(
-                            appointment._id,
-                            appointment.client?._id || ""
-                          )
-                        }
-                        aria-label="Confirmar"
-                        size="lg"
-                      >
-                        <IconCircleCheck size={20} stroke={2} />
-                      </ActionIcon>
-                    )}
+                    <ActionIcon variant="subtle" color="gray" size="sm">
+                      <IconArrowRight size={14} />
+                    </ActionIcon>
                   </Table.Td>
                 </Table.Tr>
               );
@@ -1210,6 +1437,275 @@ const DailyCashbox: React.FC = () => {
 
   return (
     <Container fluid>
+      {/* ---- Drawer detalle de cita ---- */}
+      <Drawer
+        opened={apptDrawerOpened}
+        onClose={() => setApptDrawerOpened(false)}
+        position="right"
+        size="md"
+        title={
+          selectedAppt ? (
+            <div>
+              <Text fw={800} size="sm" lineClamp={1}>{selectedAppt.client?.name || "—"}</Text>
+              <Text size="xs" c="dimmed" lineClamp={1}>
+                {selectedAppt.service?.name || "—"} · {formatInTimezone(selectedAppt.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
+              </Text>
+            </div>
+          ) : null
+        }
+      >
+        {selectedAppt && (() => {
+          const isCancelled = (selectedAppt.status || "").includes("cancelled");
+          const isPast = new Date(selectedAppt.endDate) < new Date();
+          return (
+            <Stack gap="md">
+              {/* Estado + acciones */}
+              <Paper withBorder p="sm" radius="md">
+                <Group justify="space-between" mb="sm">
+                  <Text size="sm" fw={700}>Estado</Text>
+                  <StatusBadge status={(selectedAppt.status || "pending") as ApptStatus} />
+                </Group>
+                <Group gap="xs" wrap="wrap">
+                  {canConfirm(selectedAppt.status || "pending") && (
+                    <Button
+                      size="xs" color="green"
+                      leftSection={<IconCircleCheck size={14} />}
+                      onClick={handleDrawerConfirm}
+                      loading={drawerActionLoading}
+                    >
+                      Confirmar
+                    </Button>
+                  )}
+                  {!isCancelled && isPast && (
+                    <>
+                      <Button
+                        size="xs" color="teal" variant={selectedAppt.status === "attended" ? "filled" : "light"}
+                        leftSection={<IconUserCheck size={14} />}
+                        onClick={() => handleDrawerMarkAttendance("attended")}
+                        loading={drawerActionLoading}
+                      >
+                        Asistió
+                      </Button>
+                      <Button
+                        size="xs" color="pink" variant={selectedAppt.status === "no_show" ? "filled" : "light"}
+                        leftSection={<IconUserX size={14} />}
+                        onClick={() => handleDrawerMarkAttendance("no_show")}
+                        loading={drawerActionLoading}
+                      >
+                        No asistió
+                      </Button>
+                    </>
+                  )}
+                  {!isCancelled && (
+                    <Button
+                      size="xs" color="red" variant="light"
+                      leftSection={<IconBan size={14} />}
+                      onClick={handleDrawerCancel}
+                      loading={drawerActionLoading}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </Group>
+              </Paper>
+
+              {/* Precio */}
+              <Paper withBorder p="sm" radius="md">
+                <Text size="sm" fw={700} mb="sm">Precio</Text>
+                <Group gap="xs" align="flex-end" mb="sm">
+                  <NumberInput
+                    label="Precio del servicio"
+                    prefix="$ "
+                    thousandSeparator="."
+                    decimalSeparator=","
+                    value={drawerCustomPrice ?? ""}
+                    onChange={(v) => setDrawerCustomPrice(typeof v === "number" ? v : null)}
+                    size="sm"
+                    style={{ flex: 1 }}
+                  />
+                </Group>
+
+                {/* Adicionales */}
+                <Text size="xs" fw={600} c="dimmed" mb={4}>Adicionales</Text>
+                {drawerAdditionalItems.length > 0 && (
+                  <Stack gap={4} mb="sm">
+                    {drawerAdditionalItems.map((item, idx) => (
+                      <Group key={idx} justify="space-between" wrap="nowrap"
+                        style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)", background: "var(--mantine-color-gray-0)" }}
+                      >
+                        <Text size="sm" lineClamp={1} style={{ flex: 1 }}>{item.name}</Text>
+                        <Text size="sm" fw={600} mr="xs">{formatCurrency(item.price, currency)}</Text>
+                        <ActionIcon color="red" variant="subtle" size="sm"
+                          onClick={() => setDrawerAdditionalItems((prev) => prev.filter((_, i) => i !== idx))}
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Group>
+                    ))}
+                  </Stack>
+                )}
+                <Group gap="xs" align="flex-end" mb="sm">
+                  <TextInput
+                    size="sm" label="Nombre"
+                    placeholder="Ej: Kit de color"
+                    value={drawerNewItem.name}
+                    onChange={(e) => setDrawerNewItem((p) => ({ ...p, name: e.currentTarget.value }))}
+                    style={{ flex: 2 }}
+                  />
+                  <NumberInput
+                    size="sm" label="Precio"
+                    prefix="$ " thousandSeparator="." decimalSeparator=","
+                    value={drawerNewItem.price || ""}
+                    onChange={(v) => setDrawerNewItem((p) => ({ ...p, price: typeof v === "number" ? v : 0 }))}
+                    style={{ flex: 1 }}
+                    min={0}
+                  />
+                  <ActionIcon
+                    color="green" variant="filled" size="lg" mb={1}
+                    disabled={!drawerNewItem.name.trim() || drawerNewItem.price <= 0}
+                    onClick={() => {
+                      setDrawerAdditionalItems((prev) => [...prev, drawerNewItem]);
+                      setDrawerNewItem({ name: "", price: 0 });
+                    }}
+                  >
+                    <IconPlus size={16} />
+                  </ActionIcon>
+                </Group>
+                <Button
+                  fullWidth size="sm" onClick={handleDrawerSavePrice} loading={drawerSavingPrice}
+                >
+                  Guardar precio
+                </Button>
+              </Paper>
+
+              {/* Cobro */}
+              <Paper withBorder p="sm" radius="md">
+                <Group justify="space-between" mb="sm">
+                  <Text size="sm" fw={700}>Cobro</Text>
+                  <PaymentBadge status={drawerPaymentStatus} />
+                </Group>
+
+                {/* Resumen numérico */}
+                <Stack gap={4} mb="sm">
+                  <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Total esta cita</Text>
+                    <Text size="sm" fw={600}>{formatCurrency(drawerTotal, currency)}</Text>
+                  </Group>
+                  {(selectedAppt.advancePayment || 0) > 0 && (
+                    <Group justify="space-between">
+                      <Text size="sm" c="dimmed">Abono inicial</Text>
+                      <Text size="sm">{formatCurrency(selectedAppt.advancePayment || 0, currency)}</Text>
+                    </Group>
+                  )}
+                  {drawerPayments.length > 0 && (
+                    <Group justify="space-between">
+                      <Text size="sm" c="dimmed">Pagos adicionales</Text>
+                      <Text size="sm">{formatCurrency(drawerPayments.reduce((s, p) => s + (p.amount || 0), 0), currency)}</Text>
+                    </Group>
+                  )}
+                  <Group
+                    justify="space-between" pt={4}
+                    style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}
+                  >
+                    <Text size="sm" fw={700}>Pendiente</Text>
+                    <Text size="sm" fw={700} c={drawerPending > 0 ? "red" : "green"}>
+                      {formatCurrency(drawerPending, currency)}
+                    </Text>
+                  </Group>
+                </Stack>
+
+                {/* Historial de pagos */}
+                {drawerPayments.length > 0 && (
+                  <>
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>Historial de pagos</Text>
+                    <Stack gap={4} mb="sm">
+                      {drawerPayments.map((p) => (
+                        <Group
+                          key={p._id} justify="space-between" wrap="nowrap"
+                          style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)", background: "var(--mantine-color-gray-0)" }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <Text size="sm" fw={600}>
+                              {formatCurrency(p.amount, currency)} · {METHOD_LABELS[p.method] || p.method}
+                            </Text>
+                            {p.note && <Text size="xs" c="dimmed">{p.note}</Text>}
+                          </div>
+                          <Tooltip label="Eliminar pago" withArrow>
+                            <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleDrawerRemovePayment(p._id)}>
+                              <IconTrash size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Group>
+                      ))}
+                    </Stack>
+                  </>
+                )}
+
+                {/* Formulario de pago */}
+                {drawerPaymentStatus !== "paid" && drawerPaymentStatus !== "free" && (
+                  <>
+                    <Divider label="Registrar pago" labelPosition="center" mb="sm" />
+                    <Stack gap="xs">
+                      <Group gap="xs" wrap="wrap">
+                        <Select
+                          size="sm" label="Método"
+                          value={drawerNewPayment.method}
+                          onChange={(v) => setDrawerNewPayment({ ...drawerNewPayment, method: v || "cash", otherLabel: "" })}
+                          data={[
+                            { value: "cash", label: "Efectivo" },
+                            { value: "card", label: "Tarjeta" },
+                            { value: "transfer", label: "Transferencia" },
+                            { value: "other", label: "Otro" },
+                          ]}
+                          style={{ flex: 1, minWidth: 120 }}
+                        />
+                        {drawerNewPayment.method === "other" && (
+                          <TextInput
+                            size="sm" label="¿Cuál? (opcional)"
+                            placeholder="Nequi, Daviplata..."
+                            value={drawerNewPayment.otherLabel}
+                            onChange={(e) => setDrawerNewPayment({ ...drawerNewPayment, otherLabel: e.currentTarget.value })}
+                            style={{ flex: 1 }}
+                          />
+                        )}
+                      </Group>
+                      {drawerPending > 0 && (
+                        <Button fullWidth size="sm" color="teal" onClick={handleDrawerFullPayment} loading={drawerSavingPayment}>
+                          Pago completo ({formatCurrency(drawerPending, currency)})
+                        </Button>
+                      )}
+                      <Divider label="o monto parcial" labelPosition="center" />
+                      <Group gap="xs" wrap="wrap">
+                        <NumberInput
+                          size="sm" label="Monto"
+                          prefix="$ " thousandSeparator="." decimalSeparator=","
+                          value={drawerNewPayment.amount || ""}
+                          onChange={(v) => setDrawerNewPayment({ ...drawerNewPayment, amount: typeof v === "number" ? v : 0 })}
+                          min={0} style={{ flex: 1, minWidth: 100 }}
+                        />
+                        <TextInput
+                          size="sm" label="Nota (opcional)"
+                          value={drawerNewPayment.note}
+                          onChange={(e) => setDrawerNewPayment({ ...drawerNewPayment, note: e.currentTarget.value })}
+                          style={{ flex: 1, minWidth: 100 }}
+                        />
+                      </Group>
+                      <Button
+                        fullWidth size="sm" variant="light"
+                        disabled={!drawerNewPayment.amount || drawerNewPayment.amount <= 0}
+                        onClick={handleDrawerAddPayment} loading={drawerSavingPayment}
+                      >
+                        Registrar monto parcial
+                      </Button>
+                    </Stack>
+                  </>
+                )}
+              </Paper>
+            </Stack>
+          );
+        })()}
+      </Drawer>
+
       <Group justify="space-between" mb="md">
         <Title order={2}>Caja</Title>
         {loading && <Badge variant="light">Cargando…</Badge>}
@@ -1262,29 +1758,48 @@ const DailyCashbox: React.FC = () => {
         <Group justify="space-between" align="center" mb="md">
           <Group gap="xs">
             <IconReceipt size={18} />
-            <Title order={4}>Gastos generales</Title>
+            <Title order={4}>Movimientos generales</Title>
             {totalGeneralExpenses > 0 && (
-              <Badge color="red" variant="light">
-                {formatCurrency(totalGeneralExpenses, currency)}
-              </Badge>
+              <Badge color="red" variant="light">−{formatCurrency(totalGeneralExpenses, currency)}</Badge>
+            )}
+            {totalGeneralIncomes > 0 && (
+              <Badge color="teal" variant="light">+{formatCurrency(totalGeneralIncomes, currency)}</Badge>
             )}
           </Group>
         </Group>
 
-        {/* Formulario para agregar gasto */}
+        {/* Formulario unificado */}
         <Paper withBorder p="sm" radius="md" mb="md">
-          <Text size="sm" fw={600} mb="xs">Registrar gasto</Text>
+          <SegmentedControl
+            value={movementType}
+            onChange={(v) => setMovementType(v as "expense" | "income")}
+            data={[
+              { value: "expense", label: "Gasto" },
+              { value: "income", label: "Ingreso" },
+            ]}
+            color={movementType === "income" ? "teal" : "red"}
+            size="xs"
+            mb="sm"
+          />
           <Group gap="sm" align="flex-end" wrap="wrap">
             <TextInput
-              placeholder="Concepto (ej: arriendo, suministros)"
-              value={newExpense.concept}
-              onChange={(e) => setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))}
+              placeholder={movementType === "expense" ? "Concepto (ej: arriendo, suministros)" : "Concepto (ej: venta de producto, anticipo)"}
+              value={movementType === "expense" ? newExpense.concept : newIncome.concept}
+              onChange={(e) =>
+                movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))
+                  : setNewIncome((p) => ({ ...p, concept: e.currentTarget.value }))
+              }
               style={{ flex: "1 1 200px", minWidth: 140 }}
             />
             <TextInput
               placeholder="Categoría (opcional)"
-              value={newExpense.category}
-              onChange={(e) => setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))}
+              value={movementType === "expense" ? newExpense.category : newIncome.category}
+              onChange={(e) =>
+                movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))
+                  : setNewIncome((p) => ({ ...p, category: e.currentTarget.value }))
+              }
               style={{ flex: "0 1 150px", minWidth: 110 }}
             />
             <NumberInput
@@ -1292,52 +1807,80 @@ const DailyCashbox: React.FC = () => {
               prefix="$ "
               thousandSeparator="."
               decimalSeparator=","
-              value={newExpense.amount}
-              onChange={(v) => setNewExpense((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))}
+              value={movementType === "expense" ? newExpense.amount : newIncome.amount}
+              onChange={(v) =>
+                movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))
+                  : setNewIncome((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))
+              }
               min={0}
               w={130}
             />
             <Button
+              color={movementType === "income" ? "teal" : undefined}
               leftSection={<IconPlus size={16} />}
-              onClick={handleAddExpense}
-              loading={addingExpense}
-              disabled={!newExpense.concept.trim() || newExpense.amount <= 0}
+              onClick={movementType === "expense" ? handleAddExpense : handleAddIncome}
+              loading={movementType === "expense" ? addingExpense : addingIncome}
+              disabled={
+                movementType === "expense"
+                  ? !newExpense.concept.trim() || newExpense.amount <= 0
+                  : !newIncome.concept.trim() || newIncome.amount <= 0
+              }
             >
               Agregar
             </Button>
           </Group>
         </Paper>
 
-        {/* Lista de gastos */}
-        {expenses.length === 0 ? (
+        {/* Lista unificada */}
+        {expenses.length === 0 && incomes.length === 0 ? (
           <Text c="dimmed" ta="center" size="sm" py="sm">
-            No hay gastos registrados para este período.
+            No hay movimientos registrados para este período.
           </Text>
         ) : (
           <Stack gap="xs">
-            {expenses.map((expense) => (
-              <Group key={expense._id} justify="space-between" wrap="nowrap" style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
+            {[
+              ...expenses.map((e) => ({ ...e, _type: "expense" as const })),
+              ...incomes.map((e) => ({ ...e, _type: "income" as const })),
+            ]
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((item) => (
+                <Group key={item._id} justify="space-between" wrap="nowrap" style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Group gap="xs" wrap="nowrap">
+                      <Badge size="xs" variant="light" color={item._type === "income" ? "teal" : "red"}>
+                        {item._type === "income" ? "Ingreso" : "Gasto"}
+                      </Badge>
+                      <Text size="sm" fw={600} lineClamp={1}>{item.concept}</Text>
+                      {item.category && (
+                        <Badge size="xs" variant="dot" color="gray">{item.category}</Badge>
+                      )}
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {formatInTimezone(item.date, timezone, "DD/MM/YYYY")}
+                    </Text>
+                  </div>
                   <Group gap="xs" wrap="nowrap">
-                    <Text size="sm" fw={600} lineClamp={1}>{expense.concept}</Text>
-                    {expense.category && (
-                      <Badge size="xs" variant="light" color="gray">{expense.category}</Badge>
-                    )}
+                    <Text fw={800} c={item._type === "income" ? "teal" : "red"} size="sm">
+                      {item._type === "income" ? "+" : "−"}{formatCurrency(item.amount, currency)}
+                    </Text>
+                    <Tooltip label="Eliminar" withArrow>
+                      <ActionIcon
+                        color="red"
+                        variant="subtle"
+                        size="sm"
+                        onClick={() =>
+                          item._type === "expense"
+                            ? handleDeleteExpense(item._id)
+                            : handleDeleteIncome(item._id)
+                        }
+                      >
+                        <IconTrash size={14} />
+                      </ActionIcon>
+                    </Tooltip>
                   </Group>
-                  <Text size="xs" c="dimmed">
-                    {formatInTimezone(expense.date, timezone, "DD/MM/YYYY")}
-                  </Text>
-                </div>
-                <Group gap="xs" wrap="nowrap">
-                  <Text fw={800} c="red" size="sm">{formatCurrency(expense.amount, currency)}</Text>
-                  <Tooltip label="Eliminar" withArrow>
-                    <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleDeleteExpense(expense._id)}>
-                      <IconTrash size={14} />
-                    </ActionIcon>
-                  </Tooltip>
                 </Group>
-              </Group>
-            ))}
+              ))}
           </Stack>
         )}
       </Card>
