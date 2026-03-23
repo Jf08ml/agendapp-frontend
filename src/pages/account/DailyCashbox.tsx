@@ -12,13 +12,12 @@ import {
   Container,
   ActionIcon,
   Badge,
-  Accordion,
+  SimpleGrid,
   Stack,
   Group,
   Tooltip,
   SegmentedControl,
   Button,
-  Grid,
   Divider,
   Drawer,
   Select,
@@ -236,8 +235,12 @@ const DailyCashbox: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Intervalo y fechas
-  const [interval, setInterval] = useState<Interval>("daily");
+  // Intervalo y fechas — persiste la preferencia en localStorage
+  const [interval, setInterval] = useState<Interval>(() => {
+    const saved = localStorage.getItem("cashbox_interval") as Interval | null;
+    const valid: Interval[] = ["daily", "weekly", "biweekly", "monthly", "custom"];
+    return saved && valid.includes(saved) ? saved : "daily";
+  });
   const [selectedDay, setSelectedDay] = useState<Date | null>(new Date());
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -258,6 +261,9 @@ const DailyCashbox: React.FC = () => {
 
   // Tipo de movimiento activo en el formulario unificado
   const [movementType, setMovementType] = useState<"expense" | "income">("expense");
+
+  // Base de caja (monto inicial en efectivo al abrir el día)
+  const [cashBase, setCashBase] = useState<number>(0);
 
   // Drawer de detalle de cita
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
@@ -347,6 +353,17 @@ const DailyCashbox: React.FC = () => {
     if (interval === "daily") calculateDates("daily", selectedDay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay]);
+
+  // Carga la base de caja desde localStorage al cambiar de día (solo en vista diaria)
+  useEffect(() => {
+    if (interval === "daily" && selectedDay) {
+      const key = `cashbox_base_${dayjs(selectedDay).format("YYYY-MM-DD")}`;
+      const saved = localStorage.getItem(key);
+      setCashBase(saved !== null ? Number(saved) : 0);
+    } else {
+      setCashBase(0);
+    }
+  }, [selectedDay, interval]);
 
   // Trae citas y gastos cuando hay org + rango
   useEffect(() => {
@@ -811,11 +828,12 @@ const DailyCashbox: React.FC = () => {
   );
 
   // Totales + resumen por servicio calculados sobre filteredAppointments
-  const { totalIncome, totalCount, avgTicket, servicesSummary, totalCollected, totalPending, totalCosts, netMargin } =
+  const { totalIncome, totalCount, servicesSummary, totalCollected, totalPending, totalCosts, netMargin, totalCashCollected } =
     useMemo(() => {
       const summary: Record<string, { count: number; total: number; costs: number }> = {};
       let total = 0;
       let collected = 0;
+      let cashCollected = 0;
       let costsTotal = 0;
       let completedIncome = 0;
 
@@ -841,6 +859,11 @@ const DailyCashbox: React.FC = () => {
         const paymentsSum = (appt.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
         collected += advance + paymentsSum;
 
+        // Solo pagos en efectivo cuentan para el cierre físico de caja
+        cashCollected += (appt.payments || [])
+          .filter((p: any) => p.method === "cash")
+          .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+
         const serviceName = appt.service?.name || "Otro";
         if (!summary[serviceName])
           summary[serviceName] = { count: 0, total: 0, costs: 0 };
@@ -863,12 +886,12 @@ const DailyCashbox: React.FC = () => {
       return {
         totalIncome: total,
         totalCount: count,
-        avgTicket: count > 0 ? total / count : 0,
         servicesSummary: summary,
         totalCollected: collected,
         totalPending: Math.max(0, total - collected),
         totalCosts: costsTotal,
         netMargin: completedIncome + totalGeneralIncomes - costsTotal - totalGeneralExpenses,
+        totalCashCollected: cashCollected,
       };
     }, [filteredAppointments, totalGeneralExpenses, totalGeneralIncomes]);
 
@@ -881,419 +904,88 @@ const DailyCashbox: React.FC = () => {
           )}`
       : "";
 
-  // ---- UI: filtros (contenido reutilizable desktop/mobile) ----
+  // ---- UI: filtros drawer mobile ----
   const FiltersContent = (
     <Stack gap="sm">
       {interval === "daily" && (
         <>
           <Group justify="space-between" wrap="nowrap">
-            <Button
-              variant="light"
-              leftSection={<IconChevronLeft size={16} />}
-              onClick={() =>
-                setSelectedDay((d) =>
-                  dayjs(d ?? new Date())
-                    .subtract(1, "day")
-                    .toDate()
-                )
-              }
-            >
+            <Button variant="light" leftSection={<IconChevronLeft size={16} />}
+              onClick={() => setSelectedDay((d) => dayjs(d ?? new Date()).subtract(1, "day").toDate())}>
               Anterior
             </Button>
-
-            <Button variant="subtle" onClick={() => setSelectedDay(new Date())}>
-              Hoy
-            </Button>
-
-            <Button
-              variant="light"
-              rightSection={<IconChevronRight size={16} />}
-              onClick={() =>
-                setSelectedDay((d) =>
-                  dayjs(d ?? new Date())
-                    .add(1, "day")
-                    .toDate()
-                )
-              }
-            >
+            <Button variant="subtle" onClick={() => setSelectedDay(new Date())}>Hoy</Button>
+            <Button variant="light" rightSection={<IconChevronRight size={16} />}
+              onClick={() => setSelectedDay((d) => dayjs(d ?? new Date()).add(1, "day").toDate())}>
               Siguiente
             </Button>
           </Group>
-
-          <DatePickerInput
-            label="Día"
-            locale="es"
-            value={selectedDay}
-            onChange={setSelectedDay}
-            clearable={false}
+          <DatePickerInput label="Día" locale="es" value={selectedDay} onChange={setSelectedDay} clearable={false} />
+          <NumberInput
+            label="Base de caja (efectivo inicial)"
+            description="Monto en efectivo al abrir el día"
+            leftSection={<IconReceipt size={16} />}
+            value={cashBase}
+            onChange={(v) => {
+              const val = typeof v === "number" ? v : 0;
+              setCashBase(val);
+              if (selectedDay) localStorage.setItem(`cashbox_base_${dayjs(selectedDay).format("YYYY-MM-DD")}`, String(val));
+            }}
+            min={0} hideControls placeholder="0"
           />
         </>
       )}
-
       {interval === "custom" && (
         <Group grow align="flex-start">
-          <DatePickerInput
-            label="Inicio"
-            locale="es"
-            value={startDate}
-            onChange={(d) =>
-              setStartDate(d ? dayjs(d).startOf("day").toDate() : null)
-            }
-          />
-          <DatePickerInput
-            label="Fin"
-            locale="es"
-            value={endDate}
-            onChange={(d) =>
-              setEndDate(d ? dayjs(d).endOf("day").toDate() : null)
-            }
-          />
+          <DatePickerInput label="Inicio" locale="es" value={startDate}
+            onChange={(d) => setStartDate(d ? dayjs(d).startOf("day").toDate() : null)} />
+          <DatePickerInput label="Fin" locale="es" value={endDate}
+            onChange={(d) => setEndDate(d ? dayjs(d).endOf("day").toDate() : null)} />
         </Group>
       )}
-
-      <MultiSelect
-        label="Servicios"
-        placeholder="Todos"
-        data={serviceOptions}
-        value={selectedServices}
-        onChange={setSelectedServices}
-        clearable
-        searchable
-      />
+      <MultiSelect label="Servicios" placeholder="Todos" data={serviceOptions}
+        value={selectedServices} onChange={setSelectedServices} clearable searchable />
     </Stack>
-  );
-
-  const intervalOptions = [
-    { value: "daily", label: "Diario" },
-    { value: "weekly", label: "Semanal" },
-    { value: "biweekly", label: "Quincenal" },
-    { value: "monthly", label: "Mensual" },
-    { value: "custom", label: "Personalizado" },
-  ] as const;
-
-  const IntervalPicker = (
-    <div>
-      {isMobile ? (
-        <Select
-          label="Intervalo"
-          placeholder="Selecciona intervalo"
-          data={intervalOptions as any}
-          value={interval}
-          onChange={(v) => {
-            const next = (v || "daily") as Interval;
-            setInterval(next);
-            if (next === "daily" && !selectedDay) setSelectedDay(new Date());
-          }}
-          searchable={false}
-          clearable={false}
-        />
-      ) : (
-        <SegmentedControl
-          fullWidth
-          value={interval}
-          onChange={(v) => {
-            const next = v as Interval;
-            setInterval(next);
-            if (next === "daily" && !selectedDay) setSelectedDay(new Date());
-          }}
-          data={[
-            { value: "daily", label: "Diario" },
-            { value: "weekly", label: "Semanal" },
-            { value: "biweekly", label: "Quincenal" },
-            { value: "monthly", label: "Mensual" },
-            { value: "custom", label: "Personalizado" },
-          ]}
-        />
-      )}
-    </div>
-  );
-
-  const Toolbar = (
-    <Card shadow="sm" radius="md" withBorder>
-      <Stack gap="sm">
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-            <IconCalendar size={18} />
-            <Text fw={900} lineClamp={1}>
-              Caja
-            </Text>
-            <Badge variant="light">{formattedRangeLabel || "—"}</Badge>
-          </Group>
-
-          {isMobile && (
-            <Button
-              leftSection={<IconFilter size={16} />}
-              variant="light"
-              onClick={() => setFiltersOpened(true)}
-            >
-              Filtros
-            </Button>
-          )}
-        </Group>
-
-        <Grid gutter="sm" align="center">
-          <Grid.Col span={{ base: 12, md: 6 }}>{IntervalPicker}</Grid.Col>
-
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Group
-              justify={isMobile ? "space-between" : "flex-end"}
-              gap="md"
-              wrap="wrap"
-            >
-              <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <Text size="xs" c="dimmed">
-                  Ingresos
-                </Text>
-                <Text fw={900}>{formatCurrency(totalIncome, currency)}</Text>
-              </div>
-              <Divider orientation="vertical" />
-              <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <Text size="xs" c="dimmed">
-                  Cobrado
-                </Text>
-                <Text fw={900} c="green">{formatCurrency(totalCollected, currency)}</Text>
-              </div>
-              <Divider orientation="vertical" />
-              <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <Text size="xs" c="dimmed">
-                  Pendiente
-                </Text>
-                <Text fw={900} c={totalPending > 0 ? "orange" : "dimmed"}>{formatCurrency(totalPending, currency)}</Text>
-              </div>
-              <Divider orientation="vertical" />
-              <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <Text size="xs" c="dimmed">
-                  Citas
-                </Text>
-                <Text fw={900}>{totalCount}</Text>
-              </div>
-              <Divider orientation="vertical" />
-              <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                <Text size="xs" c="dimmed">
-                  Ticket prom.
-                </Text>
-                <Text fw={900}>{formatCurrency(avgTicket, currency)}</Text>
-              </div>
-              {totalGeneralIncomes > 0 && (
-                <>
-                  <Divider orientation="vertical" />
-                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                    <Text size="xs" c="dimmed">
-                      Ingresos extra
-                    </Text>
-                    <Text fw={900} c="teal">{formatCurrency(totalGeneralIncomes, currency)}</Text>
-                  </div>
-                </>
-              )}
-              {(totalCosts > 0 || totalGeneralExpenses > 0) && (
-                <>
-                  <Divider orientation="vertical" />
-                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                    <Text size="xs" c="dimmed">
-                      Gastos
-                    </Text>
-                    <Text fw={900} c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
-                  </div>
-                  <Divider orientation="vertical" />
-                  <div style={{ textAlign: isMobile ? "left" : "right" }}>
-                    <Text size="xs" c="dimmed">
-                      Margen neto
-                    </Text>
-                    <Text fw={900} c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
-                  </div>
-                </>
-              )}
-            </Group>
-          </Grid.Col>
-
-          {/* Desktop: filtros inline */}
-          {!isMobile && (
-            <>
-              {interval === "daily" && (
-                <Grid.Col span={{ base: 12, md: 6 }}>
-                  <Group gap="xs" wrap="nowrap">
-                    <ActionIcon
-                      variant="light"
-                      onClick={() =>
-                        setSelectedDay((d) =>
-                          dayjs(d ?? new Date())
-                            .subtract(1, "day")
-                            .toDate()
-                        )
-                      }
-                      aria-label="Día anterior"
-                    >
-                      <IconChevronLeft size={16} />
-                    </ActionIcon>
-
-                    <DatePickerInput
-                      locale="es"
-                      value={selectedDay}
-                      onChange={setSelectedDay}
-                      clearable={false}
-                      w="60%"
-                    />
-
-                    <ActionIcon
-                      variant="light"
-                      onClick={() =>
-                        setSelectedDay((d) =>
-                          dayjs(d ?? new Date())
-                            .add(1, "day")
-                            .toDate()
-                        )
-                      }
-                      aria-label="Día siguiente"
-                    >
-                      <IconChevronRight size={16} />
-                    </ActionIcon>
-
-                    <Button
-                      variant="subtle"
-                      onClick={() => setSelectedDay(new Date())}
-                    >
-                      Hoy
-                    </Button>
-                  </Group>
-                </Grid.Col>
-              )}
-
-              {interval === "custom" && (
-                <>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <DatePickerInput
-                      label="Inicio"
-                      locale="es"
-                      value={startDate}
-                      onChange={(d) =>
-                        setStartDate(
-                          d ? dayjs(d).startOf("day").toDate() : null
-                        )
-                      }
-                    />
-                  </Grid.Col>
-                  <Grid.Col span={{ base: 12, md: 4 }}>
-                    <DatePickerInput
-                      label="Fin"
-                      locale="es"
-                      value={endDate}
-                      onChange={(d) =>
-                        setEndDate(d ? dayjs(d).endOf("day").toDate() : null)
-                      }
-                    />
-                  </Grid.Col>
-                </>
-              )}
-
-              <Grid.Col span={{ base: 12, md: 4 }}>
-                <MultiSelect
-                  label="Servicios"
-                  placeholder="Todos"
-                  data={serviceOptions}
-                  value={selectedServices}
-                  onChange={setSelectedServices}
-                  clearable
-                  searchable
-                />
-              </Grid.Col>
-            </>
-          )}
-        </Grid>
-      </Stack>
-
-      {/* Mobile: Drawer de filtros */}
-      <Drawer
-        opened={filtersOpened}
-        onClose={() => setFiltersOpened(false)}
-        position="bottom"
-        size="lg"
-        radius="md"
-        title={
-          <Group gap="xs">
-            <IconAdjustments size={18} />
-            <Text fw={900}>Filtros</Text>
-          </Group>
-        }
-      >
-        <Stack>
-          {FiltersContent}
-          <Button onClick={() => setFiltersOpened(false)}>Aplicar</Button>
-        </Stack>
-      </Drawer>
-    </Card>
   );
 
   // ---- UI: Mobile cards ----
   const MobileCards = (
     <Stack gap="sm">
       {filteredAppointments.length === 0 ? (
-        <Card withBorder radius="md" p="md">
-          <Text ta="center" c="dimmed">
-            No hay citas para este filtro/intervalo.
-          </Text>
-        </Card>
+        <Text ta="center" c="dimmed" py="md">No hay citas para este filtro/intervalo.</Text>
       ) : (
         filteredAppointments.map((appointment) => {
           const status = (appointment.status || "pending") as ApptStatus;
-
           const basePrice = appointment.service?.price || 0;
-          const additionalTotal =
-            appointment.additionalItems?.reduce(
-              (sum, item) => sum + (item?.price || 0),
-              0
-            ) || 0;
-
-          const usedPrice =
-            typeof appointment.customPrice === "number"
-              ? appointment.customPrice
-              : typeof appointment.totalPrice === "number"
-              ? appointment.totalPrice
-              : basePrice;
-
+          const additionalTotal = appointment.additionalItems?.reduce((s, i) => s + (i?.price || 0), 0) || 0;
+          const usedPrice = typeof appointment.customPrice === "number"
+            ? appointment.customPrice
+            : typeof appointment.totalPrice === "number" ? appointment.totalPrice : basePrice;
           const total = usedPrice + additionalTotal;
-
-          const isCustom =
-            typeof appointment.customPrice === "number" &&
-            appointment.customPrice !== basePrice;
-
+          const isCustom = typeof appointment.customPrice === "number" && appointment.customPrice !== basePrice;
           return (
-            <Card
-              key={appointment._id}
-              withBorder
-              radius="md"
-              p="sm"
+            <Card key={appointment._id} withBorder radius="md" p="sm"
               style={{ ...getCardAccentStyle(status), cursor: "pointer" }}
-              onClick={() => handleOpenApptDetail(appointment)}
-            >
+              onClick={() => handleOpenApptDetail(appointment)}>
               <Group justify="space-between" align="flex-start" wrap="nowrap">
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <Group gap="xs" wrap="nowrap" mb={2}>
-                    <Text fw={900} lineClamp={1}>
-                      {appointment.client?.name || "—"}
-                    </Text>
+                    <Text fw={700} size="sm" lineClamp={1}>{appointment.client?.name || "—"}</Text>
                     <StatusBadge status={status} />
                   </Group>
-
-                  <Text size="sm" c="dimmed" lineClamp={1}>
-                    {appointment.service?.name || "—"} •{" "}
-                    {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {appointment.service?.name || "—"} · {formatInTimezone(appointment.startDate, timezone, `DD/MM/YY ${timeFmt}`)}
                   </Text>
-
-                  <Group gap="xs" mt={6} align="center" wrap="wrap">
-                    <Badge variant="light" size="md">
-                      {formatCurrency(total, currency)}
-                    </Badge>
+                  <Group gap="xs" mt={4} align="center" wrap="wrap">
+                    <Text size="sm" fw={700}>{formatCurrency(total, currency)}</Text>
                     <PaymentBadge status={appointment.paymentStatus} />
                     <PaymentMethods payments={appointment.payments} />
                     {isCustom && <CustomPriceBadge isMobile={true} />}
-                    {additionalTotal > 0 && (
-                      <Badge variant="light" color="blue" size="sm">+ Adicionales</Badge>
-                    )}
+                    {additionalTotal > 0 && <Badge variant="light" color="blue" size="xs">+ Adic.</Badge>}
                   </Group>
                 </div>
-
-                <ActionIcon variant="subtle" color="gray" size="md" mt={4}>
-                  <IconArrowRight size={16} />
+                <ActionIcon variant="subtle" color="gray" size="sm" mt={2}>
+                  <IconArrowRight size={14} />
                 </ActionIcon>
               </Group>
             </Card>
@@ -1306,124 +998,75 @@ const DailyCashbox: React.FC = () => {
   // ---- UI: Desktop table ----
   const DesktopTable = (
     <ScrollArea scrollbarSize={10}>
-      <Table striped highlightOnHover>
+      <Table striped highlightOnHover withTableBorder={false}>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Fecha</Table.Th>
+            <Table.Th>Fecha / Hora</Table.Th>
             <Table.Th>Cliente</Table.Th>
             <Table.Th>Servicio</Table.Th>
-            <Table.Th>Precio</Table.Th>
-            <Table.Th>Estado</Table.Th>
+            <Table.Th>Total</Table.Th>
             <Table.Th>Cobro</Table.Th>
-            <Table.Th style={{ width: 40 }} />
+            <Table.Th>Estado</Table.Th>
+            <Table.Th style={{ width: 32 }} />
           </Table.Tr>
         </Table.Thead>
-
         <Table.Tbody>
           {filteredAppointments.length === 0 ? (
             <Table.Tr>
-              <Table.Td colSpan={6}>
-                <Text ta="center" c="dimmed">
-                  No hay citas registradas
-                </Text>
+              <Table.Td colSpan={7}>
+                <Text ta="center" c="dimmed" py="md">No hay citas registradas</Text>
               </Table.Td>
             </Table.Tr>
           ) : (
             filteredAppointments.map((appointment) => {
               const status = (appointment.status || "pending") as ApptStatus;
-
               const basePrice = appointment.service?.price || 0;
-              const additionalTotal =
-                appointment.additionalItems?.reduce(
-                  (sum, item) => sum + (item?.price || 0),
-                  0
-                ) || 0;
-
-              const usedPrice =
-                typeof appointment.customPrice === "number"
-                  ? appointment.customPrice
-                  : typeof appointment.totalPrice === "number"
-                  ? appointment.totalPrice
-                  : basePrice;
-
+              const additionalTotal = appointment.additionalItems?.reduce((s, i) => s + (i?.price || 0), 0) || 0;
+              const usedPrice = typeof appointment.customPrice === "number"
+                ? appointment.customPrice
+                : typeof appointment.totalPrice === "number" ? appointment.totalPrice : basePrice;
               const total = usedPrice + additionalTotal;
-
-              const isCustom =
-                typeof appointment.customPrice === "number" &&
-                appointment.customPrice !== basePrice;
-
+              const isCustom = typeof appointment.customPrice === "number" && appointment.customPrice !== basePrice;
               return (
-                <Table.Tr
-                  key={appointment._id}
+                <Table.Tr key={appointment._id}
                   style={{ ...getRowStylesSoft(status), cursor: "pointer" }}
-                  onClick={() => handleOpenApptDetail(appointment)}
-                >
+                  onClick={() => handleOpenApptDetail(appointment)}>
                   <Table.Td>
-                    {formatInTimezone(appointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
+                    <Text size="sm">{formatInTimezone(appointment.startDate, timezone, `DD/MM/YY`)}</Text>
+                    <Text size="xs" c="dimmed">{formatInTimezone(appointment.startDate, timezone, timeFmt)}</Text>
                   </Table.Td>
-
-                  <Table.Td>{appointment.client?.name || "—"}</Table.Td>
-
-                  <Table.Td>{appointment.service?.name || "—"}</Table.Td>
-
                   <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Text>{formatCurrency(total, currency)}</Text>
-
+                    <Text size="sm" fw={500}>{appointment.client?.name || "—"}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{appointment.service?.name || "—"}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4} wrap="nowrap">
+                      <Text size="sm" fw={600}>{formatCurrency(total, currency)}</Text>
                       {isCustom && (
-                        <Tooltip
-                          label={
-                            <div>
-                              <div>
-                                Precio base:{" "}
-                                {formatCurrency(basePrice, currency)}
-                              </div>
-                              <div>
-                                Precio personalizado:{" "}
-                                {formatCurrency(
-                                  appointment.customPrice!,
-                                  currency
-                                )}
-                              </div>
-                              {additionalTotal > 0 && (
-                                <div>
-                                  Adicionales:{" "}
-                                  {formatCurrency(additionalTotal, currency)}
-                                </div>
-                              )}
-                              <div style={{ marginTop: 6, fontWeight: 900 }}>
-                                Total: {formatCurrency(total, currency)}
-                              </div>
-                            </div>
-                          }
-                          withArrow
-                        >
+                        <Tooltip label={
                           <div>
-                            <CustomPriceBadge isMobile={false} />
+                            <div>Base: {formatCurrency(basePrice, currency)}</div>
+                            <div>Personalizado: {formatCurrency(appointment.customPrice!, currency)}</div>
+                            {additionalTotal > 0 && <div>Adicionales: {formatCurrency(additionalTotal, currency)}</div>}
+                            <div style={{ marginTop: 4, fontWeight: 700 }}>Total: {formatCurrency(total, currency)}</div>
                           </div>
+                        } withArrow>
+                          <div><CustomPriceBadge isMobile={false} /></div>
                         </Tooltip>
                       )}
-
-                      {additionalTotal > 0 && (
-                        <Badge variant="light" color="blue" size="sm">
-                          + Adicionales
-                        </Badge>
-                      )}
+                      {additionalTotal > 0 && <Badge variant="light" color="blue" size="xs">+Adic.</Badge>}
                     </Group>
                   </Table.Td>
-
-                  <Table.Td>
-                    <StatusBadge status={status} />
-                  </Table.Td>
-
                   <Table.Td>
                     <PaymentBadge status={appointment.paymentStatus} />
                     <PaymentMethods payments={appointment.payments} />
                   </Table.Td>
-
-                  <Table.Td style={{ textAlign: "center" }}>
-                    <ActionIcon variant="subtle" color="gray" size="sm">
-                      <IconArrowRight size={14} />
+                  <Table.Td><StatusBadge status={status} /></Table.Td>
+                  <Table.Td>
+                    <ActionIcon variant="subtle" color="gray" size="xs">
+                      <IconArrowRight size={12} />
                     </ActionIcon>
                   </Table.Td>
                 </Table.Tr>
@@ -1434,6 +1077,7 @@ const DailyCashbox: React.FC = () => {
       </Table>
     </ScrollArea>
   );
+
 
   return (
     <Container fluid>
@@ -1706,221 +1350,342 @@ const DailyCashbox: React.FC = () => {
         })()}
       </Drawer>
 
-      <Group justify="space-between" mb="md">
-        <Title order={2}>Caja</Title>
-        {loading && <Badge variant="light">Cargando…</Badge>}
-      </Group>
-
-      {Toolbar}
-
-      <Card shadow="sm" mt="md" withBorder>
-        <Accordion variant="separated">
-          <Accordion.Item value="resumen">
-            <Accordion.Control>
-              <Title order={4}>Resumen por servicio</Title>
-            </Accordion.Control>
-            <Accordion.Panel>
-              {Object.entries(servicesSummary).length > 0 ? (
-                <Stack gap="xs">
-                  {Object.entries(servicesSummary).map(
-                    ([serviceName, data]) => (
-                      <Group
-                        key={serviceName}
-                        justify="space-between"
-                        wrap="nowrap"
-                      >
-                        <Text lineClamp={1}>{serviceName}</Text>
-                        <Group gap="xs" wrap="nowrap">
-                          <Text fw={800}>
-                            {data.count} • {formatCurrency(data.total, currency)}
-                          </Text>
-                          {data.costs > 0 && (
-                            <Text size="sm" c="dimmed">
-                              (Gastos: {formatCurrency(data.costs, currency)} · Margen: {formatCurrency(data.total - data.costs, currency)})
-                            </Text>
-                          )}
-                        </Group>
-                      </Group>
-                    )
-                  )}
-                </Stack>
-              ) : (
-                <Text c="dimmed" ta="center">
-                  No hay servicios en este intervalo.
-                </Text>
-              )}
-            </Accordion.Panel>
-          </Accordion.Item>
-        </Accordion>
-      </Card>
-
-      <Card shadow="sm" radius="md" withBorder my="md">
-        <Group justify="space-between" align="center" mb="md">
-          <Group gap="xs">
-            <IconReceipt size={18} />
-            <Title order={4}>Movimientos generales</Title>
-            {totalGeneralExpenses > 0 && (
-              <Badge color="red" variant="light">−{formatCurrency(totalGeneralExpenses, currency)}</Badge>
-            )}
-            {totalGeneralIncomes > 0 && (
-              <Badge color="teal" variant="light">+{formatCurrency(totalGeneralIncomes, currency)}</Badge>
-            )}
-          </Group>
-        </Group>
-
-        {/* Formulario unificado */}
-        <Paper withBorder p="sm" radius="md" mb="md">
-          <SegmentedControl
-            value={movementType}
-            onChange={(v) => setMovementType(v as "expense" | "income")}
-            data={[
-              { value: "expense", label: "Gasto" },
-              { value: "income", label: "Ingreso" },
-            ]}
-            color={movementType === "income" ? "teal" : "red"}
-            size="xs"
-            mb="sm"
-          />
-          <Group gap="sm" align="flex-end" wrap="wrap">
-            <TextInput
-              placeholder={movementType === "expense" ? "Concepto (ej: arriendo, suministros)" : "Concepto (ej: venta de producto, anticipo)"}
-              value={movementType === "expense" ? newExpense.concept : newIncome.concept}
-              onChange={(e) =>
-                movementType === "expense"
-                  ? setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))
-                  : setNewIncome((p) => ({ ...p, concept: e.currentTarget.value }))
-              }
-              style={{ flex: "1 1 200px", minWidth: 140 }}
-            />
-            <TextInput
-              placeholder="Categoría (opcional)"
-              value={movementType === "expense" ? newExpense.category : newIncome.category}
-              onChange={(e) =>
-                movementType === "expense"
-                  ? setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))
-                  : setNewIncome((p) => ({ ...p, category: e.currentTarget.value }))
-              }
-              style={{ flex: "0 1 150px", minWidth: 110 }}
-            />
-            <NumberInput
-              placeholder="$ monto"
-              prefix="$ "
-              thousandSeparator="."
-              decimalSeparator=","
-              value={movementType === "expense" ? newExpense.amount : newIncome.amount}
-              onChange={(v) =>
-                movementType === "expense"
-                  ? setNewExpense((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))
-                  : setNewIncome((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))
-              }
-              min={0}
-              w={130}
-            />
-            <Button
-              color={movementType === "income" ? "teal" : undefined}
-              leftSection={<IconPlus size={16} />}
-              onClick={movementType === "expense" ? handleAddExpense : handleAddIncome}
-              loading={movementType === "expense" ? addingExpense : addingIncome}
-              disabled={
-                movementType === "expense"
-                  ? !newExpense.concept.trim() || newExpense.amount <= 0
-                  : !newIncome.concept.trim() || newIncome.amount <= 0
-              }
-            >
-              Agregar
-            </Button>
-          </Group>
-        </Paper>
-
-        {/* Lista unificada */}
-        {expenses.length === 0 && incomes.length === 0 ? (
-          <Text c="dimmed" ta="center" size="sm" py="sm">
-            No hay movimientos registrados para este período.
-          </Text>
-        ) : (
-          <Stack gap="xs">
-            {[
-              ...expenses.map((e) => ({ ...e, _type: "expense" as const })),
-              ...incomes.map((e) => ({ ...e, _type: "income" as const })),
-            ]
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .map((item) => (
-                <Group key={item._id} justify="space-between" wrap="nowrap" style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <Group gap="xs" wrap="nowrap">
-                      <Badge size="xs" variant="light" color={item._type === "income" ? "teal" : "red"}>
-                        {item._type === "income" ? "Ingreso" : "Gasto"}
-                      </Badge>
-                      <Text size="sm" fw={600} lineClamp={1}>{item.concept}</Text>
-                      {item.category && (
-                        <Badge size="xs" variant="dot" color="gray">{item.category}</Badge>
-                      )}
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {formatInTimezone(item.date, timezone, "DD/MM/YYYY")}
-                    </Text>
-                  </div>
-                  <Group gap="xs" wrap="nowrap">
-                    <Text fw={800} c={item._type === "income" ? "teal" : "red"} size="sm">
-                      {item._type === "income" ? "+" : "−"}{formatCurrency(item.amount, currency)}
-                    </Text>
-                    <Tooltip label="Eliminar" withArrow>
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        size="sm"
-                        onClick={() =>
-                          item._type === "expense"
-                            ? handleDeleteExpense(item._id)
-                            : handleDeleteIncome(item._id)
-                        }
-                      >
-                        <IconTrash size={14} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+      <Stack gap="md" mt="xs">
+        {/* ── Barra de control ── */}
+        <Card shadow="sm" radius="md" withBorder p="md">
+          <Stack gap="sm">
+            {/* Fila título */}
+            <Group justify="space-between" wrap="nowrap">
+              <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+                <IconCalendar size={18} style={{ flexShrink: 0 }} />
+                <Text fw={900} size="lg" style={{ flexShrink: 0 }}>Caja</Text>
+                {formattedRangeLabel && (
+                  <Badge variant="light" size="md">{formattedRangeLabel}</Badge>
+                )}
+                {loading && <Loader size="xs" style={{ flexShrink: 0 }} />}
+              </Group>
+              {/* En desktop los botones van aquí; en mobile van en fila separada */}
+              {!isMobile && (
+                <Group gap="xs" wrap="nowrap">
+                  <Button
+                    variant="light" color="teal" size="xs"
+                    leftSection={<IconReceipt size={14} />}
+                    onClick={() => document.getElementById("cashbox-movements")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    Gastos e ingresos
+                  </Button>
                 </Group>
-              ))}
-          </Stack>
-        )}
-      </Card>
+              )}
+            </Group>
 
-      <Card shadow="lg" radius="md" withBorder my="md">
-        <Group justify="space-between" mb="sm" wrap="wrap">
-          <Title order={3}>Citas</Title>
-          <Group gap="md" wrap="wrap">
-            {filteredAppointments.filter((appt) =>
-              canConfirm(appt.status || "pending")
-            ).length > 0 && (
-              <Button
-                leftSection={<IconChecks size={16} />}
-                color="green"
-                variant="light"
-                onClick={handleConfirmAllPending}
-                disabled={loading}
-              >
-                Confirmar todas pendientes
+            {/* Fila de acciones mobile (debajo del título para que el badge se vea completo) */}
+            {isMobile && (
+              <Group gap="xs" wrap="wrap">
+                <Button
+                  variant="light" color="teal" size="xs"
+                  leftSection={<IconReceipt size={14} />}
+                  onClick={() => document.getElementById("cashbox-movements")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  style={{ flex: 1 }}
+                >
+                  Gastos e ingresos
+                </Button>
+                <ActionIcon variant="light" size="lg" onClick={() => setFiltersOpened(true)} aria-label="Filtros">
+                  <IconFilter size={18} />
+                </ActionIcon>
+              </Group>
+            )}
+
+            {/* Selector de intervalo */}
+            <Tooltip label="La vista seleccionada se recuerda al volver" withArrow position="top">
+              {isMobile ? (
+                <Select
+                  placeholder="Selecciona intervalo"
+                  data={[
+                    { value: "daily", label: "Diario" },
+                    { value: "weekly", label: "Semanal" },
+                    { value: "biweekly", label: "Quincenal" },
+                    { value: "monthly", label: "Mensual" },
+                    { value: "custom", label: "Personalizado" },
+                  ] as any}
+                  value={interval}
+                  onChange={(v) => {
+                    const next = (v || "daily") as Interval;
+                    setInterval(next);
+                    localStorage.setItem("cashbox_interval", next);
+                    if (next === "daily" && !selectedDay) setSelectedDay(new Date());
+                  }}
+                  searchable={false} clearable={false}
+                />
+              ) : (
+                <SegmentedControl
+                  fullWidth
+                  value={interval}
+                  onChange={(v) => {
+                    const next = v as Interval;
+                    setInterval(next);
+                    localStorage.setItem("cashbox_interval", next);
+                    if (next === "daily" && !selectedDay) setSelectedDay(new Date());
+                  }}
+                  data={[
+                    { value: "daily", label: "Diario" },
+                    { value: "weekly", label: "Semanal" },
+                    { value: "biweekly", label: "Quincenal" },
+                    { value: "monthly", label: "Mensual" },
+                    { value: "custom", label: "Personalizado" },
+                  ]}
+                />
+              )}
+            </Tooltip>
+
+            {/* Filtros inline desktop */}
+            {!isMobile && (
+              <Group gap="sm" align="flex-end" wrap="wrap">
+                {interval === "daily" && (
+                  <>
+                    <Group gap="xs" wrap="nowrap">
+                      <ActionIcon variant="light" size="md"
+                        onClick={() => setSelectedDay((d) => dayjs(d ?? new Date()).subtract(1, "day").toDate())}
+                        aria-label="Día anterior">
+                        <IconChevronLeft size={15} />
+                      </ActionIcon>
+                      <DatePickerInput locale="es" value={selectedDay} onChange={setSelectedDay} clearable={false} w={150} />
+                      <ActionIcon variant="light" size="md"
+                        onClick={() => setSelectedDay((d) => dayjs(d ?? new Date()).add(1, "day").toDate())}
+                        aria-label="Día siguiente">
+                        <IconChevronRight size={15} />
+                      </ActionIcon>
+                      <Button variant="subtle" size="sm" onClick={() => setSelectedDay(new Date())}>Hoy</Button>
+                    </Group>
+                    <NumberInput
+                      label="Base de caja"
+                      leftSection={<IconReceipt size={14} />}
+                      value={cashBase}
+                      onChange={(v) => {
+                        const val = typeof v === "number" ? v : 0;
+                        setCashBase(val);
+                        if (selectedDay) localStorage.setItem(`cashbox_base_${dayjs(selectedDay).format("YYYY-MM-DD")}`, String(val));
+                      }}
+                      min={0} hideControls placeholder="0" w={160}
+                    />
+                  </>
+                )}
+                {interval === "custom" && (
+                  <>
+                    <DatePickerInput label="Inicio" locale="es" value={startDate}
+                      onChange={(d) => setStartDate(d ? dayjs(d).startOf("day").toDate() : null)} w={160} />
+                    <DatePickerInput label="Fin" locale="es" value={endDate}
+                      onChange={(d) => setEndDate(d ? dayjs(d).endOf("day").toDate() : null)} w={160} />
+                  </>
+                )}
+                <MultiSelect label="Servicios" placeholder="Todos" data={serviceOptions}
+                  value={selectedServices} onChange={setSelectedServices} clearable searchable
+                  style={{ flex: "1 1 200px", minWidth: 180 }} />
+              </Group>
+            )}
+          </Stack>
+
+          {/* Drawer filtros mobile */}
+          <Drawer opened={filtersOpened} onClose={() => setFiltersOpened(false)}
+            position="bottom" size="lg" radius="md"
+            title={<Group gap="xs"><IconAdjustments size={18} /><Text fw={900}>Filtros</Text></Group>}>
+            <Stack>
+              {FiltersContent}
+              <Button onClick={() => setFiltersOpened(false)}>Aplicar</Button>
+            </Stack>
+          </Drawer>
+        </Card>
+
+        {/* ── Tarjetas de métricas ── */}
+        <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: interval === "daily" ? 5 : 4 }} spacing="sm">
+          <Paper withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Ingresos</Text>
+            <Text fw={900} size="xl">{formatCurrency(totalIncome, currency)}</Text>
+            <Text size="xs" c="dimmed" mt={2}>{totalCount} cita{totalCount !== 1 ? "s" : ""}</Text>
+          </Paper>
+
+          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-green-6)" }}>
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Cobrado</Text>
+            <Text fw={900} size="xl" c="green">{formatCurrency(totalCollected, currency)}</Text>
+          </Paper>
+
+          <Paper withBorder p="md" radius="md"
+            style={totalPending > 0 ? { borderLeft: "3px solid var(--mantine-color-orange-6)" } : undefined}>
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Pendiente</Text>
+            <Text fw={900} size="xl" c={totalPending > 0 ? "orange" : "dimmed"}>{formatCurrency(totalPending, currency)}</Text>
+          </Paper>
+
+          {interval === "daily" && (
+            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-blue-6)" }}>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>Cierre efectivo</Text>
+              <Text fw={900} size="xl" c="blue">{formatCurrency(cashBase + totalCashCollected, currency)}</Text>
+              {cashBase > 0 && <Text size="xs" c="dimmed" mt={2}>Base: {formatCurrency(cashBase, currency)}</Text>}
+            </Paper>
+          )}
+
+          {totalGeneralIncomes > 0 && (
+            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-teal-6)" }}>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>Ingresos extra</Text>
+              <Text fw={900} size="xl" c="teal">{formatCurrency(totalGeneralIncomes, currency)}</Text>
+            </Paper>
+          )}
+
+          {(totalCosts > 0 || totalGeneralExpenses > 0) && (
+            <>
+              <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-red-6)" }}>
+                <Text size="xs" c="dimmed" fw={500} mb={4}>Gastos</Text>
+                <Text fw={900} size="xl" c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
+              </Paper>
+              <Paper withBorder p="md" radius="md"
+                style={{ borderLeft: `3px solid var(--mantine-color-${netMargin >= 0 ? "teal" : "red"}-6)` }}>
+                <Text size="xs" c="dimmed" fw={500} mb={4}>Margen neto</Text>
+                <Text fw={900} size="xl" c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
+              </Paper>
+            </>
+          )}
+        </SimpleGrid>
+
+        {/* ── Citas ── */}
+        <Card shadow="sm" radius="md" withBorder>
+          <Group justify="space-between" mb="sm" wrap="wrap">
+            <Group gap="xs">
+              <Title order={4}>Citas</Title>
+              <Badge variant="light" color="gray">{filteredAppointments.length}</Badge>
+              {selectedServices.length > 0 && (
+                <Badge variant="dot" color="blue" size="sm">{selectedServices.length} servicio(s)</Badge>
+              )}
+            </Group>
+            {filteredAppointments.filter((a) => canConfirm(a.status || "pending")).length > 0 && (
+              <Button size="xs" leftSection={<IconChecks size={14} />} color="green" variant="light"
+                onClick={handleConfirmAllPending} disabled={loading}>
+                Confirmar pendientes
               </Button>
             )}
-            <Text size="sm" c="dimmed">
-              {selectedServices.length > 0
-                ? `Filtrado: ${selectedServices.length} servicio(s)`
-                : "Sin filtros"}
-            </Text>
           </Group>
-        </Group>
 
-        {loading ? (
-          <Flex justify="center" align="center" direction="column" py="xl">
-            <Loader size={40} />
-            <Text mt="md">Cargando citas...</Text>
-          </Flex>
-        ) : isMobile ? (
-          MobileCards
-        ) : (
-          DesktopTable
-        )}
-      </Card>
+          {loading ? (
+            <Flex justify="center" align="center" direction="column" py="xl">
+              <Loader size={36} />
+              <Text mt="sm" size="sm" c="dimmed">Cargando citas...</Text>
+            </Flex>
+          ) : isMobile ? MobileCards : DesktopTable}
+
+          {/* Resumen por servicio compacto (solo si hay más de un tipo) */}
+          {Object.entries(servicesSummary).length > 1 && (
+            <>
+              <Divider mt="md" mb="sm" label="Resumen por servicio" labelPosition="center" />
+              <Stack gap={4}>
+                {Object.entries(servicesSummary).map(([name, data]) => (
+                  <Group key={name} justify="space-between" wrap="nowrap">
+                    <Text size="sm" lineClamp={1} style={{ flex: 1 }}>{name}</Text>
+                    <Group gap="sm" wrap="nowrap">
+                      <Badge variant="light" color="gray" size="sm">{data.count}</Badge>
+                      <Text size="sm" fw={700}>{formatCurrency(data.total, currency)}</Text>
+                      {data.costs > 0 && (
+                        <Text size="xs" c="dimmed">−{formatCurrency(data.costs, currency)}</Text>
+                      )}
+                    </Group>
+                  </Group>
+                ))}
+              </Stack>
+            </>
+          )}
+        </Card>
+
+        {/* ── Movimientos ── */}
+        <Card id="cashbox-movements" shadow="sm" radius="md" withBorder>
+          <Group justify="space-between" align="center" mb="md">
+            <Group gap="xs">
+              <IconReceipt size={18} />
+              <Title order={4}>Movimientos</Title>
+              {totalGeneralExpenses > 0 && <Badge color="red" variant="light">−{formatCurrency(totalGeneralExpenses, currency)}</Badge>}
+              {totalGeneralIncomes > 0 && <Badge color="teal" variant="light">+{formatCurrency(totalGeneralIncomes, currency)}</Badge>}
+            </Group>
+          </Group>
+
+          <Paper withBorder p="sm" radius="md" mb="md">
+            <SegmentedControl
+              value={movementType} onChange={(v) => setMovementType(v as "expense" | "income")}
+              data={[{ value: "expense", label: "Gasto" }, { value: "income", label: "Ingreso" }]}
+              color={movementType === "income" ? "teal" : "red"} size="xs" mb="sm"
+            />
+            <Group gap="sm" align="flex-end" wrap="wrap">
+              <TextInput
+                placeholder={movementType === "expense" ? "Concepto (ej: arriendo)" : "Concepto (ej: venta producto)"}
+                value={movementType === "expense" ? newExpense.concept : newIncome.concept}
+                onChange={(e) => movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))
+                  : setNewIncome((p) => ({ ...p, concept: e.currentTarget.value }))}
+                style={{ flex: "1 1 180px", minWidth: 130 }}
+              />
+              <TextInput
+                placeholder="Categoría (opc.)"
+                value={movementType === "expense" ? newExpense.category : newIncome.category}
+                onChange={(e) => movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))
+                  : setNewIncome((p) => ({ ...p, category: e.currentTarget.value }))}
+                style={{ flex: "0 1 140px", minWidth: 100 }}
+              />
+              <NumberInput
+                placeholder="$ monto" prefix="$ " thousandSeparator="." decimalSeparator=","
+                value={movementType === "expense" ? newExpense.amount : newIncome.amount}
+                onChange={(v) => movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))
+                  : setNewIncome((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))}
+                min={0} w={120}
+              />
+              <Button
+                color={movementType === "income" ? "teal" : undefined}
+                leftSection={<IconPlus size={16} />}
+                onClick={movementType === "expense" ? handleAddExpense : handleAddIncome}
+                loading={movementType === "expense" ? addingExpense : addingIncome}
+                disabled={movementType === "expense"
+                  ? !newExpense.concept.trim() || newExpense.amount <= 0
+                  : !newIncome.concept.trim() || newIncome.amount <= 0}
+              >
+                Agregar
+              </Button>
+            </Group>
+          </Paper>
+
+          {expenses.length === 0 && incomes.length === 0 ? (
+            <Text c="dimmed" ta="center" size="sm" py="sm">No hay movimientos registrados para este período.</Text>
+          ) : (
+            <Stack gap="xs">
+              {[
+                ...expenses.map((e) => ({ ...e, _type: "expense" as const })),
+                ...incomes.map((e) => ({ ...e, _type: "income" as const })),
+              ]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .map((item) => (
+                  <Group key={item._id} justify="space-between" wrap="nowrap"
+                    style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Group gap="xs" wrap="nowrap">
+                        <Badge size="xs" variant="light" color={item._type === "income" ? "teal" : "red"}>
+                          {item._type === "income" ? "Ingreso" : "Gasto"}
+                        </Badge>
+                        <Text size="sm" fw={600} lineClamp={1}>{item.concept}</Text>
+                        {item.category && <Badge size="xs" variant="dot" color="gray">{item.category}</Badge>}
+                      </Group>
+                      <Text size="xs" c="dimmed">{formatInTimezone(item.date, timezone, "DD/MM/YYYY")}</Text>
+                    </div>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text fw={700} c={item._type === "income" ? "teal" : "red"} size="sm">
+                        {item._type === "income" ? "+" : "−"}{formatCurrency(item.amount, currency)}
+                      </Text>
+                      <Tooltip label="Eliminar" withArrow>
+                        <ActionIcon color="red" variant="subtle" size="sm"
+                          onClick={() => item._type === "expense" ? handleDeleteExpense(item._id) : handleDeleteIncome(item._id)}>
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                ))}
+            </Stack>
+          )}
+        </Card>
+      </Stack>
     </Container>
   );
 };
