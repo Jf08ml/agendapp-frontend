@@ -48,3 +48,33 @@ export const formatFullDateInTimezone = (
 ): string => {
   return dayjs(date).tz(tz).format(format);
 };
+
+/**
+ * Retorna el inicio del mes en la timezone de la org, como ISO UTC string.
+ * Evita el bug donde startOfMonth() de date-fns usa la timezone del navegador
+ * y corta citas nocturnas que en UTC caen en el mes siguiente.
+ */
+export const startOfMonthInTimezone = (date: Date | string, tz: string): string => {
+  return dayjs(date).tz(tz).startOf('month').toISOString();
+};
+
+/**
+ * Retorna el fin del mes en la timezone de la org, como ISO UTC string.
+ */
+export const endOfMonthInTimezone = (date: Date | string, tz: string): string => {
+  return dayjs(date).tz(tz).endOf('month').toISOString();
+};
+
+/**
+ * Retorna el inicio del día en la timezone de la org, como ISO UTC string.
+ */
+export const startOfDayInTimezone = (date: Date | string, tz: string): string => {
+  return dayjs(date).tz(tz).startOf('day').toISOString();
+};
+
+/**
+ * Retorna el fin del día en la timezone de la org, como ISO UTC string.
+ */
+export const endOfDayInTimezone = (date: Date | string, tz: string): string => {
+  return dayjs(date).tz(tz).endOf('day').toISOString();
+};

@@ -46,7 +46,12 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { CustomLoader } from "../../../components/customLoader/CustomLoader";
-import { endOfDay, endOfMonth, startOfDay, startOfMonth } from "date-fns";
+import {
+  endOfDayInTimezone,
+  endOfMonthInTimezone,
+  startOfDayInTimezone,
+  startOfMonthInTimezone,
+} from "../../../utils/timezoneUtils";
 import { useNavigate } from "react-router-dom";
 import { sendOrgReminders } from "../../../services/reminderService";
 
@@ -122,7 +127,7 @@ const ScheduleView: React.FC = () => {
     (state: RootState) => state.organization.organization,
   );
   const organizationId = organization?._id;
-  const organizationTimezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la org
+  const organizationTimezone = organization?.timezone || "UTC"; // 🌍 Timezone de la org
 
   const initialClientId = useMemo(
     () => organization?.clientIdWhatsapp || organization?._id || "",
@@ -304,8 +309,8 @@ const ScheduleView: React.FC = () => {
       if (!readyForScopedFetch) return;
       setLoadingMonth(true);
       try {
-        const start = startOfMonth(date).toISOString();
-        const end = endOfMonth(date).toISOString();
+        const start = startOfMonthInTimezone(date, organizationTimezone);
+        const end = endOfMonthInTimezone(date, organizationTimezone);
         const response = await getAppointmentsByOrganizationId(
           organizationId as string,
           start,
@@ -323,15 +328,15 @@ const ScheduleView: React.FC = () => {
         setLoadingMonth(false);
       }
     },
-    [readyForScopedFetch, organizationId, canViewAll, userId],
+    [readyForScopedFetch, organizationId, organizationTimezone, canViewAll, userId],
   );
 
   const fetchAppointmentsForDay = useCallback(
     async (date: Date): Promise<Appointment[]> => {
       if (!readyForScopedFetch) return [];
       try {
-        const start = startOfDay(date).toISOString();
-        const end = endOfDay(date).toISOString();
+        const start = startOfDayInTimezone(date, organizationTimezone);
+        const end = endOfDayInTimezone(date, organizationTimezone);
         const response = await getAppointmentsByOrganizationId(
           organizationId as string,
           start,
@@ -350,7 +355,7 @@ const ScheduleView: React.FC = () => {
         return [];
       }
     },
-    [readyForScopedFetch, organizationId, canViewAll, userId],
+    [readyForScopedFetch, organizationId, organizationTimezone, canViewAll, userId],
   );
   /**
    * MANEJO DE SERVICIO

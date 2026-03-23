@@ -1,6 +1,6 @@
 import React from "react";
 import { Client } from "../../../services/clientService";
-import { ActionIcon, Badge, Menu, Table, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Group, Menu, Table, Text, Tooltip } from "@mantine/core";
 import { BiTrash } from "react-icons/bi";
 import { CgAdd, CgOptions, CgUserAdd } from "react-icons/cg";
 import { MdEdit, MdMerge, MdVisibility, MdRestartAlt } from "react-icons/md";
@@ -95,16 +95,12 @@ const ClientRow = React.memo(
         </Badge>
       </Table.Td>
       <Table.Td style={{ textAlign: "center" }}>
-        <Menu shadow="sm" width={220} withinPortal>
-          <Menu.Target>
-            <ActionIcon radius="xl" variant="default">
-              <CgOptions size={18} />
-            </ActionIcon>
-          </Menu.Target>
-          <Menu.Dropdown>
-            <Menu.Label>Acciones</Menu.Label>
-            <Menu.Item
-              leftSection={<CgAdd />}
+        <Group gap={4} justify="center">
+          <Tooltip label="Registrar servicio" position="top" withArrow>
+            <ActionIcon
+              radius="xl"
+              variant="light"
+              color="green"
               onClick={() =>
                 confirmAction(
                   () => handleRegisterService(client._id),
@@ -114,10 +110,14 @@ const ClientRow = React.memo(
                 )
               }
             >
-              Registrar servicio
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<CgUserAdd />}
+              <CgAdd size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Registrar referido" position="top" withArrow>
+            <ActionIcon
+              radius="xl"
+              variant="light"
+              color="grape"
               onClick={() =>
                 confirmAction(
                   () => handleReferral(client._id),
@@ -127,71 +127,82 @@ const ClientRow = React.memo(
                 )
               }
             >
-              Registrar referido
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<FaTrophy />}
-              onClick={() => handleViewRewards(client)}
-            >
-              Ver premios
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<MdEdit />}
-              onClick={() => handleEditClient(client)}
-            >
-              Editar cliente
-            </Menu.Item>
-            <Menu.Divider />
-            <Menu.Item
-              leftSection={<MdMerge />}
-              onClick={() => handleMergeClient(client)}
-            >
-              Fusionar con...
-            </Menu.Item>
-            <Menu.Item
-              color="teal"
-              leftSection={<MdRestartAlt />}
-              onClick={() =>
-                confirmAction(
-                  () => handleResetClientLoyalty(client._id),
-                  "Restablecer contadores",
-                  "¿Deseas reiniciar los servicios tomados y referidos a 0 para este cliente?",
-                  "register"
-                )
-              }
-            >
-              Restablecer contadores
-            </Menu.Item>
-            <Menu.Item
-              color="red"
-              leftSection={<BiTrash />}
-              onClick={() =>
-                confirmAction(
-                  () => handleDeleteClient(client._id),
-                  "Eliminar Cliente",
-                  "¿Estás seguro? Esta acción no se puede deshacer.",
-                  "delete"
-                )
-              }
-            >
-              Eliminar cliente
-            </Menu.Item>
-            <Menu.Item
-              color="red"
-              leftSection={<BiTrash />}
-              onClick={() =>
-                confirmAction(
-                  () => handleForceDeleteClient(client._id),
-                  "Eliminar con citas",
-                  "⚠️ Se eliminarán el cliente Y TODAS SUS CITAS. Esta acción no se puede deshacer.",
-                  "delete"
-                )
-              }
-            >
-              Eliminar con citas
-            </Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
+              <CgUserAdd size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Menu shadow="sm" width={220} withinPortal>
+            <Menu.Target>
+              <ActionIcon radius="xl" variant="default">
+                <CgOptions size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Fidelidad</Menu.Label>
+              <Menu.Item
+                leftSection={<FaTrophy />}
+                onClick={() => handleViewRewards(client)}
+              >
+                Ver premios
+              </Menu.Item>
+              <Menu.Item
+                color="teal"
+                leftSection={<MdRestartAlt />}
+                onClick={() =>
+                  confirmAction(
+                    () => handleResetClientLoyalty(client._id),
+                    "Restablecer contadores",
+                    "¿Deseas reiniciar los servicios tomados y referidos a 0 para este cliente?",
+                    "register"
+                  )
+                }
+              >
+                Restablecer contadores
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Label>Cliente</Menu.Label>
+              <Menu.Item
+                leftSection={<MdEdit />}
+                onClick={() => handleEditClient(client)}
+              >
+                Editar cliente
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<MdMerge />}
+                onClick={() => handleMergeClient(client)}
+              >
+                Fusionar con...
+              </Menu.Item>
+              <Menu.Item
+                color="red"
+                leftSection={<BiTrash />}
+                onClick={() =>
+                  confirmAction(
+                    () => handleDeleteClient(client._id),
+                    "Eliminar Cliente",
+                    "¿Estás seguro? Esta acción no se puede deshacer.",
+                    "delete"
+                  )
+                }
+              >
+                Eliminar cliente
+              </Menu.Item>
+              <Menu.Item
+                color="red"
+                leftSection={<BiTrash />}
+                onClick={() =>
+                  confirmAction(
+                    () => handleForceDeleteClient(client._id),
+                    "Eliminar con citas",
+                    "⚠️ Se eliminarán el cliente Y TODAS SUS CITAS. Esta acción no se puede deshacer.",
+                    "delete"
+                  )
+                }
+              >
+                Eliminar con citas
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
       </Table.Td>
     </Table.Tr>
   )
