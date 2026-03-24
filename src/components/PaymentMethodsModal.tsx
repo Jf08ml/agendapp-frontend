@@ -1,8 +1,34 @@
 // components/PaymentMethodsModal.tsx
-import { Modal, Stack, Text, Button, Group, CopyButton, Alert, ActionIcon, Tooltip, Badge, CheckIcon } from "@mantine/core";
-import { Membership } from "../services/membershipService";
-import { BiCopy, BiInfoCircle } from "react-icons/bi";
+import { useState } from "react";
+import {
+  Modal,
+  Stack,
+  Text,
+  Button,
+  Group,
+  CopyButton,
+  Alert,
+  ActionIcon,
+  Tooltip,
+  Badge,
+  CheckIcon,
+  Loader,
+  Paper,
+  ThemeIcon,
+  Divider,
+} from "@mantine/core";
+import {
+  IconCreditCard,
+  IconBuildingBank,
+  IconBolt,
+  IconClock,
+  IconCopy,
+  IconCheck,
+} from "@tabler/icons-react";
 import { BsWhatsapp } from "react-icons/bs";
+import { BiInfoCircle } from "react-icons/bi";
+import { Membership } from "../services/membershipService";
+import { apiGeneral } from "../services/axiosConfig";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 
@@ -12,7 +38,13 @@ interface PaymentMethodsModalProps {
   membership: Membership | null;
   planPrice?: number;
   planName?: string;
+  planId?: string;
 }
+
+// Datos de pago manual
+const PAYMENT_NUMBER = "3132735116";
+const PAYMENT_NAME = "Juan Felipe Lasso";
+const PAYPAL_EMAIL = "lassojuanfe@gmail.com";
 
 export function PaymentMethodsModal({
   opened,
@@ -20,17 +52,45 @@ export function PaymentMethodsModal({
   membership,
   planPrice,
   planName,
+  planId,
 }: PaymentMethodsModalProps) {
+  const [lsLoading, setLsLoading] = useState(false);
+  const [lsError, setLsError] = useState<string | null>(null);
+
   const organization = useSelector((state: RootState) => state.organization.organization);
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
-  // Información de pago
-  const PAYMENT_NUMBER = "3132735116";
-  const PAYMENT_NAME = "Juan Felipe Lasso";
-  const PAYPAL_EMAIL = "lassojuanfe@gmail.com";
+  const price = planPrice ?? membership?.planId?.price ?? 0;
+  const currency = membership?.planId?.currency ?? "USD";
+  const plan = planName ?? membership?.planId?.displayName ?? "Plan";
+  const resolvedPlanId = planId ?? (membership?.planId?._id as string | undefined);
 
-  const price = planPrice || membership?.planId?.price || 0;
-  const currency = membership?.planId?.currency || "USD";
-  const plan = planName || membership?.planId?.displayName || "Plan";
+  const handleCardPayment = async () => {
+    if (!resolvedPlanId || !organizationId) return;
+    setLsLoading(true);
+    setLsError(null);
+    try {
+      const res = await apiGeneral.post("/payments/checkout", {
+        provider: "lemonsqueezy",
+        planId: resolvedPlanId,
+        organizationId,
+        successUrl: `${window.location.origin}/payment-success`,
+        cancelUrl: `${window.location.origin}/my-membership`,
+      });
+      const checkoutUrl = res.data?.data?.checkoutUrl;
+      if (checkoutUrl) {
+        sessionStorage.setItem("ls_payment_initiated_at", Date.now().toString());
+        window.location.href = checkoutUrl;
+      }
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "No se pudo iniciar el pago. Intenta de nuevo.";
+      setLsError(msg);
+    } finally {
+      setLsLoading(false);
+    }
+  };
 
   const handleWhatsAppContact = () => {
     const message = encodeURIComponent(
@@ -44,229 +104,224 @@ export function PaymentMethodsModal({
       opened={opened}
       onClose={onClose}
       title={
-        <Text size="lg" fw={600}>
-          Renovar Membresía
-        </Text>
+        <Stack gap={2}>
+          <Text size="lg" fw={700}>
+            Renovar Membresía
+          </Text>
+          <Text size="sm" c="dimmed">
+            {plan} — ${price} {currency}/mes
+          </Text>
+        </Stack>
       }
       size="lg"
       centered
     >
-      <Stack gap="lg">
-        {/* Información del plan */}
-        <Alert icon={<BiInfoCircle size={20} />} color="blue" variant="light">
-          <Text size="sm" fw={500}>
-            {plan}
-          </Text>
-          <Text size="xl" fw={700} mt="xs">
-            ${price} {currency} / mes
-          </Text>
-        </Alert>
+      <Stack gap="xl">
 
-        {/* Transferencia Directa */}
+        {/* ─── OPCIÓN 1: Tarjeta (solo si hay planId disponible) ──────── */}
+        {resolvedPlanId && <Paper withBorder p="lg" radius="md">
+          <Stack gap="md">
+            <Group justify="space-between" align="flex-start">
+              <Group gap="sm">
+                <ThemeIcon size={40} radius="md" color="blue" variant="light">
+                  <IconCreditCard size={22} />
+                </ThemeIcon>
+                <div>
+                  <Text fw={600} size="md">
+                    Pago con tarjeta
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Crédito, débito o cualquier método digital
+                  </Text>
+                </div>
+              </Group>
+              <Badge
+                color="green"
+                variant="light"
+                leftSection={<IconBolt size={12} />}
+                size="sm"
+              >
+                Activación inmediata
+              </Badge>
+            </Group>
+
+            <Text size="sm" c="dimmed">
+              Serás redirigido a nuestra plataforma de pago segura. Una vez completado, tu membresía
+              se renovará automáticamente sin ninguna espera.
+            </Text>
+
+            {lsError && (
+              <Alert color="red" variant="light" icon={<BiInfoCircle size={16} />}>
+                {lsError}
+              </Alert>
+            )}
+
+            <Button
+              fullWidth
+              size="md"
+              onClick={handleCardPayment}
+              disabled={lsLoading || !resolvedPlanId}
+              leftSection={lsLoading ? <Loader size="xs" color="white" /> : <IconCreditCard size={16} />}
+            >
+              {lsLoading ? "Preparando pago..." : `Pagar $${price} ${currency} con tarjeta`}
+            </Button>
+          </Stack>
+        </Paper>}
+
+        {/* ─── DIVISOR ────────────────────────────────────────────────── */}
+        {resolvedPlanId && (
+          <Divider
+            label={
+              <Text size="sm" c="dimmed" fw={500}>
+                o paga por transferencia bancaria
+              </Text>
+            }
+            labelPosition="center"
+          />
+        )}
+
+        {/* ─── OPCIÓN 2: Transferencia ─────────────────────────────────── */}
         <Stack gap="md">
-          <Alert color="green" variant="light">
-            <Text size="sm" fw={500} mb="xs">
-              Transferencia Directa (Colombia)
-            </Text>
-            <Text size="xs">
-              Realiza una transferencia bancaria a alguna de estas cuentas y envía el comprobante por WhatsApp.
-            </Text>
-          </Alert>
-
-          {/* Nequi */}
-          <Stack gap="xs">
-            <Group gap="xs">
-              <Badge color="grape" variant="filled" size="lg">
-                Nequi
-              </Badge>
+          <Group justify="space-between" align="flex-start">
+            <Group gap="sm">
+              <ThemeIcon size={40} radius="md" color="teal" variant="light">
+                <IconBuildingBank size={22} />
+              </ThemeIcon>
+              <div>
+                <Text fw={600} size="md">
+                  Transferencia bancaria
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Nequi, Daviplata o PayPal
+                </Text>
+              </div>
             </Group>
+            <Badge
+              color="yellow"
+              variant="light"
+              leftSection={<IconClock size={12} />}
+              size="sm"
+            >
+              Activación en &lt;24 h
+            </Badge>
+          </Group>
 
-            <Stack gap="sm" p="md" style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Número:
-                </Text>
-                <Group gap="xs">
-                  <Text size="lg" fw={600} style={{ fontFamily: "monospace" }}>
-                    {PAYMENT_NUMBER}
-                  </Text>
-                  <CopyButton value={PAYMENT_NUMBER}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? "Copiado!" : "Copiar"}>
-                        <ActionIcon
-                          color={copied ? "teal" : "gray"}
-                          variant="light"
-                          onClick={copy}
-                        >
-                          {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-              </div>
+          <Text size="sm" c="dimmed">
+            Realiza la transferencia a cualquiera de las cuentas a continuación y envíanos el
+            comprobante por WhatsApp. Renovaremos tu membresía en menos de 24 horas.
+          </Text>
 
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Nombre:
-                </Text>
-                <Text size="sm" fw={500}>
-                  {PAYMENT_NAME}
-                </Text>
-              </div>
-            </Stack>
+          {/* Cuentas */}
+          <Stack gap="sm">
+            <AccountRow
+              label="Nequi"
+              color="grape"
+              value={PAYMENT_NUMBER}
+              secondaryLabel={`Nombre: ${PAYMENT_NAME}`}
+            />
+            <AccountRow
+              label="Daviplata / Bre-B"
+              color="red"
+              value={PAYMENT_NUMBER}
+              secondaryLabel={`Nombre: ${PAYMENT_NAME}`}
+            />
+            <AccountRow
+              label="PayPal"
+              color="blue"
+              value={PAYPAL_EMAIL}
+              secondaryLabel={`Nombre: ${PAYMENT_NAME}`}
+            />
           </Stack>
 
-          {/* Daviplata */}
-          <Stack gap="xs">
-            <Group gap="xs">
-              <Badge color="red" variant="filled" size="lg">
-                Daviplata
-              </Badge>
-            </Group>
-
-            <Stack gap="sm" p="md" style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Número / Llave:
-                </Text>
-                <Group gap="xs">
-                  <Text size="lg" fw={600} style={{ fontFamily: "monospace" }}>
-                    {PAYMENT_NUMBER}
-                  </Text>
-                  <CopyButton value={PAYMENT_NUMBER}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? "Copiado!" : "Copiar"}>
-                        <ActionIcon
-                          color={copied ? "teal" : "gray"}
-                          variant="light"
-                          onClick={copy}
-                        >
-                          {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-                <Text size="xs" c="dimmed" mt="xs">
-                  También: Llave Bre-B {PAYMENT_NUMBER}
-                </Text>
-              </div>
-
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Nombre:
-                </Text>
-                <Text size="sm" fw={500}>
-                  {PAYMENT_NAME}
-                </Text>
-              </div>
-            </Stack>
-          </Stack>
-
-          {/* PayPal */}
-          <Stack gap="xs">
-            <Group gap="xs">
-              <Badge color="blue" variant="filled" size="lg">
-                PayPal
-              </Badge>
-            </Group>
-
-            <Stack gap="sm" p="md" style={{ backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Correo PayPal:
-                </Text>
-                <Group gap="xs">
-                  <Text size="sm" fw={600} style={{ fontFamily: "monospace" }}>
-                    {PAYPAL_EMAIL}
-                  </Text>
-                  <CopyButton value={PAYPAL_EMAIL}>
-                    {({ copied, copy }) => (
-                      <Tooltip label={copied ? "Copiado!" : "Copiar"}>
-                        <ActionIcon
-                          color={copied ? "teal" : "gray"}
-                          variant="light"
-                          onClick={copy}
-                        >
-                          {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                        </ActionIcon>
-                      </Tooltip>
-                    )}
-                  </CopyButton>
-                </Group>
-              </div>
-
-              <div>
-                <Text size="xs" c="dimmed" mb={4}>
-                  Nombre:
-                </Text>
-                <Text size="sm" fw={500}>
-                  {PAYMENT_NAME}
-                </Text>
-              </div>
-            </Stack>
-          </Stack>
-
-          {/* Monto a transferir */}
-          <Alert color="grape" variant="light">
-            <Text size="xs" fw={500} mb={4}>
-              Monto a transferir:
-            </Text>
-            <Group gap="md" align="center">
-              <Text size="xl" fw={700}>
-                ${price} {currency}
+          {/* Monto */}
+          <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-gray-0)">
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">
+                Monto a transferir:
               </Text>
-              <CopyButton value={price.toString()}>
-                {({ copied, copy }) => (
-                  <Tooltip label={copied ? "Copiado!" : "Copiar monto"}>
-                    <ActionIcon
-                      color={copied ? "teal" : "gray"}
-                      variant="light"
-                      onClick={copy}
-                    >
-                      {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-              </CopyButton>
+              <Group gap="xs">
+                <Text fw={700} size="lg">
+                  ${price} {currency}
+                </Text>
+                <CopyButton value={String(price)}>
+                  {({ copied, copy }) => (
+                    <Tooltip label={copied ? "Copiado" : "Copiar monto"}>
+                      <ActionIcon
+                        color={copied ? "teal" : "gray"}
+                        variant="light"
+                        size="sm"
+                        onClick={copy}
+                      >
+                        {copied ? <CheckIcon size={14} /> : <IconCopy size={14} />}
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </CopyButton>
+              </Group>
             </Group>
-          </Alert>
-
-          {/* Instrucciones */}
-          <Alert color="yellow" variant="light" icon={<BiInfoCircle size={18} />}>
-            <Text size="xs" fw={500} mb={4}>
-              Instrucciones:
-            </Text>
-            <Stack gap={4}>
-              <Text size="xs">1. Realiza la transferencia a alguna de las cuentas</Text>
-              <Text size="xs">2. Envía el comprobante por WhatsApp</Text>
-              <Text size="xs">3. Espera la confirmación de activación</Text>
-              <Text size="xs" c="dimmed" mt="xs">
-                Activación en menos de 24 horas
-              </Text>
-            </Stack>
-          </Alert>
+          </Paper>
 
           {/* Botón WhatsApp */}
           <Button
-            size="lg"
             fullWidth
-            leftSection={<BsWhatsapp size={18} />}
+            size="md"
             color="teal"
+            variant="light"
+            leftSection={<BsWhatsapp size={18} />}
             onClick={handleWhatsAppContact}
           >
-            Enviar Comprobante por WhatsApp
+            Enviar comprobante por WhatsApp
           </Button>
         </Stack>
-
-        {/* Botón cerrar */}
-        <Group justify="center" mt="md">
-          <Button variant="light" color="gray" onClick={onClose}>
-            Cerrar
-          </Button>
-        </Group>
       </Stack>
     </Modal>
+  );
+}
+
+// ─── Sub-componente fila de cuenta ─────────────────────────────────────────
+function AccountRow({
+  label,
+  color,
+  value,
+  secondaryLabel,
+}: {
+  label: string;
+  color: string;
+  value: string;
+  secondaryLabel: string;
+}) {
+  return (
+    <Paper withBorder p="sm" radius="md">
+      <Group justify="space-between" wrap="nowrap">
+        <Group gap="sm" wrap="nowrap">
+          <Badge color={color} variant="filled" size="sm" style={{ flexShrink: 0 }}>
+            {label}
+          </Badge>
+          <Stack gap={0}>
+            <Text size="sm" fw={600} style={{ fontFamily: "monospace" }}>
+              {value}
+            </Text>
+            <Text size="xs" c="dimmed">
+              {secondaryLabel}
+            </Text>
+          </Stack>
+        </Group>
+        <CopyButton value={value}>
+          {({ copied, copy }) => (
+            <Tooltip label={copied ? "Copiado" : "Copiar"}>
+              <ActionIcon
+                color={copied ? "teal" : "gray"}
+                variant="light"
+                size="sm"
+                onClick={copy}
+                style={{ flexShrink: 0 }}
+              >
+                {copied ? <IconCheck size={12} /> : <IconCopy size={14} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </CopyButton>
+      </Group>
+    </Paper>
   );
 }
