@@ -182,7 +182,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   ) => {
     const confirmedAppointments = appointments.filter((a) => a.status === "confirmed" || a.status === "attended");
     const totalRevenue = confirmedAppointments.reduce(
-      (total, appointment) => total + (appointment.service?.price || 0),
+      (total, appointment) => total + (appointment.totalPrice || 0),
       0
     );
 
