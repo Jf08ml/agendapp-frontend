@@ -440,7 +440,14 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                             <Table.Td>{appointment.service?.name || "N/A"}</Table.Td>
                             <Table.Td>{getStatusBadge(appointment.status)}</Table.Td>
                             <Table.Td>
-                              {formatCurrency(appointment.service?.price || 0)}
+                              <Group gap={4} wrap="nowrap">
+                                {formatCurrency(appointment.totalPrice || 0)}
+                                {appointment.customPrice != null ? (
+                                  <Badge size="xs" color="orange" variant="light">Personalizado</Badge>
+                                ) : (
+                                  <Badge size="xs" color="gray" variant="light">Normal</Badge>
+                                )}
+                              </Group>
                             </Table.Td>
                           </Table.Tr>
                         ))}
