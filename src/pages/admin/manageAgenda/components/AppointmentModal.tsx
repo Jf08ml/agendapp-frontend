@@ -222,23 +222,13 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         setNewAppointment((prev) => ({ ...prev, endDate: end }));
       }
     } else {
-      // MODO EDICIÓN: mantener la duración original al cambiar startDate
-      // Calcular la duración actual y aplicarla al nuevo startDate
-      if (newAppointment.startDate && newAppointment.endDate) {
-        const currentDurationMs =
-          new Date(newAppointment.endDate).getTime() -
-          new Date(newAppointment.startDate).getTime();
-
-        // Solo recalcular si la duración es inválida (endDate antes de startDate)
-        // Esto ocurre cuando se cambia el día del startDate
-        if (currentDurationMs < 0) {
-          // Obtener la duración original de la cita en BD
-          const originalDurationMs =
-            new Date(appointment.endDate).getTime() -
-            new Date(appointment.startDate).getTime();
-          const newEnd = new Date(newAppointment.startDate.getTime() + originalDurationMs);
-          setNewAppointment((prev) => ({ ...prev, endDate: newEnd }));
-        }
+      // MODO EDICIÓN: siempre recalcular endDate al cambiar startDate, preservando la duración original
+      if (newAppointment.startDate && appointment.startDate && appointment.endDate) {
+        const originalDurationMs =
+          new Date(appointment.endDate).getTime() -
+          new Date(appointment.startDate).getTime();
+        const newEnd = new Date(new Date(newAppointment.startDate).getTime() + Math.max(originalDurationMs, 0));
+        setNewAppointment((prev) => ({ ...prev, endDate: newEnd }));
       }
     }
   }, [
@@ -872,19 +862,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     label="Hora"
                     date={newAppointment.startDate}
                     timeFormat={timeFormat}
-                    onChange={(date) => {
-                      // En modo edición, recalcular endDate basado en la duración del servicio
-                      if (appointment && newAppointment.services && newAppointment.services.length > 0) {
-                        const totalDuration = newAppointment.services.reduce(
-                          (acc, s) => acc + (s.duration ?? 0),
-                          0
-                        );
-                        const newEndDate = addMinutes(date, totalDuration);
-                        setNewAppointment({ ...newAppointment, startDate: date, endDate: newEndDate });
-                      } else {
-                        setNewAppointment({ ...newAppointment, startDate: date });
-                      }
-                    }}
+                    onChange={(date) =>
+                      setNewAppointment({ ...newAppointment, startDate: date })
+                    }
                   />
                 </Box>
               </Grid.Col>
