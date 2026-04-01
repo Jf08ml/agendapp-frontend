@@ -24,6 +24,8 @@ import {
   Box,
   Divider,
   Checkbox,
+  List,
+  ScrollArea,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
@@ -130,6 +132,7 @@ const ReservationsList: React.FC = () => {
     reservationId?: string;
     isGroup?: boolean;
     groupId?: string;
+    conflictingAppointments?: Array<{ _id: string; startDate: string; endDate: string; status: string; client?: { name: string } }>;
   } | null>(null);
 
   useEffect(() => {
@@ -438,6 +441,7 @@ const ReservationsList: React.FC = () => {
         setConcurrencyWarning({
           message: err.response.data.message,
           reservationId,
+          conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
         return "concurrency";
       }
@@ -619,6 +623,7 @@ const ReservationsList: React.FC = () => {
           message: err.response.data.message,
           isGroup: true,
           groupId,
+          conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
         if (organization?._id) await loadPage(organization._id);
         return "concurrency";
@@ -671,6 +676,7 @@ const ReservationsList: React.FC = () => {
           message: err.response.data.message,
           isGroup: true,
           groupId,
+          conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
         if (organization?._id) await loadPage(organization._id);
         return "concurrency";
@@ -716,6 +722,7 @@ const ReservationsList: React.FC = () => {
           message: err.response.data.message,
           isGroup: true,
           groupId,
+          conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
         if (organization?._id) await loadPage(organization._id);
         return "concurrency";
@@ -1487,12 +1494,34 @@ const ReservationsList: React.FC = () => {
         onClose={() => setConcurrencyWarning(null)}
         title="Cupo máximo alcanzado"
         centered
-        size="sm"
+        size="md"
       >
         <Stack>
           <Alert color="orange" title="Límite de concurrencia">
             {concurrencyWarning?.message}
           </Alert>
+          {concurrencyWarning?.conflictingAppointments && concurrencyWarning.conflictingAppointments.length > 0 && (
+            <>
+              <Text size="sm" fw={500}>Citas que ocupan ese horario:</Text>
+              <ScrollArea.Autosize mah={200}>
+                <List size="sm" spacing={4}>
+                  {concurrencyWarning.conflictingAppointments.map((appt) => {
+                    const tz = organization?.timezone || "America/Bogota";
+                    const start = dayjs(appt.startDate).tz(tz).format("HH:mm");
+                    const end = dayjs(appt.endDate).tz(tz).format("HH:mm");
+                    return (
+                      <List.Item key={appt._id}>
+                        <Text size="sm" component="span" fw={500}>
+                          {appt.client?.name || "Cliente"}
+                        </Text>
+                        <Text size="sm" component="span" c="dimmed"> · {start}–{end}</Text>
+                      </List.Item>
+                    );
+                  })}
+                </List>
+              </ScrollArea.Autosize>
+            </>
+          )}
           <Text size="sm">
             ¿Deseas crear la cita de igual forma ampliando el cupo manualmente?
           </Text>
