@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 import {
-  Container,
-  Paper,
   Title,
   Text,
   TextInput,
@@ -15,12 +13,10 @@ import {
   Anchor,
   Box,
   Image,
-  Divider,
-  SimpleGrid,
   ThemeIcon,
-  List,
   ActionIcon,
   Select,
+  SimpleGrid,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../utils/zodResolver";
@@ -36,7 +32,6 @@ import {
   IconBuildingStore,
   IconLink,
   IconBrandWhatsapp,
-  IconMessage2,
   IconGlobe,
   IconClock,
   IconCurrencyDollar,
@@ -69,7 +64,6 @@ const signupSchema = z.object({
   currency: z.string().optional(),
 });
 
-/** Moneda por defecto según país ISO2 */
 const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   AR: "ARS", BO: "BOB", BR: "BRL", CL: "CLP", CO: "COP",
   CR: "CRC", CU: "CUP", DO: "DOP", EC: "USD", GT: "GTQ",
@@ -92,59 +86,66 @@ const COUNTRY_CURRENCY_MAP: Record<string, string> = {
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 const SUPPORT_WA_URL = "https://wa.me/573184345284";
-const SUPPORT_WA_TEXT = "+57 318 434 5284";
-
-// ✅ 1) tiempo reducido a 3s
 const SUPPORT_AUTO_COLLAPSE_MS = 3000;
 
-// Estilos compartidos para inputs sobre fondo oscuro
-const INPUT_STYLES = {
-  input: {
-    background: "rgba(255,255,255,0.07)",
-    color: "rgba(255,255,255,0.92)",
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  label: { marginBottom: 6 },
+// Inputs compactos sobre panel oscuro
+const INPUT_SM: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#334155",
+  borderColor: "rgba(255,255,255,0.18)",
+  borderRadius: 7,
+  fontSize: 13,
+  height: 34,
+};
+
+const inputStyles = {
+  input: INPUT_SM,
+  label: { marginBottom: 3, color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 },
 } as const;
 
-const SELECT_STYLES = {
-  input: {
-    background: "rgba(255,255,255,0.07)",
-    color: "rgba(255,255,255,0.92)",
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  label: { marginBottom: 6 },
+const selectStyles = {
+  input: INPUT_SM,
+  label: { marginBottom: 3, color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 },
   dropdown: {
-    background: "#0e1825",
+    background: "#16286b",
     border: "1px solid rgba(255,255,255,0.14)",
-    color: "rgba(255,255,255,0.9)",
   },
-  option: {
-    color: "rgba(255,255,255,0.88)",
-  },
+  option: { color: "rgba(255,255,255,0.88)", fontSize: 13 },
 } as const;
 
-function RequiredLabel({ children }: { children: React.ReactNode }) {
+function RLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Group gap={6} wrap="nowrap">
-      <Text c="rgba(255,255,255,0.88)" span>
+    <Group gap={3} wrap="nowrap">
+      <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 }}>
         {children}
-      </Text>
-      <Text span c="rgba(251,191,36,0.95)" fw={800}>
-        *
-      </Text>
+      </span>
+      <span style={{ color: "#EF4444", fontWeight: 800, fontSize: 11 }}>*</span>
     </Group>
   );
 }
 
-/** Auto-detecta timezone, país y moneda del navegador */
+function SecHeader({ label, icon }: { label: string; icon: React.ReactNode }) {
+  return (
+    <Group justify="space-between" align="center" mt={12} mb={2}>
+      <Text
+        size="xs"
+        fw={700}
+        tt="uppercase"
+        style={{ color: "rgba(255,255,255,0.50)", letterSpacing: 1, fontSize: 10 }}
+      >
+        {label}
+      </Text>
+      <ThemeIcon size={26} radius="lg" variant="light" color="blue">
+        {icon}
+      </ThemeIcon>
+    </Group>
+  );
+}
+
 function detectRegionalDefaults() {
   const timezone = (() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Bogota";
-    } catch {
-      return "America/Bogota";
-    }
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Bogota"; }
+    catch { return "America/Bogota"; }
   })();
   const country = detectUserCountry();
   const currency = COUNTRY_CURRENCY_MAP[country] ?? "USD";
@@ -153,9 +154,7 @@ function detectRegionalDefaults() {
 
 export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [slugStatus, setSlugStatus] = useState<
-    "idle" | "checking" | "available" | "taken" | "invalid"
-  >("idle");
+  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,27 +163,12 @@ export default function SignupPage() {
   const turnstileRef = useRef<TurnstileInstance>(null);
   const tokenResolverRef = useRef<((t: string) => void) | null>(null);
 
-  // ✅ Soporte: expanded -> collapsed -> hidden
-  const [supportState, setSupportState] = useState<
-    "expanded" | "collapsed" | "hidden"
-  >("expanded");
+  const [supportState, setSupportState] = useState<"expanded" | "collapsed" | "hidden">("expanded");
   const supportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Listas de selects (memoizadas)
-  const countryData = useMemo(
-    () => getAllCountries().map((c) => ({ value: c.value, label: c.label })),
-    []
-  );
-  const timezoneData = useMemo(
-    () => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })),
-    []
-  );
-  const currencyData = useMemo(
-    () => getAllCurrencies().map((c) => ({ value: c.value, label: c.label })),
-    []
-  );
-
-  // Defaults regionales detectados una sola vez
+  const countryData = useMemo(() => getAllCountries().map((c) => ({ value: c.value, label: c.label })), []);
+  const timezoneData = useMemo(() => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })), []);
+  const currencyData = useMemo(() => getAllCurrencies().map((c) => ({ value: c.value, label: c.label })), []);
   const regionalDefaults = useMemo(() => detectRegionalDefaults(), []);
 
   const form = useForm<SignupFormValues>({
@@ -202,7 +186,6 @@ export default function SignupPage() {
     },
   });
 
-  // Cuando el usuario cambia de país, sugerir la moneda correspondiente
   const handleCountryChange = (value: string | null) => {
     form.setFieldValue("default_country", value ?? "");
     if (value && COUNTRY_CURRENCY_MAP[value] && !form.isDirty("currency")) {
@@ -211,34 +194,25 @@ export default function SignupPage() {
   };
 
   const checkSlug = useCallback(async (slug: string) => {
-    if (!slug || slug.length < 3) {
-      setSlugStatus("idle");
-      setSlugSuggestions([]);
-      return;
-    }
+    if (!slug || slug.length < 3) { setSlugStatus("idle"); setSlugSuggestions([]); return; }
     setSlugStatus("checking");
     try {
       const result = await checkSlugAvailability(slug.toLowerCase());
       if (result.available) {
-        setSlugStatus("available");
-        setSlugSuggestions([]);
+        setSlugStatus("available"); setSlugSuggestions([]);
       } else {
         setSlugStatus(result.reason === "invalid_format" ? "invalid" : "taken");
         setSlugSuggestions(result.suggestions || []);
       }
-    } catch {
-      setSlugStatus("idle");
-    }
+    } catch { setSlugStatus("idle"); }
   }, []);
 
   const handleBusinessNameChange = (value: string) => {
     form.setFieldValue("businessName", value);
-
     const currentAuto = slugifyName(form.values.businessName);
     if (!form.values.slug || form.values.slug === currentAuto) {
       const newSlug = slugifyName(value);
       form.setFieldValue("slug", newSlug);
-
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => checkSlug(newSlug), 300);
     }
@@ -247,867 +221,416 @@ export default function SignupPage() {
   const handleSlugChange = (value: string) => {
     const normalized = value.toLowerCase().replace(/[^a-z]/g, "");
     form.setFieldValue("slug", normalized);
-
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => checkSlug(normalized), 300);
   };
 
-  useEffect(() => {
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, []);
+  useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); }, []);
 
-  // Evita doble scroll si AppShell también scrollea
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
-
-  // ✅ auto-colapsar a los 3 segundos
   useEffect(() => {
     if (supportTimer.current) clearTimeout(supportTimer.current);
-
     if (supportState === "expanded") {
-      supportTimer.current = setTimeout(() => {
-        setSupportState("collapsed");
-      }, SUPPORT_AUTO_COLLAPSE_MS);
+      supportTimer.current = setTimeout(() => setSupportState("collapsed"), SUPPORT_AUTO_COLLAPSE_MS);
     }
-
-    return () => {
-      if (supportTimer.current) clearTimeout(supportTimer.current);
-    };
+    return () => { if (supportTimer.current) clearTimeout(supportTimer.current); };
   }, [supportState]);
 
   const handleSubmit = async (values: SignupFormValues) => {
     setError(null);
     setIsSubmitting(true);
-
     try {
       let token = turnstileToken;
-
       if (!token && turnstileRef.current) {
         token = await new Promise<string>((resolve, reject) => {
           tokenResolverRef.current = resolve;
-
-          // Por seguridad: timeout real
-          const t = setTimeout(() => {
-            tokenResolverRef.current = null;
-            reject(new Error("turnstile_timeout"));
-          }, 8000);
-
-          // envolver resolve para limpiar timeout
-          tokenResolverRef.current = (tok: string) => {
-            clearTimeout(t);
-            resolve(tok);
-          };
-
+          const t = setTimeout(() => { tokenResolverRef.current = null; reject(new Error("turnstile_timeout")); }, 8000);
+          tokenResolverRef.current = (tok: string) => { clearTimeout(t); resolve(tok); };
           turnstileRef.current?.execute();
         }).catch(() => "");
       }
-
       if (!token) {
         setError("Verificación de captcha fallida. Intenta de nuevo.");
-        turnstileRef.current?.reset?.();
-        setTurnstileToken("");
-        setIsSubmitting(false);
-        return;
+        turnstileRef.current?.reset?.(); setTurnstileToken(""); setIsSubmitting(false); return;
       }
-
       const result = await registerOrganization({
-        slug: values.slug.toLowerCase(),
-        businessName: values.businessName,
-        ownerName: values.ownerName,
-        email: values.email,
-        password: values.password,
-        phone: values.phone,
-        turnstileToken: token,
+        slug: values.slug.toLowerCase(), businessName: values.businessName,
+        ownerName: values.ownerName, email: values.email, password: values.password,
+        phone: values.phone, turnstileToken: token,
         default_country: values.default_country || undefined,
-        timezone: values.timezone || undefined,
-        currency: values.currency || undefined,
+        timezone: values.timezone || undefined, currency: values.currency || undefined,
       });
-
-      notifications.show({
-        title: "Cuenta creada",
-        message: "Redirigiendo a tu panel de administración...",
-        color: "green",
-        icon: <IconCheck size={16} />,
-      });
-
-      const redirectUrl = getPostSignupRedirectUrl(
-        values.slug.toLowerCase(),
-        result.exchangeCode,
-      );
-
-      setTimeout(() => {
-        window.location.href = redirectUrl;
-      }, 1000);
+      notifications.show({ title: "Cuenta creada", message: "Redirigiendo a tu panel...", color: "green", icon: <IconCheck size={16} /> });
+      const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
+      setTimeout(() => { window.location.href = redirectUrl; }, 1000);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
-      const message =
-        axiosErr.response?.data?.message ||
-        "Error al crear la cuenta. Intenta de nuevo.";
-      setError(message);
-      setIsSubmitting(false);
-      turnstileRef.current?.reset?.();
-      setTurnstileToken("");
+      setError(axiosErr.response?.data?.message || "Error al crear la cuenta. Intenta de nuevo.");
+      setIsSubmitting(false); turnstileRef.current?.reset?.(); setTurnstileToken("");
     }
   };
 
   const slugRightSection = () => {
-    if (slugStatus === "checking") return <Loader size="xs" />;
-    if (slugStatus === "available")
-      return (
-        <IconCheck
-          size={16}
-          style={{ color: "var(--mantine-color-green-6)" }}
-        />
-      );
-    if (slugStatus === "taken" || slugStatus === "invalid")
-      return (
-        <IconX size={16} style={{ color: "var(--mantine-color-red-6)" }} />
-      );
+    if (slugStatus === "checking") return <Loader size="xs" color="white" />;
+    if (slugStatus === "available") return <IconCheck size={14} style={{ color: "#10B981" }} />;
+    if (slugStatus === "taken" || slugStatus === "invalid") return <IconX size={14} style={{ color: "#EF4444" }} />;
     return null;
   };
 
-  const slugHelpText =
-    form.values.slug && slugStatus !== "invalid"
-      ? `${form.values.slug}.agenditapp.com`
-      : "";
+  const slugHelpText = form.values.slug && slugStatus !== "invalid" ? `${form.values.slug}.agenditapp.com` : "";
 
   return (
-    <Box
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        overflow: "hidden",
-        backgroundColor: "#050b14",
-      }}
-    >
-      {/* Background (desktop) */}
-      <Box
-        visibleFrom="sm"
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: `
-            radial-gradient(900px 520px at 18% 20%, rgba(29,78,216,0.25), transparent 60%),
-            radial-gradient(700px 420px at 80% 15%, rgba(14,165,233,0.18), transparent 55%),
-            linear-gradient(180deg, rgba(5,11,20,0.25), rgba(5,11,20,0.92)),
-            url("/images/fondo-agenditapp.png")
-          `,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "saturate(1.08) blur(4px)",
-        }}
-      />
-      {/* Background (mobile) */}
-      <Box
-        hiddenFrom="sm"
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: `
-            radial-gradient(700px 420px at 50% 10%, rgba(29,78,216,0.22), transparent 60%),
-            linear-gradient(180deg, rgba(5,11,20,0.35), rgba(5,11,20,0.96)),
-            url("/images/fondo-agenditapp-mobile.png")
-          `,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "saturate(1.08) blur(4px)",
-        }}
-      />
+    <>
+      <style>{`
+        .sp-grid {
+          display: flex;
+          height: 100%;
+        }
+        .sp-left {
+          width: 44%;
+          flex-shrink: 0;
+          overflow-y: auto;
+          padding: 36px 40px;
+          background: linear-gradient(155deg, #EEF4FF 0%, #DCE9FF 60%, #C3D4F8 100%);
+          display: flex;
+          flex-direction: column;
+        }
+        .sp-right {
+          flex: 1;
+          overflow-y: auto;
+          padding: 28px 36px 48px;
+          background: #192f6e;
+        }
+        .sp-features { display: flex; flex-direction: column; gap: 18px; flex: 1; }
+        @media (max-width: 900px) {
+          .sp-root  { overflow: hidden auto !important; }
+          .sp-grid  { flex-direction: column; height: auto; min-height: 100%; }
+          .sp-left  { width: 100%; height: auto; padding: 22px 18px; overflow-y: visible; }
+          .sp-right { height: auto; padding: 22px 18px 48px; overflow-y: visible; }
+          .sp-features { display: none; }
+        }
+      `}</style>
 
-      {/* Content */}
-      <Box
-        style={{
-          position: "relative",
-          zIndex: 2,
-          height: "100%",
-          overflowY: "auto",
-          padding: "22px 0 140px 0", // deja espacio para soporte esquina
-        }}
-      >
-        <Container size="lg">
-          {/* Header */}
-          <Group justify="space-between" align="center" mb={18} wrap="wrap">
-            <Image
-              src="/images/logo_dorado.png"
-              alt="AgenditApp"
-              w={160}
-              fit="contain"
-              style={{ filter: "drop-shadow(0 10px 22px rgba(0,0,0,0.45))" }}
-            />
+      <Box className="sp-root" style={{ position: "fixed", inset: 0, zIndex: 9999, overflow: "hidden" }}>
+        <div className="sp-grid">
 
-            <Paper
-              radius="xl"
-              px="md"
-              py={10}
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.10)",
-                backdropFilter: "blur(10px)",
-              }}
+          {/* ── LEFT ── */}
+          <div className="sp-left">
+            <Image src="/images/logo-text.png" alt="AgenditApp" w={130} fit="contain" style={{ marginBottom: 28 }} />
+
+            <Title
+              order={1}
+              style={{ color: "#0F172A", letterSpacing: -0.5, lineHeight: 1.15, marginBottom: 24, fontSize: "clamp(1.6rem, 2.6vw, 2.2rem)" }}
             >
-              <Group gap={10} wrap="nowrap">
-                <ThemeIcon radius="xl" size={34} variant="light" color="blue">
-                  <IconLink size={18} />
-                </ThemeIcon>
-                <Box>
-                  <Text size="sm" fw={800} c="white">
-                    Acceso por enlace
-                  </Text>
-                  <Text size="xs" c="rgba(255,255,255,0.68)">
-                    Tu negocio tendrá una URL (dominio o subdominio) para entrar
-                    al panel.
-                  </Text>
-                </Box>
-              </Group>
-            </Paper>
-          </Group>
+              Crea tu panel con tu{" "}
+              <span style={{ color: "#1D4ED8", fontWeight: 900 }}>dirección web</span>{" "}
+              en minutos.
+            </Title>
 
-          <SimpleGrid
-            cols={{ base: 1, md: 2 }}
-            spacing={{ base: "xl", md: 48 }}
-          >
-            {/* LEFT */}
-            <Box>
-              <Title c="white" order={1} style={{ letterSpacing: -0.6 }}>
-                Crea tu panel con tu{" "}
-                <Text span c="rgba(251,191,36,0.95)">
-                  dirección web
-                </Text>{" "}
-                en minutos.
-              </Title>
-
-              <Text mt={10} c="rgba(255,255,255,0.72)" maw={520}>
-                Configura tu organización y tu URL. Al finalizar, quedarás
-                dentro de tu panel para empezar a configurar servicios, horarios
-                y reservas.
-              </Text>
-
-              <Paper
-                mt={18}
-                radius="xl"
-                p="lg"
-                style={{
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                <Group align="flex-start" gap="md" wrap="nowrap">
-                  <ThemeIcon radius="xl" size={44} variant="light" color="blue">
-                    <IconRocket size={22} />
-                  </ThemeIcon>
-
-                  <Box>
-                    <Text fw={800} c="white">
-                      Cómo funciona
-                    </Text>
-
-                    <List
-                      mt={10}
-                      spacing={8}
-                      icon={
-                        <ThemeIcon
-                          radius="xl"
-                          size={20}
-                          variant="light"
-                          color="yellow"
-                        >
-                          <IconArrowRight size={12} />
-                        </ThemeIcon>
-                      }
-                    >
-                      <List.Item>
-                        <Text c="rgba(255,255,255,0.72)">
-                          Creas tu organización y eliges tu URL.
-                        </Text>
-                      </List.Item>
-                      <List.Item>
-                        <Text c="rgba(255,255,255,0.72)">
-                          Te redirigimos automáticamente al panel de tu negocio.
-                        </Text>
-                      </List.Item>
-                      <List.Item>
-                        <Text c="rgba(255,255,255,0.72)">
-                          Empiezas a agendar y a gestionar clientes desde tu
-                          panel.
-                        </Text>
-                      </List.Item>
-                    </List>
-                  </Box>
-                </Group>
-
-                <Divider my="md" opacity={0.25} />
-
-                <Group gap="md" wrap="nowrap" align="flex-start">
-                  <ThemeIcon
-                    radius="xl"
-                    size={44}
-                    variant="light"
-                    color="green"
-                  >
-                    <IconBrandWhatsapp size={22} />
-                  </ThemeIcon>
-
-                  <Box>
-                    <Text fw={800} c="white">
-                      Mensajes y recordatorios
-                    </Text>
-
-                    <Text mt={6} c="rgba(255,255,255,0.72)">
-                      AgenditApp te acompaña en la configuración para que puedas
-                      enviar mensajes a tus clientes desde tu WhatsApp Business
-                      y mantener tus citas organizadas.
-                    </Text>
-                  </Box>
-                </Group>
-              </Paper>
-
-              <Paper
-                mt={14}
-                radius="xl"
-                px="lg"
-                py="md"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                <Group gap="md" wrap="nowrap" align="flex-start">
-                  <ThemeIcon radius="xl" size={42} variant="light" color="blue">
-                    <IconCalendar size={20} />
+            {/* Features — ocultas en mobile */}
+            <div className="sp-features">
+              {[
+                {
+                  icon: <IconRocket size={18} />,
+                  color: "blue" as const,
+                  label: "Cómo funciona",
+                  items: [
+                    "Creas tu organización y eliges tu URL.",
+                    "Te redirigimos automáticamente al panel de tu negocio.",
+                    "Empiezas a gestionar y agendar clientes desde tu panel.",
+                  ],
+                },
+                {
+                  icon: <IconBrandWhatsapp size={18} />,
+                  color: "green" as const,
+                  label: "Mensajes y recordatorios",
+                  text: "Envía mensajes y recordatorios a tus clientes desde tu WhatsApp Business.",
+                },
+                {
+                  icon: <IconCalendar size={18} />,
+                  color: "blue" as const,
+                  label: "Listo para operar",
+                  text: "Al finalizar, tu panel queda activo en tu URL para configurar servicios, horarios y reservas.",
+                },
+              ].map(({ icon, color, label, items, text }) => (
+                <Group key={label} align="flex-start" gap={12} wrap="nowrap">
+                  <ThemeIcon radius="xl" size={38} variant="light" color={color} style={{ flexShrink: 0, marginTop: 1 }}>
+                    {icon}
                   </ThemeIcon>
                   <Box>
-                    <Text fw={800} c="white">
-                      Listo para operar
+                    <Text size="xs" fw={700} tt="uppercase" style={{ color: "#64748B", letterSpacing: 0.7, marginBottom: 4 }}>
+                      {label}
                     </Text>
-                    <Text size="sm" mt={4} c="rgba(255,255,255,0.68)">
-                      Al finalizar, tu panel queda activo en tu URL y puedes
-                      empezar a configurar servicios, horarios y reservas.
-                    </Text>
-                  </Box>
-                </Group>
-              </Paper>
-            </Box>
-
-            {/* RIGHT */}
-            <Box>
-              <Paper
-                radius="xl"
-                p={{ base: 18, sm: 26 }}
-                style={{
-                  position: "relative",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  backdropFilter: "blur(14px)",
-                  boxShadow: "0 18px 45px rgba(0,0,0,0.50)",
-                  overflow: "hidden",
-                }}
-              >
-                <Box
-                  style={{
-                    position: "absolute",
-                    inset: -2,
-                    background:
-                      "linear-gradient(135deg, rgba(251,191,36,0.16), rgba(59,130,246,0.16), rgba(14,165,233,0.10))",
-                    filter: "blur(14px)",
-                    opacity: 0.95,
-                    pointerEvents: "none",
-                  }}
-                />
-
-                <Box style={{ position: "relative" }}>
-                  <Group justify="space-between" align="center">
-                    <Group gap={10} wrap="nowrap">
-                      <ThemeIcon
-                        radius="xl"
-                        size={40}
-                        variant="light"
-                        color="yellow"
-                      >
-                        <IconBuildingStore size={18} />
-                      </ThemeIcon>
-                      <Box>
-                        <Text fw={900} c="white">
-                          Crear panel
-                        </Text>
-                        <Text size="xs" c="rgba(255,255,255,0.65)">
-                          Completa los datos para generar tu URL
-                        </Text>
-                      </Box>
-                    </Group>
-
-                    <Paper
-                      radius="xl"
-                      px="md"
-                      py={8}
-                      style={{
-                        background: "rgba(59,130,246,0.10)",
-                        border: "1px solid rgba(59,130,246,0.18)",
-                      }}
-                    >
-                      <Group gap={8} wrap="nowrap">
-                        <IconArrowRight
-                          size={14}
-                          style={{ color: "rgba(191,219,254,0.95)" }}
-                        />
-                        <Text size="xs" fw={800} c="rgba(191,219,254,0.95)">
-                          1 minuto
-                        </Text>
-                      </Group>
-                    </Paper>
-                  </Group>
-
-                  <Divider my="md" opacity={0.25} />
-
-                  <form onSubmit={form.onSubmit(handleSubmit)}>
-                    <Stack
-                      gap="md"
-                      style={
-                        {
-                          "--mantine-color-placeholder":
-                            "rgba(255,255,255,0.35)",
-                        } as React.CSSProperties
-                      }
-                    >
-                      {error && (
-                        <Alert
-                          icon={<IconAlertCircle size={16} />}
-                          title="Error"
-                          color="red"
-                          withCloseButton
-                          onClose={() => setError(null)}
-                        >
-                          {error}
-                        </Alert>
-                      )}
-
-                      <Text
-                        size="xs"
-                        c="rgba(255,255,255,0.65)"
-                        fw={800}
-                        tt="uppercase"
-                      >
-                        Datos del negocio
-                      </Text>
-
-                      <TextInput
-                        leftSection={<IconBuildingStore size={16} />}
-                        label={
-                          <RequiredLabel>Nombre del negocio</RequiredLabel>
-                        }
-                        placeholder="Mi Salón de Belleza"
-                        value={form.values.businessName}
-                        onChange={(e) =>
-                          handleBusinessNameChange(e.currentTarget.value)
-                        }
-                        error={form.errors.businessName}
-                        styles={INPUT_STYLES}
-                      />
-
-                      <Box>
-                        <TextInput
-                          label={<RequiredLabel>Dirección web</RequiredLabel>}
-                          placeholder="misalon"
-                          value={form.values.slug}
-                          onChange={(e) =>
-                            handleSlugChange(e.currentTarget.value)
-                          }
-                          error={
-                            form.errors.slug ||
-                            (slugStatus === "taken" &&
-                              "Este nombre ya está en uso") ||
-                            (slugStatus === "invalid" &&
-                              "Solo letras minúsculas, sin números ni guiones")
-                          }
-                          rightSection={slugRightSection()}
-                          styles={INPUT_STYLES}
-                        />
-
-                        {slugHelpText && (
-                          <Paper
-                            mt={8}
-                            radius="lg"
-                            px="md"
-                            py={10}
-                            style={{
-                              background:
-                                slugStatus === "available"
-                                  ? "rgba(34,197,94,0.08)"
-                                  : "rgba(255,255,255,0.04)",
-                              border: "1px solid rgba(255,255,255,0.10)",
-                            }}
-                          >
-                            <Group
-                              justify="space-between"
-                              wrap="nowrap"
-                              align="center"
-                            >
-                              <Group gap={10} wrap="nowrap">
-                                <ThemeIcon
-                                  radius="xl"
-                                  size={34}
-                                  variant="light"
-                                  color={
-                                    slugStatus === "available"
-                                      ? "green"
-                                      : "gray"
-                                  }
-                                >
-                                  {slugStatus === "available" ? (
-                                    <IconCheck size={18} />
-                                  ) : (
-                                    <IconLink size={18} />
-                                  )}
-                                </ThemeIcon>
-
-                                <Box>
-                                  <Text
-                                    size="xs"
-                                    fw={800}
-                                    c="rgba(255,255,255,0.85)"
-                                  >
-                                    {slugStatus === "available"
-                                      ? "Disponible"
-                                      : "Tu subdominio"}
-                                  </Text>
-                                  <Text size="sm" fw={900} c="white">
-                                    {slugHelpText}
-                                  </Text>
-                                </Box>
-                              </Group>
-
-                              <Text
-                                size="xs"
-                                c="rgba(255,255,255,0.60)"
-                                visibleFrom="sm"
-                              >
-                                Podrás usar dominio propio más adelante
-                              </Text>
-                            </Group>
-                          </Paper>
-                        )}
-
-                        {slugSuggestions.length > 0 && (
-                          <Group gap="xs" mt={10} wrap="wrap">
-                            <Text size="xs" c="rgba(255,255,255,0.65)">
-                              Sugerencias:
-                            </Text>
-                            {slugSuggestions.map((s) => (
-                              <Anchor
-                                key={s}
-                                size="xs"
-                                c="rgba(251,191,36,0.95)"
-                                onClick={() => {
-                                  form.setFieldValue("slug", s);
-                                  checkSlug(s);
-                                }}
-                                style={{ fontWeight: 800 }}
-                              >
-                                {s}
-                              </Anchor>
-                            ))}
+                    {items ? (
+                      <Stack gap={3}>
+                        {items.map((item) => (
+                          <Group key={item} gap={7} wrap="nowrap" align="flex-start">
+                            <IconArrowRight size={11} style={{ color: "#1D4ED8", flexShrink: 0, marginTop: 4 }} />
+                            <Text size="sm" c="#334155" lh={1.5}>{item}</Text>
                           </Group>
-                        )}
-                      </Box>
-
-                      <Divider my={4} opacity={0.25} />
-
-                      <Text
-                        size="xs"
-                        c="rgba(255,255,255,0.65)"
-                        fw={800}
-                        tt="uppercase"
-                      >
-                        Región
-                      </Text>
-
-                      <Select
-                        label={<RequiredLabel>País</RequiredLabel>}
-                        placeholder="Selecciona tu país"
-                        leftSection={<IconGlobe size={16} />}
-                        value={form.values.default_country ?? null}
-                        onChange={handleCountryChange}
-                        error={form.errors.default_country}
-                        data={countryData}
-                        searchable
-                        comboboxProps={{ zIndex: 10001 }}
-                        styles={SELECT_STYLES}
-                      />
-
-                      <Select
-                        label={<RequiredLabel>Zona horaria</RequiredLabel>}
-                        placeholder="Busca tu zona horaria..."
-                        leftSection={<IconClock size={16} />}
-                        {...form.getInputProps("timezone")}
-                        data={timezoneData}
-                        searchable
-                        comboboxProps={{ zIndex: 10001 }}
-                        styles={SELECT_STYLES}
-                      />
-
-                      <Select
-                        label={<RequiredLabel>Moneda</RequiredLabel>}
-                        placeholder="Selecciona la moneda..."
-                        leftSection={<IconCurrencyDollar size={16} />}
-                        {...form.getInputProps("currency")}
-                        data={currencyData}
-                        searchable
-                        comboboxProps={{ zIndex: 10001 }}
-                        styles={SELECT_STYLES}
-                      />
-
-                      <Divider my={4} opacity={0.25} />
-
-                      <Text
-                        size="xs"
-                        c="rgba(255,255,255,0.65)"
-                        fw={800}
-                        tt="uppercase"
-                      >
-                        Administrador
-                      </Text>
-
-                      <TextInput
-                        leftSection={<IconUser size={16} />}
-                        label={<RequiredLabel>Tu nombre</RequiredLabel>}
-                        placeholder="Juan Pérez"
-                        {...form.getInputProps("ownerName")}
-                        styles={INPUT_STYLES}
-                      />
-
-                      <TextInput
-                        label={<RequiredLabel>Email</RequiredLabel>}
-                        placeholder="tu@email.com"
-                        {...form.getInputProps("email")}
-                        styles={INPUT_STYLES}
-                      />
-
-                      <TextInput
-                        label={<RequiredLabel>Teléfono</RequiredLabel>}
-                        placeholder="+57 300 123 4567"
-                        {...form.getInputProps("phone")}
-                        styles={INPUT_STYLES}
-                      />
-
-                      <PasswordInput
-                        label={<RequiredLabel>Contraseña</RequiredLabel>}
-                        placeholder="Mínimo 6 caracteres"
-                        {...form.getInputProps("password")}
-                        styles={INPUT_STYLES}
-                      />
-
-                      <Box>
-                        <Turnstile
-                          ref={turnstileRef}
-                          siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                          options={{ size: "invisible" }}
-                          onSuccess={(token) => {
-                            setTurnstileToken(token);
-                            tokenResolverRef.current?.(token);
-                            tokenResolverRef.current = null;
-                          }}
-                          onExpire={() => setTurnstileToken("")}
-                          onError={() => setTurnstileToken("")}
-                        />
-                      </Box>
-
-                      <Button
-                        type="submit"
-                        fullWidth
-                        mt="xs"
-                        loading={isSubmitting}
-                        disabled={
-                          slugStatus === "taken" || slugStatus === "invalid"
-                        }
-                        styles={{
-                          root: {
-                            height: 44,
-                            fontWeight: 900,
-                            letterSpacing: 0.2,
-                            background:
-                              "linear-gradient(90deg, rgba(251,191,36,0.95) 0%, rgba(59,130,246,0.95) 55%, rgba(14,165,233,0.95) 100%)",
-                            boxShadow: "0 14px 28px rgba(0,0,0,0.35)",
-                          },
-                        }}
-                      >
-                        Crear cuenta
-                      </Button>
-
-                      <Paper
-                        radius="lg"
-                        px="md"
-                        py="sm"
-                        style={{
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(255,255,255,0.10)",
-                        }}
-                      >
-                        <Text size="xs" c="rgba(255,255,255,0.65)">
-                          Al finalizar, podrás entrar desde el enlace de tu
-                          negocio (dominio o subdominio). Si necesitas ayuda,
-                          contáctanos.
-                        </Text>
-                      </Paper>
-                    </Stack>
-                  </form>
-                </Box>
-              </Paper>
-            </Box>
-          </SimpleGrid>
-        </Container>
-      </Box>
-
-      {/* ✅ Soporte global esquina (desktop + mobile): expanded/collapsed/hidden */}
-      {supportState !== "hidden" && (
-        <Box
-          style={{
-            position: "fixed",
-            right: 16,
-            bottom: 16,
-            zIndex: 5,
-            pointerEvents: "none",
-          }}
-        >
-          {supportState === "expanded" ? (
-            <Paper
-              radius="xl"
-              px="md"
-              py="sm"
-              style={{
-                width: "min(420px, calc(100vw - 32px))",
-                background: "rgba(255,255,255,0.07)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                backdropFilter: "blur(10px)",
-                boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
-                pointerEvents: "auto",
-              }}
-            >
-              <Group justify="space-between" align="flex-start" wrap="nowrap">
-                <Group gap={10} wrap="nowrap" align="flex-start">
-                  <ThemeIcon
-                    radius="xl"
-                    size={38}
-                    variant="light"
-                    color="green"
-                  >
-                    <IconBrandWhatsapp size={18} />
-                  </ThemeIcon>
-
-                  <Box style={{ flex: 1 }}>
-                    <Text size="sm" fw={900} c="white">
-                      ¿Necesitas ayuda?
-                    </Text>
-                    <Text size="xs" c="rgba(255,255,255,0.72)" mt={2}>
-                      Escríbenos por WhatsApp para dudas, soporte o cualquier
-                      inquietud.
-                    </Text>
-
-                    <Group gap={10} mt={8} wrap="wrap">
-                      <Anchor
-                        href={SUPPORT_WA_URL}
-                        target="_blank"
-                        style={{
-                          display: "inline-flex",
-                          fontWeight: 900,
-                          color: "rgba(34,197,94,0.95)",
-                        }}
-                      >
-                        {SUPPORT_WA_TEXT}
-                      </Anchor>
-
-                      <Anchor
-                        href={SUPPORT_WA_URL}
-                        target="_blank"
-                        style={{
-                          display: "inline-flex",
-                          fontWeight: 800,
-                          color: "rgba(191,219,254,0.95)",
-                        }}
-                      >
-                        Abrir chat
-                      </Anchor>
-                    </Group>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Text size="sm" c="#334155" lh={1.5}>{text}</Text>
+                    )}
                   </Box>
                 </Group>
+              ))}
+            </div>
 
-                {/* X para colapsar sin esperar */}
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Cerrar"
-                  onClick={() => setSupportState("collapsed")}
+            {/* CTA */}
+            <Box style={{ marginTop: 28 }}>
+              <Text fw={600} style={{ color: "#0F172A", fontSize: "clamp(0.95rem, 1.6vw, 1.1rem)", lineHeight: 1.4, marginBottom: 4 }}>
+                Al finalizar,{" "}
+                <span style={{ color: "#1D4ED8", fontWeight: 800 }}>podrás entrar desde el enlace de tu negocio</span>
+              </Text>
+              <Text size="sm" c="#64748B" mb={16}>Si necesitas ayuda, contáctanos.</Text>
+
+              <Anchor href={SUPPORT_WA_URL} target="_blank" style={{ textDecoration: "none" }}>
+                <Group
+                  gap={10}
+                  style={{
+                    display: "inline-flex",
+                    background: "#0F172A",
+                    borderRadius: 40,
+                    padding: "7px 20px 7px 7px",
+                    cursor: "pointer",
+                  }}
                 >
-                  <IconX size={18} />
+                  <Box
+                    style={{
+                      width: 34, height: 34, borderRadius: "50%",
+                      background: "#25D366",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <IconBrandWhatsapp size={18} color="#FFFFFF" />
+                  </Box>
+                  <Text size="xs" fw={900} tt="uppercase" style={{ color: "#FFFFFF", letterSpacing: 1 }}>
+                    Estamos contigo
+                  </Text>
+                </Group>
+              </Anchor>
+            </Box>
+          </div>
+
+          {/* ── RIGHT ── */}
+          <div className="sp-right">
+            {/* Top info */}
+            <Group gap={20} mb={20} wrap="wrap">
+              {[
+                { icon: <IconLink size={12} />, label: "Acceso por enlace", desc: "Tu negocio tendrá una URL para entrar al panel." },
+                { icon: <IconRocket size={12} />, label: "Crear panel", desc: "Completa los datos para generar tu URL." },
+              ].map(({ icon, label, desc }) => (
+                <Group key={label} gap={8} wrap="nowrap" align="flex-start">
+                  <ThemeIcon size={24} radius="md" variant="light" color="blue">{icon}</ThemeIcon>
+                  <Box>
+                    <Text size="xs" fw={700} tt="uppercase" style={{ color: "rgba(255,255,255,0.85)", letterSpacing: 0.8, fontSize: 10 }}>{label}</Text>
+                    <Text size="xs" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</Text>
+                  </Box>
+                </Group>
+              ))}
+            </Group>
+
+            {/* Form */}
+            <form onSubmit={form.onSubmit(handleSubmit)}>
+              <Stack
+                gap={8}
+                style={{ "--mantine-color-placeholder": "rgba(100,116,139,0.9)" } as React.CSSProperties}
+              >
+                {error && (
+                  <Alert icon={<IconAlertCircle size={14} />} title="Error" color="red" withCloseButton onClose={() => setError(null)} styles={{ root: { padding: "8px 12px" } }}>
+                    {error}
+                  </Alert>
+                )}
+
+                {/* ── Datos del negocio ── */}
+                <SecHeader label="Datos del negocio" icon={<IconBuildingStore size={13} />} />
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
+                  <TextInput
+                    label={<RLabel>Nombre del negocio</RLabel>}
+                    placeholder="Mi Salón de Belleza"
+                    value={form.values.businessName}
+                    onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
+                    error={form.errors.businessName}
+                    styles={inputStyles}
+                  />
+
+                  <Box>
+                    <TextInput
+                      label={<RLabel>Dirección web</RLabel>}
+                      placeholder="misalon"
+                      value={form.values.slug}
+                      onChange={(e) => handleSlugChange(e.currentTarget.value)}
+                      error={
+                        form.errors.slug ||
+                        (slugStatus === "taken" && "Este nombre ya está en uso") ||
+                        (slugStatus === "invalid" && "Solo letras minúsculas, sin números ni guiones")
+                      }
+                      rightSection={slugRightSection()}
+                      styles={inputStyles}
+                    />
+                    {slugHelpText && (
+                      <Box
+                        mt={4} px={8} py={5}
+                        style={{
+                          background: slugStatus === "available" ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.05)",
+                          border: slugStatus === "available" ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(255,255,255,0.10)",
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Group gap={6} align="center">
+                          {slugStatus === "available" && <IconCheck size={12} style={{ color: "#10B981", flexShrink: 0 }} />}
+                          <Text size="xs" fw={700} style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>{slugHelpText}</Text>
+                        </Group>
+                      </Box>
+                    )}
+                    {slugSuggestions.length > 0 && (
+                      <Group gap={6} mt={4} wrap="wrap">
+                        <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>Sugerencias:</Text>
+                        {slugSuggestions.map((s) => (
+                          <Anchor key={s} style={{ color: "#93C5FD", fontWeight: 700, fontSize: 11 }} onClick={() => { form.setFieldValue("slug", s); checkSlug(s); }}>
+                            {s}
+                          </Anchor>
+                        ))}
+                      </Group>
+                    )}
+                  </Box>
+                </SimpleGrid>
+
+                {/* ── Región ── */}
+                <SecHeader label="Región" icon={<IconGlobe size={13} />} />
+
+                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={8}>
+                  <Select
+                    label={<RLabel>País</RLabel>}
+                    placeholder="País"
+                    leftSection={<IconGlobe size={13} style={{ color: "#64748B" }} />}
+                    value={form.values.default_country ?? null}
+                    onChange={handleCountryChange}
+                    error={form.errors.default_country}
+                    data={countryData}
+                    searchable
+                    comboboxProps={{ zIndex: 10001 }}
+                    styles={selectStyles}
+                  />
+                  <Select
+                    label={<RLabel>Zona horaria</RLabel>}
+                    placeholder="Zona horaria"
+                    leftSection={<IconClock size={13} style={{ color: "#64748B" }} />}
+                    {...form.getInputProps("timezone")}
+                    data={timezoneData}
+                    searchable
+                    comboboxProps={{ zIndex: 10001 }}
+                    styles={selectStyles}
+                  />
+                  <Select
+                    label={<RLabel>Moneda</RLabel>}
+                    placeholder="Moneda"
+                    leftSection={<IconCurrencyDollar size={13} style={{ color: "#64748B" }} />}
+                    {...form.getInputProps("currency")}
+                    data={currencyData}
+                    searchable
+                    comboboxProps={{ zIndex: 10001 }}
+                    styles={selectStyles}
+                  />
+                </SimpleGrid>
+
+                {/* ── Administrador ── */}
+                <SecHeader label="Administrador" icon={<IconUser size={13} />} />
+
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
+                  <TextInput
+                    label={<RLabel>Tu nombre</RLabel>}
+                    placeholder="Juan Pérez"
+                    leftSection={<IconUser size={13} style={{ color: "#64748B" }} />}
+                    {...form.getInputProps("ownerName")}
+                    styles={inputStyles}
+                  />
+                  <TextInput
+                    label={<RLabel>Email</RLabel>}
+                    placeholder="tu@email.com"
+                    {...form.getInputProps("email")}
+                    styles={inputStyles}
+                  />
+                  <TextInput
+                    label={<RLabel>Teléfono</RLabel>}
+                    placeholder="+57 300 123 4567"
+                    {...form.getInputProps("phone")}
+                    styles={inputStyles}
+                  />
+                  <PasswordInput
+                    label={<RLabel>Contraseña</RLabel>}
+                    placeholder="Mínimo 6 caracteres"
+                    {...form.getInputProps("password")}
+                    styles={inputStyles}
+                  />
+                </SimpleGrid>
+
+                <Box mt={4}>
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                    options={{ size: "invisible" }}
+                    onSuccess={(token) => { setTurnstileToken(token); tokenResolverRef.current?.(token); tokenResolverRef.current = null; }}
+                    onExpire={() => setTurnstileToken("")}
+                    onError={() => setTurnstileToken("")}
+                  />
+                </Box>
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  mt={6}
+                  loading={isSubmitting}
+                  disabled={slugStatus === "taken" || slugStatus === "invalid"}
+                  styles={{
+                    root: {
+                      height: 40,
+                      fontWeight: 900,
+                      letterSpacing: 0.4,
+                      backgroundColor: "#FFFFFF",
+                      color: "#1D4ED8",
+                      borderRadius: 9,
+                    },
+                  }}
+                >
+                  Crear cuenta
+                </Button>
+
+                <Text size="xs" ta="center" style={{ color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                  Al finalizar podrás entrar desde el enlace de tu negocio.
+                </Text>
+              </Stack>
+            </form>
+          </div>
+        </div>
+
+        {/* Botón flotante WA — solo visible en mobile (panels apilados) */}
+        {supportState !== "hidden" && (
+          <Box style={{ position: "fixed", right: 14, bottom: 14, zIndex: 10 }}>
+            {supportState === "collapsed" ? (
+              <Group gap={6}>
+                <ActionIcon
+                  radius="xl" size={44} variant="filled" color="green"
+                  component="a" href={SUPPORT_WA_URL} target="_blank"
+                  aria-label="Soporte WhatsApp"
+                >
+                  <IconBrandWhatsapp size={22} />
+                </ActionIcon>
+                <ActionIcon
+                  radius="xl" size={28} variant="subtle" color="gray"
+                  style={{ background: "rgba(255,255,255,0.9)" }}
+                  onClick={() => setSupportState("hidden")}
+                >
+                  <IconX size={14} />
                 </ActionIcon>
               </Group>
-            </Paper>
-          ) : (
-            <Paper
-              radius="xl"
-              px={10}
-              py={10}
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.14)",
-                backdropFilter: "blur(10px)",
-                boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                pointerEvents: "auto",
-              }}
-            >
-              {/* Botón WA */}
-              <ActionIcon
-                radius="xl"
-                size={44}
-                variant="filled"
-                color="green"
-                component="a"
-                href={SUPPORT_WA_URL}
-                target="_blank"
-                aria-label="Soporte por WhatsApp"
-              >
-                <IconBrandWhatsapp size={22} />
-              </ActionIcon>
-
-              {/* Expandir aviso */}
-              <ActionIcon
-                radius="xl"
-                size={44}
-                variant="light"
-                color="blue"
-                aria-label="Mostrar ayuda"
-                onClick={() => setSupportState("expanded")}
-              >
-                <IconMessage2 size={22} />
-              </ActionIcon>
-
-              {/* Ocultar por completo */}
-              <ActionIcon
-                radius="xl"
-                size={44}
-                variant="subtle"
-                color="gray"
-                aria-label="Ocultar"
-                onClick={() => setSupportState("hidden")}
-              >
-                <IconX size={22} />
-              </ActionIcon>
-            </Paper>
-          )}
-        </Box>
-      )}
-    </Box>
+            ) : null}
+          </Box>
+        )}
+      </Box>
+    </>
   );
 }
 

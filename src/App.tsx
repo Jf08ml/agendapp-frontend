@@ -65,6 +65,7 @@ function AppContent() {
   const isSuperadmin = role === "superadmin";
   // Las rutas /superadmin* no necesitan org (ni antes de login ni después)
   const isSuperadminPath = location.pathname.startsWith("/superadmin");
+  const isSignupPath = location.pathname === "/signup";
   const isImpersonating = localStorage.getItem("sa_is_impersonating") === "true";
 
   const handleReturnToSuperadmin = useCallback(() => {
@@ -187,7 +188,7 @@ function AppContent() {
   }, [isAuthenticated, userId]);
 
   // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
-  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && (loading || !organization)) {
+  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && (loading || !organization)) {
     return (
       <CustomLoader
         loadingText={`Cargando ${organization?.name || "organización"}...`}
