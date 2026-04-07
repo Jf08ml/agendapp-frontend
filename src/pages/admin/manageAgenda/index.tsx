@@ -932,10 +932,6 @@ const ScheduleView: React.FC = () => {
             autoClose: 3000,
             position: "top-right",
           });
-
-          setCreatingAppointment(false);
-          closeModal();
-          fetchAppointmentsForMonth(currentDate);
         }
         setCreatingAppointment(false);
         closeModal();
