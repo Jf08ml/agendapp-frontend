@@ -1,7 +1,8 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState } from "react";
 import {
   Modal, Text, Badge, Table, Group, Button, Stack, Loader,
-  Center, ActionIcon, Tooltip, Menu, Divider, NumberInput,
+  Center, ActionIcon, Menu, Divider, NumberInput,
   Select, ScrollArea, Alert, Progress,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";

@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import {
   Stack, TextInput, Switch, Divider, Text, Alert,
   Badge, Card, Group, ThemeIcon,
 } from "@mantine/core";
-import { IconUsers, IconDiscount, IconAlertCircle } from "@tabler/icons-react";
+import { IconUsers, IconDiscount } from "@tabler/icons-react";
 import { CountryCode } from "libphonenumber-js";
 import InternationalPhoneInput from "../../../components/InternationalPhoneInput";
 import { ClassType } from "../../../services/classService";

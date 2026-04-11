@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Stack, Text, Divider, Card, Group, Badge, ThemeIcon,
 } from "@mantine/core";

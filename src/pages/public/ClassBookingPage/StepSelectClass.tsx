@@ -1,7 +1,6 @@
-import React from "react";
 import {
   SimpleGrid, Card, Text, Badge, Group, Stack, ThemeIcon,
-  Center, Loader, rem,
+  Center, Loader,
 } from "@mantine/core";
 import { IconSchool, IconUsers, IconDiscount, IconClock } from "@tabler/icons-react";
 import { ClassType } from "../../../services/classService";

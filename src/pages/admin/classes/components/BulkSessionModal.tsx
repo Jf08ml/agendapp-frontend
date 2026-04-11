@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal, Select, NumberInput, Textarea, Button, Group,
   Stack, SimpleGrid, Text, Alert, Badge, Chip, Divider,

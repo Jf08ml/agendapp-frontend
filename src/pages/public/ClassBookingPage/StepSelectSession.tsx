@@ -1,9 +1,8 @@
-import React from "react";
 import {
   Stack, Card, Text, Badge, Group, Center, Loader,
   Progress, ThemeIcon, Alert,
 } from "@mantine/core";
-import { IconCalendar, IconAlertCircle, IconClock, IconUsers } from "@tabler/icons-react";
+import { IconCalendar, IconAlertCircle, IconClock } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";

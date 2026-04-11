@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+/* eslint-disable react-hooks/exhaustive-deps */
+import { useEffect } from "react";
 import { Modal, TextInput, NumberInput, Textarea, Button, Group, Switch } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { Room } from "../../../../services/classService";

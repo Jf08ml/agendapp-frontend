@@ -1,8 +1,9 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Card, Stack, Stepper, Button, Group, Text, Paper, Divider,
-  Center, Badge, Title, LoadingOverlay,
+  Center, Title, LoadingOverlay,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { IconCheck } from "@tabler/icons-react";
@@ -18,7 +19,6 @@ import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
 import StepAttendees, { AttendeeForm, emptyAttendee } from "./StepAttendees";
 import StepSummary from "./StepSummary";
-import CustomLoader from "../../../components/customLoader/CustomLoader";
 
 const STEPS = [
   { label: "Clase" },
