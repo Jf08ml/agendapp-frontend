@@ -92,6 +92,13 @@ export default function OnlineBookingTab({
           disabled={!isEditing}
         />
 
+        <Switch
+          label="Habilitar reserva de clases"
+          description="Permite a los clientes reservar clases grupales desde la página pública. Al desactivar, se ocultará el acceso al módulo de clases en el menú y en la página principal."
+          {...form.getInputProps("enableClassBooking", { type: "checkbox" })}
+          disabled={!isEditing}
+        />
+
         <Divider />
 
         <Switch

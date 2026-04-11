@@ -5,6 +5,7 @@ import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
+import { IconSchool } from "@tabler/icons-react";
 import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout } from "./HomeLayouts";
 
 export default function Home() {
@@ -25,6 +26,12 @@ export default function Home() {
       title: "Nuestros Servicios",
       icon: <GiPriceTag size={28} />,
       link: "/servicios-precios",
+    },
+    {
+      title: "Reservar clase",
+      icon: <IconSchool size={28} />,
+      link: "/reservar-clase",
+      show: organization?.enableClassBooking ?? false,
     },
     {
       title: "Plan de fidelidad",

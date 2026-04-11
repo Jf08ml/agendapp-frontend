@@ -18,7 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText, BsQuestionCircle } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage, IconShieldCheck } from "@tabler/icons-react";
+import { IconPackage, IconShieldCheck, IconSchool } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -102,6 +102,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           icon: <BiCalendar size={18} />,
           canShow: organization?.enableOnlineBooking ?? true,
         },
+        {
+          label: "Reservar clase",
+          to: "/reservar-clase",
+          icon: <IconSchool size={18} />,
+          canShow: organization?.enableClassBooking ?? false,
+        },
       ],
     },
     {
@@ -177,6 +183,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/gestionar-paquetes",
           icon: <IconPackage size={18} />,
           canShow: can.packagesRead,
+        },
+        {
+          label: "Módulo de Clases",
+          to: "/gestionar-clases",
+          icon: <IconSchool size={18} />,
+          canShow: can.apptsAll || can.servicesRead,
         },
         {
           label: "Gestionar WhatsApp",
