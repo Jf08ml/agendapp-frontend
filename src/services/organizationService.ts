@@ -104,6 +104,7 @@ export interface Organization {
   showLoyaltyProgram?: boolean;
   enableOnlineBooking?: boolean;
   enableClassBooking?: boolean;
+  setupCompleted?: boolean;
   blockHolidaysForReservations?: boolean;
   allowedHolidayDates?: string[];
   paymentMethods?: PaymentMethod[];

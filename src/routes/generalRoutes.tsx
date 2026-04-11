@@ -39,6 +39,7 @@ import HelpPage from "../pages/admin/HelpPage";
 import AuditLogPage from "../pages/admin/auditLog";
 import ManageClasses from "../pages/admin/classes";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
+import SetupWizard from "../pages/onboarding/SetupWizard";
 
 const generalRoutes = [
   {
@@ -339,6 +340,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Pago exitoso",
       description: "Tu pago fue procesado correctamente",
+    },
+  },
+
+  {
+    path: "/configuracion-inicial",
+    component: SetupWizard,
+    MediaMetadata: {
+      title: "Configuración inicial",
+      description: "Configura tu negocio antes de comenzar.",
     },
   },
 

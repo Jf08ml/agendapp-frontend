@@ -33,6 +33,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/my-membership" />;
   }
 
+  // Si la org ya cargó y el setup inicial no está completo, forzar al wizard
+  if (
+    organization &&
+    organization.setupCompleted === false &&
+    location.pathname !== "/configuracion-inicial"
+  ) {
+    return <Navigate to="/configuracion-inicial" replace />;
+  }
+
   return <>{children}</>;
 };
 

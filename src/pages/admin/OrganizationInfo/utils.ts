@@ -1,6 +1,6 @@
 import type { Organization } from "../../../services/organizationService";
 
-export const ensureBranding = (b?: Organization["branding"]) => b ?? {};
+export const ensureBranding = (b?: Organization["branding"]) => b ? { ...b } : {};
 export const ensureDomains = (d?: string[]) => (Array.isArray(d) ? d : []);
 
 // ---------------------------------------------------------------------------
@@ -30,6 +30,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
   referralTiers: Array.isArray(response.referralTiers) ? [...response.referralTiers] : [],
   enableOnlineBooking: response.enableOnlineBooking ?? true,
   enableClassBooking: response.enableClassBooking ?? false,
+  setupCompleted: response.setupCompleted ?? false,
   blockHolidaysForReservations: response.blockHolidaysForReservations ?? false,
   allowedHolidayDates: Array.isArray(response.allowedHolidayDates)
     ? [...response.allowedHolidayDates]
@@ -61,10 +62,16 @@ export const normalizeOrg = (response: Organization): Organization => ({
     breaks: ensureBreaks(response.openingHours?.breaks),
     stepMinutes: response.openingHours?.stepMinutes ?? 5,
   },
-  weeklySchedule: response.weeklySchedule ?? {
-    enabled: false,
-    schedule: [],
-    stepMinutes: 30,
+  weeklySchedule: {
+    enabled: response.weeklySchedule?.enabled ?? false,
+    stepMinutes: response.weeklySchedule?.stepMinutes ?? 30,
+    schedule: Array.isArray(response.weeklySchedule?.schedule)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? response.weeklySchedule.schedule.map((s: any) => ({
+          ...s,
+          breaks: Array.isArray(s.breaks) ? s.breaks.map((b: any) => ({ ...b })) : [],
+        }))
+      : [],
   },
   currency: response.currency ?? "COP",
   timeFormat: response.timeFormat ?? "12h",
