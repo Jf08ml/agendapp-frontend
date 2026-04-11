@@ -37,6 +37,8 @@ import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import HelpPage from "../pages/admin/HelpPage";
 import AuditLogPage from "../pages/admin/auditLog";
+import ManageClasses from "../pages/admin/classes";
+import ClassBookingWizard from "../pages/public/ClassBookingPage";
 
 const generalRoutes = [
   {
@@ -340,6 +342,26 @@ const generalRoutes = [
     },
   },
 
+  {
+    path: "/reservar-clase",
+    component: ClassBookingWizard,
+    MediaMetadata: {
+      title: "Reservar Clase",
+      description: "Reserva tu lugar en nuestras clases grupales.",
+    },
+  },
+  {
+    path: "/gestionar-clases",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <ManageClasses {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Módulo de Clases",
+      description: "Gestiona clases, salones, sesiones e inscripciones.",
+    },
+  },
   {
     path: "/historial-eliminaciones",
     component: (props: JSX.IntrinsicAttributes) => (

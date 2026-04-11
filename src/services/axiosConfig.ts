@@ -275,6 +275,12 @@ const apiPlansPublic: AxiosInstance = createPublicAxiosInstance(
   `${API_BASE_URL}/plans`
 );
 
+// Módulo de Clases
+const apiClass: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/classes`);
+const apiClassPublic: AxiosInstance = createPublicAxiosInstance(`${API_BASE_URL}/classes`);
+const apiEnrollment: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/enrollments`);
+const apiEnrollmentPublic: AxiosInstance = createPublicAxiosInstance(`${API_BASE_URL}/enrollments`);
+
 export {
   apiGeneral,
   apiClient,
@@ -294,4 +300,8 @@ export {
   apiPackage,
   apiPackagePublic,
   apiPlansPublic,
+  apiClass,
+  apiClassPublic,
+  apiEnrollment,
+  apiEnrollmentPublic,
 };
