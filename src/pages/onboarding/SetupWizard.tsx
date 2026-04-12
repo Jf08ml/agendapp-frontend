@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useEffect } from "react";
 import {
   Box, Group, Text, Stack, Title, Progress, Badge,
-  Button, ScrollArea, Loader, Center, Stepper,
+  ScrollArea, Loader, Center, Stepper,
   ThemeIcon, useMantineTheme, rem,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
 import {
   Stack, TextInput, Button, ActionIcon, Group, Image,
   Text, Loader, Grid, Checkbox, ScrollArea, Paper, Box,
