@@ -39,11 +39,6 @@ export default function PaymentSuccess() {
   const [pageStatus, setPageStatus] = useState<PageStatus>("waiting");
   const [attempts, setAttempts] = useState(0);
 
-  // Timestamp guardado en sessionStorage por ActivatePlanModal antes del redirect a LS.
-  // Nos permite detectar si el webhook llegó antes de que el usuario aterrizara aquí.
-  const paymentInitiatedAt = useRef<number>(
-    Number(sessionStorage.getItem("ls_payment_initiated_at") || 0)
-  );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -68,17 +63,10 @@ export default function PaymentSuccess() {
         return;
       }
 
-      if (membership.status === "active" && membership.lastPaymentDate) {
-        const paymentDate = new Date(membership.lastPaymentDate).getTime();
-        // Activado si lastPaymentDate es posterior (o muy cercano) a cuando se inició el pago.
-        // Buffer de 30s para absorber diferencias de reloj o pagos que tardaron segundos.
-        const isThisPayment = paymentDate >= paymentInitiatedAt.current - 30_000;
-        if (isThisPayment) {
-          sessionStorage.removeItem("ls_payment_initiated_at");
-          stopPolling();
-          setPageStatus("activated");
-          return;
-        }
+      if (membership.status === "active") {
+        stopPolling();
+        setPageStatus("activated");
+        return;
       }
 
       setAttempts((prev) => {
@@ -218,7 +206,7 @@ export default function PaymentSuccess() {
 
       <Alert color="blue" variant="light" style={{ width: "100%" }}>
         <Text size="sm">
-          Si completaste el pago en Lemon Squeezy, tu plan se activará
+          Si completaste el pago con PayPal, tu plan se activará
           automáticamente en los próximos minutos. También puedes contactarnos
           por WhatsApp para una activación manual inmediata.
         </Text>

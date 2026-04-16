@@ -1,13 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ReactNode, useEffect, useState } from "react";
-import { Button, Card, Group, Stack, Text, Title, Badge, List, Loader } from "@mantine/core";
-import { apiPlansPublic, apiGeneral } from "../../services/axiosConfig";
-import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
-import { useSelector } from "react-redux";
-import { RootState } from "../../app/store";
+import { useEffect, useState } from "react";
+import { Button, Card, Group, Stack, Text, Title, Badge, List } from "@mantine/core";
+import { apiPlansPublic } from "../../services/axiosConfig";
+import { billingLabel } from "../../utils/billingCycle";
+import { ActivatePlanModal } from "../../components/ActivatePlanModal";
 
 interface PlanPublic {
-  currency: ReactNode;
   _id: string;
   name: string;
   slug: string;
@@ -17,15 +15,14 @@ interface PlanPublic {
   characteristics: string[];
   limits: Record<string, any>;
   price?: number;
+  currency?: string;
+  paypalPlanId?: string | null;
 }
 
 export default function MembershipPlans() {
   const [plans, setPlans] = useState<PlanPublic[]>([]);
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<{ _id: string; name: string; price: number } | null>(null);
-  const [lsLoading, setLsLoading] = useState<string | null>(null); // planId en carga
-
-  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
+  const [selectedPlan, setSelectedPlan] = useState<PlanPublic | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -34,26 +31,9 @@ export default function MembershipPlans() {
     })();
   }, []);
 
-  const handleCardCheckout = async (plan: PlanPublic) => {
-    if (!organizationId) return;
-    setLsLoading(plan._id);
-    try {
-      const res = await apiGeneral.post("/payments/checkout", {
-        provider: "lemonsqueezy",
-        planId: plan._id,
-        organizationId,
-        successUrl: `${window.location.origin}/payment-success`,
-        cancelUrl: `${window.location.origin}/plans`,
-      });
-      const checkoutUrl = res.data?.data?.checkoutUrl;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
-      }
-    } catch (err: any) {
-      console.error("Error al crear checkout:", err);
-    } finally {
-      setLsLoading(null);
-    }
+  const handleSelectPlan = (plan: PlanPublic) => {
+    setSelectedPlan(plan);
+    setModalOpen(true);
   };
 
   return (
@@ -67,7 +47,7 @@ export default function MembershipPlans() {
                 <Title order={4}>{p.displayName}</Title>
                 <Badge>{p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}</Badge>
               </Group>
-              <Text c="dimmed">{p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}</Text>
+              <Text c="dimmed">{billingLabel(p.billingCycle)}</Text>
               <Text fw={700}>
                 ${p.price} {p.currency}
               </Text>
@@ -77,39 +57,29 @@ export default function MembershipPlans() {
                 ))}
               </List>
 
-              {/* Pago con tarjeta vía Lemon Squeezy */}
-              {organizationId && (
-                <Button
-                  onClick={() => handleCardCheckout(p)}
-                  loading={lsLoading === p._id}
-                  disabled={lsLoading !== null && lsLoading !== p._id}
-                  leftSection={lsLoading === p._id ? <Loader size="xs" color="white" /> : undefined}
-                >
-                  Pagar con tarjeta
-                </Button>
-              )}
-
-              {/* Pago manual (transferencia) */}
-              <Button
-                variant="light"
-                onClick={() => {
-                  setSelectedPlan({ _id: p._id, name: p.displayName, price: p.price || 0 });
-                  setTransferOpen(true);
-                }}
-              >
-                Pagar por transferencia
+              <Button onClick={() => handleSelectPlan(p)}>
+                Activar plan
               </Button>
             </Stack>
           </Card>
         ))}
       </Group>
 
-      <PaymentMethodsModal
-        opened={transferOpen}
-        onClose={() => setTransferOpen(false)}
-        membership={null}
-        planName={selectedPlan?.name}
-        planPrice={selectedPlan?.price}
+      <ActivatePlanModal
+        opened={modalOpen}
+        onClose={() => setModalOpen(false)}
+        plan={
+          selectedPlan
+            ? {
+                _id: selectedPlan._id,
+                displayName: selectedPlan.displayName,
+                price: selectedPlan.price ?? 0,
+                currency: String(selectedPlan.currency ?? "USD"),
+                billingCycle: selectedPlan.billingCycle,
+                paypalPlanId: selectedPlan.paypalPlanId ?? null,
+              }
+            : null
+        }
       />
     </Stack>
   );

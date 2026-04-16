@@ -27,7 +27,7 @@ export interface Plan {
   };
   description: string;
   isActive: boolean;
-  lsVariantId: string | null;
+  paypalPlanId: string | null;
   payment?: {
     provider: string;
     productId: string | null;
@@ -305,7 +305,7 @@ export type PlanInput = {
   description: string;
   characteristics: string[];
   isActive: boolean;
-  lsVariantId?: string | null;
+  paypalPlanId?: string | null;
   limits: {
     maxEmployees: number | null;
     maxServices: number | null;

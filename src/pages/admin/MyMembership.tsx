@@ -35,6 +35,7 @@ import { ActivatePlanModal } from "../../components/ActivatePlanModal";
 import { apiPlansPublic } from "../../services/axiosConfig";
 import { IoAlertCircle } from "react-icons/io5";
 import { BiCalendar, BiCreditCard, BiX } from "react-icons/bi";
+import { billingLabel, billingShort } from "../../utils/billingCycle";
 
 interface PublicPlan {
   _id: string;
@@ -46,6 +47,7 @@ interface PublicPlan {
   characteristics: string[];
   limits: Record<string, any>;
   slug: string;
+  paypalPlanId?: string | null;
 }
 
 export default function MyMembership() {
@@ -139,14 +141,23 @@ export default function MyMembership() {
   };
 
   const isTrial = membership?.status === "trial";
-  const showPlans =
+  const isActive = membership?.status === "active";
+  const isNonActive =
     isTrial ||
     membership?.status === "past_due" ||
     membership?.status === "suspended" ||
     membership?.status === "expired";
-  const paidPlans = publicPlans.filter(
-    (p) => p.slug !== "plan-demo" && p.price > 0
-  );
+
+  const paidPlans = publicPlans.filter((p) => p.slug !== "plan-demo" && p.price > 0);
+
+  // Para membresías activas: mostrar planes distintos al actual (cambio de plan)
+  const otherPlans = isActive
+    ? paidPlans.filter((p) => p._id !== membership?.planId?._id)
+    : paidPlans;
+
+  // Título y botón según si es activación nueva o cambio de plan
+  const planActionTitle = isActive ? "Cambiar de plan" : "Activar mi plan";
+  const planActionButton = isActive ? "Cambiar a este plan" : "Activar mi plan";
 
   if (loading) {
     return (
@@ -188,7 +199,7 @@ export default function MyMembership() {
                         </Badge>
                       </Group>
                       <Text c="dimmed">
-                        {p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}
+                        {billingLabel(p.billingCycle)}
                       </Text>
                       <Text fw={700} size="lg">${p.price} {p.currency}</Text>
                       <Button onClick={() => setActivatePlan(p)}>
@@ -206,6 +217,7 @@ export default function MyMembership() {
           opened={!!activatePlan}
           onClose={() => setActivatePlan(null)}
           plan={activatePlan}
+          modalTitle="Activar mi plan"
         />
       </Container>
     );
@@ -230,8 +242,8 @@ export default function MyMembership() {
             <Badge size="xl" variant="filled" color={getStatusColor(membership.status)}>
               {getStatusLabel(membership.status)}
             </Badge>
-            {!isTrial && (
-              <Button size="lg" onClick={() => setPaymentModalOpened(true)} variant="filled" color="blue">
+            {isActive && (
+              <Button size="md" onClick={() => setPaymentModalOpened(true)} variant="filled" color="blue">
                 Renovar Membresía
               </Button>
             )}
@@ -301,7 +313,7 @@ export default function MyMembership() {
                   <Text size="sm" c="dimmed">
                     {isTrial
                       ? `${trialInfo?.totalDays || 7} días de acceso completo`
-                      : membership.planId.billingCycle === "monthly" ? "Mensual" : "Anual"}
+                      : billingLabel(membership.planId.billingCycle)}
                   </Text>
                 </div>
                 {!isTrial && (
@@ -375,18 +387,24 @@ export default function MyMembership() {
           </Grid.Col>
         </Grid>
 
-        {/* Planes disponibles (trial, past_due, suspended, expired) */}
-        {showPlans && (
+        {/* Planes disponibles: activación (trial/past_due/suspended/expired) o cambio (active) */}
+        {(isNonActive || isActive) && otherPlans.length > 0 && (
           <Paper withBorder p="lg" radius="md">
             <Stack gap="md">
               <div>
                 <Text size="lg" fw={600}>
-                  {isTrial ? "Elige tu plan para continuar" : "Reactiva tu cuenta"}
+                  {isTrial
+                    ? "Elige tu plan para continuar"
+                    : isActive
+                      ? "Cambiar de plan"
+                      : "Reactiva tu cuenta"}
                 </Text>
                 <Text size="sm" c="dimmed">
                   {isTrial
                     ? "Selecciona un plan antes de que termine tu período de prueba"
-                    : "Elige un plan para recuperar el acceso completo"}
+                    : isActive
+                      ? "Puedes cambiar a otro plan en cualquier momento. El nuevo plan se activa al completar el pago."
+                      : "Elige un plan para recuperar el acceso completo"}
                 </Text>
               </div>
 
@@ -399,7 +417,7 @@ export default function MyMembership() {
                 </Alert>
               ) : (
                 <Grid>
-                  {paidPlans.map((p) => (
+                  {otherPlans.map((p) => (
                     <Grid.Col key={p._id} span={{ base: 12, md: 6, lg: 4 }}>
                       <Card withBorder shadow="sm" radius="md" padding="lg">
                         <Stack gap="sm">
@@ -414,7 +432,7 @@ export default function MyMembership() {
                             <Text size="xl" fw={700} c="blue">
                               ${p.price}{" "}
                               <Text span size="sm" c="dimmed" fw={400}>
-                                {p.currency} / {p.billingCycle === "monthly" ? "mes" : p.billingCycle}
+                                {p.currency} / {billingShort(p.billingCycle)}
                               </Text>
                             </Text>
                           </div>
@@ -443,8 +461,13 @@ export default function MyMembership() {
                             </>
                           )}
 
-                          <Button fullWidth mt="sm" onClick={() => setActivatePlan(p)}>
-                            Activar mi plan
+                          <Button
+                            fullWidth
+                            mt="sm"
+                            variant={isActive ? "light" : "filled"}
+                            onClick={() => setActivatePlan(p)}
+                          >
+                            {planActionButton}
                           </Button>
                         </Stack>
                       </Card>
@@ -553,11 +576,12 @@ export default function MyMembership() {
         membership={membership}
       />
 
-      {/* Modal de activación de plan (trial / suspended / etc.) */}
+      {/* Modal de activación / cambio de plan */}
       <ActivatePlanModal
         opened={!!activatePlan}
         onClose={() => setActivatePlan(null)}
         plan={activatePlan}
+        modalTitle={planActionTitle}
       />
     </Container>
   );

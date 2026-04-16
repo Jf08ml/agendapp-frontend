@@ -47,6 +47,7 @@ import {
   Plan,
   PlanInput,
 } from "../../services/membershipService";
+import { billingLabel } from "../../utils/billingCycle";
 
 const EMPTY_PLAN: PlanInput = {
   name: "",
@@ -59,7 +60,7 @@ const EMPTY_PLAN: PlanInput = {
   description: "",
   characteristics: [],
   isActive: true,
-  lsVariantId: "",
+  paypalPlanId: "",
   limits: {
     maxEmployees: null,
     maxServices: null,
@@ -139,7 +140,7 @@ export default function SuperadminPlans() {
       description: plan.description || "",
       characteristics: [...plan.characteristics],
       isActive: plan.isActive,
-      lsVariantId: plan.lsVariantId ?? "",
+      paypalPlanId: plan.paypalPlanId ?? "",
       limits: {
         maxEmployees: plan.limits.maxEmployees,
         maxServices: plan.limits.maxServices,
@@ -198,7 +199,7 @@ export default function SuperadminPlans() {
     try {
       const payload: PlanInput = {
         ...form,
-        lsVariantId: form.lsVariantId?.trim() || null,
+        paypalPlanId: form.paypalPlanId?.trim() || null,
       };
       if (editingPlan) {
         await updatePlan(editingPlan._id, payload);
@@ -251,7 +252,7 @@ export default function SuperadminPlans() {
       </Table.Td>
       <Table.Td>
         <Text fw={700}>${p.price} {p.currency}</Text>
-        <Text size="xs" c="dimmed">{p.billingCycle === "monthly" ? "Mensual" : p.billingCycle}</Text>
+        <Text size="xs" c="dimmed">{billingLabel(p.billingCycle)}</Text>
       </Table.Td>
       <Table.Td>
         <Badge variant="light" color={p.domainType === "custom_domain" ? "grape" : "blue"} size="sm">
@@ -259,9 +260,9 @@ export default function SuperadminPlans() {
         </Badge>
       </Table.Td>
       <Table.Td>
-        {p.lsVariantId ? (
+        {p.paypalPlanId ? (
           <Badge color="green" variant="light" size="sm" leftSection={<IconCheck size={10} />}>
-            {p.lsVariantId}
+            {p.paypalPlanId}
           </Badge>
         ) : (
           <Badge color="red" variant="light" size="sm" leftSection={<IconX size={10} />}>
@@ -313,7 +314,7 @@ export default function SuperadminPlans() {
           <div>
             <Title order={2}>Gestión de Planes</Title>
             <Text c="dimmed" size="sm">
-              Crea y edita los planes de la plataforma, incluyendo la configuración de Lemon Squeezy
+              Crea y edita los planes de la plataforma, incluyendo la configuración de PayPal
             </Text>
           </div>
           <Group gap="xs">
@@ -326,11 +327,11 @@ export default function SuperadminPlans() {
           </Group>
         </Group>
 
-        {/* Aviso Lemon Squeezy */}
+        {/* Aviso PayPal */}
         <Alert color="blue" variant="light" icon={<IconCreditCard size={18} />}>
           <Text size="sm">
-            El <strong>Variant ID de Lemon Squeezy</strong> es necesario para habilitar el pago con tarjeta en cada plan.
-            Ve a tu dashboard de LS → Products → [Producto] → [Variante] para obtener el ID.
+            El <strong>Plan ID de PayPal</strong> es necesario para habilitar el pago con suscripción automática en cada plan.
+            Ve a tu dashboard de PayPal → Productos y planes → [Plan] para obtener el ID (formato <code>P-XXXXX</code>).
           </Text>
         </Alert>
 
@@ -348,7 +349,7 @@ export default function SuperadminPlans() {
                   <Table.Th>Plan</Table.Th>
                   <Table.Th>Precio</Table.Th>
                   <Table.Th>Dominio</Table.Th>
-                  <Table.Th>LS Variant ID</Table.Th>
+                  <Table.Th>PayPal Plan ID</Table.Th>
                   <Table.Th>Estado</Table.Th>
                   <Table.Th>Acciones</Table.Th>
                 </Table.Tr>
@@ -444,6 +445,8 @@ export default function SuperadminPlans() {
                   label="Ciclo de facturación"
                   data={[
                     { value: "monthly", label: "Mensual" },
+                    { value: "quarterly", label: "Trimestral" },
+                    { value: "semiannual", label: "Semestral" },
                     { value: "yearly", label: "Anual" },
                     { value: "lifetime", label: "De por vida" },
                   ]}
@@ -462,15 +465,15 @@ export default function SuperadminPlans() {
                 onChange={(v) => setField("domainType", v || "subdomain")}
               />
 
-              <Divider label="Lemon Squeezy" />
+              <Divider label="PayPal" />
 
               <TextInput
-                label="Variant ID de Lemon Squeezy"
-                placeholder="1330373"
-                description="ID de la variante en el dashboard de LS. Necesario para pago con tarjeta."
+                label="Plan ID de PayPal"
+                placeholder="P-9RU26879V1709291PNHQBEWA"
+                description="ID del plan de suscripción en PayPal (formato P-XXXXX). Necesario para pago automático mensual."
                 leftSection={<IconBuildingBank size={16} />}
-                value={form.lsVariantId ?? ""}
-                onChange={(e) => setField("lsVariantId", e.target.value)}
+                value={form.paypalPlanId ?? ""}
+                onChange={(e) => setField("paypalPlanId", e.target.value)}
                 styles={{ input: { fontFamily: "monospace" } }}
               />
 
