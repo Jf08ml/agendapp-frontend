@@ -31,7 +31,7 @@ import {
 import { BsWhatsapp } from "react-icons/bs";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { apiGeneral } from "../services/axiosConfig";
-import { billingLabel, billingShort } from "../utils/billingCycle";
+import { billingShort } from "../utils/billingCycle";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useNavigate } from "react-router-dom";

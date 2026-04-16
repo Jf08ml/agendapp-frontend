@@ -47,7 +47,7 @@ interface PublicPlan {
   characteristics: string[];
   limits: Record<string, any>;
   slug: string;
-  paypalPlanId?: string | null;
+  paypalPlanId: string | null;
 }
 
 export default function MyMembership() {
