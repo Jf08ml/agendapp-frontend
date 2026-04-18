@@ -139,6 +139,7 @@ export const schema = z.object({
   referralTiers: z.array(z.object({ threshold: z.number().min(1), reward: z.string() })).optional(),
   showLoyaltyProgram: z.boolean().optional(),
   enableOnlineBooking: z.boolean().optional(),
+  reservationPolicy: z.enum(["manual", "auto_if_available"]).optional(),
   enableClassBooking: z.boolean().optional(),
   blockHolidaysForReservations: z.boolean().optional(),
   allowedHolidayDates: z.array(z.string()).optional(),

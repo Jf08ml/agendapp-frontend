@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function StepOnlineBooking({ form, onNext, onBack, saving }: Props) {
-  const isAutoApprove = form.values.enableOnlineBooking ?? true;
+  const isAutoApprove = (form.values.reservationPolicy ?? "manual") === "auto_if_available";
 
   return (
     <Stack gap="lg">
@@ -40,7 +40,7 @@ export default function StepOnlineBooking({ form, onNext, onBack, saving }: Prop
             background: isAutoApprove ? "var(--mantine-color-green-0)" : undefined,
             transition: "all 0.15s",
           }}
-          onClick={() => form.setFieldValue("enableOnlineBooking", true)}
+          onClick={() => form.setFieldValue("reservationPolicy", "auto_if_available")}
         >
           <Stack gap="sm">
             <Group gap="sm">
@@ -80,7 +80,7 @@ export default function StepOnlineBooking({ form, onNext, onBack, saving }: Prop
             background: !isAutoApprove ? "var(--mantine-color-blue-0)" : undefined,
             transition: "all 0.15s",
           }}
-          onClick={() => form.setFieldValue("enableOnlineBooking", false)}
+          onClick={() => form.setFieldValue("reservationPolicy", "manual")}
         >
           <Stack gap="sm">
             <Group gap="sm">

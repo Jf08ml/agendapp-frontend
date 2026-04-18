@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Stack, TextInput, NumberInput, Textarea, Chip,
   Button, Image, ActionIcon, Group, Text, Autocomplete,
   SimpleGrid, Paper, Box, Badge, Switch, Divider,
-  Tooltip, Center, ThemeIcon, SegmentedControl, Alert,
+  Tooltip, Center, ThemeIcon, SegmentedControl, Alert, Loader,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { showNotification } from "@mantine/notifications";
@@ -12,7 +12,7 @@ import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
 import { BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle } from "react-icons/bs";
 import { IconInfoCircle } from "@tabler/icons-react";
 
-import { createService, ServiceCost } from "../../../services/serviceService";
+import { createService, getServicesByOrganizationId, ServiceCost } from "../../../services/serviceService";
 import { uploadImage } from "../../../services/imageService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -23,6 +23,8 @@ interface Props {
 
 export default function StepService({ onDone }: Props) {
   const organizationId = useSelector((s: RootState) => s.auth.organizationId) ?? "";
+  const [existingServices, setExistingServices] = useState<{ _id: string; name: string }[]>([]);
+  const [loadingExisting, setLoadingExisting] = useState(true);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
@@ -37,6 +39,12 @@ export default function StepService({ onDone }: Props) {
   const [costs, setCosts] = useState<ServiceCost[]>([{ concept: "", amount: 0 }]);
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getServicesByOrganizationId(organizationId).then((svcs) => {
+      setExistingServices(svcs.map((s: any) => ({ _id: s._id, name: s.name })));
+    }).finally(() => setLoadingExisting(false));
+  }, [organizationId]);
 
   const canSave =
     name.trim().length > 1 &&
@@ -98,11 +106,35 @@ export default function StepService({ onDone }: Props) {
     }
   };
 
+  if (loadingExisting) {
+    return <Center py="xl"><Loader /></Center>;
+  }
+
   return (
     <Stack gap="lg">
-      <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
-        Crea el primer servicio que ofrecerás a tus clientes. Podrás agregar más después desde el panel de administración.
-      </Alert>
+      {existingServices.length > 0 ? (
+        <Alert icon={<IconInfoCircle size={16} />} color="green" variant="light" radius="md">
+          <Stack gap="xs">
+            <Text size="sm" fw={600}>Ya tienes {existingServices.length} servicio{existingServices.length > 1 ? "s" : ""} creado{existingServices.length > 1 ? "s" : ""}:</Text>
+            {existingServices.map((s) => (
+              <Text key={s._id} size="sm" c="dimmed">• {s.name}</Text>
+            ))}
+            <Button
+              size="xs"
+              variant="filled"
+              color="green"
+              mt="xs"
+              onClick={() => onDone(existingServices[0]._id)}
+            >
+              Continuar con estos servicios →
+            </Button>
+          </Stack>
+        </Alert>
+      ) : (
+        <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
+          Crea el primer servicio que ofrecerás a tus clientes. Podrás agregar más después desde el panel de administración.
+        </Alert>
+      )}
 
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
         {/* ── Columna izquierda: campos ── */}

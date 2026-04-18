@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Stack, TextInput, Button, ActionIcon, Group, Image,
   Text, Loader, Grid, Checkbox, ScrollArea, Paper, Box,
-  ColorInput, SegmentedControl, NumberInput, Alert, Divider,
+  ColorInput, SegmentedControl, NumberInput, Alert, Divider, Center,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { showNotification } from "@mantine/notifications";
@@ -13,7 +13,8 @@ import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
 import { IconInfoCircle } from "@tabler/icons-react";
 
 import { uploadImage } from "../../../services/imageService";
-import { createEmployee } from "../../../services/employeeService";
+import { createEmployee, getEmployeesByOrganizationId } from "../../../services/employeeService";
+import { getServicesByOrganizationId } from "../../../services/serviceService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 
@@ -32,10 +33,11 @@ interface ServiceOption {
 export default function StepEmployee({ createdServiceId, onDone, onBack }: Props) {
   const organizationId = useSelector((s: RootState) => s.auth.organizationId) ?? "";
 
-  // We show the service created in step 1 pre-selected
-  const serviceOptions: ServiceOption[] = createdServiceId
-    ? [{ _id: createdServiceId, name: "Servicio creado en el paso anterior" }]
-    : [];
+  const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>(
+    createdServiceId ? [{ _id: createdServiceId, name: "Servicio creado en el paso anterior" }] : []
+  );
+  const [existingEmployees, setExistingEmployees] = useState<{ _id: string; names: string }[]>([]);
+  const [loadingExisting, setLoadingExisting] = useState(true);
 
   const [names, setNames] = useState("");
   const [position, setPosition] = useState("");
@@ -52,6 +54,19 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
   const [profileImage, setProfileImage] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      getServicesByOrganizationId(organizationId),
+      getEmployeesByOrganizationId(organizationId),
+    ]).then(([svcs, emps]) => {
+      const options = svcs.map((s: any) => ({ _id: s._id, name: s.name }));
+      setServiceOptions(options);
+      setSelectedServiceIds(createdServiceId ? [createdServiceId] : options.map((s: any) => s._id).slice(0, 1));
+      setExistingEmployees(emps.map((e: any) => ({ _id: e._id, names: e.names })));
+    }).finally(() => setLoadingExisting(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId]);
 
   const canSave =
     names.trim().length > 1 &&
@@ -110,11 +125,29 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
     }
   };
 
+  if (loadingExisting) {
+    return <Group justify="center" py="xl"><Loader /></Group>;
+  }
+
   return (
     <Stack gap="lg">
-      <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
-        Agrega el primer profesional que atenderá las citas. Podrás editar su horario y permisos después desde el panel de administración.
-      </Alert>
+      {existingEmployees.length > 0 ? (
+        <Alert icon={<IconInfoCircle size={16} />} color="green" variant="light" radius="md">
+          <Stack gap="xs">
+            <Text size="sm" fw={600}>Ya tienes {existingEmployees.length} profesional{existingEmployees.length > 1 ? "es" : ""} creado{existingEmployees.length > 1 ? "s" : ""}:</Text>
+            {existingEmployees.map((e) => (
+              <Text key={e._id} size="sm" c="dimmed">• {e.names}</Text>
+            ))}
+            <Button size="xs" variant="filled" color="green" mt="xs" onClick={onDone}>
+              Continuar con estos profesionales →
+            </Button>
+          </Stack>
+        </Alert>
+      ) : (
+        <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
+          Agrega el primer profesional que atenderá las citas. Podrás editar su horario y permisos después desde el panel de administración.
+        </Alert>
+      )}
 
       <Grid>
         {/* Columna izquierda */}
