@@ -210,27 +210,16 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   }, [appointment, setNewAppointment]);
 
   useEffect(() => {
-    if (!appointment) {
-      // MODO CREACIÓN: recalcular endDate basado en duración de servicios
-      if (newAppointment.startDate && newAppointment.services) {
-        const totalDuration = newAppointment.services.reduce((acc, s) => {
-          // Usar duración personalizada si existe, sino la duración del servicio
-          const customDuration = newAppointment.customDurations?.[s._id];
-          return acc + (customDuration ?? s.duration ?? 0);
-        }, 0);
-        const end = addMinutes(newAppointment.startDate, totalDuration);
-        setNewAppointment((prev) => ({ ...prev, endDate: end }));
-      }
-    } else {
-      // MODO EDICIÓN: siempre recalcular endDate al cambiar startDate, preservando la duración original
-      if (newAppointment.startDate && appointment.startDate && appointment.endDate) {
-        const originalDurationMs =
-          new Date(appointment.endDate).getTime() -
-          new Date(appointment.startDate).getTime();
-        const newEnd = new Date(new Date(newAppointment.startDate).getTime() + Math.max(originalDurationMs, 0));
-        setNewAppointment((prev) => ({ ...prev, endDate: newEnd }));
-      }
+    // MODO CREACIÓN: recalcular endDate basado en duración de servicios
+    if (!appointment && newAppointment.startDate && newAppointment.services) {
+      const totalDuration = newAppointment.services.reduce((acc, s) => {
+        const customDuration = newAppointment.customDurations?.[s._id];
+        return acc + (customDuration ?? s.duration ?? 0);
+      }, 0);
+      const end = addMinutes(newAppointment.startDate, totalDuration);
+      setNewAppointment((prev) => ({ ...prev, endDate: end }));
     }
+    // MODO EDICIÓN: el recálculo de endDate se hace directamente en los onChange de startDate
   }, [
     appointment,
     newAppointment.startDate,
@@ -855,7 +844,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     label="Fecha"
                     value={newAppointment.startDate}
                     onChange={(date) =>
-                      setNewAppointment({ ...newAppointment, startDate: date })
+                      setNewAppointment((prev) => {
+                        const updated: typeof prev = { ...prev, startDate: date };
+                        if (appointment?.startDate && appointment?.endDate) {
+                          const durationMs = new Date(appointment.endDate).getTime() - new Date(appointment.startDate).getTime();
+                          updated.endDate = new Date(date.getTime() + Math.max(durationMs, 0));
+                        }
+                        return updated;
+                      })
                     }
                   />
                   <TimeSelector
@@ -863,7 +859,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     date={newAppointment.startDate}
                     timeFormat={timeFormat}
                     onChange={(date) =>
-                      setNewAppointment({ ...newAppointment, startDate: date })
+                      setNewAppointment((prev) => {
+                        const updated: typeof prev = { ...prev, startDate: date };
+                        if (appointment?.startDate && appointment?.endDate) {
+                          const durationMs = new Date(appointment.endDate).getTime() - new Date(appointment.startDate).getTime();
+                          updated.endDate = new Date(date.getTime() + Math.max(durationMs, 0));
+                        }
+                        return updated;
+                      })
                     }
                   />
                 </Box>
@@ -887,7 +890,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       label="Fecha"
                       value={newAppointment.endDate}
                       onChange={(date) =>
-                        setNewAppointment({ ...newAppointment, endDate: date })
+                        setNewAppointment((prev) => ({ ...prev, endDate: date }))
                       }
                     />
                     <TimeSelector
@@ -895,7 +898,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       date={newAppointment.endDate}
                       timeFormat={timeFormat}
                       onChange={(date) =>
-                        setNewAppointment({ ...newAppointment, endDate: date })
+                        setNewAppointment((prev) => ({ ...prev, endDate: date }))
                       }
                     />
                   </Box>
