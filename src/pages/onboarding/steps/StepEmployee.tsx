@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import {
   Stack, TextInput, Button, ActionIcon, Group, Image,
   Text, Loader, Grid, Checkbox, ScrollArea, Paper, Box,
-  ColorInput, SegmentedControl, NumberInput, Alert, Divider, Center,
+  ColorInput, SegmentedControl, NumberInput, Alert, Divider,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { showNotification } from "@mantine/notifications";
