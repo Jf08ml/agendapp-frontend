@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
@@ -95,6 +96,20 @@ export default function MultiBookingWizard() {
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+
+  // Pre-selección de servicio vía query param ?serviceId=
+  const [searchParams] = useSearchParams();
+  const preselectedServiceId = searchParams.get("serviceId");
+  const preselectionApplied = useRef(false);
+
+  useEffect(() => {
+    if (loading || !preselectedServiceId || preselectionApplied.current) return;
+    const service = services.find((s) => s._id === preselectedServiceId);
+    if (service) {
+      setSelected([{ serviceId: preselectedServiceId, employeeId: null }]);
+      preselectionApplied.current = true;
+    }
+  }, [loading, preselectedServiceId, services]);
 
   // === Responsive helpers ===
   const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px

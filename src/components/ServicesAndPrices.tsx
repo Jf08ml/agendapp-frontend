@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Badge,
   Box,
+  Button,
   Card,
   Container,
   Group,
@@ -262,6 +264,18 @@ const ServicesAndPrices: React.FC = () => {
             <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
               {plainText(modalService.description)}
             </Text>
+
+            {organization?.enableOnlineBooking !== false && (
+              <Button
+                component={Link}
+                to={`/online-reservation?serviceId=${modalService._id}`}
+                fullWidth
+                mt="xs"
+                onClick={() => setModalService(null)}
+              >
+                Reservar ahora
+              </Button>
+            )}
           </Stack>
         )}
       </Modal>
@@ -353,6 +367,21 @@ const ServiceCard = ({
             {service.type || "General"}
           </Badge>
         </Group>
+
+        {organization?.enableOnlineBooking !== false && (
+          <Box onClick={(e) => e.stopPropagation()} mt="xs">
+            <Button
+              component={Link}
+              to={`/online-reservation?serviceId=${service._id}`}
+              size="xs"
+              variant="light"
+              color={primaryColor}
+              fullWidth
+            >
+              Reservar ahora
+            </Button>
+          </Box>
+        )}
       </Stack>
     </Card>
   );

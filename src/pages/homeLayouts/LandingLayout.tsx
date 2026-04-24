@@ -278,12 +278,12 @@ export function LandingLayout({
                           {enableOnlineBooking && (
                             <Button
                               component={Link}
-                              to="/online-reservation"
+                              to={`/online-reservation?serviceId=${service._id}`}
                               size="sm"
                               variant="light"
                               color={theme.primaryColor}
                             >
-                              Reservar
+                              Reservar ahora
                             </Button>
                           )}
                         </Group>
