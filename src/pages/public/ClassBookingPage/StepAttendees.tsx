@@ -1,4 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-refresh/only-export-components */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from "react";
 import {
@@ -75,7 +75,6 @@ export default function StepAttendees({
 
   const phoneCfg      = fieldCfg("phone");
   const emailCfg      = fieldCfg("email");
-  const birthDateCfg  = fieldCfg("birthDate");
   const documentIdCfg = fieldCfg("documentId");
   const notesCfg      = fieldCfg("notes");
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Stack,
   Table,
@@ -127,7 +128,7 @@ export default function ClientFormTab({
             Activa los campos que deseas recopilar de tus clientes. El campo identificador siempre es visible y requerido.
           </Text>
 
-          <Table withBorder withColumnBorders radius="md" mt="xs">
+          <Table withTableBorder withColumnBorders mt="xs">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Campo</Table.Th>
