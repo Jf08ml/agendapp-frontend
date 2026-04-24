@@ -57,6 +57,8 @@ export interface Attendee {
   phone_e164?: string;
   phone_country?: string;
   email?: string;
+  documentId?: string;
+  notes?: string;
   customPrice?: number;
 }
 

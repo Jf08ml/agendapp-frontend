@@ -90,6 +90,11 @@ const ClientTable: React.FC<ClientTableProps> = ({
   const timeFormat = organization?.timeFormat || "12h";
   const timeFmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
 
+  const identifierField = organization?.clientFormConfig?.identifierField ?? "phone";
+  const configFields = organization?.clientFormConfig?.fields ?? [];
+  const documentIdEnabled = identifierField === "documentId" ||
+    configFields.some((f: any) => f.key === "documentId" && f.enabled);
+
   const [opened, setOpened] = useState(false);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -258,6 +263,9 @@ const ClientTable: React.FC<ClientTableProps> = ({
                 <Table.Th style={{ textAlign: "center" }}>Nombre</Table.Th>
                 <Table.Th style={{ textAlign: "center" }}>Teléfono</Table.Th>
                 <Table.Th style={{ textAlign: "center" }}>País</Table.Th>
+                {documentIdEnabled && (
+                  <Table.Th style={{ textAlign: "center" }}>Documento</Table.Th>
+                )}
                 <Table.Th style={{ textAlign: "center" }}>
                   Servicios Tomados
                 </Table.Th>
@@ -284,11 +292,12 @@ const ClientTable: React.FC<ClientTableProps> = ({
                   handleMergeClient={handleMergeClient}
                   handleForceDeleteClient={handleForceDeleteClient}
                   handleResetClientLoyalty={handleResetClientLoyalty}
+                  showDocumentId={documentIdEnabled}
                 />
               ))}
               {displayedClients.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
+                  <Table.Td colSpan={documentIdEnabled ? 7 : 6}>
                     <Text c="dimmed" ta="center" py="md">
                       No hay clientes para mostrar.
                     </Text>

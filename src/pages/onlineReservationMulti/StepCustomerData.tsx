@@ -4,17 +4,19 @@ import { useState, useRef, useEffect } from "react";
 import {
   Stack,
   TextInput,
+  Textarea,
   Loader,
   SimpleGrid,
   Text,
   Group,
   Badge,
+  Divider,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { useMediaQuery } from "@mantine/hooks";
-import { 
-  getClientByPhoneNumberAndOrganization,
-  updateClient
+import {
+  getClientByIdentifier,
+  updateClient,
 } from "../../services/clientService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -24,6 +26,10 @@ import { CountryCode } from "libphonenumber-js";
 import { checkClientPackagesPublic, ClientPackage } from "../../services/packageService";
 import { Paper, Checkbox } from "@mantine/core";
 import { IconPackage } from "@tabler/icons-react";
+import {
+  DEFAULT_CLIENT_FORM_CONFIG,
+  type ClientFieldConfig,
+} from "../../services/organizationService";
 
 interface StepCustomerDataProps {
   bookingData: Partial<Reservation>;
@@ -36,6 +42,12 @@ interface StepCustomerDataProps {
 const isValidEmail = (v: string) =>
   !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
+const IDENTIFIER_LABELS: Record<string, string> = {
+  phone: "Teléfono",
+  email: "Correo electrónico",
+  documentId: "Número de documento",
+};
+
 const StepCustomerData: React.FC<StepCustomerDataProps> = ({
   bookingData,
   setBookingData,
@@ -43,34 +55,46 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
   selectedServiceIds = [],
   onPackageDetected,
 }) => {
-  const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
+  const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+
+  // Config dinámica — si no existe, usar defaults (comportamiento original)
+  const rawConfig = organization?.clientFormConfig;
+  const identifierField: 'phone' | 'email' | 'documentId' =
+    rawConfig?.identifierField ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+  const configFields: ClientFieldConfig[] =
+    rawConfig?.fields?.length ? rawConfig.fields : DEFAULT_CLIENT_FORM_CONFIG.fields;
+
+  const fieldCfg = (key: ClientFieldConfig['key']) =>
+    configFields.find((f) => f.key === key) ?? { key, enabled: false, required: false };
 
   const customerDetails = bookingData.customerDetails || {
     name: "",
     email: "",
     phone: "",
     birthDate: null,
+    documentId: "",
+    notes: "",
   };
 
-  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+  // Estado del campo teléfono (necesario para InternationalPhoneInput)
+  const [isLookingUp, setIsLookingUp] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [phoneValid, setPhoneValid] = useState<boolean>(false);
   const [phoneE164, setPhoneE164] = useState<string | null>(null);
   const [phoneCountry, setPhoneCountry] = useState<CountryCode | null>(null);
+
   const [emailError, setEmailError] = useState<string | null>(null);
   const [foundName, setFoundName] = useState<string | null>(null);
-  const [clientId, setClientId] = useState<string | null>(null); // Guardar ID del cliente encontrado
+  const [clientId, setClientId] = useState<string | null>(null);
   const [detectedPackages, setDetectedPackages] = useState<ClientPackage[]>([]);
   const [useDetectedPackage, setUseDetectedPackage] = useState(true);
-  
-  // Ref para evitar actualizaciones durante el montaje inicial
+
   const isInitialMount = useRef(true);
 
-  // Sincronizar el estado inicial del teléfono
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -85,10 +109,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     field: keyof Reservation["customerDetails"],
     value: string | Date | null
   ) => {
-    // limpia errores al tipear
     if (field === "email") setEmailError(null);
-
-    // Solo actualizar si el valor realmente cambió
     const currentValue = customerDetails[field];
     if (currentValue !== value) {
       setBookingData((prev) => ({
@@ -106,17 +127,11 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     phone_country: CountryCode | null,
     isValid: boolean
   ) => {
-    // Evitar actualizaciones durante el montaje inicial
-    if (isInitialMount.current) {
-      return;
-    }
-
+    if (isInitialMount.current) return;
     setPhoneE164(phone_e164);
-    setPhoneCountry(phone_country); // Guardar el país
+    setPhoneCountry(phone_country);
     setPhoneValid(isValid);
     setPhoneError(null);
-
-    // Solo actualizar si el valor realmente cambió
     const newPhone = phone_e164 ?? "";
     if (customerDetails.phone !== newPhone) {
       setBookingData((prev) => ({
@@ -127,60 +142,47 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         },
       }));
     }
-
-    // Mostrar error solo si hay contenido pero no es válido
-    if (phone_e164 && !isValid) {
-      setPhoneError("Número de teléfono inválido");
-    }
+    if (phone_e164 && !isValid) setPhoneError("Número de teléfono inválido");
   };
 
-  const handlePhoneBlur = async () => {
-    if (!phoneValid || !phoneE164) {
-      setPhoneError("Ingresa un número de teléfono válido");
-      return;
-    }
+  // Lookup unificado: se llama desde el blur del campo identificador
+  const runLookup = async (field: typeof identifierField, value: string) => {
+    if (!value?.trim()) return;
+    const orgId = organization?._id as string;
+    if (!orgId) return;
 
-    setIsCheckingPhone(true);
+    setIsLookingUp(true);
     setFoundName(null);
 
     try {
-      const orgId = organization?._id as string;
-      // Buscar por E.164 (el backend ya lo soporta)
-      const client = await getClientByPhoneNumberAndOrganization(
-        phoneE164,
-        orgId
-      );
+      const client = await getClientByIdentifier(field, value, orgId);
 
       if (client) {
-        setClientId(client._id); // Guardar el ID del cliente
-        
-        // Rellena datos si vienen vacíos o distintos
+        setClientId(client._id);
         setBookingData((prev) => {
           const prevDetails = prev.customerDetails || customerDetails;
           return {
             ...prev,
             customerDetails: {
               ...prevDetails,
-              name: prevDetails.name?.trim()
-                ? prevDetails.name
-                : client.name || "",
-              email: prevDetails.email?.trim()
-                ? prevDetails.email
-                : client.email || "",
-              phone: phoneE164, // Mantener E.164
-              birthDate: client.birthDate
-                ? new Date(client.birthDate)
-                : prevDetails.birthDate ?? null,
+              name: prevDetails.name?.trim() ? prevDetails.name : client.name || "",
+              email: prevDetails.email?.trim() ? prevDetails.email : client.email || "",
+              phone: field === "phone" ? value : (prevDetails.phone || ""),
+              birthDate: client.birthDate ? new Date(client.birthDate) : prevDetails.birthDate ?? null,
+              documentId: prevDetails.documentId?.trim() ? prevDetails.documentId : client.documentId || "",
+              notes: prevDetails.notes?.trim() ? prevDetails.notes : client.notes || "",
             },
           };
         });
         if (client.name) setFoundName(client.name);
 
-        // Detectar paquetes activos del cliente
-        if (selectedServiceIds.length > 0) {
+        // Detección de paquetes activos (usa teléfono del cliente encontrado o el actual)
+        const phoneForPkg =
+          field === "phone" ? value : (client.phone_e164 || "");
+        if (selectedServiceIds.length > 0 && phoneForPkg) {
           try {
             const pkgResult = await checkClientPackagesPublic(
-              phoneE164,
+              phoneForPkg,
               selectedServiceIds,
               orgId
             );
@@ -197,150 +199,248 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           }
         }
       } else {
-        setClientId(null); // No existe, se creará uno nuevo
+        setClientId(null);
         setDetectedPackages([]);
         onPackageDetected?.(null, null);
       }
-    } catch (error) {
-      // No bloqueamos el flujo si falla la búsqueda
-      console.error("Error al verificar el cliente:", error);
+    } catch {
       setClientId(null);
     } finally {
-      setIsCheckingPhone(false);
+      setIsLookingUp(false);
     }
   };
 
-  // Función para actualizar el cliente antes de hacer la reserva
+  // Blur del identificador teléfono
+  const handlePhoneIdentifierBlur = async () => {
+    if (!phoneValid || !phoneE164) {
+      setPhoneError("Ingresa un número de teléfono válido");
+      return;
+    }
+    await runLookup("phone", phoneE164);
+  };
+
+  // Blur del identificador email
+  const handleEmailBlur = async () => {
+    const email = (customerDetails.email || "").trim();
+    if (email && !isValidEmail(email)) {
+      setEmailError("Correo no válido");
+      return;
+    }
+    setEmailError(null);
+    if (email && email !== customerDetails.email) {
+      handleInputChange("email", email.toLowerCase());
+    }
+    if (identifierField === "email" && email) {
+      await runLookup("email", email);
+    }
+  };
+
+  // Blur del identificador documento
+  const handleDocumentIdBlur = async () => {
+    const val = (customerDetails.documentId || "").trim();
+    if (identifierField === "documentId" && val) {
+      await runLookup("documentId", val);
+    }
+  };
+
+  // Actualizar cliente existente antes de confirmar reserva
   const updateClientIfNeeded = async (): Promise<boolean> => {
-    if (!clientId) return true; // Si no hay cliente, no hay nada que actualizar
-
+    if (!clientId) return true;
     try {
-      // Verificar si hay cambios para actualizar
       const updates: Partial<any> = {};
-      
-      if (customerDetails.name && customerDetails.name.trim()) {
-        updates.name = customerDetails.name.trim();
-      }
-      
-      if (customerDetails.email && customerDetails.email.trim()) {
-        updates.email = customerDetails.email.trim();
-      }
-      
-      if (customerDetails.birthDate) {
-        updates.birthDate = customerDetails.birthDate;
-      }
-      
-      // 🌍 Actualizar teléfono con el formato E.164 y país (igual que ClientFormModal)
+      if (customerDetails.name?.trim()) updates.name = customerDetails.name.trim();
+      if (customerDetails.email?.trim()) updates.email = customerDetails.email.trim();
+      if (customerDetails.birthDate) updates.birthDate = customerDetails.birthDate;
+      if (customerDetails.documentId?.trim()) updates.documentId = customerDetails.documentId.trim();
+      if (customerDetails.notes?.trim()) updates.notes = customerDetails.notes.trim();
       if (phoneE164) {
-        updates.phoneNumber = phoneE164; // El backend normalizará automáticamente
-        updates.phone_country = phoneCountry || undefined; // Enviar el país seleccionado
+        updates.phoneNumber = phoneE164;
+        updates.phone_country = phoneCountry || undefined;
       }
-
-      // Solo actualizar si hay cambios
-      if (Object.keys(updates).length > 0) {
-        await updateClient(clientId, updates);
-      }
-      
+      if (Object.keys(updates).length > 0) await updateClient(clientId, updates);
       return true;
-    } catch (error) {
-      console.error("Error al actualizar el cliente:", error);
+    } catch {
       return false;
     }
   };
 
-  // Exponer la función de actualización al componente padre
   useEffect(() => {
-    if (onClientUpdateReady) {
-      onClientUpdateReady(updateClientIfNeeded);
-    }
+    if (onClientUpdateReady) onClientUpdateReady(updateClientIfNeeded);
   }, [clientId, customerDetails, phoneE164, phoneCountry, onClientUpdateReady]);
 
-  const handleEmailBlur = () => {
-    const email = (customerDetails.email || "").trim();
-    if (!isValidEmail(email)) {
-      setEmailError("Correo no válido");
-    } else {
-      setEmailError(null);
-      // opcional: normalizar a lowercase
-      if (email && email !== customerDetails.email) {
-        handleInputChange("email", email.toLowerCase());
-      }
-    }
-  };
+  const phoneCfg       = fieldCfg("phone");
+  const emailCfg       = fieldCfg("email");
+  const birthDateCfg   = fieldCfg("birthDate");
+  const documentIdCfg  = fieldCfg("documentId");
+  const notesCfg       = fieldCfg("notes");
+
+  // Feedback del lookup (siempre visible bajo el campo identificador)
+  const LookupFeedback = () => (
+    <>
+      {isLookingUp && (
+        <Group gap="xs">
+          <Loader size="xs" />
+          <Text size="xs" c="dimmed">
+            Buscando por {IDENTIFIER_LABELS[identifierField]}...
+          </Text>
+        </Group>
+      )}
+      {foundName && !isLookingUp && (
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">Cliente encontrado:</Text>
+          <Badge variant="light" size="sm">{foundName}</Badge>
+        </Group>
+      )}
+    </>
+  );
 
   return (
     <Stack>
-      {/* Teléfono arriba para auto-lookup */}
-      <Stack gap={6}>
-        <InternationalPhoneInput
-          value={customerDetails.phone || ""}
-          organizationDefaultCountry={
-            organization?.default_country as CountryCode
-          }
-          onChange={handlePhoneChange}
-          onBlur={handlePhoneBlur}
-          error={phoneError}
-          label="Teléfono"
-          placeholder="300 000 0000"
-          required
-          compact
-        />
-        {isCheckingPhone && (
-          <Group gap="xs">
-            <Loader size="xs" />
-            <Text size="xs" c="dimmed">
-              Verificando cliente...
-            </Text>
-          </Group>
-        )}
-        {foundName && !isCheckingPhone && (
-          <Group gap="xs">
-            <Text size="xs" c="dimmed">
-              Cliente detectado:
-            </Text>
-            <Badge variant="light" size="sm">
-              {foundName}
-            </Badge>
-          </Group>
-        )}
-      </Stack>
 
-      {/* Nombre y correo lado a lado en desktop */}
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={isMobile ? "sm" : "md"}>
-        <TextInput
-          label="Nombre completo"
-          placeholder="Ingresa tu nombre"
-          value={customerDetails.name}
-          onChange={(e) => handleInputChange("name", e.currentTarget.value)}
-          disabled={isCheckingPhone}
-          autoComplete="name"
-        />
+      {/* ── CAMPO IDENTIFICADOR (siempre primero) ─────────────────── */}
 
-        <TextInput
-          label="Correo electrónico"
-          placeholder="Ingresa tu correo"
-          type="email"
-          value={customerDetails.email}
-          onChange={(e) => handleInputChange("email", e.currentTarget.value)}
-          onBlur={handleEmailBlur}
-          error={emailError}
-          disabled={isCheckingPhone}
-          autoComplete="email"
-        />
-      </SimpleGrid>
+      {identifierField === "phone" && (
+        <Stack gap={6}>
+          <InternationalPhoneInput
+            value={customerDetails.phone || ""}
+            organizationDefaultCountry={organization?.default_country as CountryCode}
+            onChange={handlePhoneChange}
+            onBlur={handlePhoneIdentifierBlur}
+            error={phoneError}
+            label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+            placeholder="300 000 0000"
+            required
+            compact
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
 
-      <DateInput
-        label="Fecha de nacimiento"
-        value={customerDetails.birthDate}
-        locale="es"
-        valueFormat="DD/MM/YYYY"
-        onChange={(value) => handleInputChange("birthDate", value)}
-        placeholder="Selecciona una fecha 00/00/0000"
-        maxDate={new Date()}
-        clearable
-        popoverProps={{ withinPortal: true, trapFocus: false }}
+      {identifierField === "email" && (
+        <Stack gap={6}>
+          <TextInput
+            label={emailCfg.label || IDENTIFIER_LABELS.email}
+            placeholder="Ingresa tu correo"
+            type="email"
+            value={customerDetails.email || ""}
+            onChange={(e) => handleInputChange("email", e.currentTarget.value)}
+            onBlur={handleEmailBlur}
+            error={emailError}
+            required
+            disabled={isLookingUp}
+            autoComplete="email"
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
+
+      {identifierField === "documentId" && (
+        <Stack gap={6}>
+          <TextInput
+            label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+            placeholder="Cédula, pasaporte, etc."
+            value={customerDetails.documentId || ""}
+            onChange={(e) => handleInputChange("documentId", e.currentTarget.value)}
+            onBlur={handleDocumentIdBlur}
+            required
+            disabled={isLookingUp}
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
+
+      <Divider />
+
+      {/* ── NOMBRE (siempre obligatorio) ─────────────────────────── */}
+      <TextInput
+        label="Nombre completo"
+        placeholder="Ingresa tu nombre"
+        value={customerDetails.name}
+        onChange={(e) => handleInputChange("name", e.currentTarget.value)}
+        disabled={isLookingUp}
+        required
+        autoComplete="name"
       />
 
+      {/* ── CAMPOS SECUNDARIOS (excluyendo el que ya es identificador) */}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={isMobile ? "sm" : "md"}>
+
+        {/* Teléfono — solo si está habilitado Y no es el identificador */}
+        {phoneCfg.enabled && identifierField !== "phone" && (
+          <InternationalPhoneInput
+            value={customerDetails.phone || ""}
+            organizationDefaultCountry={organization?.default_country as CountryCode}
+            onChange={handlePhoneChange}
+            onBlur={() => {
+              if (phoneE164 && !phoneValid) setPhoneError("Número de teléfono inválido");
+            }}
+            error={phoneError}
+            label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+            placeholder="300 000 0000"
+            required={phoneCfg.required}
+            compact
+          />
+        )}
+
+        {/* Correo — solo si está habilitado Y no es el identificador */}
+        {emailCfg.enabled && identifierField !== "email" && (
+          <TextInput
+            label={emailCfg.label || IDENTIFIER_LABELS.email}
+            placeholder="Ingresa tu correo"
+            type="email"
+            value={customerDetails.email || ""}
+            onChange={(e) => handleInputChange("email", e.currentTarget.value)}
+            onBlur={handleEmailBlur}
+            error={emailError}
+            required={emailCfg.required}
+            disabled={isLookingUp}
+            autoComplete="email"
+          />
+        )}
+
+        {/* Documento — solo si está habilitado Y no es el identificador */}
+        {documentIdCfg.enabled && identifierField !== "documentId" && (
+          <TextInput
+            label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+            placeholder="Cédula, pasaporte, etc."
+            value={customerDetails.documentId || ""}
+            onChange={(e) => handleInputChange("documentId", e.currentTarget.value)}
+            required={documentIdCfg.required}
+            disabled={isLookingUp}
+          />
+        )}
+
+        {/* Fecha de nacimiento */}
+        {birthDateCfg.enabled && (
+          <DateInput
+            label={birthDateCfg.label || "Fecha de nacimiento"}
+            value={customerDetails.birthDate}
+            locale="es"
+            valueFormat="DD/MM/YYYY"
+            onChange={(value) => handleInputChange("birthDate", value)}
+            placeholder="Selecciona una fecha 00/00/0000"
+            maxDate={new Date()}
+            required={birthDateCfg.required}
+            clearable
+            popoverProps={{ withinPortal: true, trapFocus: false }}
+          />
+        )}
+      </SimpleGrid>
+
+      {/* Notas */}
+      {notesCfg.enabled && (
+        <Textarea
+          label={notesCfg.label || "Notas"}
+          placeholder="Información adicional..."
+          value={customerDetails.notes || ""}
+          onChange={(e) => handleInputChange("notes", e.currentTarget.value)}
+          required={notesCfg.required}
+          minRows={2}
+          autosize
+        />
+      )}
+
+      {/* Paquetes de sesiones detectados */}
       {detectedPackages.length > 0 && (
         <Paper withBorder p="md" radius="md" bg="teal.0" style={{ borderColor: "#63e6be" }}>
           <Group gap="xs" mb="xs">
@@ -350,21 +450,21 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
             </Text>
           </Group>
           {detectedPackages.map((pkg) => {
-            const pkgName = typeof pkg.servicePackageId === "object"
-              ? pkg.servicePackageId.name
-              : "Paquete";
+            const pkgName =
+              typeof pkg.servicePackageId === "object"
+                ? pkg.servicePackageId.name
+                : "Paquete";
             return (
               <Paper key={pkg._id} withBorder p="sm" radius="sm" mb="xs" bg="white">
                 <Group justify="space-between" mb={4}>
                   <Text size="sm" fw={600}>{pkgName}</Text>
-                  <Badge variant="light" color="teal" size="sm">
-                    Activo
-                  </Badge>
+                  <Badge variant="light" color="teal" size="sm">Activo</Badge>
                 </Group>
                 {pkg.services.map((svc, idx) => {
-                  const svcName = typeof svc.serviceId === "object"
-                    ? svc.serviceId.name
-                    : "Servicio";
+                  const svcName =
+                    typeof svc.serviceId === "object"
+                      ? svc.serviceId.name
+                      : "Servicio";
                   return svc.sessionsRemaining > 0 ? (
                     <Group key={idx} justify="space-between" gap="xs">
                       <Text size="xs">{svcName}</Text>

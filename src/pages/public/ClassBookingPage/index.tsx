@@ -9,6 +9,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { IconCheck } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
+import { DEFAULT_CLIENT_FORM_CONFIG } from "../../../services/organizationService";
 
 import {
   ClassType, ClassSession,
@@ -85,11 +86,21 @@ export default function ClassBookingWizard() {
     );
   }
 
+  const identifierField = organization?.clientFormConfig?.identifierField
+    ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+
+  const attendeeHasIdentifier = (a: typeof attendee) => {
+    if (identifierField === "phone") return !!(a.phone_e164 || a.phone);
+    if (identifierField === "email") return !!a.email.trim();
+    if (identifierField === "documentId") return !!a.documentId.trim();
+    return false;
+  };
+
   // ── Validaciones por paso ──────────────────────────
   const canNext: Record<number, boolean> = {
     0: !!selectedClass,
     1: !!selectedSession,
-    2: !!attendee.name.trim() && !!(attendee.phone_e164 || attendee.phone) &&
+    2: !!attendee.name.trim() && attendeeHasIdentifier(attendee) &&
        (!companion || (!!companion.name.trim() && !!(companion.phone_e164 || companion.phone))),
     3: true,
   };
@@ -115,16 +126,18 @@ export default function ClassBookingWizard() {
         attendee: {
           name: attendee.name,
           phone: attendee.phone_e164 || attendee.phone,
-          phone_e164: attendee.phone_e164,
-          phone_country: attendee.phone_country,
+          phone_e164: attendee.phone_e164 || undefined,
+          phone_country: attendee.phone_country || undefined,
           email: attendee.email || undefined,
+          documentId: attendee.documentId || undefined,
+          notes: attendee.notes || undefined,
         },
         companion: companion
           ? {
               name: companion.name,
               phone: companion.phone_e164 || companion.phone,
-              phone_e164: companion.phone_e164,
-              phone_country: companion.phone_country,
+              phone_e164: companion.phone_e164 || undefined,
+              phone_country: companion.phone_country || undefined,
               email: companion.email || undefined,
             }
           : undefined,

@@ -22,6 +22,7 @@ const ClientRow = React.memo(
     handleMergeClient,
     handleResetClientLoyalty,
     handleForceDeleteClient,
+    showDocumentId = false,
   }: {
     client: Client;
     loadingClientId: string | null;
@@ -41,6 +42,7 @@ const ClientRow = React.memo(
     handleMergeClient: (client: Client) => void;
     handleResetClientLoyalty: (clientId: string) => void;
     handleForceDeleteClient: (id: string) => void;
+    showDocumentId?: boolean;
   }) => (
     <Table.Tr key={client._id}>
       <Table.Td>
@@ -60,6 +62,11 @@ const ClientRow = React.memo(
           <Text size="sm" c="dimmed">-</Text>
         )}
       </Table.Td>
+      {showDocumentId && (
+        <Table.Td style={{ textAlign: "center" }}>
+          <Text size="sm">{(client as any).documentId || <Text span c="dimmed">—</Text>}</Text>
+        </Table.Td>
+      )}
       <Table.Td>
         <Badge
           fullWidth

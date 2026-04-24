@@ -16,6 +16,8 @@ export interface Reservation {
     email: string;
     phone: string;
     birthDate: Date | null;
+    documentId?: string;
+    notes?: string;
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted";
@@ -34,6 +36,8 @@ export interface CreateReservationPayload {
     email: string;
     phone: string;
     birthDate: Date | null;
+    documentId?: string;
+    notes?: string;
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected";
@@ -55,12 +59,14 @@ interface MultipleReservationServiceItem {
 // Payload para el endpoint múltiple
 export interface CreateMultipleReservationsPayload {
   services: MultipleReservationServiceItem[];
-  startDate: Date | string; // hora inicial de la secuencia
+  startDate: Date | string;
   customerDetails: {
     name: string;
     email: string;
     phone: string;
     birthDate: Date | null;
+    documentId?: string;
+    notes?: string;
   };
   organizationId: string;
   clientPackageId?: string; // ID del paquete de sesiones del cliente (si aplica)

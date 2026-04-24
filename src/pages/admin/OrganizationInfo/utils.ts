@@ -1,4 +1,5 @@
 import type { Organization } from "../../../services/organizationService";
+import { DEFAULT_CLIENT_FORM_CONFIG } from "../../../services/organizationService";
 
 export const ensureBranding = (b?: Organization["branding"]) => b ? { ...b } : {};
 export const ensureDomains = (d?: string[]) => (Array.isArray(d) ? d : []);
@@ -81,5 +82,11 @@ export const normalizeOrg = (response: Organization): Organization => ({
       response.cancellationPolicy?.minHoursBeforeAppointment ?? 0,
     preventCancellingConfirmed:
       response.cancellationPolicy?.preventCancellingConfirmed ?? false,
+  },
+  clientFormConfig: {
+    identifierField: response.clientFormConfig?.identifierField ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField,
+    fields: Array.isArray(response.clientFormConfig?.fields) && response.clientFormConfig.fields.length > 0
+      ? [...response.clientFormConfig.fields]
+      : [...DEFAULT_CLIENT_FORM_CONFIG.fields],
   },
 });

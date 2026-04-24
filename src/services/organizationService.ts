@@ -69,6 +69,30 @@ export interface WeeklySchedule {
   stepMinutes?: number;
 }
 
+export interface ClientFieldConfig {
+  key: 'name' | 'phone' | 'email' | 'birthDate' | 'documentId' | 'notes';
+  enabled: boolean;
+  required: boolean;
+  label?: string;
+}
+
+export interface ClientFormConfig {
+  identifierField: 'phone' | 'email' | 'documentId';
+  fields: ClientFieldConfig[];
+}
+
+export const DEFAULT_CLIENT_FORM_CONFIG: ClientFormConfig = {
+  identifierField: 'phone',
+  fields: [
+    { key: 'name',       enabled: true,  required: true },
+    { key: 'phone',      enabled: true,  required: true },
+    { key: 'email',      enabled: true,  required: false },
+    { key: 'birthDate',  enabled: true,  required: false },
+    { key: 'documentId', enabled: false, required: false },
+    { key: 'notes',      enabled: false, required: false },
+  ],
+};
+
 export interface Organization {
   _id?: string;
   slug?: string;
@@ -116,7 +140,8 @@ export interface Organization {
   reminderSettings?: ReminderSettings;
   cancellationPolicy?: CancellationPolicy;
   currency?: string;
-  timeFormat?: '12h' | '24h'; // 🕐 Formato de hora para display
+  timeFormat?: '12h' | '24h';
+  clientFormConfig?: ClientFormConfig;
   // Sistema de membresías
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "past_due" | "suspended" | "cancelled" | "none";

@@ -16,9 +16,11 @@ export interface Client {
   _id: string;
   name: string;
   phoneNumber: string;
-  phone_e164?: string; // 🌍 Número normalizado en formato E.164
-  phone_country?: string; // 🌍 Código de país ISO2 (CO, MX, US, etc.)
+  phone_e164?: string;
+  phone_country?: string;
   email?: string;
+  documentId?: string;
+  notes?: string;
   servicesTaken: number;
   referralsMade: number;
   hasServiceDiscount?: boolean;
@@ -152,6 +154,25 @@ export const getClientByPhoneNumberAndOrganization = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al buscar el cliente");
+  }
+};
+
+// Buscar cliente por el campo identificador configurado en la organización
+export const getClientByIdentifier = async (
+  field: 'phone' | 'email' | 'documentId',
+  value: string,
+  organizationId: string
+): Promise<Client | undefined> => {
+  if (field === 'phone') {
+    return getClientByPhoneNumberAndOrganization(value, organizationId);
+  }
+  try {
+    const response = await apiClient.get<Response<Client>>('/by-identifier', {
+      params: { field, value, organizationId },
+    });
+    return response.data.data;
+  } catch (error) {
+    return undefined;
   }
 };
 

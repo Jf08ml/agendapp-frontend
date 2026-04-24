@@ -1,14 +1,21 @@
-/* eslint-disable react-refresh/only-export-components */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useState } from "react";
 import {
-  Stack, TextInput, Switch, Divider, Text, Alert,
-  Badge, Card, Group, ThemeIcon,
+  Stack, TextInput, Textarea, Switch, Divider, Text, Alert,
+  Badge, Card, Group, ThemeIcon, Loader,
 } from "@mantine/core";
 import { IconUsers, IconDiscount } from "@tabler/icons-react";
 import { CountryCode } from "libphonenumber-js";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 import InternationalPhoneInput from "../../../components/InternationalPhoneInput";
 import { ClassType } from "../../../services/classService";
+import { getClientByIdentifier } from "../../../services/clientService";
+import {
+  DEFAULT_CLIENT_FORM_CONFIG,
+  type ClientFieldConfig,
+} from "../../../services/organizationService";
 
 export interface AttendeeForm {
   name: string;
@@ -16,6 +23,8 @@ export interface AttendeeForm {
   phone_e164: string;
   phone_country: string;
   email: string;
+  documentId: string;
+  notes: string;
 }
 
 interface Props {
@@ -30,9 +39,19 @@ interface Props {
 
 const emptyAttendee = (): AttendeeForm => ({
   name: "", phone: "", phone_e164: "", phone_country: "CO", email: "",
+  documentId: "", notes: "",
 });
 
 export { emptyAttendee };
+
+const isValidEmail = (v: string) =>
+  !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+const IDENTIFIER_LABELS: Record<string, string> = {
+  phone: "Teléfono",
+  email: "Correo electrónico",
+  documentId: "Número de documento",
+};
 
 export default function StepAttendees({
   classDoc,
@@ -43,10 +62,90 @@ export default function StepAttendees({
   onCompanionToggle,
   organizationCountry = "CO",
 }: Props) {
+  const organization = useSelector((s: RootState) => s.organization.organization);
+
+  const rawConfig = organization?.clientFormConfig;
+  const identifierField: 'phone' | 'email' | 'documentId' =
+    rawConfig?.identifierField ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+  const configFields: ClientFieldConfig[] =
+    rawConfig?.fields?.length ? rawConfig.fields : DEFAULT_CLIENT_FORM_CONFIG.fields;
+
+  const fieldCfg = (key: ClientFieldConfig['key']) =>
+    configFields.find((f) => f.key === key) ?? { key, enabled: false, required: false };
+
+  const phoneCfg      = fieldCfg("phone");
+  const emailCfg      = fieldCfg("email");
+  const birthDateCfg  = fieldCfg("birthDate");
+  const documentIdCfg = fieldCfg("documentId");
+  const notesCfg      = fieldCfg("notes");
+
+  // birthDate is not part of AttendeeForm; skip rendering if enabled — enrollment doesn't use it
+
+  const [phoneValid, setPhoneValid] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [foundName, setFoundName] = useState<string | null>(null);
+
+  const runLookup = async (field: typeof identifierField, value: string) => {
+    const orgId = organization?._id as string;
+    if (!value?.trim() || !orgId) return;
+    setIsLookingUp(true);
+    setFoundName(null);
+    try {
+      const client = await getClientByIdentifier(field, value, orgId);
+      if (client) {
+        if (!attendee.name.trim() && client.name) onAttendeeChange("name", client.name);
+        if (!attendee.email.trim() && client.email) onAttendeeChange("email", client.email);
+        if (!attendee.documentId.trim() && (client as any).documentId) onAttendeeChange("documentId", (client as any).documentId);
+        setFoundName(client.name || null);
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  const handlePhoneIdentifierBlur = async () => {
+    if (!phoneValid || !attendee.phone_e164) {
+      if (attendee.phone) setPhoneError("Número de teléfono inválido");
+      return;
+    }
+    await runLookup("phone", attendee.phone_e164);
+  };
+
+  const handleEmailBlur = async () => {
+    const email = attendee.email.trim();
+    if (email && !isValidEmail(email)) { setEmailError("Correo no válido"); return; }
+    setEmailError(null);
+    if (identifierField === "email" && email) await runLookup("email", email);
+  };
+
+  const handleDocumentIdBlur = async () => {
+    const val = attendee.documentId.trim();
+    if (val) await runLookup("documentId", val);
+  };
+
+  const LookupFeedback = () => (
+    <>
+      {isLookingUp && (
+        <Group gap="xs">
+          <Loader size="xs" />
+          <Text size="xs" c="dimmed">Buscando por {IDENTIFIER_LABELS[identifierField]}...</Text>
+        </Group>
+      )}
+      {foundName && !isLookingUp && (
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">Cliente encontrado:</Text>
+          <Badge variant="light" size="sm">{foundName}</Badge>
+        </Group>
+      )}
+    </>
+  );
+
   const discount = classDoc?.groupDiscount;
   const hasCompanion = companion !== null;
-
-  // Calcula el descuento si hay acompañante
   const numPeople = hasCompanion ? 2 : 1;
   const discountApplies =
     discount?.enabled &&
@@ -61,45 +160,135 @@ export default function StepAttendees({
     <Stack gap="md">
       <Text fw={600} size="lg">Tus datos</Text>
 
-      {/* ── Datos del titular ───────────────────────── */}
+      {/* ── CAMPO IDENTIFICADOR (siempre primero) ───────── */}
+
+      {identifierField === "phone" && (
+        <Stack gap={6}>
+          <InternationalPhoneInput
+            label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+            value={attendee.phone_e164 || attendee.phone}
+            organizationDefaultCountry={organizationCountry as CountryCode}
+            onChange={(e164, country, isValid) => {
+              onAttendeeChange("phone_e164", e164 ?? "");
+              onAttendeeChange("phone", e164 ?? "");
+              onAttendeeChange("phone_country", country ?? "CO");
+              setPhoneValid(isValid);
+              setPhoneError(null);
+            }}
+            onBlur={handlePhoneIdentifierBlur}
+            error={phoneError}
+            required
+            compact
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
+
+      {identifierField === "email" && (
+        <Stack gap={6}>
+          <TextInput
+            label={emailCfg.label || IDENTIFIER_LABELS.email}
+            placeholder="Ingresa tu correo"
+            type="email"
+            value={attendee.email}
+            onChange={(e) => onAttendeeChange("email", e.currentTarget.value)}
+            onBlur={handleEmailBlur}
+            error={emailError}
+            required
+            disabled={isLookingUp}
+            autoComplete="email"
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
+
+      {identifierField === "documentId" && (
+        <Stack gap={6}>
+          <TextInput
+            label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+            placeholder="Cédula, pasaporte, etc."
+            value={attendee.documentId}
+            onChange={(e) => onAttendeeChange("documentId", e.currentTarget.value)}
+            onBlur={handleDocumentIdBlur}
+            required
+            disabled={isLookingUp}
+          />
+          <LookupFeedback />
+        </Stack>
+      )}
+
+      {/* ── NOMBRE (siempre) ────────────────────────────── */}
       <TextInput
         label="Nombre completo"
         placeholder="Tu nombre"
         required
         value={attendee.name}
         onChange={(e) => onAttendeeChange("name", e.currentTarget.value)}
+        disabled={isLookingUp}
       />
-      <InternationalPhoneInput
-        label="Teléfono (WhatsApp)"
-        value={attendee.phone_e164 || attendee.phone}
-        organizationDefaultCountry={organizationCountry as CountryCode}
-        onChange={(e164, country, _isValid) => {
-          onAttendeeChange("phone_e164", e164 ?? "");
-          onAttendeeChange("phone", e164 ?? "");
-          onAttendeeChange("phone_country", country ?? "CO");
-        }}
-      />
-      <TextInput
-        label="Correo electrónico"
-        placeholder="opcional"
-        type="email"
-        value={attendee.email}
-        onChange={(e) => onAttendeeChange("email", e.currentTarget.value)}
-      />
+
+      {/* ── CAMPOS SECUNDARIOS ──────────────────────────── */}
+      {phoneCfg.enabled && identifierField !== "phone" && (
+        <InternationalPhoneInput
+          label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+          value={attendee.phone_e164 || attendee.phone}
+          organizationDefaultCountry={organizationCountry as CountryCode}
+          onChange={(e164, country, isValid) => {
+            onAttendeeChange("phone_e164", e164 ?? "");
+            onAttendeeChange("phone", e164 ?? "");
+            onAttendeeChange("phone_country", country ?? "CO");
+            setPhoneValid(isValid);
+            if (e164 && !isValid) setPhoneError("Número inválido");
+            else setPhoneError(null);
+          }}
+          error={phoneError}
+          required={phoneCfg.required}
+          compact
+        />
+      )}
+
+      {emailCfg.enabled && identifierField !== "email" && (
+        <TextInput
+          label={emailCfg.label || IDENTIFIER_LABELS.email}
+          placeholder="opcional"
+          type="email"
+          value={attendee.email}
+          onChange={(e) => onAttendeeChange("email", e.currentTarget.value)}
+          onBlur={handleEmailBlur}
+          error={emailError}
+          required={emailCfg.required}
+          autoComplete="email"
+        />
+      )}
+
+      {documentIdCfg.enabled && identifierField !== "documentId" && (
+        <TextInput
+          label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+          placeholder="Cédula, pasaporte, etc."
+          value={attendee.documentId}
+          onChange={(e) => onAttendeeChange("documentId", e.currentTarget.value)}
+          required={documentIdCfg.required}
+        />
+      )}
+
+      {notesCfg.enabled && (
+        <Textarea
+          label={notesCfg.label || "Notas"}
+          placeholder="Información adicional..."
+          value={attendee.notes}
+          onChange={(e) => onAttendeeChange("notes", e.currentTarget.value)}
+          required={notesCfg.required}
+          minRows={2}
+          autosize
+        />
+      )}
 
       <Divider />
 
-      {/* ── Toggle acompañante ───────────────────────── */}
+      {/* ── Toggle acompañante ──────────────────────────── */}
       {discount?.enabled && (
-        <Alert
-          icon={<IconDiscount size={16} />}
-          color="blue"
-          variant="light"
-          radius="md"
-        >
-          <Text size="sm" fw={500}>
-            ¡Descuento grupal disponible!
-          </Text>
+        <Alert icon={<IconDiscount size={16} />} color="blue" variant="light" radius="md">
+          <Text size="sm" fw={500}>¡Descuento grupal disponible!</Text>
           <Text size="xs" mt={2}>
             Si reservas con {discount.minPeople} o más personas
             {discount.maxPeople ? ` (máx. ${discount.maxPeople})` : ""}, obtienes un{" "}
@@ -116,7 +305,7 @@ export default function StepAttendees({
         size="md"
       />
 
-      {/* ── Datos del acompañante ───────────────────── */}
+      {/* ── Datos del acompañante (siempre teléfono + nombre, simple) */}
       {hasCompanion && companion && (
         <Card withBorder radius="md" p="md" bg="var(--mantine-color-gray-0)">
           <Group gap="xs" mb="sm">
@@ -137,11 +326,12 @@ export default function StepAttendees({
               label="Teléfono (WhatsApp)"
               value={companion.phone_e164 || companion.phone}
               organizationDefaultCountry={organizationCountry as CountryCode}
-              onChange={(e164, country, _isValid) => {
+              onChange={(e164, country) => {
                 onCompanionChange("phone_e164", e164 ?? "");
                 onCompanionChange("phone", e164 ?? "");
                 onCompanionChange("phone_country", country ?? "CO");
               }}
+              compact
             />
             <TextInput
               label="Correo electrónico"
@@ -154,7 +344,7 @@ export default function StepAttendees({
         </Card>
       )}
 
-      {/* ── Resumen de precio ───────────────────────── */}
+      {/* ── Resumen de precio ───────────────────────────── */}
       {classDoc && (
         <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
           <Stack gap={4}>
@@ -182,9 +372,7 @@ export default function StepAttendees({
             <Divider my={4} />
             <Group justify="space-between">
               <Text fw={700}>Total</Text>
-              <Text fw={700} size="lg" c="green">
-                ${totalPrice.toLocaleString("es-CO")}
-              </Text>
+              <Text fw={700} size="lg" c="green">${totalPrice.toLocaleString("es-CO")}</Text>
             </Group>
             {discountApplies && numPeople > 1 && (
               <Text size="xs" c="dimmed" ta="right">

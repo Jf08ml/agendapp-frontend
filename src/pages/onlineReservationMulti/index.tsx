@@ -67,6 +67,8 @@ export default function MultiBookingWizard() {
     email: "",
     phone: "",
     birthDate: null as Date | null,
+    documentId: "",
+    notes: "",
   });
 
   // 🔁 Recurrencia
@@ -171,8 +173,11 @@ export default function MultiBookingWizard() {
 
   const hasCustomerData = (() => {
     const hasName = customerDetails.name.trim().length > 0;
-    const hasPhone = customerDetails.phone.trim().length >= 7;
-    return hasName && hasPhone;
+    const identifierField = organization?.clientFormConfig?.identifierField || 'phone';
+    if (identifierField === 'phone') return hasName && customerDetails.phone.trim().length >= 7;
+    if (identifierField === 'email') return hasName && customerDetails.email.trim().length > 3;
+    if (identifierField === 'documentId') return hasName && (customerDetails.documentId || "").trim().length > 0;
+    return hasName;
   })();
 
   if (!organization?._id) {
@@ -272,7 +277,7 @@ export default function MultiBookingWizard() {
     setSelected([]);
     setDates([]);
     setTimes(null);
-    setCustomerDetails({ name: "", email: "", phone: "", birthDate: null });
+    setCustomerDetails({ name: "", email: "", phone: "", birthDate: null, documentId: "", notes: "" });
     setFinishInfo(null);
     setCompleted(false);
     setClientPackageId(null);

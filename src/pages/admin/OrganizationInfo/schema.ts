@@ -214,6 +214,16 @@ export const schema = z.object({
     z.null(),
     z.undefined()
   ]).optional(),
+
+  clientFormConfig: z.object({
+    identifierField: z.enum(['phone', 'email', 'documentId']).optional(),
+    fields: z.array(z.object({
+      key: z.string(),
+      enabled: z.boolean().optional(),
+      required: z.boolean().optional(),
+      label: z.string().optional(),
+    })).optional(),
+  }).optional(),
   // Moneda de la organización (ISO 4217)
   currency: z.string().length(3, "Código de moneda inválido (ISO 4217)").optional(),
   // Formato de hora

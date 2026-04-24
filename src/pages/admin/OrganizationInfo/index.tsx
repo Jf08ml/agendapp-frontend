@@ -17,6 +17,7 @@ import {
   IconCreditCard,
   IconBan,
   IconBell,
+  IconForms,
 } from "@tabler/icons-react";
 
 import { RootState } from "../../../app/store";
@@ -41,6 +42,7 @@ import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
 import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
 import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
+import ClientFormTab from "./components/tabs/ClientFormTab";
 
 import { schema, FormValues } from "./schema";
 import { normalizeOrg } from "./utils";
@@ -276,6 +278,9 @@ export default function OrganizationInfo() {
             <Tabs.Tab value="reminders" leftSection={<IconBell size={14} />}>
               Recordatorios
             </Tabs.Tab>
+            <Tabs.Tab value="clientForm" leftSection={<IconForms size={14} />}>
+              Formulario cliente
+            </Tabs.Tab>
           </Tabs.List>
         </ScrollArea>
 
@@ -324,6 +329,10 @@ export default function OrganizationInfo() {
 
         <Tabs.Panel value="reminders" pt="md">
           <ReminderSettingsTab form={form} isEditing={true} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="clientForm" pt="md">
+          <ClientFormTab form={form} isEditing={true} />
         </Tabs.Panel>
       </Tabs>
 
