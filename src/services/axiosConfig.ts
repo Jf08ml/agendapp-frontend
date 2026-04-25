@@ -5,6 +5,9 @@ const API_BASE_URL: string =
     ? (import.meta.env.VITE_APP_API_URL as string)
     : (import.meta.env.VITE_APP_API_URL_DEPLOYMENT as string);
 
+// Cache del hostname para no leer window.location en cada request
+const TENANT_HOSTNAME = window.location.hostname;
+
 // Control de refresh token en progreso
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string) => void> = [];
@@ -32,7 +35,7 @@ const refreshAxios = axios.create({ baseURL: API_BASE_URL });
 const addAuthHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
     // Enviar hostname del tenant para que el backend resuelva la organización
-    config.headers["X-Tenant-Domain"] = window.location.hostname;
+    config.headers["X-Tenant-Domain"] = TENANT_HOSTNAME;
 
     // En dev, enviar slug como header para override
     if (import.meta.env.DEV) {
@@ -111,7 +114,7 @@ const addAuthHeader = (api: AxiosInstance) => {
 const addNoAuthInterceptor = (api: AxiosInstance) => {
   // No auth token, pero enviar hostname del tenant
   api.interceptors.request.use((config) => {
-    config.headers["X-Tenant-Domain"] = window.location.hostname;
+    config.headers["X-Tenant-Domain"] = TENANT_HOSTNAME;
 
     if (import.meta.env.DEV) {
       const urlParams = new URLSearchParams(window.location.search);

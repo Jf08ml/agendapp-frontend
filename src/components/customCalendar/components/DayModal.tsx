@@ -1,7 +1,7 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
 import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { format, addDays } from "date-fns";
+import { format, addDays, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -42,6 +42,7 @@ interface DayModalProps {
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
+  loadedMonthDate: Date;
   onEditAppointment: (appointment: Appointment) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
@@ -59,6 +60,7 @@ const DayModal: FC<DayModalProps> = ({
   onOpenModal,
   getAppointmentsForDay,
   fetchAppointmentsForDay,
+  loadedMonthDate,
   onEditAppointment,
   onCancelAppointment,
   onConfirmAppointment,
@@ -101,11 +103,11 @@ const DayModal: FC<DayModalProps> = ({
     [currentDay, getAppointmentsForDay]
   );
 
-  // Si el día NO está en el mes, haz fetch sólo para ese día, y ponlo local
+  // Si el día está fuera del mes cargado, hacer fetch solo para ese día
   useEffect(() => {
     let mounted = true;
-    // Si el día no está en el array global (mes), o el array está vacío
-    if (appointmentsFromMonth.length === 0) {
+    // Solo fetchar si el día cae fuera del rango mensual ya cargado
+    if (!isSameMonth(currentDay, loadedMonthDate)) {
       setFetchingLocalDay(true);
       fetchAppointmentsForDay(currentDay)
         .then((res) => {
@@ -115,12 +117,12 @@ const DayModal: FC<DayModalProps> = ({
           if (mounted) setFetchingLocalDay(false);
         });
     } else {
-      setLocalDayAppointments(null); // usar global
+      setLocalDayAppointments(null); // usar data global del mes
     }
     return () => {
       mounted = false;
     };
-  }, [currentDay, appointmentsFromMonth, fetchAppointmentsForDay]);
+  }, [currentDay, loadedMonthDate, fetchAppointmentsForDay]);
 
   // Lo que va a mostrar
   const appointments = localDayAppointments ?? appointmentsFromMonth;
@@ -339,8 +341,9 @@ const DayModal: FC<DayModalProps> = ({
             timeFormat={timeFormat}
           />
         ) : (
-          /* Vista de calendario */
-          <>
+          /* Vista de calendario — minWidth garantiza que el outer div tenga scroll
+             horizontal real y que el sticky de la columna de horas funcione siempre */
+          <div style={{ minWidth: "max-content" }}>
             <Box
               style={{
                 display: "flex",
@@ -360,16 +363,17 @@ const DayModal: FC<DayModalProps> = ({
             <Box style={{ display: "flex", position: "relative" }}>
               <Box
                 style={{
-                  display: "flex",
                   position: "sticky",
                   left: 0,
+                  top: 0,
                   zIndex: 100,
                   backgroundColor: "white",
+                  flexShrink: 0,
                 }}
               >
                 <TimeColumn timeIntervals={timeIntervals} timeFormat={timeFormat} />
               </Box>
-              <Box style={{ flex: 1, position: "relative" }}>
+              <Box style={{ position: "relative" }}>
                 {currentLinePosition !== null && (
                   <div
                     style={{
@@ -436,7 +440,7 @@ const DayModal: FC<DayModalProps> = ({
                 </Box>
               </Box>
             </Box>
-          </>
+          </div>
         )}
       </div>
       <Paper

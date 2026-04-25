@@ -36,8 +36,18 @@ const DayModalHeader: FC<HeaderProps> = ({
         backgroundColor: "#f8f9fb",
       }}
     >
-      {/* Espacio reservado para la columna de horas */}
-      <Box style={{ width: "80px" }} />
+      {/* Espacio reservado para la columna de horas — sticky left para que
+          la esquina superior-izquierda no desaparezca al scrollear horizontalmente */}
+      <Box
+        style={{
+          width: "80px",
+          flexShrink: 0,
+          position: "sticky",
+          left: 0,
+          zIndex: 5,
+          backgroundColor: "#f8f9fb",
+        }}
+      />
 
       {/* Encabezados de cada profesional */}
       {employees.map((employee) => {

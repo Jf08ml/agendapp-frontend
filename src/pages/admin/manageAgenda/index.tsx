@@ -35,10 +35,7 @@ import {
   getEmployeesByOrganizationId,
   updateEmployee,
 } from "../../../services/employeeService";
-import {
-  Client,
-  getClientsByOrganizationId,
-} from "../../../services/clientService";
+import { Client } from "../../../services/clientService";
 import { Service } from "../../../services/serviceService";
 import { showNotification } from "@mantine/notifications";
 import { openConfirmModal, modals } from "@mantine/modals";
@@ -98,7 +95,6 @@ const ScheduleView: React.FC = () => {
 
   const [modalOpenedAppointment, setModalOpenedAppointment] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
@@ -160,10 +156,12 @@ const ScheduleView: React.FC = () => {
 
   // ---------- DATA FETCH ----------
   useEffect(() => {
-    if (!readyForScopedFetch) return; // espera orgId y, si no hay view_all, también userId
-    fetchClients();
-    fetchEmployees();
-    fetchAppointmentsForMonth(currentDate);
+    if (!readyForScopedFetch) return;
+    setLoadingAgenda(true);
+    Promise.all([
+      fetchEmployees(),
+      fetchAppointmentsForMonth(currentDate),
+    ]).finally(() => setLoadingAgenda(false));
   }, [readyForScopedFetch]);
 
   // ---------- Ajuste de servicios según profesional ----------
@@ -267,25 +265,9 @@ const ScheduleView: React.FC = () => {
     });
   };
 
-  // ---------- DATA: Clientes/Profesionales/Citas ----------
-  const fetchClients = useCallback(async () => {
-    if (!organizationId) return;
-    setLoadingAgenda(true);
-    try {
-      const response = await getClientsByOrganizationId(
-        organizationId as string,
-      );
-      setClients(response);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingAgenda(false);
-    }
-  }, [organizationId]);
-
+  // ---------- DATA: Profesionales/Citas ----------
   const fetchEmployees = useCallback(async () => {
     if (!readyForScopedFetch) return;
-    setLoadingAgenda(true);
     try {
       const response = await getEmployeesByOrganizationId(
         organizationId as string,
@@ -299,8 +281,6 @@ const ScheduleView: React.FC = () => {
       setEmployees(activeEmployees);
     } catch (error) {
       console.error(error);
-    } finally {
-      setLoadingAgenda(false);
     }
   }, [readyForScopedFetch, organizationId, canViewAll, userId]);
 
@@ -388,11 +368,10 @@ const ScheduleView: React.FC = () => {
    * MANEJO DE CLIENTE
    */
   const handleClientChange = useCallback(
-    (clientId: string | null) => {
-      const selectedClient = clients.find((client) => client._id === clientId);
-      setNewAppointment((prev) => ({ ...prev, client: selectedClient }));
+    (client: Client | null) => {
+      setNewAppointment((prev) => ({ ...prev, client: client ?? undefined }));
     },
-    [clients],
+    [],
   );
 
   /**
@@ -1101,11 +1080,9 @@ const ScheduleView: React.FC = () => {
             setNewAppointment={setNewAppointment}
             services={filteredServices}
             employees={employees}
-            clients={clients}
             onEmployeeChange={handleEmployeeChange}
             onClientChange={handleClientChange}
             onSave={addOrUpdateAppointment}
-            fetchClients={fetchClients}
             creatingAppointment={creatingAppointment}
             fetchAppointmentsForMonth={fetchAppointmentsForMonth}
           />

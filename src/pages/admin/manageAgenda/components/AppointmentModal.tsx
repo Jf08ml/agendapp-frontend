@@ -63,12 +63,11 @@ interface AppointmentModalProps {
   >;
   services: Service[];
   employees: Employee[];
-  clients: Client[];
   // onServiceChange: (value: string | null) => void;
   onEmployeeChange: (value: string | null) => void;
-  onClientChange: (value: string | null) => void;
+  onClientChange: (client: Client | null) => void;
   onSave: () => void;
-  fetchClients: () => void;
+  fetchClients?: () => void;
   creatingAppointment: boolean;
   fetchAppointmentsForMonth?: (date: Date) => Promise<void>;
 }
@@ -520,7 +519,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 if (value === "create-client") {
                   setCreateClientModalOpened(true);
                 } else {
-                  onClientChange(value);
+                  const found = searchedClients.find((c) => c._id === value) ?? null;
+                  onClientChange(found);
                   setClientSearchQuery(""); // Limpiar búsqueda después de seleccionar
                 }
               }}
@@ -612,13 +612,18 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   : []
               }
               onChange={(selectedIds) => {
-                // selectedIds es un array de IDs
-                const selectedServices = services.filter((s) =>
-                  selectedIds.includes(s._id),
-                );
+                const currentServices = newAppointment.services ?? [];
+                const currentIds = currentServices.map((s) => s._id);
+                const added = selectedIds.filter((id) => !currentIds.includes(id));
+                const newServices = [
+                  ...currentServices.filter((s) => selectedIds.includes(s._id)),
+                  ...added
+                    .map((id) => services.find((s) => s._id === id))
+                    .filter((s): s is Service => s !== undefined),
+                ];
                 setNewAppointment((prev) => ({
                   ...prev,
-                  services: selectedServices,
+                  services: newServices,
                 }));
               }}
             >
@@ -655,9 +660,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         const newIds = isSelected
                           ? currentIds.filter((id) => id !== service._id)
                           : [...currentIds, service._id];
-                        const selectedServices = services.filter((s) =>
-                          newIds.includes(s._id),
-                        );
+                        const selectedServices = newIds
+                          .map((id) => services.find((s) => s._id === id))
+                          .filter((s): s is Service => s !== undefined);
                         setNewAppointment((prev) => ({
                           ...prev,
                           services: selectedServices,
@@ -1533,7 +1538,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             );
           }
         }}
-        fetchClients={fetchClients}
+        fetchClients={fetchClients ?? (() => {})}
       />
     </>
   );

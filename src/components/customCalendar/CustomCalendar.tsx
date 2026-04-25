@@ -338,6 +338,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           onDeleteAppointment={onDeleteAppointment}
           setAppointments={setAppointments}
           fetchAppointmentsForDay={fetchAppointmentsForDay}
+          loadedMonthDate={currentDate}
           timezone={timezone}
         />
       )}
