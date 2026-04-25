@@ -113,6 +113,24 @@ export interface CreateAppointmentPayload {
   additionalItems?: AdditionalItem[]; // Lista de adicionales adquiridos (opcional)
 }
 
+/** Un bloque de profesional + servicios para la creación multi-profesional */
+export interface MultiEmployeeBlockPayload {
+  employee: string; // id del profesional
+  services: string[]; // ids de servicios
+  startDate: string; // ISO sin timezone
+  endDate?: string;  // ISO sin timezone (opcional)
+  customDurations?: Record<string, number>; // { [serviceId]: minutos }
+}
+
+/** Payload para el endpoint multi-profesional */
+export interface CreateMultiEmployeeBatchPayload {
+  client: string;
+  organizationId: string;
+  advancePayment?: number;
+  employeeRequestedByClient?: boolean;
+  blocks: MultiEmployeeBlockPayload[];
+}
+
 /** Payload para el endpoint BATCH RECOMENDADO */
 export interface CreateAppointmentsBatchPayload {
   services: Array<Service | string>; // ids
@@ -317,6 +335,21 @@ export const createAppointmentsBatch = async (
     return res.data.data;
   } catch (err) {
     handleAxiosError(err, "Error al crear las citas en lote");
+  }
+};
+
+// Crear citas para múltiples profesionales en paralelo
+export const createMultiEmployeeBatch = async (
+  data: CreateMultiEmployeeBatchPayload
+): Promise<Appointment[] | undefined> => {
+  try {
+    const res = await apiAppointment.post<Response<Appointment[]>>(
+      "/multi-batch",
+      data
+    );
+    return res.data.data;
+  } catch (err) {
+    handleAxiosError(err, "Error al crear las citas multi-profesional");
   }
 };
 

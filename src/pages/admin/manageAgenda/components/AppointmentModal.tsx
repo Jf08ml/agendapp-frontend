@@ -16,6 +16,7 @@ import {
   Loader,
   Divider,
   Badge,
+  ActionIcon,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
@@ -41,7 +42,7 @@ import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
-import { IconPackage } from "@tabler/icons-react";
+import { IconPackage, IconX } from "@tabler/icons-react";
 
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
@@ -52,6 +53,141 @@ import {
   createAppointmentSeries,
 } from "../../../../services/appointmentService";
 import { notifications } from "@mantine/notifications";
+
+// ----- Tipos para el modo multi-profesional -----
+
+export interface EmployeeBlockData {
+  employee: Employee;
+  services: Service[];
+  startDate: Date;
+  endDate: Date;
+  customDurations: Record<string, number>;
+  employeeRequestedByClient?: boolean;
+}
+
+interface ExtraBlock {
+  id: string;
+  employee: Employee | null;
+  services: Service[];
+  startDate: Date;
+  endDate: Date;
+  customDurations: Record<string, number>;
+}
+
+const ExtraEmployeeBlockEditor: React.FC<{
+  block: ExtraBlock;
+  blockIndex: number;
+  employees: Employee[];
+  timeFormat: string;
+  onChange: (updated: ExtraBlock) => void;
+  onRemove: () => void;
+}> = ({ block, blockIndex, employees, timeFormat, onChange, onRemove }) => {
+  const availableServices = block.employee
+    ? (block.employee.services as unknown as Service[])
+    : [];
+
+  const recalcEnd = (svcs: Service[], durations: Record<string, number>, start: Date) => {
+    const total = svcs.reduce((acc, s) => acc + (durations[s._id] ?? s.duration ?? 0), 0);
+    return addMinutes(start, Math.max(total, 0));
+  };
+
+  const handleEmployeeChange = (employeeId: string | null) => {
+    const emp = employees.find((e) => e._id === employeeId) ?? null;
+    onChange({ ...block, employee: emp, services: [], customDurations: {}, endDate: block.startDate });
+  };
+
+  const handleServiceToggle = (service: Service) => {
+    const isSelected = block.services.some((s) => s._id === service._id);
+    const newServices = isSelected
+      ? block.services.filter((s) => s._id !== service._id)
+      : [...block.services, service];
+    const newDurations: Record<string, number> = {};
+    newServices.forEach((s) => { newDurations[s._id] = block.customDurations[s._id] ?? s.duration ?? 0; });
+    onChange({ ...block, services: newServices, customDurations: newDurations, endDate: recalcEnd(newServices, newDurations, block.startDate) });
+  };
+
+  const handleStartChange = (date: Date) => {
+    onChange({ ...block, startDate: date, endDate: recalcEnd(block.services, block.customDurations, date) });
+  };
+
+  return (
+    <Box mb="sm" p="md" style={{ border: "1px solid #d0ebff", borderRadius: 8, backgroundColor: "#f0f8ff" }}>
+      <Group justify="space-between" mb="sm">
+        <Text size="sm" fw={700} c="blue.7">👤 Profesional {blockIndex}</Text>
+        <ActionIcon size="xs" variant="light" color="red" onClick={onRemove} radius="xl">
+          <IconX size={12} />
+        </ActionIcon>
+      </Group>
+
+      <Select
+        label="Profesional"
+        size="sm"
+        placeholder="Selecciona un profesional"
+        data={employees.map((e) => ({ value: e._id, label: e.names }))}
+        value={block.employee?._id || ""}
+        onChange={handleEmployeeChange}
+        searchable
+        mb="sm"
+        styles={{ input: { borderRadius: 8 } }}
+      />
+
+      {block.employee && availableServices.length > 0 && (
+        <Box mb="sm">
+          <Text size="xs" fw={600} mb={6} c="dimmed" tt="uppercase">Servicios</Text>
+          <Box style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 6 }}>
+            {availableServices.map((service) => {
+              const isSelected = block.services.some((s) => s._id === service._id);
+              return (
+                <Card
+                  key={service._id}
+                  padding="xs"
+                  withBorder
+                  radius="md"
+                  style={{
+                    backgroundColor: isSelected ? "#e7f5ff" : "white",
+                    borderColor: isSelected ? "#228be6" : "#e9ecef",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => handleServiceToggle(service)}
+                >
+                  <Group gap="xs" wrap="nowrap">
+                    <Checkbox
+                      size="xs"
+                      checked={isSelected}
+                      onChange={() => {}}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <Box>
+                      <Text size="xs" fw={600} style={{ lineHeight: 1.2 }}>{service.name}</Text>
+                      <Text size="xs" c="dimmed">⏱️ {service.duration} min</Text>
+                    </Box>
+                  </Group>
+                </Card>
+              );
+            })}
+          </Box>
+        </Box>
+      )}
+
+      <Grid gutter="sm">
+        <Grid.Col span={{ base: 12, sm: 6 }}>
+          <Box p="xs" style={{ backgroundColor: "white", borderRadius: 8, border: "1px solid #e9ecef" }}>
+            <Text size="xs" fw={600} mb={4} c="dimmed">Inicio</Text>
+            <DateSelector label="Fecha" value={block.startDate} onChange={handleStartChange} />
+            <TimeSelector label="Hora" date={block.startDate} timeFormat={timeFormat} onChange={handleStartChange} />
+          </Box>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6 }}>
+          <Box p="xs" style={{ backgroundColor: "white", borderRadius: 8, border: "1px solid #e9ecef" }}>
+            <Text size="xs" fw={600} mb={4} c="dimmed">Fin (auto-calculado)</Text>
+            <DateSelector label="Fecha" value={block.endDate} onChange={(d) => onChange({ ...block, endDate: d })} />
+            <TimeSelector label="Hora" date={block.endDate} timeFormat={timeFormat} onChange={(d) => onChange({ ...block, endDate: d })} />
+          </Box>
+        </Grid.Col>
+      </Grid>
+    </Box>
+  );
+};
 
 interface AppointmentModalProps {
   opened: boolean;
@@ -70,6 +206,7 @@ interface AppointmentModalProps {
   fetchClients?: () => void;
   creatingAppointment: boolean;
   fetchAppointmentsForMonth?: (date: Date) => Promise<void>;
+  onSaveMulti?: (blocks: EmployeeBlockData[]) => void;
 }
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -87,6 +224,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   fetchClients,
   creatingAppointment,
   fetchAppointmentsForMonth,
+  onSaveMulti,
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
@@ -114,6 +252,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [notifyAllAppointments, setNotifyAllAppointments] = useState(false); // 📨 Por defecto solo primera cita
+
+  // Multi-profesional
+  const [extraBlocks, setExtraBlocks] = useState<ExtraBlock[]>([]);
+  const isMultiMode = extraBlocks.length > 0;
 
   // Estado para paquetes de sesiones del cliente
   const [availablePackages, setAvailablePackages] = useState<Record<string, ClientPackage[]>>({});
@@ -474,7 +616,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             }}
           >
             <Text size="sm" fw={600} mb="md" c="dimmed" tt="uppercase">
-              👤 Cliente y Profesional
+              {isMultiMode ? "👥 Cliente y Profesional 1" : "👤 Cliente y Profesional"}
             </Text>
 
             <Select
@@ -708,6 +850,103 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </Checkbox.Group>
           </Box>
 
+          {/* Multi-modo: horario inline del Profesional 1 */}
+          {isMultiMode && !appointment && (
+            <Box
+              mb="sm"
+              p="md"
+              style={{ backgroundColor: "#f0f8ff", borderRadius: 8, border: "1px solid #d0ebff" }}
+            >
+              <Text size="xs" fw={700} c="blue.7" mb="sm">⏰ Horario — Profesional 1</Text>
+              <Grid gutter="sm">
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Box p="xs" style={{ backgroundColor: "white", borderRadius: 8, border: "1px solid #e9ecef" }}>
+                    <Text size="xs" fw={600} mb={4} c="dimmed">Inicio</Text>
+                    <DateSelector
+                      label="Fecha"
+                      value={newAppointment.startDate}
+                      onChange={(date) =>
+                        setNewAppointment((prev) => {
+                          const total = (prev.services || []).reduce((acc, s) => acc + (prev.customDurations?.[s._id] ?? s.duration ?? 0), 0);
+                          return { ...prev, startDate: date, endDate: addMinutes(date, total) };
+                        })
+                      }
+                    />
+                    <TimeSelector
+                      label="Hora"
+                      date={newAppointment.startDate}
+                      timeFormat={timeFormat}
+                      onChange={(date) =>
+                        setNewAppointment((prev) => {
+                          const total = (prev.services || []).reduce((acc, s) => acc + (prev.customDurations?.[s._id] ?? s.duration ?? 0), 0);
+                          return { ...prev, startDate: date, endDate: addMinutes(date, total) };
+                        })
+                      }
+                    />
+                  </Box>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, sm: 6 }}>
+                  <Box p="xs" style={{ backgroundColor: "white", borderRadius: 8, border: "1px solid #e9ecef" }}>
+                    <Text size="xs" fw={600} mb={4} c="dimmed">Fin (auto-calculado)</Text>
+                    <DateSelector
+                      label="Fecha"
+                      value={newAppointment.endDate}
+                      onChange={(date) => setNewAppointment((prev) => ({ ...prev, endDate: date }))}
+                    />
+                    <TimeSelector
+                      label="Hora"
+                      date={newAppointment.endDate}
+                      timeFormat={timeFormat}
+                      onChange={(date) => setNewAppointment((prev) => ({ ...prev, endDate: date }))}
+                    />
+                  </Box>
+                </Grid.Col>
+              </Grid>
+            </Box>
+          )}
+
+          {/* Multi-modo: bloques extra de profesionales */}
+          {isMultiMode && !appointment && extraBlocks.map((block, idx) => (
+            <ExtraEmployeeBlockEditor
+              key={block.id}
+              block={block}
+              blockIndex={idx + 2}
+              employees={employees}
+              timeFormat={timeFormat}
+              onChange={(updated) =>
+                setExtraBlocks((prev) => prev.map((b) => (b.id === block.id ? updated : b)))
+              }
+              onRemove={() => setExtraBlocks((prev) => prev.filter((b) => b.id !== block.id))}
+            />
+          ))}
+
+          {/* Botón para agregar otro profesional */}
+          {!appointment && (
+            <Button
+              variant="light"
+              color="blue"
+              size="xs"
+              mb="xl"
+              fullWidth
+              onClick={() => {
+                const defaultStart = newAppointment.startDate || new Date();
+                setExtraBlocks((prev) => [
+                  ...prev,
+                  {
+                    id: `block-${Date.now()}-${Math.random()}`,
+                    employee: null,
+                    services: [],
+                    startDate: defaultStart,
+                    endDate: defaultStart,
+                    customDurations: {},
+                  },
+                ]);
+              }}
+            >
+              + Agregar otro profesional
+            </Button>
+          )}
+
           {/* Sección: Paquetes de sesiones disponibles */}
           {Object.keys(availablePackages).length > 0 && !appointment && (
             <Box
@@ -822,6 +1061,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             mb="xl"
             p="md"
             style={{
+              display: isMultiMode ? "none" : undefined,
               backgroundColor: "#f8f9fa",
               borderRadius: 8,
               border: "1px solid #e9ecef",
@@ -1080,8 +1320,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               )}
           </Box>
 
-          {/* 🔁 Sección: Citas Recurrentes (solo para nuevas citas) */}
-          {!appointment && (
+          {/* 🔁 Sección: Citas Recurrentes (solo para nuevas citas, no en multi-mode) */}
+          {!appointment && !isMultiMode && (
             <Box
               mb="xl"
               p="md"
@@ -1237,154 +1477,199 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   </Box>
                 )}
 
-                {newAppointment.employee && (
-                  <Box mb="xs">
-                    <Text size="xs" c="dimmed" mb={2}>
-                      Profesional:
-                    </Text>
-                    <Group gap="xs">
-                      <Avatar
-                        src={newAppointment.employee.profileImage}
-                        size={24}
-                        radius="xl"
-                      />
-                      <Text size="sm" fw={600}>
-                        {newAppointment.employee.names}
-                      </Text>
-                      {newAppointment.employeeRequestedByClient && (
-                        <Text size="xs" c="violet" fw={600}>
-                          (solicitado)
-                        </Text>
-                      )}
-                    </Group>
-                  </Box>
-                )}
-
-                {newAppointment.services &&
-                  newAppointment.services.length > 0 && (
-                    <>
-                      <Box mb="xs">
-                        <Text size="xs" c="dimmed" mb={4}>
-                          Servicios:
-                        </Text>
-                        {newAppointment.services.map((service, index) => (
-                          <Box
-                            key={service._id}
-                            mb={4}
-                            p={6}
-                            style={{
-                              backgroundColor: "white",
-                              borderRadius: 6,
-                              border: "1px solid #d0ebff",
-                            }}
-                          >
-                            <Group justify="space-between" wrap="nowrap">
-                              <Text size="sm" fw={500}>
-                                {index + 1}. {service.name}
-                              </Text>
-                              <Text size="xs" c="dimmed">
-                                ⏱️ {service.duration} min
-                              </Text>
-                            </Group>
-                          </Box>
-                        ))}
-                      </Box>
-
+                {isMultiMode ? (
+                  // ---- Resumen multi-profesional ----
+                  <>
+                    {/* Bloque 0 */}
+                    {newAppointment.employee && (
                       <Box
-                        mt="sm"
-                        pt="sm"
-                        style={{
-                          borderTop: "1px solid #a5d8ff",
-                        }}
+                        mb="xs"
+                        p="sm"
+                        style={{ backgroundColor: "white", borderRadius: 6, border: "1px solid #d0ebff" }}
                       >
-                        <Group justify="space-between" mb={4}>
-                          <Text size="sm" c="dimmed">
-                            Total servicios:
-                          </Text>
-                          <Text size="sm" fw={700}>
-                            {formatCurrency(
-                              newAppointment.services.reduce(
-                                (acc, s) => acc + (s.price || 0),
-                                0,
-                              ),
-                              organization?.currency || "COP",
-                            )}
+                        <Group gap="xs" mb={4}>
+                          <Avatar src={newAppointment.employee.profileImage} size={20} radius="xl" />
+                          <Text size="sm" fw={700} c="blue.7">
+                            Profesional 1: {newAppointment.employee.names}
                           </Text>
                         </Group>
-
-                        {typeof newAppointment.advancePayment === "number" &&
-                          newAppointment.advancePayment > 0 && (
-                            <>
-                              <Group justify="space-between" mb={4}>
-                                <Text size="sm" c="dimmed">
-                                  Abono:
-                                </Text>
-                                <Text size="sm" fw={600} c="green">
-                                  -{" "}
-                                  {formatCurrency(
-                                    newAppointment.advancePayment,
-                                    organization?.currency || "COP",
-                                  )}
-                                </Text>
-                              </Group>
-                              <Group justify="space-between">
-                                <Text size="sm" fw={600}>
-                                  Pendiente:
-                                </Text>
-                                <Text size="sm" fw={700} c="orange">
-                                  {formatCurrency(
-                                    newAppointment.services.reduce(
-                                      (acc, s) => acc + (s.price || 0),
-                                      0,
-                                    ) - (newAppointment.advancePayment || 0),
-                                    organization?.currency || "COP",
-                                  )}
-                                </Text>
-                              </Group>
-                            </>
-                          )}
+                        {newAppointment.services?.map((s) => (
+                          <Text key={s._id} size="xs" c="dimmed" ml="xs">
+                            • {s.name} — ⏱️ {s.duration} min
+                          </Text>
+                        ))}
+                        {newAppointment.startDate && newAppointment.endDate && (
+                          <Text size="xs" c="blue.6" mt={4}>
+                            {formatInTimezone(newAppointment.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                            {" – "}
+                            {formatInTimezone(newAppointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                          </Text>
+                        )}
                       </Box>
-                    </>
-                  )}
+                    )}
 
-                {newAppointment.startDate && newAppointment.endDate && (
-                  <Box
-                    mt="sm"
-                    pt="sm"
-                    style={{
-                      borderTop: "1px solid #a5d8ff",
-                    }}
-                  >
-                    <Text size="xs" c="dimmed" mb={4}>
-                      Horario:
-                    </Text>
-                    <Text size="sm" fw={600}>
-                      {formatFullDateInTimezone(
-                        appointment
-                          ? appointment.startDate
-                          : newAppointment.startDate!,
-                        timezone,
-                        "DD/MM/YYYY",
-                      )}
-                    </Text>
-                    <Text size="sm" c="dimmed">
-                      {formatInTimezone(
-                        appointment
-                          ? appointment.startDate
-                          : newAppointment.startDate!,
-                        timezone,
-                        timeFormat === "24h" ? "HH:mm" : "h:mm A",
-                      )}{" "}
-                      -{" "}
-                      {formatInTimezone(
-                        appointment
-                          ? appointment.endDate
-                          : newAppointment.endDate!,
-                        timezone,
-                        timeFormat === "24h" ? "HH:mm" : "h:mm A",
-                      )}
-                    </Text>
-                  </Box>
+                    {/* Bloques extra */}
+                    {extraBlocks
+                      .filter((b) => b.employee && b.services.length > 0)
+                      .map((b, idx) => (
+                        <Box
+                          key={b.id}
+                          mb="xs"
+                          p="sm"
+                          style={{ backgroundColor: "white", borderRadius: 6, border: "1px solid #d0ebff" }}
+                        >
+                          <Group gap="xs" mb={4}>
+                            <Avatar src={b.employee!.profileImage} size={20} radius="xl" />
+                            <Text size="sm" fw={700} c="blue.7">
+                              Profesional {idx + 2}: {b.employee!.names}
+                            </Text>
+                          </Group>
+                          {b.services.map((s) => (
+                            <Text key={s._id} size="xs" c="dimmed" ml="xs">
+                              • {s.name} — ⏱️ {s.duration} min
+                            </Text>
+                          ))}
+                          <Text size="xs" c="blue.6" mt={4}>
+                            {formatInTimezone(b.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                            {" – "}
+                            {formatInTimezone(b.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                          </Text>
+                        </Box>
+                      ))}
+
+                    {/* Totales */}
+                    {(() => {
+                      const allSvcs = [
+                        ...(newAppointment.services || []),
+                        ...extraBlocks.flatMap((b) => b.services),
+                      ];
+                      const total = allSvcs.reduce((acc, s) => acc + (s.price || 0), 0);
+                      return total > 0 ? (
+                        <Box mt="sm" pt="sm" style={{ borderTop: "1px solid #a5d8ff" }}>
+                          <Group justify="space-between" mb={4}>
+                            <Text size="sm" c="dimmed">Total servicios:</Text>
+                            <Text size="sm" fw={700}>
+                              {formatCurrency(total, organization?.currency || "COP")}
+                            </Text>
+                          </Group>
+                          {typeof newAppointment.advancePayment === "number" &&
+                            newAppointment.advancePayment > 0 && (
+                              <>
+                                <Group justify="space-between" mb={4}>
+                                  <Text size="sm" c="dimmed">Abono:</Text>
+                                  <Text size="sm" fw={600} c="green">
+                                    - {formatCurrency(newAppointment.advancePayment, organization?.currency || "COP")}
+                                  </Text>
+                                </Group>
+                                <Group justify="space-between">
+                                  <Text size="sm" fw={600}>Pendiente:</Text>
+                                  <Text size="sm" fw={700} c="orange">
+                                    {formatCurrency(total - newAppointment.advancePayment, organization?.currency || "COP")}
+                                  </Text>
+                                </Group>
+                              </>
+                            )}
+                        </Box>
+                      ) : null;
+                    })()}
+                  </>
+                ) : (
+                  // ---- Resumen single-profesional (original) ----
+                  <>
+                    {newAppointment.employee && (
+                      <Box mb="xs">
+                        <Text size="xs" c="dimmed" mb={2}>Profesional:</Text>
+                        <Group gap="xs">
+                          <Avatar src={newAppointment.employee.profileImage} size={24} radius="xl" />
+                          <Text size="sm" fw={600}>{newAppointment.employee.names}</Text>
+                          {newAppointment.employeeRequestedByClient && (
+                            <Text size="xs" c="violet" fw={600}>(solicitado)</Text>
+                          )}
+                        </Group>
+                      </Box>
+                    )}
+
+                    {newAppointment.services && newAppointment.services.length > 0 && (
+                      <>
+                        <Box mb="xs">
+                          <Text size="xs" c="dimmed" mb={4}>Servicios:</Text>
+                          {newAppointment.services.map((service, index) => (
+                            <Box
+                              key={service._id}
+                              mb={4}
+                              p={6}
+                              style={{ backgroundColor: "white", borderRadius: 6, border: "1px solid #d0ebff" }}
+                            >
+                              <Group justify="space-between" wrap="nowrap">
+                                <Text size="sm" fw={500}>{index + 1}. {service.name}</Text>
+                                <Text size="xs" c="dimmed">⏱️ {service.duration} min</Text>
+                              </Group>
+                            </Box>
+                          ))}
+                        </Box>
+
+                        <Box mt="sm" pt="sm" style={{ borderTop: "1px solid #a5d8ff" }}>
+                          <Group justify="space-between" mb={4}>
+                            <Text size="sm" c="dimmed">Total servicios:</Text>
+                            <Text size="sm" fw={700}>
+                              {formatCurrency(
+                                newAppointment.services.reduce((acc, s) => acc + (s.price || 0), 0),
+                                organization?.currency || "COP",
+                              )}
+                            </Text>
+                          </Group>
+                          {typeof newAppointment.advancePayment === "number" &&
+                            newAppointment.advancePayment > 0 && (
+                              <>
+                                <Group justify="space-between" mb={4}>
+                                  <Text size="sm" c="dimmed">Abono:</Text>
+                                  <Text size="sm" fw={600} c="green">
+                                    -{" "}
+                                    {formatCurrency(newAppointment.advancePayment, organization?.currency || "COP")}
+                                  </Text>
+                                </Group>
+                                <Group justify="space-between">
+                                  <Text size="sm" fw={600}>Pendiente:</Text>
+                                  <Text size="sm" fw={700} c="orange">
+                                    {formatCurrency(
+                                      newAppointment.services.reduce((acc, s) => acc + (s.price || 0), 0) -
+                                        (newAppointment.advancePayment || 0),
+                                      organization?.currency || "COP",
+                                    )}
+                                  </Text>
+                                </Group>
+                              </>
+                            )}
+                        </Box>
+                      </>
+                    )}
+
+                    {newAppointment.startDate && newAppointment.endDate && (
+                      <Box mt="sm" pt="sm" style={{ borderTop: "1px solid #a5d8ff" }}>
+                        <Text size="xs" c="dimmed" mb={4}>Horario:</Text>
+                        <Text size="sm" fw={600}>
+                          {formatFullDateInTimezone(
+                            appointment ? appointment.startDate : newAppointment.startDate!,
+                            timezone,
+                            "DD/MM/YYYY",
+                          )}
+                        </Text>
+                        <Text size="sm" c="dimmed">
+                          {formatInTimezone(
+                            appointment ? appointment.startDate : newAppointment.startDate!,
+                            timezone,
+                            timeFormat === "24h" ? "HH:mm" : "h:mm A",
+                          )}{" "}
+                          -{" "}
+                          {formatInTimezone(
+                            appointment ? appointment.endDate : newAppointment.endDate!,
+                            timezone,
+                            timeFormat === "24h" ? "HH:mm" : "h:mm A",
+                          )}
+                        </Text>
+                      </Box>
+                    )}
+                  </>
                 )}
               </Box>
             )}
@@ -1409,6 +1694,34 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </Button>
             <Button
               onClick={async () => {
+                // 👥 Multi-profesional
+                if (!appointment && isMultiMode) {
+                  const block0: EmployeeBlockData | null =
+                    newAppointment.employee && newAppointment.services?.length && newAppointment.startDate && newAppointment.endDate
+                      ? {
+                          employee: newAppointment.employee,
+                          services: newAppointment.services,
+                          startDate: newAppointment.startDate,
+                          endDate: newAppointment.endDate,
+                          customDurations: newAppointment.customDurations || {},
+                          employeeRequestedByClient: newAppointment.employeeRequestedByClient,
+                        }
+                      : null;
+                  const validExtra = extraBlocks
+                    .filter((b) => b.employee && b.services.length > 0)
+                    .map((b) => ({
+                      employee: b.employee!,
+                      services: b.services,
+                      startDate: b.startDate,
+                      endDate: b.endDate,
+                      customDurations: b.customDurations,
+                    }));
+                  const allBlocks = [...(block0 ? [block0] : []), ...validExtra];
+                  if (allBlocks.length > 0) {
+                    onSaveMulti?.(allBlocks);
+                  }
+                  return;
+                }
                 // 🔁 Si es cita recurrente, crearla como serie
                 if (!appointment && recurrencePattern.type === "weekly") {
                   if (!organizationId) {
@@ -1506,9 +1819,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               leftSection={
                 appointment
                   ? "✏️"
-                  : recurrencePattern.type === "weekly"
-                    ? "🔁"
-                    : "➕"
+                  : isMultiMode
+                    ? "👥"
+                    : recurrencePattern.type === "weekly"
+                      ? "🔁"
+                      : "➕"
               }
               styles={{
                 root: {
@@ -1518,9 +1833,11 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             >
               {appointment
                 ? "Actualizar Cita"
-                : recurrencePattern.type === "weekly"
-                  ? "Crear Serie Recurrente"
-                  : "Crear Cita"}
+                : isMultiMode
+                  ? `Crear Citas (${extraBlocks.filter((b) => b.employee && b.services.length > 0).length + (newAppointment.employee ? 1 : 0)} profesionales)`
+                  : recurrencePattern.type === "weekly"
+                    ? "Crear Serie Recurrente"
+                    : "Crear Cita"}
             </Button>
           </Group>
         </Box>

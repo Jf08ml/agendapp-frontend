@@ -25,6 +25,7 @@ import {
   Appointment,
   cancelAppointment,
   createAppointmentsBatch,
+  createMultiEmployeeBatch,
   deleteAppointment,
   getAppointmentsByOrganizationId,
   markAttendance,
@@ -56,6 +57,8 @@ import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import WhatsappStatusIcon from "./components/WhatsappStatusIcon";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
+
+import type { EmployeeBlockData } from "./components/AppointmentModal";
 
 // 🚀 Lazy loading de modales para mejorar carga inicial
 const AppointmentModal = lazy(() => import("./components/AppointmentModal"));
@@ -930,6 +933,59 @@ const ScheduleView: React.FC = () => {
   };
 
   /**
+   * CREAR CITAS MULTI-PROFESIONAL
+   */
+  const handleMultiSave = useCallback(
+    async (blocks: EmployeeBlockData[]) => {
+      if (!organizationId || !newAppointment.client) return;
+      setCreatingAppointment(true);
+      try {
+        await createMultiEmployeeBatch({
+          client: newAppointment.client._id,
+          organizationId,
+          advancePayment: newAppointment.advancePayment,
+          employeeRequestedByClient: newAppointment.employeeRequestedByClient ?? false,
+          blocks: blocks.map((b) => ({
+            employee: b.employee._id,
+            services: b.services.map((s) => s._id),
+            startDate: (() => {
+              const d = b.startDate;
+              const pad = (n: number) => String(n).padStart(2, "0");
+              return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+            })(),
+            endDate: (() => {
+              const d = b.endDate;
+              const pad = (n: number) => String(n).padStart(2, "0");
+              return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+            })(),
+            customDurations: b.customDurations,
+          })),
+        });
+        showNotification({
+          title: "Éxito",
+          message: `Citas creadas para ${blocks.length} profesionales`,
+          color: "green",
+          autoClose: 3000,
+          position: "top-right",
+        });
+        closeModal();
+        fetchAppointmentsForMonth(currentDate);
+      } catch (error) {
+        showNotification({
+          title: "Error",
+          message: (error as Error).message,
+          color: "red",
+          autoClose: 3000,
+          position: "top-right",
+        });
+      } finally {
+        setCreatingAppointment(false);
+      }
+    },
+    [organizationId, newAppointment, currentDate, fetchAppointmentsForMonth, closeModal],
+  );
+
+  /**
    * ACTUALIZAR ORDEN DE EMPLEADOS
    */
   const handleSaveReorderedEmployees = useCallback(
@@ -1083,6 +1139,7 @@ const ScheduleView: React.FC = () => {
             onEmployeeChange={handleEmployeeChange}
             onClientChange={handleClientChange}
             onSave={addOrUpdateAppointment}
+            onSaveMulti={handleMultiSave}
             creatingAppointment={creatingAppointment}
             fetchAppointmentsForMonth={fetchAppointmentsForMonth}
           />
