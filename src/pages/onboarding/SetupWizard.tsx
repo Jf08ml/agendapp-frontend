@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   Box, Group, Text, Stack, Title, Progress, Badge,
   ScrollArea, Loader, Center, Stepper,
-  ThemeIcon, useMantineTheme, rem, Button, Paper, SimpleGrid,
+  ThemeIcon, useMantineTheme, rem, Paper, SimpleGrid,
 } from "@mantine/core";
 import { IconRobotFace, IconListDetails } from "@tabler/icons-react";
 import { useForm } from "@mantine/form";

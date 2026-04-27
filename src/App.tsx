@@ -61,7 +61,6 @@ function AppContent() {
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
-  const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
   const [chatOpen, { open: openChat, toggle: toggleChat, close: closeChat }] = useDisclosure(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -216,8 +215,7 @@ function AppContent() {
   if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !organization) {
     return (
       <CustomLoader
-        loadingText={`Cargando ${organization?.name || "organización"}...`}
-        logoUrl={organization?.branding?.logoUrl}
+        loadingText="Cargando organización..."
       />
     );
   }
