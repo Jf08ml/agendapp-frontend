@@ -11,9 +11,10 @@ import {
   Flex,
   CloseButton,
   Divider,
+  Badge,
   rem,
 } from "@mantine/core";
-import { IconSend, IconRobot } from "@tabler/icons-react";
+import { IconSend, IconRobot, IconFlask } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "./useChatbot";
 import { useSelector } from "react-redux";
@@ -57,11 +58,20 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
         <Flex align="center" gap="xs">
           <IconRobot size={20} color="white" />
           <Text fw={600} c="white" size="sm">Asistente AgenditApp</Text>
+          <Badge size="xs" variant="light" color="yellow" style={{ textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Beta
+          </Badge>
         </Flex>
         <CloseButton onClick={onClose} color="white" variant="transparent" />
       </Flex>
 
-      <Divider />
+      {/* Aviso beta */}
+      <Flex align="center" gap={6} px="md" py={6} bg="yellow.0" style={{ flexShrink: 0, borderBottom: "1px solid var(--mantine-color-yellow-2)" }}>
+        <IconFlask size={13} color="var(--mantine-color-yellow-8)" style={{ flexShrink: 0 }} />
+        <Text size="xs" c="yellow.8" lh={1.4}>
+          Función en fase beta · Hará parte de un plan próximamente · Tu retroalimentación es bienvenida
+        </Text>
+      </Flex>
 
       {/* Mensajes */}
       <ScrollArea flex={1} px="md" py="xs">
