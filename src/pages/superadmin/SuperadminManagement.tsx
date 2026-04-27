@@ -428,7 +428,7 @@ export default function SuperadminManagement() {
                     <Table.Td>
                       <Stack gap={2}>
                         <Text size="sm" fw={500}>
-                          {org?.name || "N/A"}
+                          {org?.name || membership._id}
                         </Text>
                         <Text size="xs" c="dimmed">
                           {org?.email || ""}

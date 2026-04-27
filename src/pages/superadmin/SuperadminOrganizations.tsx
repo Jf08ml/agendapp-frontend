@@ -20,7 +20,7 @@ import {
   Tooltip,
   ActionIcon,
 } from "@mantine/core";
-import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard } from "react-icons/bi";
+import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard, BiTrash } from "react-icons/bi";
 import {
   getOrganizations,
   Organization,
@@ -105,6 +105,27 @@ export default function SuperadminOrganizations() {
       setImpersonateError(e?.response?.data?.message || "Error al generar acceso");
       setImpersonating(false);
     }
+  };
+
+  // Estado para eliminar organización
+  const [deleteOrg, setDeleteOrg] = useState<Organization | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDelete = async () => {
+    if (!deleteOrg) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await apiGeneral.delete(`/admin/organizations/${deleteOrg._id}`);
+      setOrgs((prev) => prev?.filter((o) => o._id !== deleteOrg._id) ?? null);
+      setDeleteOrg(null);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setDeleteError(e?.response?.data?.message || "Error al eliminar la organización");
+    }
+    setDeleting(false);
   };
 
   // Estado para crear organización
@@ -414,6 +435,20 @@ export default function SuperadminOrganizations() {
                           <BiKey size={14} />
                         </ActionIcon>
                       </Tooltip>
+                      <Tooltip label="Eliminar organización">
+                        <ActionIcon
+                          color="red"
+                          variant="light"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteOrg(org);
+                            setDeleteConfirmName("");
+                            setDeleteError("");
+                          }}
+                        >
+                          <BiTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
                     </Group>
                   </Table.Td>
                 </Table.Tr>
@@ -489,6 +524,47 @@ export default function SuperadminOrganizations() {
             Cambiar contraseña
           </Button>
         </Group>
+      </Modal>
+
+      {/* Modal: Eliminar organización */}
+      <Modal
+        opened={!!deleteOrg}
+        onClose={() => setDeleteOrg(null)}
+        title="Eliminar organización"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm" c="red" fw={600}>
+            ¡Esta acción es irreversible! Se eliminarán todos los datos asociados:
+            citas, clientes, empleados, servicios, membresías, campañas y más.
+          </Text>
+          <Text size="sm">
+            Para confirmar, escribe el nombre exacto de la organización:{" "}
+            <Text component="span" fw={700}>{deleteOrg?.name}</Text>
+          </Text>
+          <TextInput
+            placeholder={deleteOrg?.name}
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
+            disabled={deleting}
+          />
+          {deleteError && (
+            <Text size="sm" c="red">{deleteError}</Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setDeleteOrg(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button
+              color="red"
+              onClick={handleDelete}
+              loading={deleting}
+              disabled={deleteConfirmName !== deleteOrg?.name}
+            >
+              Eliminar definitivamente
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Modal: Nueva organización */}

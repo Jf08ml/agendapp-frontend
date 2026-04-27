@@ -66,7 +66,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
   useEffect(() => {
     if (service) {
-      setEditingService(service);
+      setEditingService({ ...service, type: service.type ?? "" });
       setImageFiles(service.images || []);
       setIsFreeService(service.price === 0);
       const existingCosts = service.costs ?? [];
@@ -138,7 +138,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
   const canSave =
     editingService.name.trim().length > 1 &&
-    editingService.type.trim().length > 1 &&
+    (editingService.type ?? "").trim().length > 1 &&
     (isFreeService || (editingService.price ?? 0) > 0) &&
     (editingService.duration ?? 0) > 0;
 

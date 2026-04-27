@@ -4,8 +4,9 @@ import { useState, useCallback, useEffect } from "react";
 import {
   Box, Group, Text, Stack, Title, Progress, Badge,
   ScrollArea, Loader, Center, Stepper,
-  ThemeIcon, useMantineTheme, rem,
+  ThemeIcon, useMantineTheme, rem, Button, Paper, SimpleGrid,
 } from "@mantine/core";
+import { IconRobotFace, IconListDetails } from "@tabler/icons-react";
 import { useForm } from "@mantine/form";
 import { useMediaQuery } from "@mantine/hooks";
 import { showNotification } from "@mantine/notifications";
@@ -63,10 +64,13 @@ const STEPS: StepDef[] = [
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
+type SetupMode = "choice" | "manual" | "ai";
+
 export default function SetupWizard() {
   const theme = useMantineTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [mode, setMode] = useState<SetupMode>("choice");
   const isMobile = useMediaQuery("(max-width: 62rem)");
 
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
@@ -195,6 +199,66 @@ export default function SetupWizard() {
         <Stack align="center" gap="sm">
           <Loader size="lg" />
           <Text c="dimmed">Cargando tu cuenta...</Text>
+        </Stack>
+      </Center>
+    );
+  }
+
+  // Pantalla de elección
+  if (mode === "choice") {
+    return (
+      <Center h="100vh" bg="gray.0">
+        <Stack align="center" gap="xl" maw={580} px="md">
+          <Stack align="center" gap="xs">
+            <ThemeIcon size={56} radius="xl" variant="light" color="blue">
+              <IconRocket size={28} />
+            </ThemeIcon>
+            <Title order={2} ta="center">¡Bienvenido a {organization.name}!</Title>
+            <Text c="dimmed" ta="center" size="sm">
+              Vamos a configurar tu cuenta. ¿Cómo prefieres hacerlo?
+            </Text>
+          </Stack>
+
+          <SimpleGrid cols={2} spacing="md" w="100%">
+            <Paper
+              withBorder
+              p="xl"
+              radius="lg"
+              style={{ cursor: "pointer", transition: "box-shadow .15s" }}
+              onClick={() => navigate("/gestionar-agenda?asistente=onboarding")}
+              styles={{ root: { "&:hover": { boxShadow: theme.shadows.md } } }}
+            >
+              <Stack align="center" gap="sm">
+                <ThemeIcon size={48} radius="xl" variant="light" color="violet">
+                  <IconRobotFace size={24} />
+                </ThemeIcon>
+                <Text fw={700} ta="center">Configurar con IA</Text>
+                <Text size="xs" c="dimmed" ta="center">
+                  Un asistente te guía paso a paso en una conversación. Más fácil y rápido.
+                </Text>
+                <Badge color="violet" variant="light" size="sm">Recomendado</Badge>
+              </Stack>
+            </Paper>
+
+            <Paper
+              withBorder
+              p="xl"
+              radius="lg"
+              style={{ cursor: "pointer", transition: "box-shadow .15s" }}
+              onClick={() => setMode("manual")}
+              styles={{ root: { "&:hover": { boxShadow: theme.shadows.md } } }}
+            >
+              <Stack align="center" gap="sm">
+                <ThemeIcon size={48} radius="xl" variant="light" color="gray">
+                  <IconListDetails size={24} />
+                </ThemeIcon>
+                <Text fw={700} ta="center">Configurar manualmente</Text>
+                <Text size="xs" c="dimmed" ta="center">
+                  Sigue el asistente paso a paso completando cada formulario.
+                </Text>
+              </Stack>
+            </Paper>
+          </SimpleGrid>
         </Stack>
       </Center>
     );

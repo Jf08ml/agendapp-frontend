@@ -7,8 +7,12 @@ import {
   UnstyledButton,
   Text,
   Anchor,
+  Drawer,
+  ActionIcon,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useMediaQuery } from "@mantine/hooks";
+import { IconRobot } from "@tabler/icons-react";
+import ChatPanel from "./chatbot/ChatPanel";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css";
@@ -21,13 +25,13 @@ import { useSessionExpiry } from "./hooks/useSessionExpiry";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
-import { useEffect, useMemo, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
 import { loginSuccess } from "./features/auth/sliceAuth";
-import { clearOrganization } from "./features/organization/sliceOrganization";
+import { clearOrganization, fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
 
@@ -59,10 +63,31 @@ function AppContent() {
   );
   const loading = useSelector((state: RootState) => state.organization.loading);
   const [opened, { toggle, close }] = useDisclosure(false);
+  const [chatOpen, { open: openChat, toggle: toggleChat, close: closeChat }] = useDisclosure(false);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const [chatAutoStart, setChatAutoStart] = useState(false);
+  const isSuperadmin = role === "superadmin";
+
+  const handleChatInvalidate = useCallback((invalidates: string[]) => {
+    if (invalidates.includes("organization")) {
+      dispatch(fetchOrganizationConfig());
+    }
+  }, [dispatch]);
+
+  // Abrir chat automáticamente cuando viene de ?asistente=onboarding
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("asistente") === "onboarding" && isAuthenticated && !isSuperadmin) {
+      openChat();
+      setChatAutoStart(true);
+      // Limpiar el param de la URL sin recargar
+      const clean = location.pathname;
+      window.history.replaceState({}, "", clean);
+    }
+  }, [location.search, isAuthenticated, isSuperadmin, openChat]);
   const hasRedirected = useRef(false);
   const domainInfo = useMemo(() => extractTenantFromHost(), []);
   const isSignupDomain = domainInfo.type === "signup";
-  const isSuperadmin = role === "superadmin";
   // Las rutas /superadmin* no necesitan org (ni antes de login ni después)
   const isSuperadminPath = location.pathname.startsWith("/superadmin");
   const isSignupPath = location.pathname === "/signup";
@@ -188,7 +213,7 @@ function AppContent() {
   }, [isAuthenticated, userId]);
 
   // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
-  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && (loading || !organization)) {
+  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !organization) {
     return (
       <CustomLoader
         loadingText={`Cargando ${organization?.name || "organización"}...`}
@@ -206,6 +231,11 @@ function AppContent() {
           width: 300,
           breakpoint: "sm",
           collapsed: { desktop: !opened, mobile: !opened },
+        }}
+        aside={{
+          width: 350,
+          breakpoint: "sm",
+          collapsed: { desktop: !chatOpen || !!isMobile, mobile: true },
         }}
         header={{ height: 50 }}
         footer={{ height: 30 }}
@@ -241,6 +271,21 @@ function AppContent() {
             />
             {/* Nombre dinámico y contenido extra del Header */}
             <Header organization={organization} />
+            {/* Botón asistente IA */}
+            {isAuthenticated && !isSuperadmin && (
+              <ActionIcon
+                onClick={toggleChat}
+                variant={chatOpen ? "filled" : "subtle"}
+                color="white"
+                size="lg"
+                ml="auto"
+                mr="sm"
+                aria-label="Abrir asistente"
+                style={{ background: chatOpen ? "rgba(255,255,255,0.2)" : "transparent" }}
+              >
+                <IconRobot size={22} />
+              </ActionIcon>
+            )}
           </Flex>
         </AppShell.Header>
 
@@ -266,6 +311,28 @@ function AppContent() {
             </Text>
           </div>
         </AppShell.Navbar>
+
+        {/* Aside para desktop */}
+        {!isMobile && (
+          <AppShell.Aside>
+            <ChatPanel onClose={closeChat} onInvalidate={handleChatInvalidate} autoStart={chatAutoStart} onAutoStartDone={() => setChatAutoStart(false)} />
+          </AppShell.Aside>
+        )}
+
+        {/* Drawer para mobile */}
+        {isMobile && (
+          <Drawer
+            opened={chatOpen}
+            onClose={closeChat}
+            position="right"
+            size="100%"
+            withCloseButton={false}
+            padding={0}
+            styles={{ body: { height: "100%", overflow: "hidden", padding: 0 } }}
+          >
+            <ChatPanel onClose={closeChat} onInvalidate={handleChatInvalidate} autoStart={chatAutoStart} onAutoStartDone={() => setChatAutoStart(false)} />
+          </Drawer>
+        )}
 
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
           {/* Banner de sesión de soporte (impersonación activa) */}
