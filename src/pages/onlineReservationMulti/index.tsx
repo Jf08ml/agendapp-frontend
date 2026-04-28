@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import BookingChoiceScreen from "./BookingChoiceScreen";
+import BookingChatPanel from "./BookingChatPanel";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
@@ -47,7 +49,11 @@ import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 
+type BookingMode = "choice" | "chat" | "manual";
+
 export default function MultiBookingWizard() {
+  const [mode, setMode] = useState<BookingMode>("choice");
+
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -285,6 +291,25 @@ export default function MultiBookingWizard() {
     setSeriesPreview(null);
     setCurrentStep(0);
   };
+
+  if (mode === "choice") {
+    return (
+      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+        <BookingChoiceScreen
+          onSelectAI={() => setMode("chat")}
+          onSelectManual={() => setMode("manual")}
+        />
+      </Card>
+    );
+  }
+
+  if (mode === "chat") {
+    return (
+      <Card withBorder radius="md" p={0} style={{ overflow: "hidden" }}>
+        <BookingChatPanel onBack={() => setMode("choice")} />
+      </Card>
+    );
+  }
 
   if (loading) {
     return <CustomLoader loadingText="Cargando servicios y profesionales" />;
