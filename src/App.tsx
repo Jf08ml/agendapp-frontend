@@ -9,9 +9,10 @@ import {
   Anchor,
   Drawer,
   ActionIcon,
+  Tooltip,
 } from "@mantine/core";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
-import { IconRobot } from "@tabler/icons-react";
+import { IconRobot, IconX } from "@tabler/icons-react";
 import ChatPanel from "./chatbot/ChatPanel";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -66,6 +67,66 @@ function AppContent() {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const [chatAutoStart, setChatAutoStart] = useState(false);
   const isSuperadmin = role === "superadmin";
+
+  // ── FAB draggable ────────────────────────────────────────────────────────
+  const FAB_SIZE = 56;
+  // null = usar posición CSS por defecto (bottom/right); objeto = usuario arrastró
+  const [fabPos, setFabPos] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const s = localStorage.getItem("agendit_fab_pos");
+      if (s) {
+        const pos = JSON.parse(s);
+        // Clamp al viewport actual por si cambió el tamaño de pantalla
+        return {
+          x: Math.min(Math.max(pos.x, 0), window.innerWidth - FAB_SIZE),
+          y: Math.min(Math.max(pos.y, 0), window.innerHeight - FAB_SIZE),
+        };
+      }
+    } catch {}
+    return null;
+  });
+  const fabPosRef = useRef(fabPos);
+  const [fabDragging, setFabDragging] = useState(false);
+
+  const handleFabPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const startMx = e.clientX;
+    const startMy = e.clientY;
+    // Usar posición actual del DOM en lugar del estado (maneja tanto null como posición guardada)
+    const startEx = rect.left;
+    const startEy = rect.top;
+    let moved = false;
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startMx;
+      const dy = ev.clientY - startMy;
+      if (!moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        moved = true;
+        setFabDragging(true);
+      }
+      if (!moved) return;
+      const next = {
+        x: Math.min(Math.max(startEx + dx, 0), window.innerWidth - FAB_SIZE),
+        y: Math.min(Math.max(startEy + dy, 0), window.innerHeight - FAB_SIZE),
+      };
+      fabPosRef.current = next;
+      setFabPos(next);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setFabDragging(false);
+      if (!moved) {
+        toggleChat();
+      } else {
+        try { localStorage.setItem("agendit_fab_pos", JSON.stringify(fabPosRef.current)); } catch {}
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, [toggleChat]);
 
   const handleChatInvalidate = useCallback((invalidates: string[]) => {
     if (invalidates.includes("organization")) {
@@ -230,11 +291,6 @@ function AppContent() {
           breakpoint: "sm",
           collapsed: { desktop: !opened, mobile: !opened },
         }}
-        aside={{
-          width: 350,
-          breakpoint: "sm",
-          collapsed: { desktop: !chatOpen || !!isMobile, mobile: true },
-        }}
         header={{ height: 50 }}
         footer={{ height: 30 }}
         styles={{ footer: { borderTop: "none" } }}
@@ -269,21 +325,6 @@ function AppContent() {
             />
             {/* Nombre dinámico y contenido extra del Header */}
             <Header organization={organization} />
-            {/* Botón asistente IA */}
-            {isAuthenticated && !isSuperadmin && (
-              <ActionIcon
-                onClick={toggleChat}
-                variant={chatOpen ? "filled" : "subtle"}
-                color="white"
-                size="lg"
-                ml="auto"
-                mr="sm"
-                aria-label="Abrir asistente"
-                style={{ background: chatOpen ? "rgba(255,255,255,0.2)" : "transparent" }}
-              >
-                <IconRobot size={22} />
-              </ActionIcon>
-            )}
           </Flex>
         </AppShell.Header>
 
@@ -310,25 +351,23 @@ function AppContent() {
           </div>
         </AppShell.Navbar>
 
-        {/* Aside para desktop */}
-        {!isMobile && (
-          <AppShell.Aside>
-            <ChatPanel onClose={closeChat} onInvalidate={handleChatInvalidate} autoStart={chatAutoStart} onAutoStartDone={() => setChatAutoStart(false)} />
-          </AppShell.Aside>
-        )}
-
-        {/* Drawer para mobile */}
-        {isMobile && (
+        {/* Panel del asistente IA — Drawer unificado para desktop y mobile */}
+        {isAuthenticated && !isSuperadmin && (
           <Drawer
             opened={chatOpen}
             onClose={closeChat}
             position="right"
-            size="100%"
+            size={isMobile ? "100%" : 380}
             withCloseButton={false}
             padding={0}
             styles={{ body: { height: "100%", overflow: "hidden", padding: 0 } }}
           >
-            <ChatPanel onClose={closeChat} onInvalidate={handleChatInvalidate} autoStart={chatAutoStart} onAutoStartDone={() => setChatAutoStart(false)} />
+            <ChatPanel
+              onClose={closeChat}
+              onInvalidate={handleChatInvalidate}
+              autoStart={chatAutoStart}
+              onAutoStartDone={() => setChatAutoStart(false)}
+            />
           </Drawer>
         )}
 
@@ -416,6 +455,38 @@ function AppContent() {
           <Footer />
         </AppShell.Footer>
       </AppShell>
+
+      {/* FAB — Botón flotante arrastrable del asistente IA */}
+      {isAuthenticated && !isSuperadmin && (
+        <Tooltip label={chatOpen ? "Cerrar asistente" : "Asistente IA"} withArrow disabled={fabDragging}>
+          <ActionIcon
+            onPointerDown={handleFabPointerDown}
+            size={FAB_SIZE}
+            radius="xl"
+            aria-label="Abrir asistente IA"
+            style={{
+              position: "fixed",
+              // Sin arrastrar: bottom/right con safe-area para iOS
+              // Arrastrado: top/left con valor exacto en px
+              ...(fabPos
+                ? { left: fabPos.x, top: fabPos.y }
+                : { bottom: "calc(48px + env(safe-area-inset-bottom, 0px))", right: 24 }
+              ),
+              zIndex: 300,
+              background: chatOpen ? "#333" : color,
+              boxShadow: chatOpen
+                ? "0 4px 16px rgba(0,0,0,0.3)"
+                : `0 4px 20px ${color}80`,
+              transition: "background 0.2s, box-shadow 0.2s",
+              cursor: fabDragging ? "grabbing" : "grab",
+              touchAction: "none",
+              userSelect: "none",
+            }}
+          >
+            {chatOpen ? <IconX size={24} color="white" /> : <IconRobot size={26} color="white" />}
+          </ActionIcon>
+        </Tooltip>
+      )}
 
     </>
   );
