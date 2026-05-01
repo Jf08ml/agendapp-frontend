@@ -35,10 +35,10 @@ import {
   IconGlobe,
   IconClock,
   IconCurrencyDollar,
+  IconCopy,
 } from "@tabler/icons-react";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
 import { detectUserCountry } from "../../utils/phoneUtils";
-import { notifications } from "@mantine/notifications";
 import {
   checkSlugAvailability,
   registerOrganization,
@@ -157,6 +157,9 @@ export default function SignupPage() {
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{ displayUrl: string; redirectUrl: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [countdown, setCountdown] = useState(10);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [turnstileToken, setTurnstileToken] = useState<string>("");
@@ -235,6 +238,13 @@ export default function SignupPage() {
     return () => { if (supportTimer.current) clearTimeout(supportTimer.current); };
   }, [supportState]);
 
+  useEffect(() => {
+    if (!successInfo) return;
+    if (countdown === 0) { window.location.href = successInfo.redirectUrl; return; }
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [successInfo, countdown]);
+
   const handleSubmit = async (values: SignupFormValues) => {
     setError(null);
     setIsSubmitting(true);
@@ -259,9 +269,10 @@ export default function SignupPage() {
         default_country: values.default_country || undefined,
         timezone: values.timezone || undefined, currency: values.currency || undefined,
       });
-      notifications.show({ title: "Cuenta creada", message: "Redirigiendo a tu panel...", color: "green", icon: <IconCheck size={16} /> });
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
-      setTimeout(() => { window.location.href = redirectUrl; }, 1000);
+      const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
+      setSuccessInfo({ displayUrl, redirectUrl });
+      setIsSubmitting(false);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       setError(axiosErr.response?.data?.message || "Error al crear la cuenta. Intenta de nuevo.");
@@ -415,6 +426,95 @@ export default function SignupPage() {
 
           {/* ── RIGHT ── */}
           <div className="sp-right">
+            {successInfo ? (
+              <Stack align="center" justify="center" style={{ minHeight: "100%", textAlign: "center" }} gap={24} py={40}>
+                <ThemeIcon size={72} radius="xl" variant="light" color="green">
+                  <IconCheck size={40} />
+                </ThemeIcon>
+
+                <Box>
+                  <Title order={3} style={{ color: "#FFFFFF", marginBottom: 8 }}>¡Tu cuenta fue creada!</Title>
+                  <Text size="sm" style={{ color: "rgba(255,255,255,0.55)", maxWidth: 380, margin: "0 auto", lineHeight: 1.6 }}>
+                    Este es tu <strong style={{ color: "rgba(255,255,255,0.85)" }}>enlace permanente</strong> para acceder a tu panel.
+                    Guárdalo o agrégalo a tus favoritos — siempre entrarás desde aquí.
+                  </Text>
+                </Box>
+
+                <Box
+                  style={{
+                    background: "rgba(255,255,255,0.07)",
+                    border: "1px solid rgba(96,165,250,0.35)",
+                    borderRadius: 12,
+                    padding: "14px 18px",
+                    width: "100%",
+                    maxWidth: 420,
+                  }}
+                >
+                  <Text size="xs" fw={700} tt="uppercase" style={{ color: "rgba(255,255,255,0.4)", letterSpacing: 0.9, marginBottom: 10 }}>
+                    Tu enlace de acceso
+                  </Text>
+                  <Group justify="space-between" align="center" wrap="nowrap" gap={8}>
+                    <Group gap={8} align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                      <IconLink size={15} style={{ color: "#60A5FA", flexShrink: 0 }} />
+                      <Text
+                        fw={700}
+                        style={{
+                          color: "#93C5FD",
+                          fontSize: 14,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {successInfo.displayUrl}
+                      </Text>
+                    </Group>
+                    <ActionIcon
+                      variant={copied ? "filled" : "subtle"}
+                      color={copied ? "green" : "blue"}
+                      size={36}
+                      radius="md"
+                      onClick={() => {
+                        navigator.clipboard.writeText(successInfo.displayUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2500);
+                      }}
+                      title="Copiar enlace"
+                    >
+                      {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                    </ActionIcon>
+                  </Group>
+                  {copied && (
+                    <Text size="xs" style={{ color: "#4ADE80", marginTop: 6, textAlign: "left" }}>
+                      ¡Enlace copiado!
+                    </Text>
+                  )}
+                </Box>
+
+                <Button
+                  size="md"
+                  onClick={() => { window.location.href = successInfo.redirectUrl; }}
+                  rightSection={<IconArrowRight size={16} />}
+                  style={{ maxWidth: 420, width: "100%" }}
+                  styles={{
+                    root: {
+                      backgroundColor: "#FFFFFF",
+                      color: "#1D4ED8",
+                      fontWeight: 900,
+                      borderRadius: 10,
+                      letterSpacing: 0.3,
+                    },
+                  }}
+                >
+                  Ingresar a mi panel
+                </Button>
+
+                <Text size="xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+                  Redirigiendo automáticamente en {countdown}s…
+                </Text>
+              </Stack>
+            ) : (
+              <>
             {/* Top info */}
             <Group gap={20} mb={20} wrap="wrap">
               {[
@@ -603,6 +703,8 @@ export default function SignupPage() {
                 </Text>
               </Stack>
             </form>
+            </>
+            )}
           </div>
         </div>
 
