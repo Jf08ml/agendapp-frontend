@@ -1051,34 +1051,38 @@ ${clientServices}`;
 
       {/* -------- CARD EN LA COLUMNA -------- */}
       <Paper
-        shadow={isPastAppointment ? "xs" : "sm"}
-        radius="md"
-        withBorder
+        radius={10}
         style={{
           backgroundColor: isCancelled
-            ? "#f1f3f5"
+            ? "#F0EBE0"
             : isPastAppointment
-            ? "#ffffff"
-            : employeeColor, // ❌ Gris si cancelada
-          color: isCancelled ? "#868e96" : isPastAppointment ? "#495057" : textColor,
+            ? "#FAF7F2"
+            : employeeColor,
+          color: isCancelled ? "#9CA3AF" : isPastAppointment ? "#8B92A6" : textColor,
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          padding: "6px 8px 6px 8px",
+          padding: "6px 8px",
           height: "100%",
           position: "relative",
           cursor: isCancelled ? "default" : "pointer",
           fontSize: 10,
           border: isCancelled
-            ? "1px solid #ced4da"
+            ? "1px dashed #C9C2B5"
             : appointment.status === "attended"
             ? "2px solid #12b886"
             : appointment.status === "no_show"
             ? "2px solid #e64980"
-            : "1px solid gray",
+            : isPastAppointment
+            ? "1px solid #E7E2D6"
+            : "1px solid rgba(0,0,0,0.12)",
+          boxShadow: isCancelled || isPastAppointment
+            ? "none"
+            : "0 1px 4px rgba(0,0,0,0.10)",
           opacity: isCancelled ? 0.5 : appointment.status === "no_show" ? 0.65 : 1,
           textDecoration: isCancelled ? "line-through" : "none",
           pointerEvents: isCancelled ? "none" : "auto",
+          transition: "opacity 0.12s",
         }}
         onClick={(e) => {
           // clave para que NO se propague al onClick de la columna
@@ -1260,7 +1264,15 @@ ${clientServices}`;
         )}
 
         {/* Horario */}
-        <Text fw={700} style={{ fontSize: 10, marginTop: 6 }}>
+        <Text
+          style={{
+            fontFamily: "'Fraunces', serif",
+            fontSize: 10,
+            fontWeight: 700,
+            marginTop: 6,
+            letterSpacing: -0.2,
+          }}
+        >
           {formatInTimezone(appointment.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm")}
           {" - "}
           {formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm a")}
@@ -1269,7 +1281,7 @@ ${clientServices}`;
         {/* Cliente */}
         <Text
           style={{
-            color: isPastAppointment ? "#495057" : textColor,
+            color: isPastAppointment ? "#8B92A6" : textColor,
             fontSize: 10,
           }}
         >

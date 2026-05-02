@@ -32,8 +32,8 @@ const DayModalHeader: FC<HeaderProps> = ({
     <Box
       style={{
         display: "flex",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
-        backgroundColor: "#f8f9fb",
+        borderBottom: "1px solid #F0EBE0",
+        backgroundColor: "#FAF7F2",
       }}
     >
       {/* Espacio reservado para la columna de horas — sticky left para que
@@ -45,7 +45,7 @@ const DayModalHeader: FC<HeaderProps> = ({
           position: "sticky",
           left: 0,
           zIndex: 5,
-          backgroundColor: "#f8f9fb",
+          backgroundColor: "#FAF7F2",
         }}
       />
 
@@ -68,16 +68,16 @@ const DayModalHeader: FC<HeaderProps> = ({
               justifyContent: "center",
               position: "relative",
               textAlign: "center",
-              marginLeft: "2px", // se mantiene igual que el layout original
+              marginLeft: "2px",
               padding: "6px 4px",
-              backgroundColor: isHidden ? "#f1f3f5" : color,
-              borderRadius: 6,
+              backgroundColor: isHidden ? "#F0EBE0" : color,
+              borderRadius: 8,
               border: isHidden
-                ? "1px dashed rgba(0,0,0,0.3)"
+                ? "1px dashed #C9C2B5"
                 : "1px solid rgba(0,0,0,0.08)",
               boxShadow: isHidden
                 ? "none"
-                : "0 1px 3px rgba(0,0,0,0.15)",
+                : "0 1px 4px rgba(0,0,0,0.10)",
               opacity: isHidden ? 0.6 : 1,
               transition: "all 120ms ease",
             }}

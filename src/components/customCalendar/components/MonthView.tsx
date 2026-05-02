@@ -1,15 +1,12 @@
 import React, { useMemo } from "react";
-import { Grid, Box, Paper, Text, Group, Button, Badge } from "@mantine/core";
+import { Box, Text } from "@mantine/core";
 import {
   eachDayOfInterval,
   startOfMonth,
   endOfMonth,
-  format,
   isSameDay,
   isSameMonth,
   isToday,
-} from "date-fns";
-import {
   startOfWeek as startOfCalendarWeek,
   endOfWeek as endOfCalendarWeek,
 } from "date-fns";
@@ -17,7 +14,28 @@ import { es } from "date-fns/locale";
 import { Appointment } from "../../../services/appointmentService";
 import CustomLoader from "../../customLoader/CustomLoader";
 import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
-import { BsChevronCompactLeft, BsChevronCompactRight } from "react-icons/bs";
+
+const BRAND = {
+  deep: "#1E3A8A",
+  cream: "#FAF7F2",
+  surface: "#FFFFFF",
+  ink: "#101526",
+  body: "#404760",
+  muted: "#8B92A6",
+  line: "#E7E2D6",
+  lineSoft: "#F0EBE0",
+  accent: "#D97A4A",
+  accentSoft: "#FDF1E8",
+};
+
+// DOM · LUN · MAR · MIÉ · JUE · VIE · SÁB
+const WEEK_LABELS = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+const WEEK_LABELS_SHORT = ["D", "L", "M", "X", "J", "V", "S"];
+
+interface DayData {
+  count: number;
+  avatars: { color: string; initials: string }[];
+}
 
 interface MonthViewProps {
   currentDate: Date;
@@ -26,48 +44,15 @@ interface MonthViewProps {
   getAppointmentsForDay: (day: Date) => Appointment[];
   loadingMonth: boolean;
   holidayConfig?: HolidayConfig;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
+  selectedDay?: Date | null;
 }
 
-const COLOR = {
-  today: "#6366f1",
-  holiday: "#ef4444",
-  weekendBg: "rgba(0,0,0,0.03)",
-  selectedBg: "#eef2ff",
-  selectedBorder: "#4f46e5",
-};
-
-const daysOfWeekFull = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-];
-
-const daysOfWeekShort = ["D", "L", "M", "X", "J", "V", "S"];
-
-const LegendDot: React.FC<{ color: string; label: string }> = ({
-  color,
-  label,
-}) => (
-  <Group gap={6} align="center">
-    <Box
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 999,
-        background: color,
-      }}
-    />
-    <Text size="xs" c="dimmed">
-      {label}
-    </Text>
-  </Group>
-);
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : (parts[0]?.[0] ?? "?").toUpperCase();
+}
 
 const MonthView: React.FC<MonthViewProps> = ({
   currentDate,
@@ -76,8 +61,7 @@ const MonthView: React.FC<MonthViewProps> = ({
   getAppointmentsForDay,
   loadingMonth,
   holidayConfig = { country: "CO", language: "es" },
-  onPrevMonth,
-  onNextMonth,
+  selectedDay,
 }) => {
   const startMonth = startOfMonth(currentDate);
   const endMonth = endOfMonth(currentDate);
@@ -93,18 +77,29 @@ const MonthView: React.FC<MonthViewProps> = ({
 
   const { isHoliday } = useHolidays(currentDate, holidayConfig);
 
-  const apptCountByKey = useMemo(() => {
-    const map = new Map<string, number>();
+  const dayDataMap = useMemo(() => {
+    const map = new Map<string, DayData>();
     for (const d of daysInMonth) {
       const key = d.toISOString().slice(0, 10);
-      map.set(key, getAppointmentsForDay(d)?.length ?? 0);
+      const apts = getAppointmentsForDay(d);
+      const seen = new Set<string>();
+      const avatars: { color: string; initials: string }[] = [];
+      for (const apt of apts) {
+        const empId = apt.employee?._id;
+        if (empId && !seen.has(empId)) {
+          seen.add(empId);
+          avatars.push({
+            color: apt.employee?.color || "#3B5BDB",
+            initials: getInitials(apt.employee?.names || "?"),
+          });
+        }
+      }
+      map.set(key, { count: apts.length, avatars });
     }
     return map;
   }, [daysInMonth, getAppointmentsForDay]);
 
-  // Desktop: llenamos viewport. Mobile: dejamos que la altura sea natural.
-  // const calendarHeight = "calc(100vh - 180px)";
-  const weekdayLabels = isMobile ? daysOfWeekShort : daysOfWeekFull;
+  const weekLabels = isMobile ? WEEK_LABELS_SHORT : WEEK_LABELS;
 
   return (
     <Box
@@ -114,315 +109,241 @@ const MonthView: React.FC<MonthViewProps> = ({
         flexDirection: "column",
         height: isMobile ? "auto" : "100%",
         overflow: "hidden",
+        // Calendar shell card
+        background: BRAND.surface,
+        border: `1px solid ${BRAND.line}`,
+        borderRadius: isMobile ? 12 : 18,
       }}
     >
-      {/* HEADER: Mes/Año + navegación */}
-      <Group justify="space-between" align="center" mb={isMobile ? 2 : 4}>
-        <Button
-          variant="subtle"
-          size={isMobile ? "xs" : "sm"}
-          onClick={onPrevMonth}
-          leftSection={<BsChevronCompactLeft />}
-        >
-          {isMobile ? "Ant." : "Anterior"}
-        </Button>
-
-        <Paper
-          withBorder
-          px={isMobile ? "xs" : "md"}
-          py={isMobile ? 2 : 4}
-          radius="lg"
-          style={{ textTransform: "uppercase" }}
-          shadow="xs"
-        >
-          <Text
-            ta="center"
-            fw={700}
-            style={{
-              fontSize: isMobile ? 12 : 17,
-              letterSpacing: 1,
-              lineHeight: 1.2,
-            }}
-          >
-            {format(currentDate, "MMMM yyyy", { locale: es })}
-          </Text>
-        </Paper>
-
-        <Button
-          variant="subtle"
-          size={isMobile ? "xs" : "sm"}
-          onClick={onNextMonth}
-          rightSection={<BsChevronCompactRight />}
-        >
-          {isMobile ? "Sig." : "Siguiente"}
-        </Button>
-      </Group>
-
-      {/* LEYENDA */}
-      <Group
-        justify="center"
-        gap={isMobile ? 8 : "md"}
-        mb={isMobile ? 4 : 6}
-        wrap="wrap"
+      {/* Week day header row */}
+      <Box
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          borderBottom: `1px solid ${BRAND.line}`,
+          background: BRAND.cream,
+          flexShrink: 0,
+        }}
       >
-        <LegendDot color={COLOR.today} label="Hoy" />
-        <LegendDot color={COLOR.holiday} label="Festivo" />
-        <LegendDot color="#9ca3af" label="Fin de semana" />
-      </Group>
+        {weekLabels.map((label, i) => (
+          <Box key={label} style={{ textAlign: "center", padding: isMobile ? "8px 0" : "12px 0" }}>
+            <Text
+              style={{
+                fontSize: isMobile ? 9 : 10,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+                color: i === 0 || i === 6 ? BRAND.deep : BRAND.muted,
+              }}
+            >
+              {label}
+            </Text>
+          </Box>
+        ))}
+      </Box>
 
-      {/* Encabezado días de la semana */}
-      <Paper withBorder radius="md" shadow="xs" mb={isMobile ? 2 : 4}>
-        <Grid columns={7} gutter={0}>
-          {weekdayLabels.map((day) => (
-            <Grid.Col span={1} key={day}>
-              <Box py={isMobile ? 2 : 6}>
-                <Text
-                  ta="center"
-                  fw={600}
-                  c="dimmed"
-                  style={{ fontSize: isMobile ? 10 : 11 }}
-                >
-                  {day}
-                </Text>
-              </Box>
-            </Grid.Col>
-          ))}
-        </Grid>
-      </Paper>
-
-      {/* GRID DEL CALENDARIO */}
+      {/* Calendar grid */}
       <Box
         style={{
           flex: isMobile ? "initial" : 1,
           display: "grid",
           gridTemplateColumns: "repeat(7, 1fr)",
-          gridAutoRows: isMobile ? "auto" : "1fr",
-          gap: 4,
-          padding: 2
+          gridTemplateRows: isMobile ? undefined : "repeat(5, 1fr)",
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
-        {daysInMonth.map((day) => {
+        {daysInMonth.map((day, idx) => {
           const key = day.toISOString().slice(0, 10);
-          const count = apptCountByKey.get(key) ?? 0;
-
-          const selected = isSameDay(day, currentDate);
-          const holiday = isHoliday(day);
-          const weekend = [0, 6].includes(day.getDay());
-          const outsideMonth = !isSameMonth(day, currentDate);
+          const data = dayDataMap.get(key) ?? { count: 0, avatars: [] };
+          const outside = !isSameMonth(day, currentDate);
+          const holiday = !outside && isHoliday(day);
+          const weekend = idx % 7 === 0 || idx % 7 === 6;
           const today = isToday(day);
+          const selected = selectedDay ? isSameDay(day, selectedDay) : false;
 
-          const baseBg = "white";
-          const bgColor = selected
-            ? COLOR.selectedBg
-            : holiday
-            ? "rgba(239, 68, 68, 0.08)"
-            : weekend
-            ? COLOR.weekendBg
-            : baseBg;
+          // Cell background
+          let cellBg = BRAND.surface;
+          if (outside) cellBg = BRAND.cream;
+          else if (selected) cellBg = BRAND.deep;
+          else if (holiday) cellBg = BRAND.accentSoft;
 
-          const borderColor = selected
-            ? COLOR.selectedBorder
-            : holiday
-            ? "rgba(239, 68, 68, 0.6)"
-            : "rgba(0,0,0,0.06)";
+          // Day number color
+          let numColor = BRAND.ink;
+          if (outside) numColor = "#C9C2B5";
+          else if (selected) numColor = "#fff";
+          else if (holiday) numColor = BRAND.accent;
+          else if (today) numColor = BRAND.deep;
+          else if (weekend) numColor = BRAND.body;
 
-          const citasText =
-            count > 0
-              ? `${count} ${count === 1 ? "cita" : "citas"}`
-              : "";
+          const numWeight = today && !selected ? 700 : 500;
+
+          const row = Math.floor(idx / 7);
+          const col = idx % 7;
+          const isLastRow = row === Math.floor((daysInMonth.length - 1) / 7);
+          const isLastCol = col === 6;
 
           return (
             <Box
               key={key}
+              role="button"
+              onClick={() => !outside && handleDayClick(day)}
               style={{
-                minHeight: 0,
-                position: isMobile ? "relative" : "static",
+                padding: isMobile ? "6px 5px" : "10px 9px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                minHeight: isMobile ? 52 : 0,
+                cursor: outside ? "default" : "pointer",
+                background: cellBg,
+                opacity: outside ? 0.65 : loadingMonth ? 0.7 : 1,
+                borderBottom: isLastRow ? "none" : `1px solid ${BRAND.lineSoft}`,
+                borderRight: isLastCol ? "none" : `1px solid ${BRAND.lineSoft}`,
+                transition: "background 0.12s",
+                position: "relative",
+              }}
+              onMouseEnter={(e) => {
+                if (!outside && !selected)
+                  e.currentTarget.style.background = selected
+                    ? BRAND.deep
+                    : holiday
+                    ? "#FBEADC"
+                    : "#F5F1EC";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = cellBg;
               }}
             >
-              {/* MOBILE: celda cuadrada, sin badges */}
-              {isMobile ? (
-                <>
-                  <Box
+              {/* Day number row */}
+              <Box
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Box style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                  <Text
                     style={{
-                      width: "100%",
-                      paddingTop: "100%", // 1:1 aspect ratio
-                    }}
-                  />
-                  <Paper
-                    shadow="xs"
-                    radius="md"
-                    p={4}
-                    withBorder
-                    role="button"
-                    onClick={() => handleDayClick(day)}
-                    style={{
-                      cursor: "pointer",
-                      position: "absolute",
-                      inset: 0,
-                      backgroundColor: bgColor,
-                      borderColor,
-                      borderWidth: selected || holiday ? 2 : 1,
-                      transition:
-                        "background 0.15s ease, border-color 0.15s ease",
-                      opacity: loadingMonth ? 0.7 : outsideMonth ? 0.6 : 1,
-                      outline: today ? `2px solid ${COLOR.today}` : "none",
-                      outlineOffset: today ? -2 : 0,
-                      display: "flex",
-                      flexDirection: "column",
+                      fontFamily: "'Fraunces', serif",
+                      fontSize: isMobile ? 15 : 18,
+                      fontWeight: numWeight,
+                      color: numColor,
+                      letterSpacing: -0.4,
+                      lineHeight: 1,
                     }}
                   >
-                    {/* Número del día (sin badge Hoy en mobile) */}
-                    <Group
-                      justify="flex-start"
-                      align="flex-start"
-                      gap={4}
-                      mb={2}
-                    >
-                      <Text
-                        size="sm"
-                        fw={800}
-                        c={
-                          holiday
-                            ? "#dc2626"
-                            : today
-                            ? COLOR.today
-                            : outsideMonth
-                            ? "#9ca3af"
-                            : "#111827"
-                        }
-                      >
-                        {format(day, "d", { locale: es })}
-                      </Text>
-                    </Group>
-
-                    <Box style={{ flex: 1 }} />
-
-                    {/* Texto de citas en una sola línea, sin badge */}
-                    {count > 0 && (
-                      <Box
-                        style={{
-                          display: "flex",
-                          justifyContent: "center",
-                          marginTop: 2,
-                        }}
-                      >
-                        <Text
-                          size="xxxs"
-                          c="dimmed"
-                          style={{
-                            whiteSpace: "nowrap",
-                            lineHeight: 1,
-                          }}
-                        >
-                          {citasText}
-                        </Text>
-                      </Box>
-                    )}
-                  </Paper>
-                </>
-              ) : (
-                // DESKTOP / TABLET: con badges
-                <Paper
-                  shadow="xs"
-                  radius="md"
-                  p={6}
-                  withBorder
-                  role="button"
-                  onClick={() => handleDayClick(day)}
-                  style={{
-                    cursor: "pointer",
-                    position: "relative",
-                    height: "100%",
-                    backgroundColor: bgColor,
-                    borderColor,
-                    borderWidth: selected || holiday ? 2 : 1,
-                    transition:
-                      "background 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.1s ease",
-                    opacity: loadingMonth ? 0.7 : outsideMonth ? 0.6 : 1,
-                    outline: today ? `2px solid ${COLOR.today}` : "none",
-                    outlineOffset: today ? -2 : 0,
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-1px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 10px rgba(15,23,42,0.08)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "none";
-                    e.currentTarget.style.boxShadow =
-                      "var(--mantine-shadow-xs)";
-                  }}
-                >
-                  <Group
-                    justify="center"
-                    align="flex-start"
-                    gap="xs"
-                    mb={4}
-                  >
+                    {day.getDate()}
+                  </Text>
+                  {today && !selected && (
                     <Text
-                      size="md"
-                      fw={800}
-                      c={
-                        holiday
-                          ? "#dc2626"
-                          : today
-                          ? COLOR.today
-                          : outsideMonth
-                          ? "#9ca3af"
-                          : "#111827"
-                      }
-                    >
-                      {format(day, "d", { locale: es })}
-                    </Text>
-                  </Group>
-
-                  <Box style={{ flex: 1 }} />
-
-                  {/* Badge de citas solo en desktop */}
-                  {count > 0 && (
-                    <Box
                       style={{
-                        display: "flex",
-                        justifyContent: "center",
-                        marginTop: 2,
+                        fontSize: 7.5,
+                        fontWeight: 800,
+                        letterSpacing: 1,
+                        color: BRAND.deep,
+                        textTransform: "uppercase",
                       }}
                     >
-                      <Badge
-                        size="sm"
-                        radius="xl"
-                        variant={selected ? "filled" : "light"}
-                        style={{
-                          fontSize: 11,
-                          textTransform: "none",
-                        }}
-                      >
-                        {citasText}
-                      </Badge>
-                    </Box>
+                      Hoy
+                    </Text>
                   )}
-                </Paper>
+                </Box>
+                {holiday && (
+                  <Text
+                    style={{
+                      fontSize: 7.5,
+                      fontWeight: 800,
+                      letterSpacing: 0.8,
+                      color: selected ? "#FFB48A" : BRAND.accent,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {isMobile ? "F" : "Fest."}
+                  </Text>
+                )}
+              </Box>
+
+              {/* Employee avatars + count — desktop only */}
+              {!isMobile && data.count > 0 && (
+                <Box
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    marginTop: "auto",
+                  }}
+                >
+                  {data.avatars.slice(0, 3).map((av, i) => (
+                    <Box
+                      key={i}
+                      style={{
+                        width: 17,
+                        height: 17,
+                        borderRadius: "50%",
+                        background: av.color,
+                        color: "#fff",
+                        fontSize: 8,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        border: `1.5px solid ${selected ? BRAND.deep : "#fff"}`,
+                        marginLeft: i === 0 ? 0 : -4,
+                        flexShrink: 0,
+                        zIndex: 3 - i,
+                        position: "relative",
+                      }}
+                    >
+                      {av.initials[0]}
+                    </Box>
+                  ))}
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      marginLeft: 5,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {data.count} {data.count === 1 ? "cita" : "citas"}
+                  </Text>
+                </Box>
+              )}
+
+              {/* Mobile: count + label */}
+              {isMobile && data.count > 0 && (
+                <Box style={{ display: "flex", justifyContent: "center" }}>
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 600,
+                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {data.count} {data.count === 1 ? "cita" : "citas"}
+                  </Text>
+                </Box>
               )}
             </Box>
           );
         })}
       </Box>
 
-      {/* LOADER OVERLAY */}
+      {/* Loading overlay */}
       {loadingMonth && (
         <Box
           style={{
             position: "absolute",
             inset: 0,
             zIndex: 10,
-            background: "rgba(255,255,255,0.70)",
+            background: "rgba(255,255,255,0.72)",
             backdropFilter: "blur(2px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            pointerEvents: "auto",
-            borderRadius: 12,
+            borderRadius: 18,
           }}
         >
           <CustomLoader loadingText="Obteniendo citas..." overlay />

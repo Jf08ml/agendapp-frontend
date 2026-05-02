@@ -61,8 +61,8 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
               <Box
                 style={{
                   borderTop: isMainHour
-                    ? "1px solid #e0e0e0"
-                    : "1px dashed rgb(171, 171, 173)",
+                    ? "1px solid #E7E2D6"
+                    : "1px dashed #DDD8CE",
                   height: 0,
                 }}
               />

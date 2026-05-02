@@ -21,6 +21,7 @@ import utc from "dayjs/plugin/utc";
 import timezonePlugin from "dayjs/plugin/timezone";
 import DayModalTimeColumn from "./subcomponents/DayModalTimeColumn";
 import DayModalEmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
+import CustomLoader from "../../../components/customLoader/CustomLoader";
 
 dayjs.extend(utc);
 dayjs.extend(timezonePlugin);
@@ -46,6 +47,7 @@ interface WeekViewProps {
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
   onDeleteAppointment?: (appointmentId: string) => void;
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
+  loadingMonth?: boolean;
   timezone?: string;
 }
 
@@ -59,6 +61,7 @@ const WeekView: FC<WeekViewProps> = ({
   onConfirmAppointment,
   onMarkAttendance,
   setAppointments,
+  loadingMonth = false,
   timezone: tz = "America/Bogota",
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
@@ -202,13 +205,25 @@ const WeekView: FC<WeekViewProps> = ({
   const DAY_ROW_H = 62;  // day name + circle
   const EMP_ROW_H = 32;  // employee name chips
 
+  const WEEK_BRAND = {
+    deep: "#1E3A8A",
+    cream: "#FAF7F2",
+    surface: "#FFFFFF",
+    line: "#E7E2D6",
+    lineSoft: "#F0EBE0",
+    muted: "#8B92A6",
+    body: "#404760",
+    ink: "#101526",
+  };
+
   return (
     <Box
       style={{
-        borderRadius: 8,
-        border: "1px solid #e9ecef",
+        position: "relative",
+        borderRadius: 18,
+        border: `1px solid ${WEEK_BRAND.line}`,
         overflow: "hidden",
-        backgroundColor: "#fff",
+        backgroundColor: WEEK_BRAND.surface,
         height: "100%",
         display: "flex",
         flexDirection: "column",
@@ -239,8 +254,8 @@ const WeekView: FC<WeekViewProps> = ({
             top: 0,
             zIndex: 100,
             display: "flex",
-            backgroundColor: "#f8f9fb",
-            borderBottom: "1px solid #e9ecef",
+            backgroundColor: WEEK_BRAND.cream,
+            borderBottom: `1px solid ${WEEK_BRAND.line}`,
             minWidth: "max-content",
           }}
         >
@@ -253,8 +268,8 @@ const WeekView: FC<WeekViewProps> = ({
               width: TIME_COL_W,
               minWidth: TIME_COL_W,
               height: DAY_ROW_H,
-              backgroundColor: "#f8f9fb",
-              borderRight: "1px solid #e9ecef",
+              backgroundColor: WEEK_BRAND.cream,
+              borderRight: `1px solid ${WEEK_BRAND.line}`,
             }}
           />
 
@@ -274,21 +289,23 @@ const WeekView: FC<WeekViewProps> = ({
                   alignItems: "center",
                   justifyContent: "center",
                   padding: "6px 4px 4px",
-                  borderRight: "2px solid #dee2e6",
+                  borderRight: `1px solid ${WEEK_BRAND.line}`,
                   backgroundColor: isCurrentDay
-                    ? "var(--mantine-color-blue-0)"
+                    ? "rgba(30,58,138,0.06)"
                     : "transparent",
                   borderBottom: isCurrentDay
-                    ? "2px solid var(--mantine-color-blue-5)"
+                    ? `2px solid ${WEEK_BRAND.deep}`
                     : "2px solid transparent",
                 }}
               >
                 <Text
-                  size="xs"
-                  c="dimmed"
-                  tt="uppercase"
-                  fw={600}
-                  style={{ letterSpacing: "0.04em" }}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                    color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                  }}
                 >
                   {format(day, isMobile ? "EEE" : "EEEE", { locale: es })}
                 </Text>
@@ -301,31 +318,35 @@ const WeekView: FC<WeekViewProps> = ({
                     alignItems: "center",
                     justifyContent: "center",
                     marginTop: 2,
-                    backgroundColor: isCurrentDay
-                      ? "var(--mantine-color-blue-6)"
-                      : "transparent",
+                    backgroundColor: isCurrentDay ? WEEK_BRAND.deep : "transparent",
                   }}
                 >
                   <Text
-                    size="sm"
-                    fw={isCurrentDay ? 700 : 500}
-                    c={isCurrentDay ? "white" : "dark"}
-                    style={{ lineHeight: 1 }}
+                    style={{
+                      fontFamily: "'Fraunces', serif",
+                      fontSize: 14,
+                      fontWeight: isCurrentDay ? 700 : 500,
+                      color: isCurrentDay ? "#fff" : WEEK_BRAND.ink,
+                      lineHeight: 1,
+                    }}
                   >
                     {format(day, "d")}
                   </Text>
                 </Box>
                 {dayApts.length > 0 ? (
                   <Text
-                    size="9px"
-                    c={isCurrentDay ? "blue.6" : "dimmed"}
-                    fw={500}
-                    style={{ lineHeight: 1, marginTop: 2 }}
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 500,
+                      lineHeight: 1,
+                      marginTop: 2,
+                      color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                    }}
                   >
                     {dayApts.length} {dayApts.length === 1 ? "cita" : "citas"}
                   </Text>
                 ) : (
-                  <Text size="9px" style={{ lineHeight: 1, marginTop: 2, opacity: 0 }}>
+                  <Text style={{ fontSize: 9, lineHeight: 1, marginTop: 2, opacity: 0 }}>
                     —
                   </Text>
                 )}
@@ -341,8 +362,8 @@ const WeekView: FC<WeekViewProps> = ({
             top: DAY_ROW_H,
             zIndex: 99,
             display: "flex",
-            backgroundColor: "#f8f9fb",
-            borderBottom: "1px solid rgba(0,0,0,0.06)",
+            backgroundColor: WEEK_BRAND.cream,
+            borderBottom: `1px solid ${WEEK_BRAND.lineSoft}`,
             minWidth: "max-content",
           }}
         >
@@ -355,8 +376,8 @@ const WeekView: FC<WeekViewProps> = ({
               width: TIME_COL_W,
               minWidth: TIME_COL_W,
               minHeight: EMP_ROW_H,
-              backgroundColor: "#f8f9fb",
-              borderRight: "1px solid #e9ecef",
+              backgroundColor: WEEK_BRAND.cream,
+              borderRight: `1px solid ${WEEK_BRAND.line}`,
             }}
           />
 
@@ -370,7 +391,7 @@ const WeekView: FC<WeekViewProps> = ({
                   alignItems: "stretch",
                   width: `${dayGroupWidths[dayIdx]}px`,
                   minWidth: `${dayGroupWidths[dayIdx]}px`,
-                  borderRight: "2px solid #dee2e6",
+                  borderRight: `1px solid ${WEEK_BRAND.line}`,
                   padding: "4px 0",
                 }}
               >
@@ -390,9 +411,9 @@ const WeekView: FC<WeekViewProps> = ({
                         justifyContent: "center",
                         marginLeft: 2,
                         backgroundColor: color,
-                        borderRadius: 6,
+                        borderRadius: 8,
                         border: "1px solid rgba(0,0,0,0.08)",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                        boxShadow: "0 1px 4px rgba(0,0,0,0.10)",
                         padding: "6px 4px",
                         textAlign: "center",
                       }}
@@ -432,7 +453,7 @@ const WeekView: FC<WeekViewProps> = ({
               position: "sticky",
               left: 0,
               zIndex: 50,
-              backgroundColor: "#fff",
+              backgroundColor: WEEK_BRAND.surface,
               flexShrink: 0,
             }}
           >
@@ -457,9 +478,9 @@ const WeekView: FC<WeekViewProps> = ({
                   display: "flex",
                   width: `${dayGroupWidths[dayIdx]}px`,
                   minWidth: `${dayGroupWidths[dayIdx]}px`,
-                  borderRight: "2px solid #dee2e6",
+                  borderRight: `1px solid ${WEEK_BRAND.line}`,
                   backgroundColor: isCurrentDay
-                    ? "rgba(224, 231, 255, 0.08)"
+                    ? "rgba(30,58,138,0.03)"
                     : "transparent",
                 }}
               >
@@ -472,7 +493,7 @@ const WeekView: FC<WeekViewProps> = ({
                       left: 0,
                       right: 0,
                       height: 2,
-                      backgroundColor: "red",
+                      backgroundColor: WEEK_BRAND.deep,
                       zIndex: 20,
                       pointerEvents: "none",
                     }}
@@ -485,7 +506,7 @@ const WeekView: FC<WeekViewProps> = ({
                         width: 10,
                         height: 10,
                         borderRadius: "50%",
-                        backgroundColor: "red",
+                        backgroundColor: WEEK_BRAND.deep,
                       }}
                     />
                   </Box>
@@ -520,6 +541,25 @@ const WeekView: FC<WeekViewProps> = ({
           })}
         </Box>
       </Box>
+
+      {/* Loading overlay */}
+      {loadingMonth && (
+        <Box
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(250,247,242,0.78)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 18,
+          }}
+        >
+          <CustomLoader loadingText="Obteniendo citas..." overlay />
+        </Box>
+      )}
     </Box>
   );
 };

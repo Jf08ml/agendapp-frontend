@@ -19,6 +19,8 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -51,10 +53,11 @@ import {
   startOfMonthInTimezone,
 } from "../../../utils/timezoneUtils";
 import { useNavigate } from "react-router-dom";
+import { useMediaQuery } from "@mantine/hooks";
 import { sendOrgReminders } from "../../../services/reminderService";
 
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
-import WhatsappStatusIcon from "./components/WhatsappStatusIcon";
+import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
 
@@ -95,6 +98,7 @@ const ScheduleView: React.FC = () => {
   >({ services: [] });
 
   const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
 
   const [modalOpenedAppointment, setModalOpenedAppointment] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1035,7 +1039,7 @@ const ScheduleView: React.FC = () => {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        padding: "8px 8px 0",
+        padding: isMobile ? "4px 4px 0" : "8px 8px 0",
         gap: 8,
       }}
     >
@@ -1043,42 +1047,81 @@ const ScheduleView: React.FC = () => {
         <CustomLoader loadingText="Enviando recordatorios.." overlay />
       )}
 
-      {/* Barra superior tipo toolbar */}
-      <Paper
-        withBorder
-        radius="md"
-        p="xs"
+      {/* Header V3 */}
+      <Box
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 8,
+          flexShrink: 0,
+          padding: isMobile ? "2px 2px 4px" : "2px 4px 6px",
         }}
       >
-        {/* Izquierda: estado WhatsApp */}
-        <WhatsappStatusIcon
-          code={code}
-          reason={reason}
-          onRecheck={recheck}
-          onConfigure={() => navigate("/gestionar-whatsapp")}
-          trigger="click"
-          size="xs"
-          blocked={organization?.planLimits?.whatsappIntegration === false}
-        />
+        {/* Left: eyebrow (hidden on mobile) + Fraunces month title */}
+        <Box style={{ minWidth: 0 }}>
+          {!isMobile && (
+            <Text
+              style={{
+                fontSize: 10.5,
+                letterSpacing: 2,
+                color: "#8B92A6",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                lineHeight: 1,
+                marginBottom: 3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "clamp(160px, 30vw, 340px)",
+              }}
+            >
+              {organization?.name
+                ? `${organization.name} · Calendario`
+                : "Calendario"}
+            </Text>
+          )}
+          <Text
+            style={{
+              fontFamily: "'Fraunces', serif",
+              fontSize: isMobile ? 20 : 26,
+              fontWeight: 600,
+              letterSpacing: -1,
+              color: "#101526",
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {format(currentDate, "MMMM", { locale: es }).charAt(0).toUpperCase() +
+              format(currentDate, "MMMM", { locale: es }).slice(1)}
+            {!isMobile && (
+              <span style={{ color: "#8B92A6", fontStyle: "italic", fontWeight: 400 }}>
+                {" "}{format(currentDate, "yyyy")}
+              </span>
+            )}
+          </Text>
+        </Box>
 
-        {/* Derecha: contador + quick actions */}
-        <Group gap="sm" align="center">
-          <Badge size="xs" radius="xl" variant="light">
-            Citas este mes:{" "}
-            {
-              appointments.filter((apt) => !apt.status.includes("cancelled"))
-                .length
-            }
-          </Badge>
+        {/* Right: WA pill (compact on mobile) + create btn + actions menu */}
+        <Group gap={isMobile ? 6 : 8} align="center" style={{ flexShrink: 0 }}>
+          <WhatsAppStatusPill
+            code={code}
+            reason={reason}
+            onRecheck={recheck}
+            onConfigure={() => navigate("/gestionar-whatsapp")}
+            blocked={organization?.planLimits?.whatsappIntegration === false}
+            compact={isMobile}
+          />
 
-          <Button size="xs" onClick={() => openModal(new Date(), new Date())}>
-            Crear cita
-          </Button>
+          {!isMobile && hasPermission("appointments:create") && (
+            <Button
+              size="xs"
+              onClick={() => openModal(new Date(), new Date())}
+              style={{ borderRadius: 8 }}
+            >
+              Crear cita
+            </Button>
+          )}
 
           <SchedulerQuickActionsMenu
             onOpenSearch={() => setShowSearchModal(true)}
@@ -1089,9 +1132,7 @@ const ScheduleView: React.FC = () => {
             isWhatsappReady={isWhatsAppReady}
             sendingReminders={sendingReminders}
             reasonForDisabled={reason}
-            canSearchAppointments={hasPermission(
-              "appointments:search_schedule",
-            )}
+            canSearchAppointments={hasPermission("appointments:search_schedule")}
             canCreate={hasPermission("appointments:create")}
             canSendReminders={hasPermission("appointments:send_reminders")}
             canReorderEmployees={hasPermission("appointments:reorderemployees")}
@@ -1099,7 +1140,7 @@ const ScheduleView: React.FC = () => {
             onChangeReminderDate={setReminderDate}
           />
         </Group>
-      </Paper>
+      </Box>
 
       {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
       {employees.length === 0 && <SetupGuide employees={employees} />}

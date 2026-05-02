@@ -1,5 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Modal, Box, Button, Paper, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
+import { Modal, Box, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { format, addDays, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -250,26 +250,64 @@ const DayModal: FC<DayModalProps> = ({
   const goToNextDay = () => setCurrentDay((prev) => addDays(prev, 1));
   const goToPreviousDay = () => setCurrentDay((prev) => addDays(prev, -1));
 
+  const MODAL_BRAND = {
+    deep: "#1E3A8A",
+    cream: "#FAF7F2",
+    surface: "#FFFFFF",
+    ink: "#101526",
+    body: "#404760",
+    muted: "#8B92A6",
+    line: "#E7E2D6",
+    lineSoft: "#F0EBE0",
+  };
+
   return (
     <Modal
       opened={opened}
       onClose={onClose}
       fullScreen
       title={
-        <Text size="sm">{`Agenda para el ${format(currentDay, "EEEE, d MMMM", { locale: es })}`}</Text>
+        <Box>
+          <Text
+            style={{
+              fontSize: 9.5,
+              fontWeight: 700,
+              letterSpacing: 1.5,
+              textTransform: "uppercase",
+              color: MODAL_BRAND.muted,
+              lineHeight: 1,
+              marginBottom: 2,
+            }}
+          >
+            Agenda del día
+          </Text>
+          <Text
+            style={{
+              fontFamily: "'Fraunces', serif",
+              fontSize: isSmallScreen ? 16 : 20,
+              fontWeight: 600,
+              letterSpacing: -0.4,
+              color: MODAL_BRAND.ink,
+              lineHeight: 1.1,
+              textTransform: "capitalize",
+            }}
+          >
+            {format(currentDay, "EEEE, d 'de' MMMM", { locale: es })}
+          </Text>
+        </Box>
       }
       size="xl"
       styles={{ body: { padding: 0 } }}
     >
-      {/* Tabs y badges encima de la tabla */}
-      <Paper
-        radius={0}
+      {/* Toolbar */}
+      <Box
         style={{
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
-          backgroundColor: "white",
+          borderBottom: `1px solid ${MODAL_BRAND.lineSoft}`,
+          backgroundColor: MODAL_BRAND.cream,
+          padding: "8px 12px",
         }}
       >
-        <Group gap="md" align="center" justify="space-between" style={{ flexWrap: "wrap"}}>
+        <Group gap="md" align="center" justify="space-between" style={{ flexWrap: "wrap" }}>
           <SegmentedControl
             size="xs"
             value={viewMode}
@@ -295,16 +333,37 @@ const DayModal: FC<DayModalProps> = ({
               },
             ]}
           />
-          <Group gap={8} align="center" mr="xs">
-            <Badge size={isSmallScreen ? "xs" : "sm"} radius="xl" variant="light" style={{ whiteSpace: "nowrap" }}>
-              {activeAppointments.length} citas
-            </Badge>
-            <Badge size={isSmallScreen ? "xs" : "sm"} radius="xl" variant="outline" style={{ whiteSpace: "nowrap" }}>
-              {totalUniqueClients} clientes
-            </Badge>
+          <Group gap={6} align="center">
+            <Box
+              style={{
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: "rgba(30,58,138,0.08)",
+                fontSize: isSmallScreen ? 10.5 : 11.5,
+                fontWeight: 600,
+                color: MODAL_BRAND.deep,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {activeAppointments.length} {activeAppointments.length === 1 ? "cita" : "citas"}
+            </Box>
+            <Box
+              style={{
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: MODAL_BRAND.surface,
+                border: `1px solid ${MODAL_BRAND.line}`,
+                fontSize: isSmallScreen ? 10.5 : 11.5,
+                fontWeight: 600,
+                color: MODAL_BRAND.body,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {totalUniqueClients} {totalUniqueClients === 1 ? "cliente" : "clientes"}
+            </Box>
           </Group>
         </Group>
-      </Paper>
+      </Box>
       <div
         style={{
           width: "100%",
@@ -350,7 +409,7 @@ const DayModal: FC<DayModalProps> = ({
                 position: "sticky",
                 top: 0,
                 zIndex: 100,
-                backgroundColor: "white",
+                backgroundColor: MODAL_BRAND.cream,
               }}
             >
               <Header
@@ -367,7 +426,7 @@ const DayModal: FC<DayModalProps> = ({
                   left: 0,
                   top: 0,
                   zIndex: 100,
-                  backgroundColor: "white",
+                  backgroundColor: MODAL_BRAND.surface,
                   flexShrink: 0,
                 }}
               >
@@ -380,8 +439,8 @@ const DayModal: FC<DayModalProps> = ({
                       position: "absolute",
                       top: `${currentLinePosition}px`,
                       width: "100%",
-                      height: "2px",
-                      backgroundColor: "red",
+                      height: 2,
+                      backgroundColor: MODAL_BRAND.deep,
                       zIndex: 10,
                       display: "flex",
                       alignItems: "center",
@@ -389,13 +448,13 @@ const DayModal: FC<DayModalProps> = ({
                   >
                     <div
                       style={{
-                        width: 0,
-                        height: 0,
-                        borderLeft: "8px solid red",
-                        borderRight: "8px solid transparent",
-                        borderBottom: "8px solid transparent",
-                        borderTop: "8px solid transparent",
                         position: "absolute",
+                        left: -1,
+                        top: -4,
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        backgroundColor: MODAL_BRAND.deep,
                       }}
                     />
                   </div>
@@ -443,69 +502,93 @@ const DayModal: FC<DayModalProps> = ({
           </div>
         )}
       </div>
-      <Paper
-        radius={0}
-        withBorder
+      <Box
         style={{
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-          backgroundColor: "white",
+          borderTop: `1px solid ${MODAL_BRAND.lineSoft}`,
+          backgroundColor: MODAL_BRAND.cream,
+          padding: "6px 12px",
         }}
       >
         <Group
           justify="space-between"
           align="center"
           gap="xs"
-          px="xs"
-          style={{
-            flexWrap: "wrap",
-            paddingBlock: "4px"
-          }}
+          style={{ flexWrap: "wrap" }}
         >
           {/* Navegación de días */}
-          <Group gap={5}>
-            <Button size="xxs" variant="light" onClick={goToPreviousDay}>
-              Día anterior
-            </Button>
-            <Button size="xxs" variant="light" onClick={goToNextDay}>
-              Día siguiente
-            </Button>
+          <Group gap={6}>
+            {[
+              { label: "← Día anterior", fn: goToPreviousDay },
+              { label: "Día siguiente →", fn: goToNextDay },
+            ].map(({ label, fn }) => (
+              <Box
+                key={label}
+                onClick={fn}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  background: MODAL_BRAND.surface,
+                  border: `1px solid ${MODAL_BRAND.line}`,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: MODAL_BRAND.body,
+                  cursor: "pointer",
+                  userSelect: "none",
+                  transition: "background 0.12s",
+                  whiteSpace: "nowrap",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#F0EBE0")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = MODAL_BRAND.surface)}
+              >
+                {label}
+              </Box>
+            ))}
           </Group>
 
-          {/* Badge de canceladas */}
+          {/* Token de canceladas */}
           {cancelledAppointments.length > 0 && (
-            <Badge 
-              size="sm" 
-              radius="xl" 
-              variant="filled" 
-              color="red"
-              style={{ cursor: 'pointer' }}
+            <Box
               onClick={() => setShowCancelled(!showCancelled)}
+              style={{
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: "#FDECEC",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#B23A3A",
+                cursor: "pointer",
+                userSelect: "none",
+                whiteSpace: "nowrap",
+              }}
             >
-              Canceladas: {cancelledAppointments.length}
-            </Badge>
+              {cancelledAppointments.length} cancelada{cancelledAppointments.length !== 1 ? "s" : ""}
+            </Box>
           )}
         </Group>
-        
+
         {/* Sección de citas canceladas */}
         <Collapse in={showCancelled && cancelledAppointments.length > 0}>
-          <Divider my="xs" />
-          <Text size="sm" fw={600} mb="xs">Citas canceladas del día:</Text>
+          <Divider my="xs" color={MODAL_BRAND.line} />
+          <Text style={{ fontSize: 11.5, fontWeight: 600, color: MODAL_BRAND.body, marginBottom: 6 }}>
+            Citas canceladas del día:
+          </Text>
           <Box style={{ maxHeight: 200, overflowY: 'auto' }}>
             {cancelledAppointments.map((apt) => (
-              <Paper
+              <Box
                 key={apt._id}
-                p="xs"
-                mb="xs"
-                withBorder
                 style={{
-                  backgroundColor: '#f8f9fa',
-                  transition: 'all 0.2s',
+                  padding: "8px 10px",
+                  marginBottom: 6,
+                  borderRadius: 8,
+                  background: MODAL_BRAND.surface,
+                  border: `1px solid ${MODAL_BRAND.line}`,
+                  transition: 'opacity 0.12s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#e9ecef';
+                  e.currentTarget.style.opacity = "0.82";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                  e.currentTarget.style.opacity = "1";
                 }}
               >
                 <Flex justify="space-between" align="center">
@@ -546,11 +629,11 @@ const DayModal: FC<DayModalProps> = ({
                     )}
                   </Group>
                 </Flex>
-              </Paper>
+              </Box>
             ))}
           </Box>
         </Collapse>
-      </Paper>
+      </Box>
     </Modal>
   );
 };

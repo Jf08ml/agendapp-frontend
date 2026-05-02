@@ -14,8 +14,8 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals, timeFormat }) 
   return (
     <Box
       style={{
-        backgroundColor: "#fff",
-        borderRight: "1px solid #e0e0e0",
+        backgroundColor: "#FFFFFF",
+        borderRight: "1px solid #E7E2D6",
         width: "80px",
       }}
     >
@@ -48,20 +48,20 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals, timeFormat }) 
                 <Box
                   style={{
                     borderTop: isMainHour
-                      ? "1px solid #ccc"
-                      : "1px dashed rgb(171, 171, 173)",
+                      ? "1px solid #E7E2D6"
+                      : "1px dashed #DDD8CE",
                   }}
                 />
 
                 {/* Texto pegado a esa misma línea */}
                 <Text
-                  c={isMainHour ? "dark" : "dimmed"}
                   style={{
                     position: "absolute",
                     top: -8,
                     left: 4,
                     fontSize: isMainHour ? 10 : 9,
-                    backgroundColor: "#fff",
+                    color: isMainHour ? "#404760" : "#8B92A6",
+                    backgroundColor: "#FFFFFF",
                     padding: "0 4px",
                     borderRadius: 999,
                   }}
