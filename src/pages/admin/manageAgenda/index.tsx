@@ -9,13 +9,11 @@ import React, {
   lazy,
 } from "react";
 import {
-  Badge,
   Box,
   Button,
   Checkbox,
   Group,
   Loader,
-  Paper,
   Stack,
   Text,
 } from "@mantine/core";

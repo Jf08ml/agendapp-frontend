@@ -10,7 +10,6 @@ import {
   startOfWeek as startOfCalendarWeek,
   endOfWeek as endOfCalendarWeek,
 } from "date-fns";
-import { es } from "date-fns/locale";
 import { Appointment } from "../../../services/appointmentService";
 import CustomLoader from "../../customLoader/CustomLoader";
 import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
