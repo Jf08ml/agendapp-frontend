@@ -40,6 +40,7 @@ import AuditLogPage from "../pages/admin/auditLog";
 import ManageClasses from "../pages/admin/classes";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
+import TermsAndConditionsPage from "../pages/public/TermsAndConditionsPage";
 
 const generalRoutes = [
   {
@@ -358,6 +359,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Reservar Clase",
       description: "Reserva tu lugar en nuestras clases grupales.",
+    },
+  },
+
+  {
+    path: "/terminos-condiciones",
+    component: TermsAndConditionsPage,
+    MediaMetadata: {
+      title: "Términos y Condiciones",
+      description: "Lee los términos y condiciones del negocio.",
     },
   },
   {

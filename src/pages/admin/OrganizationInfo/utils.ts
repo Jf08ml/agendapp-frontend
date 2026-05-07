@@ -89,4 +89,8 @@ export const normalizeOrg = (response: Organization): Organization => ({
       ? [...response.clientFormConfig.fields]
       : [...DEFAULT_CLIENT_FORM_CONFIG.fields],
   },
+  termsAndConditions: {
+    enabled: response.termsAndConditions?.enabled ?? false,
+    text: response.termsAndConditions?.text ?? "",
+  },
 });

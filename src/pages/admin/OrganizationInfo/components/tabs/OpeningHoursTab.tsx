@@ -20,6 +20,8 @@ import {
   Table,
   Text,
   TextInput,
+  Textarea,
+  Anchor,
 } from "@mantine/core";
 import { TimeInput } from "@mantine/dates";
 import { UseFormReturnType } from "@mantine/form";
@@ -479,6 +481,35 @@ export default function OpeningHoursTab({
                 )}
               </Stack>
             </Paper>
+          </Collapse>
+
+          <Divider />
+
+          <Switch
+            label="Requerir aceptación de términos y condiciones"
+            description="Los clientes deberán aceptar los términos antes de completar una reserva en línea."
+            {...form.getInputProps("termsAndConditions.enabled", { type: "checkbox" })}
+            disabled={!isEditing}
+          />
+
+          <Collapse in={form.values.termsAndConditions?.enabled ?? false}>
+            <Textarea
+              label="Texto de términos y condiciones"
+              description={
+                <>
+                  Se mostrará en{" "}
+                  <Anchor href="/terminos-condiciones" target="_blank" size="xs">
+                    /terminos-condiciones
+                  </Anchor>
+                  . Usa saltos de línea para separar secciones.
+                </>
+              }
+              placeholder={"1. Política de cancelación\nLas reservas deben cancelarse con al menos 24 horas de anticipación...\n\n2. Responsabilidad\n..."}
+              minRows={8}
+              autosize
+              {...form.getInputProps("termsAndConditions.text")}
+              disabled={!isEditing}
+            />
           </Collapse>
         </Stack>
       </SectionCard>

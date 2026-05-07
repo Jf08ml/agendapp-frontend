@@ -24,7 +24,7 @@ import { Reservation } from "../../services/reservationService";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { CountryCode } from "libphonenumber-js";
 import { checkClientPackagesPublic, ClientPackage } from "../../services/packageService";
-import { Paper, Checkbox } from "@mantine/core";
+import { Paper, Checkbox, Anchor } from "@mantine/core";
 import { IconPackage } from "@tabler/icons-react";
 import {
   DEFAULT_CLIENT_FORM_CONFIG,
@@ -37,6 +37,7 @@ interface StepCustomerDataProps {
   onClientUpdateReady?: (updateFn: () => Promise<boolean>) => void;
   selectedServiceIds?: string[];
   onPackageDetected?: (clientPackageId: string | null, packageInfo: any) => void;
+  onTermsAcceptedChange?: (accepted: boolean) => void;
 }
 
 const isValidEmail = (v: string) =>
@@ -54,12 +55,15 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
   onClientUpdateReady,
   selectedServiceIds = [],
   onPackageDetected,
+  onTermsAcceptedChange,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+  const termsEnabled = organization?.termsAndConditions?.enabled ?? false;
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Config dinámica — si no existe, usar defaults (comportamiento original)
   const rawConfig = organization?.clientFormConfig;
@@ -437,6 +441,32 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           required={notesCfg.required}
           minRows={2}
           autosize
+        />
+      )}
+
+      {/* Términos y condiciones */}
+      {termsEnabled && (
+        <Checkbox
+          label={
+            <>
+              He leído y acepto los{" "}
+              <Anchor
+                href="/terminos-condiciones"
+                target="_blank"
+                size="sm"
+                fw={500}
+              >
+                términos y condiciones
+              </Anchor>
+            </>
+          }
+          checked={termsAccepted}
+          onChange={(e) => {
+            const v = e.currentTarget.checked;
+            setTermsAccepted(v);
+            onTermsAcceptedChange?.(v);
+          }}
+          required
         />
       )}
 

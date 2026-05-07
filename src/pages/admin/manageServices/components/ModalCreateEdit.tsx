@@ -424,6 +424,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                       <div>
                         <Text size="sm" fw={600} ta="center">Arrastra imágenes aquí o haz clic</Text>
                         <Text size="xs" c="dimmed" ta="center">Formatos: JPEG, PNG, WebP</Text>
+                        <Text size="xs" c="dimmed" ta="center">Dimensiones ideales: 1200 × 675 px (proporción 16:9)</Text>
                       </div>
                     </Stack>
                   </Center>

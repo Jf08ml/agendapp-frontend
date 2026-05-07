@@ -148,6 +148,10 @@ export interface Organization {
   homeLayout?: "modern" | "minimal" | "cards" | "landing";
   reminderSettings?: ReminderSettings;
   cancellationPolicy?: CancellationPolicy;
+  termsAndConditions?: {
+    enabled?: boolean;
+    text?: string;
+  };
   currency?: string;
   timeFormat?: '12h' | '24h';
   clientFormConfig?: ClientFormConfig;

@@ -159,6 +159,8 @@ export default function MultiBookingWizard() {
     });
   }, [currentStep]);
 
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
   // Validaciones para navegación
   const canGoNextFromStep0 = selected.length > 0;
 
@@ -180,10 +182,11 @@ export default function MultiBookingWizard() {
   const hasCustomerData = (() => {
     const hasName = customerDetails.name.trim().length > 0;
     const identifierField = organization?.clientFormConfig?.identifierField || 'phone';
-    if (identifierField === 'phone') return hasName && customerDetails.phone.trim().length >= 7;
-    if (identifierField === 'email') return hasName && customerDetails.email.trim().length > 3;
-    if (identifierField === 'documentId') return hasName && (customerDetails.documentId || "").trim().length > 0;
-    return hasName;
+    const termsOk = !organization?.termsAndConditions?.enabled || termsAccepted;
+    if (identifierField === 'phone') return hasName && customerDetails.phone.trim().length >= 7 && termsOk;
+    if (identifierField === 'email') return hasName && customerDetails.email.trim().length > 3 && termsOk;
+    if (identifierField === 'documentId') return hasName && (customerDetails.documentId || "").trim().length > 0 && termsOk;
+    return hasName && termsOk;
   })();
 
   if (!organization?._id) {
@@ -398,6 +401,7 @@ export default function MultiBookingWizard() {
             }}
             selectedServiceIds={selected.map((s) => s.serviceId)}
             onPackageDetected={(pkgId) => setClientPackageId(pkgId)}
+            onTermsAcceptedChange={setTermsAccepted}
           />
         );
       case 4:

@@ -143,6 +143,12 @@ export const schema = z.object({
   enableClassBooking: z.boolean().optional(),
   blockHolidaysForReservations: z.boolean().optional(),
   allowedHolidayDates: z.array(z.string()).optional(),
+  termsAndConditions: z
+    .object({
+      enabled: z.boolean().optional(),
+      text: optionalString,
+    })
+    .optional(),
   welcomeTitle: optionalString,
   welcomeDescription: optionalString,
   homeLayout: z.enum(["modern", "minimal", "cards", "landing"]).optional(),
