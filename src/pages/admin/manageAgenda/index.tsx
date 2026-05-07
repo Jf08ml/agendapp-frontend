@@ -14,6 +14,10 @@ import {
   Checkbox,
   Group,
   Loader,
+  Menu,
+  ActionIcon,
+  Tooltip,
+  Avatar,
   Stack,
   Text,
 } from "@mantine/core";
@@ -58,6 +62,8 @@ import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
+import QuickPermissionsModal from "./components/QuickPermissionsModal";
+import { IconShieldCog } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
 
@@ -113,9 +119,11 @@ const ScheduleView: React.FC = () => {
   const [sendingReminders, setSendingReminders] = useState(false);
 
   const [reminderDate, setReminderDate] = useState<Date | null>(null);
+  const [permissionsEmployee, setPermissionsEmployee] = useState<Employee | null>(null);
 
   // Identificador del usuario actual, con su "profesional" asociado
   const userId = useSelector((state: RootState) => state.auth.userId as string);
+  const role = useSelector((state: RootState) => state.auth.role);
 
   // organizationId del auth slice: se setea junto con los permisos en useAuthInitializer,
   // así que su presencia garantiza que los permisos ya están cargados.
@@ -1121,6 +1129,39 @@ const ScheduleView: React.FC = () => {
             </Button>
           )}
 
+          {role === "admin" && employees.length > 0 && (
+            <Menu position="bottom-end" withArrow shadow="md">
+              <Menu.Target>
+                <Tooltip label="Permisos de profesionales" withArrow>
+                  <ActionIcon variant="subtle" size="md">
+                    <IconShieldCog size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Selecciona un profesional</Menu.Label>
+                {employees.map((emp) => (
+                  <Menu.Item
+                    key={emp._id}
+                    leftSection={
+                      <Avatar
+                        src={emp.profileImage || undefined}
+                        size="xs"
+                        radius="xl"
+                      >
+                        {emp.names?.[0]}
+                      </Avatar>
+                    }
+                    onClick={() => setPermissionsEmployee(emp)}
+                  >
+                    <Text size="sm">{emp.names}</Text>
+                    <Text size="xs" c="dimmed">{emp.position}</Text>
+                  </Menu.Item>
+                ))}
+              </Menu.Dropdown>
+            </Menu>
+          )}
+
           <SchedulerQuickActionsMenu
             onOpenSearch={() => setShowSearchModal(true)}
             onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
@@ -1206,6 +1247,17 @@ const ScheduleView: React.FC = () => {
           />
         )}
       </Suspense>
+
+      <QuickPermissionsModal
+        employee={permissionsEmployee}
+        onClose={() => setPermissionsEmployee(null)}
+        onSaved={(updated) => {
+          setEmployees((prev) =>
+            prev.map((e) => (e._id === updated._id ? updated : e))
+          );
+          setPermissionsEmployee(null);
+        }}
+      />
     </Box>
   );
 };

@@ -19,7 +19,11 @@ import {
   LoadingOverlay,
   SegmentedControl,
   NumberInput,
+  Divider,
+  Badge,
+  Tooltip,
 } from "@mantine/core";
+import { AGENDA_PERMISSIONS } from "../../../../constants/agendaPermissions";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useMediaQuery } from "@mantine/hooks";
 import { IoEyeOff } from "react-icons/io5";
@@ -471,6 +475,59 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
             </Stack>
           </Grid.Col>
         </Grid>
+
+        {/* Permisos de agenda */}
+        {employee && (
+          <>
+            <Divider
+              my="md"
+              label={<Text size="sm" fw={600}>Permisos de agenda</Text>}
+              labelPosition="left"
+            />
+            <Paper withBorder p="md">
+              <Stack gap="sm">
+                {AGENDA_PERMISSIONS.map((perm) => {
+                  const fromRole = (editingEmployee.role?.permissions ?? []).includes(perm.key);
+                  const fromCustom = (editingEmployee.customPermissions ?? []).includes(perm.key);
+                  return (
+                    <Tooltip
+                      key={perm.key}
+                      label="Otorgado por el rol — edita el rol para quitarlo"
+                      disabled={!fromRole}
+                      withArrow
+                      position="right"
+                    >
+                      <Checkbox
+                        label={
+                          <Group gap={6} wrap="nowrap">
+                            <Text size="sm">{perm.label}</Text>
+                            {fromRole && (
+                              <Badge size="xs" variant="light" color="gray">
+                                Rol
+                              </Badge>
+                            )}
+                          </Group>
+                        }
+                        description={perm.description}
+                        checked={fromRole || fromCustom}
+                        disabled={fromRole}
+                        onChange={() => {
+                          const current = editingEmployee.customPermissions ?? [];
+                          setEditingEmployee({
+                            ...editingEmployee,
+                            customPermissions: fromCustom
+                              ? current.filter((p) => p !== perm.key)
+                              : [...current, perm.key],
+                          });
+                        }}
+                      />
+                    </Tooltip>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          </>
+        )}
 
         {/* Footer con botones */}
         <Flex justify="end" gap="sm" mt="xl">
