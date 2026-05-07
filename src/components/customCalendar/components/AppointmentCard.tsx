@@ -1266,7 +1266,6 @@ ${clientServices}`;
         {/* Horario */}
         <Text
           style={{
-            fontFamily: "'Fraunces', serif",
             fontSize: 10,
             fontWeight: 700,
             marginTop: 6,

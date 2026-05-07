@@ -283,7 +283,6 @@ const DayModal: FC<DayModalProps> = ({
           </Text>
           <Text
             style={{
-              fontFamily: "'Fraunces', serif",
               fontSize: isSmallScreen ? 16 : 20,
               fontWeight: 600,
               letterSpacing: -0.4,

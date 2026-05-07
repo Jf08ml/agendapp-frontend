@@ -192,6 +192,9 @@ export const schema = z.object({
       pwaName: optionalString,
       pwaShortName: optionalString,
       pwaDescription: optionalString,
+      fontFamily: z
+        .enum(["inter", "plus-jakarta-sans", "nunito", "dm-sans", "outfit", "manrope"])
+        .optional(),
     })
     .optional(),
 

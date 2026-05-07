@@ -224,7 +224,6 @@ const MonthView: React.FC<MonthViewProps> = ({
                 <Box style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
                   <Text
                     style={{
-                      fontFamily: "'Fraunces', serif",
                       fontSize: isMobile ? 15 : 18,
                       fontWeight: numWeight,
                       color: numColor,

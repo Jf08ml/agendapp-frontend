@@ -323,7 +323,6 @@ const WeekView: FC<WeekViewProps> = ({
                 >
                   <Text
                     style={{
-                      fontFamily: "'Fraunces', serif",
                       fontSize: 14,
                       fontWeight: isCurrentDay ? 700 : 500,
                       color: isCurrentDay ? "#fff" : WEEK_BRAND.ink,

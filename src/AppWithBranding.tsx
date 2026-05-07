@@ -19,6 +19,15 @@ declare global {
   }
 }
 
+const FONT_FAMILY_MAP: Record<string, string> = {
+  "inter": '"Inter", system-ui, -apple-system, sans-serif',
+  "plus-jakarta-sans": '"Plus Jakarta Sans", system-ui, sans-serif',
+  "nunito": '"Nunito", system-ui, sans-serif',
+  "dm-sans": '"DM Sans", system-ui, sans-serif',
+  "outfit": '"Outfit", system-ui, sans-serif',
+  "manrope": '"Manrope", system-ui, sans-serif',
+};
+
 // Función para crear paleta de 10 colores iguales con HEX
 function createCustomPalette(
   hex: string
@@ -120,21 +129,20 @@ export default function AppWithBranding() {
   // El nombre del color primario
   const primaryColor = isHex ? "custom" : "blue";
 
-  // Crea el theme dinámico
+  const resolvedFont =
+    FONT_FAMILY_MAP[organization?.branding?.fontFamily ?? ""] ??
+    FONT_FAMILY_MAP["inter"];
+
   // Crea el theme dinámico
   const theme = createTheme({
-    // Base UI: Inter
-    fontFamily:
-      '"Inter", system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, sans-serif',
+    fontFamily: resolvedFont,
 
     // Monospace (para logs / código)
     fontFamilyMonospace:
       'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 
-    // Títulos / Headings: Poppins
     headings: {
-      fontFamily:
-        '"Poppins", "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      fontFamily: resolvedFont,
       sizes: {
         h1: {
           fontSize: "clamp(2rem, 2.8vw, 3rem)",

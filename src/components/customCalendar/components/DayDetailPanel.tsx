@@ -134,7 +134,6 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
         >
           <Text
             style={{
-              fontFamily: "'Fraunces', serif",
               fontSize: 48,
               fontWeight: 500,
               letterSpacing: -2,
@@ -209,7 +208,6 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
             </Text>
             <Text
               style={{
-                fontFamily: "'Fraunces', serif",
                 fontSize: 22,
                 fontWeight: 600,
                 letterSpacing: -0.5,
@@ -304,7 +302,6 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                   >
                     <Text
                       style={{
-                        fontFamily: "'Fraunces', serif",
                         fontSize: 13,
                         fontWeight: 600,
                         color: BRAND.ink,

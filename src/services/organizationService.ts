@@ -15,6 +15,14 @@ export interface OpeningHours {
   stepMinutes?: number;
 }
 
+export type BrandingFont =
+  | "inter"
+  | "plus-jakarta-sans"
+  | "nunito"
+  | "dm-sans"
+  | "outfit"
+  | "manrope";
+
 export interface Branding {
   primaryColor?: string;
   secondaryColor?: string;
@@ -27,6 +35,7 @@ export interface Branding {
   pwaIcon?: string;
   footerTextColor?: string;
   manifest?: object;
+  fontFamily?: BrandingFont;
 }
 
 export interface ReminderSettings {
