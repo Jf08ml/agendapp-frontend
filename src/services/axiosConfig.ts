@@ -10,27 +10,32 @@ const TENANT_HOSTNAME = window.location.hostname;
 
 // Control de refresh token en progreso
 let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshSubscribers: Array<(token: string | null) => void> = [];
+let refreshDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
 
-const subscribeTokenRefresh = (callback: (token: string) => void) => {
+const REFRESH_TIMEOUT_MS = 8_000; // 8 segundos máximo para renovar el token
+
+const subscribeTokenRefresh = (callback: (token: string | null) => void) => {
   refreshSubscribers.push(callback);
 };
 
 const notifyTokenRefresh = (token: string) => {
-  refreshSubscribers.forEach((callback) => callback(token));
+  if (refreshDeadlineTimer) clearTimeout(refreshDeadlineTimer);
+  refreshDeadlineTimer = null;
+  refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
 };
 
-// Notificar a los subscribers que el refresh falló (desbloquear peticiones)
+// Desbloquea todos los subscribers con null → cada uno decide si reintentar o fallar
 const notifyTokenRefreshFailed = () => {
-  // Resolver con el token actual (o vacío) para desbloquear las peticiones
-  const currentToken = localStorage.getItem("app_token") || "";
-  refreshSubscribers.forEach((callback) => callback(currentToken));
+  if (refreshDeadlineTimer) clearTimeout(refreshDeadlineTimer);
+  refreshDeadlineTimer = null;
+  refreshSubscribers.forEach((cb) => cb(null));
   refreshSubscribers = [];
 };
 
-// Instancia dedicada para refresh (sin interceptores de auth para evitar deadlock)
-const refreshAxios = axios.create({ baseURL: API_BASE_URL });
+// Instancia dedicada para refresh — timeout corto para no bloquear el queue
+const refreshAxios = axios.create({ baseURL: API_BASE_URL, timeout: REFRESH_TIMEOUT_MS });
 
 const addAuthHeader = (api: AxiosInstance) => {
   api.interceptors.request.use((config) => {
@@ -68,7 +73,16 @@ const addAuthHeader = (api: AxiosInstance) => {
         if (timeUntilExpiry < refreshThreshold && timeUntilExpiry > 0) {
           if (!isRefreshing) {
             isRefreshing = true;
-            // Usar refreshAxios directamente para evitar deadlock con interceptores
+
+            // Válvula de seguridad: si tras REFRESH_TIMEOUT_MS + 1s el refresh sigue
+            // sin resolverse (p.ej. red colgada), desbloqueamos el queue para que las
+            // requests no queden atrapadas indefinidamente.
+            refreshDeadlineTimer = setTimeout(() => {
+              console.warn("[Auth] Refresh timeout — desbloqueando queue");
+              notifyTokenRefreshFailed();
+              isRefreshing = false;
+            }, REFRESH_TIMEOUT_MS + 1_000);
+
             refreshAxios.post("/refresh", {}, {
               headers: { Authorization: `Bearer ${token}` }
             })
@@ -84,8 +98,7 @@ const addAuthHeader = (api: AxiosInstance) => {
                   notifyTokenRefreshFailed();
                 }
               })
-              .catch((error) => {
-                console.error("Error renovando token:", error);
+              .catch(() => {
                 notifyTokenRefreshFailed();
               })
               .finally(() => {
@@ -93,12 +106,17 @@ const addAuthHeader = (api: AxiosInstance) => {
               });
           }
 
-          // Si ya estamos renovando, esperar a que termine
+          // Encolar la request actual hasta que el refresh termine
           if (isRefreshing) {
-            return new Promise((resolve) => {
-              subscribeTokenRefresh((newToken: string) => {
-                config.headers["Authorization"] = `Bearer ${newToken}`;
-                resolve(config);
+            return new Promise((resolve, reject) => {
+              subscribeTokenRefresh((newToken) => {
+                if (newToken) {
+                  config.headers["Authorization"] = `Bearer ${newToken}`;
+                  resolve(config);
+                } else {
+                  // Refresh falló: dejar pasar con el token actual (el 401 lo manejará)
+                  resolve(config);
+                }
               });
             });
           }
@@ -132,22 +150,44 @@ const addNoAuthInterceptor = (api: AxiosInstance) => {
   return api;
 };
 
+const forceLogout = () => {
+  const publicPaths = ["/login", "/login-admin", "/planes", "/servicios-precios", "/"];
+  const currentPath = window.location.pathname;
+  const isPublic = publicPaths.some((p) => currentPath === p || currentPath.startsWith(p));
+
+  localStorage.removeItem("app_token");
+  localStorage.removeItem("app_userId");
+  localStorage.removeItem("app_role");
+  localStorage.removeItem("app_token_expires_at");
+  localStorage.removeItem("app_dev_slug");
+
+  if (!isPublic && !currentPath.includes("/login")) {
+    window.dispatchEvent(
+      new CustomEvent("session-expired", {
+        detail: {
+          message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+          type: "token-expired",
+        },
+      })
+    );
+    setTimeout(() => {
+      window.location.href = "/login-admin";
+    }, 2000);
+  }
+};
+
 const addMembershipInterceptor = (api: AxiosInstance) => {
   api.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
       // Detectar error 403 por membresía suspendida
       if (
         error.response?.status === 403 &&
         error.response?.data?.reason === "membership_suspended"
       ) {
-        const event = new CustomEvent("membership-suspended", {
-          detail: {
-            message: error.response.data.message,
-            orgId: error.response.data.orgId,
-          },
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent("membership-suspended", {
+          detail: { message: error.response.data.message, orgId: error.response.data.orgId },
+        }));
       }
 
       // Detectar error 403 por membresía past_due (read-only)
@@ -155,13 +195,9 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         error.response?.status === 403 &&
         error.response?.data?.reason === "membership_past_due"
       ) {
-        const event = new CustomEvent("membership-past-due", {
-          detail: {
-            message: error.response.data.message,
-            data: error.response.data.data,
-          },
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent("membership-past-due", {
+          detail: { message: error.response.data.message, data: error.response.data.data },
+        }));
       }
 
       // Detectar error 403 por no tener membresía activa
@@ -169,47 +205,59 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
         error.response?.status === 403 &&
         error.response?.data?.reason === "no_active_membership"
       ) {
-        const event = new CustomEvent("membership-suspended", {
-          detail: {
-            message: error.response.data.message,
-          },
-        });
-        window.dispatchEvent(event);
+        window.dispatchEvent(new CustomEvent("membership-suspended", {
+          detail: { message: error.response.data.message },
+        }));
       }
-      
-      // Detectar error 401 por token expirado o inválido
-      if (error.response?.status === 401) {
-        // Limpiar datos de autenticación
-        localStorage.removeItem("app_token");
-        localStorage.removeItem("app_userId");
-        localStorage.removeItem("app_role");
-        localStorage.removeItem("app_token_expires_at");
-        localStorage.removeItem("app_dev_slug");
-        
-        // Solo redirigir a login si estamos en rutas protegidas
-        // No redirigir si estamos en landing, login, o rutas públicas
-        const publicPaths = ['/login', '/login-admin', '/planes', '/servicios-precios', '/'];
-        const currentPath = window.location.pathname;
-        
-        const isPublicPath = publicPaths.some(path => currentPath === path || currentPath.startsWith(path));
-        
-        if (!isPublicPath && !currentPath.includes('/login')) {
-          // Dispatch evento para mostrar notificación
-          const event = new CustomEvent("session-expired", {
-            detail: {
-              message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
-              type: "token-expired",
-            },
+
+      // 401: intentar refresh antes de hacer logout.
+      // _retry evita un loop infinito si el propio endpoint de refresh devuelve 401.
+      if (error.response?.status === 401 && !error.config?._retry) {
+        const token = localStorage.getItem("app_token");
+
+        if (token && !isRefreshing) {
+          error.config._retry = true;
+          isRefreshing = true;
+
+          try {
+            const res = await refreshAxios.post(
+              "/refresh",
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const data = res.data?.data;
+            if (data?.token) {
+              localStorage.setItem("app_token", data.token);
+              if (data.expiresAt) {
+                localStorage.setItem("app_token_expires_at", data.expiresAt);
+              }
+              notifyTokenRefresh(data.token);
+              // Reintentar la request original con el nuevo token
+              error.config.headers["Authorization"] = `Bearer ${data.token}`;
+              return api(error.config);
+            }
+          } catch {
+            notifyTokenRefreshFailed();
+          } finally {
+            isRefreshing = false;
+          }
+        } else if (token && isRefreshing) {
+          // Refresh ya en curso — encolar y reintentar cuando termine
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh((newToken) => {
+              if (newToken) {
+                error.config.headers["Authorization"] = `Bearer ${newToken}`;
+                resolve(api(error.config));
+              } else {
+                reject(error);
+              }
+            });
           });
-          window.dispatchEvent(event);
-          
-          // Redirigir después de un breve delay para que se vea la notificación
-          setTimeout(() => {
-            window.location.href = '/login-admin';
-          }, 2000);
         }
+
+        forceLogout();
       }
-      
+
       return Promise.reject(error);
     }
   );
