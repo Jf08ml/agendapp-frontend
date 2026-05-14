@@ -27,6 +27,7 @@ import {
   IconCalendarRepeat,
   IconCalendarOff,
   IconInfoCircle,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { BsWhatsapp } from "react-icons/bs";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -36,6 +37,10 @@ import { billingShort } from "../utils/billingCycle";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useNavigate } from "react-router-dom";
+
+const isPwa =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 
 interface PaymentMethodsModalProps {
   opened: boolean;
@@ -194,20 +199,39 @@ export function PaymentMethodsModal({
                 </Alert>
               )}
 
-              {paypalError && (
-                <Alert color="red" variant="light" icon={<IconInfoCircle size={16} />}>
-                  {paypalError}
-                </Alert>
-              )}
-
-              {processing ? (
-                <Center py="sm">
-                  <Stack align="center" gap="xs">
-                    <Loader size="sm" />
-                    <Text size="sm" c="dimmed">Procesando tu pago...</Text>
-                  </Stack>
-                </Center>
+              {isPwa ? (
+                <Stack gap="xs" align="center" py="sm">
+                  <Text size="sm" c="dimmed" ta="center">
+                    Para pagar con PayPal abre la página en tu navegador.
+                  </Text>
+                  <Button
+                    component="a"
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    leftSection={<IconExternalLink size={16} />}
+                    variant="light"
+                    color="blue"
+                    fullWidth
+                  >
+                    Abrir en el navegador
+                  </Button>
+                </Stack>
               ) : (
+                <>
+                  {paypalError && (
+                    <Alert color="red" variant="light" icon={<IconInfoCircle size={16} />}>
+                      {paypalError}
+                    </Alert>
+                  )}
+                  {processing ? (
+                    <Center py="sm">
+                      <Stack align="center" gap="xs">
+                        <Loader size="sm" />
+                        <Text size="sm" c="dimmed">Procesando tu pago...</Text>
+                      </Stack>
+                    </Center>
+                  ) : (
                 <PayPalScriptProvider key={payMode} options={sdkOptions}>
                   {payMode === "subscription" ? (
                     <PayPalButtons
@@ -241,6 +265,8 @@ export function PaymentMethodsModal({
                     />
                   )}
                 </PayPalScriptProvider>
+                  )}
+                </>
               )}
             </Stack>
           </Paper>

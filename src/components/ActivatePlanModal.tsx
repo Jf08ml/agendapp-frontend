@@ -35,6 +35,12 @@ import { billingShort } from "../utils/billingCycle";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useNavigate } from "react-router-dom";
+import { IconExternalLink } from "@tabler/icons-react";
+
+// Detecta si la app corre instalada como PWA (standalone) en Android o iOS
+const isPwa =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 
 interface Plan {
   _id: string;
@@ -191,54 +197,74 @@ export function ActivatePlanModal({ opened, onClose, plan, modalTitle = "Activar
                 </Alert>
               )}
 
-              {paypalError && (
-                <Alert color="red" variant="light" icon={<IconInfoCircle size={16} />}>
-                  {paypalError}
-                </Alert>
-              )}
-
-              {processing ? (
-                <Center py="sm">
-                  <Stack align="center" gap="xs">
-                    <Loader size="sm" />
-                    <Text size="sm" c="dimmed">Procesando tu pago...</Text>
-                  </Stack>
-                </Center>
+              {isPwa ? (
+                <Stack gap="xs" align="center" py="sm">
+                  <Text size="sm" c="dimmed" ta="center">
+                    Para pagar con PayPal abre la página en tu navegador.
+                  </Text>
+                  <Button
+                    component="a"
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    leftSection={<IconExternalLink size={16} />}
+                    variant="light"
+                    color="blue"
+                    fullWidth
+                  >
+                    Abrir en el navegador
+                  </Button>
+                </Stack>
               ) : (
-                // key fuerza remount del provider al cambiar intent (subscription vs capture)
-                <PayPalScriptProvider key={payMode} options={sdkOptions}>
-                  {payMode === "subscription" ? (
-                    <PayPalButtons
-                      style={{ layout: "vertical", label: "subscribe" }}
-                      createSubscription={(_data, actions) =>
-                        actions.subscription.create({ plan_id: plan.paypalPlanId! })
-                      }
-                      onApprove={(data) => handleSubscriptionApprove(data as { subscriptionID: string | null })}
-                      onError={() => setPaypalError("Ocurrió un error con PayPal. Intenta de nuevo.")}
-                      onCancel={() => setPaypalError(null)}
-                    />
-                  ) : (
-                    <PayPalButtons
-                      style={{ layout: "vertical", label: "pay" }}
-                      createOrder={(_data, actions) =>
-                        actions.order.create({
-                          intent: "CAPTURE" as const,
-                          purchase_units: [
-                            {
-                              amount: {
-                                currency_code: plan.currency.toUpperCase(),
-                                value: plan.price.toFixed(2),
-                              },
-                            },
-                          ],
-                        })
-                      }
-                      onApprove={(data) => handleOrderApprove(data)}
-                      onError={(err) => { console.error("[PayPal] onError pago único:", err); setPaypalError("Ocurrió un error con PayPal. Intenta de nuevo."); }}
-                      onCancel={() => setPaypalError(null)}
-                    />
+                <>
+                  {paypalError && (
+                    <Alert color="red" variant="light" icon={<IconInfoCircle size={16} />}>
+                      {paypalError}
+                    </Alert>
                   )}
-                </PayPalScriptProvider>
+                  {processing ? (
+                    <Center py="sm">
+                      <Stack align="center" gap="xs">
+                        <Loader size="sm" />
+                        <Text size="sm" c="dimmed">Procesando tu pago...</Text>
+                      </Stack>
+                    </Center>
+                  ) : (
+                    <PayPalScriptProvider key={payMode} options={sdkOptions}>
+                      {payMode === "subscription" ? (
+                        <PayPalButtons
+                          style={{ layout: "vertical", label: "subscribe" }}
+                          createSubscription={(_data, actions) =>
+                            actions.subscription.create({ plan_id: plan.paypalPlanId! })
+                          }
+                          onApprove={(data) => handleSubscriptionApprove(data as { subscriptionID: string | null })}
+                          onError={() => setPaypalError("Ocurrió un error con PayPal. Intenta de nuevo.")}
+                          onCancel={() => setPaypalError(null)}
+                        />
+                      ) : (
+                        <PayPalButtons
+                          style={{ layout: "vertical", label: "pay" }}
+                          createOrder={(_data, actions) =>
+                            actions.order.create({
+                              intent: "CAPTURE" as const,
+                              purchase_units: [
+                                {
+                                  amount: {
+                                    currency_code: plan.currency.toUpperCase(),
+                                    value: plan.price.toFixed(2),
+                                  },
+                                },
+                              ],
+                            })
+                          }
+                          onApprove={(data) => handleOrderApprove(data)}
+                          onError={(err) => { console.error("[PayPal] onError pago único:", err); setPaypalError("Ocurrió un error con PayPal. Intenta de nuevo."); }}
+                          onCancel={() => setPaypalError(null)}
+                        />
+                      )}
+                    </PayPalScriptProvider>
+                  )}
+                </>
               )}
             </Stack>
           </Paper>
