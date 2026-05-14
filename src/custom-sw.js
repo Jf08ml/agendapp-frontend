@@ -1,6 +1,6 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
-import { NetworkFirst, CacheFirst } from "workbox-strategies";
+import { NetworkFirst, NetworkOnly, CacheFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { clientsClaim } from 'workbox-core';
 
@@ -16,6 +16,17 @@ console.log('[SW] Service Worker Version:', SW_VERSION);
 
 // Inyección de manifiesto (SOLO UNA REFERENCIA A self.__WB_MANIFEST)
 precacheAndRoute(self.__WB_MANIFEST);
+
+// PayPal y dominios de pago: siempre ir a la red, nunca usar caché.
+// El SDK de PayPal abre popups/iframes y requiere cookies de terceros;
+// cualquier intercepción del SW rompe el flujo de autenticación en PWA.
+registerRoute(
+  ({ url }) =>
+    url.hostname.endsWith("paypal.com") ||
+    url.hostname.endsWith("paypalobjects.com") ||
+    url.hostname.endsWith("paypal.me"),
+  new NetworkOnly()
+);
 
 // Manejo de navegación para SPA - NetworkFirst para siempre obtener HTML fresco
 // Solo usa caché como fallback cuando está offline
