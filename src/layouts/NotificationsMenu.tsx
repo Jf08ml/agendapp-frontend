@@ -249,7 +249,7 @@ export default function NotificationsMenu({
     [notifications],
   );
 
-  const formatNotificationTime = (dateStr: string): string => {
+  const formatNotificationTime = (dateStr: string | Date): string => {
     const date = new Date(dateStr);
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
