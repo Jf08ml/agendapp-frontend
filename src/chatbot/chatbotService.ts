@@ -12,7 +12,7 @@ export interface ChatResponse {
   invalidates: string[];
 }
 
-export const sendMessage = async (messages: ChatMessage[]): Promise<ChatResponse> => {
-  const { data } = await apiGeneral.post("/chat", { messages });
+export const sendMessage = async (messages: ChatMessage[], sessionId?: string): Promise<ChatResponse> => {
+  const { data } = await apiGeneral.post("/chat", { messages, sessionId });
   return { reply: data.data.reply, invalidates: data.data.invalidates ?? [] };
 };

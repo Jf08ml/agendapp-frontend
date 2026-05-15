@@ -36,12 +36,13 @@ import { createMultipleReservations } from "../../services/reservationService";
 
 interface BookingChatPanelProps {
   onBack: () => void;
+  preselectedService?: { _id: string; name: string };
 }
 
 const GREETING =
   "¡Hola! Soy tu asistente de reservas. ¿En qué puedo ayudarte hoy? Puedo ayudarte a reservar un servicio, consultar disponibilidad o responder tus dudas. 😊";
 
-export default function BookingChatPanel({ onBack }: BookingChatPanelProps) {
+export default function BookingChatPanel({ onBack, preselectedService }: BookingChatPanelProps) {
   const color =
     useSelector(
       (s: RootState) => s.organization.organization?.branding?.primaryColor
@@ -63,6 +64,8 @@ export default function BookingChatPanel({ onBack }: BookingChatPanelProps) {
   const [reservationError, setReservationError] = useState<string | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const sessionId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const scrollToBottom = () => {
     if (viewportRef.current) {
@@ -76,6 +79,21 @@ export default function BookingChatPanel({ onBack }: BookingChatPanelProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading, pendingPayload]);
+
+  // Re-enfocar el input automáticamente cuando termina de cargar
+  useEffect(() => {
+    if (!loading) inputRef.current?.focus();
+  }, [loading]);
+
+  // Pre-llenar el input si viene con servicio seleccionado desde la landing
+  useEffect(() => {
+    if (preselectedService) {
+      setInput(`Quiero reservar ${preselectedService.name}, `);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  // Solo al montar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -93,7 +111,7 @@ export default function BookingChatPanel({ onBack }: BookingChatPanelProps) {
         (m) => !(m.role === "assistant" && m.content === GREETING)
       );
 
-      const res = await sendBookingMessage(history);
+      const res = await sendBookingMessage(history, sessionId.current);
 
       const assistantMsg: BookingChatMessage = {
         role: "assistant",
@@ -330,6 +348,7 @@ export default function BookingChatPanel({ onBack }: BookingChatPanelProps) {
       <Box px="md" py="sm" style={{ flexShrink: 0 }}>
         <Flex gap="xs" align="center">
           <TextInput
+            ref={inputRef}
             flex={1}
             placeholder="Escribe un mensaje..."
             value={input}

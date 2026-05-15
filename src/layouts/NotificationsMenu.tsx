@@ -249,6 +249,19 @@ export default function NotificationsMenu({
     [notifications],
   );
 
+  const formatNotificationTime = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86_400_000);
+    const notifDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const time = date.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+    if (notifDay.getTime() === today.getTime()) return `Hoy ${time}`;
+    if (notifDay.getTime() === yesterday.getTime()) return `Ayer ${time}`;
+    const day = date.toLocaleDateString("es", { day: "numeric", month: "short" });
+    return `${day} ${time}`;
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "reservation":
@@ -457,13 +470,17 @@ export default function NotificationsMenu({
                     {getNotificationIcon(notification.type)}
                   </Avatar>
 
-                  <div style={{ flex: 1 }}>
-                    <Text
-                      fw={notification.status === "unread" ? 700 : 500}
-                      size="sm"
-                    >
-                      {notification.title}
-                    </Text>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Flex justify="space-between" align="baseline" gap={4}>
+                      <Text fw={notification.status === "unread" ? 700 : 500} size="sm" style={{ minWidth: 0 }} lineClamp={1}>
+                        {notification.title}
+                      </Text>
+                      {notification.createdAt && (
+                        <Text fz={10} c="dimmed" style={{ flexShrink: 0 }}>
+                          {formatNotificationTime(notification.createdAt)}
+                        </Text>
+                      )}
+                    </Flex>
                     <Text
                       c={notification.status === "unread" ? "dark" : "dimmed"}
                       size="xs"

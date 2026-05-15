@@ -360,6 +360,7 @@ function AppContent() {
             size={isMobile ? "100%" : 380}
             withCloseButton={false}
             padding={0}
+            keepMounted
             styles={{ body: { height: "100%", overflow: "hidden", padding: 0 } }}
           >
             <ChatPanel

@@ -307,9 +307,15 @@ export default function MultiBookingWizard() {
   }
 
   if (mode === "chat") {
+    const preselectedService = preselectedServiceId
+      ? services.find((s) => s._id === preselectedServiceId)
+      : undefined;
     return (
       <Card withBorder radius="md" p={0} style={{ overflow: "hidden" }}>
-        <BookingChatPanel onBack={() => setMode("choice")} />
+        <BookingChatPanel
+          onBack={() => setMode("choice")}
+          preselectedService={preselectedService}
+        />
       </Card>
     );
   }

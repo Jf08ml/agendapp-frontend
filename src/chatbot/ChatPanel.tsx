@@ -12,9 +12,10 @@ import {
   CloseButton,
   Divider,
   Badge,
+  Tooltip,
   rem,
 } from "@mantine/core";
-import { IconSend, IconRobot, IconFlask } from "@tabler/icons-react";
+import { IconSend, IconRobot, IconFlask, IconMessagePlus } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "./useChatbot";
 import { useSelector } from "react-redux";
@@ -28,7 +29,7 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStartDone }: ChatPanelProps) {
-  const { messages, loading, error, send } = useChatbot({ onInvalidate, autoStart, onAutoStartDone });
+  const { messages, loading, error, send, reset } = useChatbot({ onInvalidate, autoStart, onAutoStartDone });
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const color = useSelector((s: RootState) => s.organization.organization?.branding?.primaryColor || "#1C3461");
@@ -62,7 +63,20 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
             Beta
           </Badge>
         </Flex>
-        <CloseButton onClick={onClose} color="white" variant="transparent" />
+        <Flex gap={4} align="center">
+          <Tooltip label="Nueva conversación" withArrow position="bottom">
+            <ActionIcon
+              variant="transparent"
+              color="white"
+              onClick={reset}
+              disabled={messages.length <= 1 || loading}
+              aria-label="Nueva conversación"
+            >
+              <IconMessagePlus size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <CloseButton onClick={onClose} color="white" variant="transparent" />
+        </Flex>
       </Flex>
 
       {/* Aviso beta */}

@@ -19,6 +19,7 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone }: UseChat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoStarted = useRef(false);
+  const sessionId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   const sendInternal = useCallback(async (text: string, isAuto = false) => {
     if (!text.trim() || loading) return;
@@ -33,7 +34,7 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone }: UseChat
         setMessages((prev) => { resolve(prev); return prev; });
       });
       const toSend = current.filter((m) => m.role === "user" || m.role === "assistant");
-      const { reply, invalidates } = await sendMessage(toSend);
+      const { reply, invalidates } = await sendMessage(toSend, sessionId.current);
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
       if (invalidates.length > 0) onInvalidate?.(invalidates);
       if (isAuto) onAutoStartDone?.();
@@ -63,10 +64,11 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone }: UseChat
   }, [autoStart, messages.length]);
 
   const reset = useCallback(() => {
+    sessionId.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setMessages(autoStart ? [] : [WELCOME_MESSAGE]);
     setError(null);
     autoStarted.current = false;
   }, [autoStart]);
 
-  return { messages, loading, error, send, reset };
+  return { messages, loading, error, send, reset, sessionId: sessionId.current };
 };

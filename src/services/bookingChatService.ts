@@ -48,9 +48,10 @@ export interface BookingPayload {
 }
 
 export const sendBookingMessage = async (
-  messages: BookingChatMessage[]
+  messages: BookingChatMessage[],
+  sessionId?: string
 ): Promise<BookingChatResponse> => {
-  const { data } = await api.post("/", { messages });
+  const { data } = await api.post("/", { messages, sessionId });
   return {
     reply: data.data.reply,
     bookingPayload: data.data.bookingPayload ?? null,
