@@ -10,12 +10,12 @@ import {
   rem,
   Avatar,
 } from "@mantine/core";
-import { FaUserShield, FaSignOutAlt } from "react-icons/fa";
 import { MdInstallMobile, MdSystemUpdateAlt } from "react-icons/md";
 import { IconRefresh } from "@tabler/icons-react";
+import { FaSignOutAlt, FaUserShield } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "../app/store";
+import { RootState, AppDispatch } from "../app/store";
 import { logout } from "../features/auth/sliceAuth";
 import { useServiceWorkerUpdate } from "../hooks/useServiceWorkerUpdate";
 
@@ -31,17 +31,14 @@ interface Version {
 }
 
 async function clearSiteData() {
-  // Desregistrar todos los Service Workers
   if ("serviceWorker" in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((r) => r.unregister()));
   }
-  // Limpiar todas las caches del Cache API
   if ("caches" in window) {
     const names = await caches.keys();
     await Promise.all(names.map((n) => caches.delete(n)));
   }
-  // Recargar desde el servidor
   window.location.reload();
 }
 
@@ -52,41 +49,32 @@ export default function Footer() {
   const [clearing, setClearing] = useState(false);
 
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
 
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
-  const organization = useSelector(
-    (s: RootState) => s.organization.organization
-  );
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const { name, branding } = organization || {};
-  const footerColor =
-    branding?.primaryColor || branding?.themeColor || "#1C3461";
+  const footerColor = branding?.primaryColor || branding?.themeColor || "#1C3461";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
 
-  const {
-    updateAvailable,
-    applyUpdate,
-    checkForUpdates,
-    isUpdateSupported,
-  } = useServiceWorkerUpdate();
+  const { updateAvailable, applyUpdate } =
+    useServiceWorkerUpdate();
 
-  // Obtener versión de la app
   useEffect(() => {
     const fetchVersion = async () => {
       try {
-        const response = await fetch('/version.json?_=' + Date.now());
+        const response = await fetch("/version.json?_=" + Date.now());
         const version: Version = await response.json();
         setAppVersion(version);
-      } catch (error) {
-        console.error('Error fetching version:', error);
+      } catch {
+        // silencioso
       }
     };
     void fetchVersion();
   }, []);
 
-  // Captura del evento PWA
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -94,10 +82,7 @@ export default function Footer() {
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     return () =>
-      window.removeEventListener(
-        "beforeinstallprompt",
-        handleBeforeInstallPrompt
-      );
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallClick = async () => {
@@ -116,10 +101,6 @@ export default function Footer() {
     }
   };
 
-  const handleCheckUpdates = () => {
-    void checkForUpdates();
-  };
-
   const handleClearCache = () => {
     if (!confirm("Esto limpiará la caché y recargará la página. ¿Continuar?")) return;
     setClearing(true);
@@ -131,51 +112,59 @@ export default function Footer() {
       component="footer"
       style={{
         height: "100%",
-        background: `linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06)), ${footerColor}`,
+        background: `linear-gradient(0deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08)), ${footerColor}`,
         color: textColor,
+        borderTop: `1px solid rgba(255,255,255,0.1)`,
       }}
     >
-      <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
-        {/* IZQUIERDA: marca y versión */}
-        <Group gap="xs" wrap="nowrap" pl="xs">
-          {logoUrl && (
-            <Avatar
-              src={logoUrl}
-              alt={name || "Logo"}
-              size={22}
-              radius="md"
-              styles={{
-                root: {
-                  background: "#fff",
-                  borderRadius: 6,
-                },
-                image: {
-                  objectFit: "contain",
-                },
-              }}
-            />
-          )}
-          <Box>
-            <Text size="xs" fw={600} style={{ color: textColor, lineHeight: 1.2 }}>
-              © {name || "Organización"}
+      <Group
+        justify="space-between"
+        align="center"
+        wrap="nowrap"
+        gap="xs"
+        px="sm"
+        style={{ height: "100%" }}
+      >
+        {/* IZQUIERDA: logo + nombre + copyright + links legales */}
+        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0, flex: "1 1 auto" }}>
+          <Avatar
+            src={logoUrl}
+            alt={name || "Logo"}
+            size={22}
+            radius="md"
+            styles={{
+              root: { background: "#fff", borderRadius: 6, flexShrink: 0 },
+              image: { objectFit: "contain" },
+            }}
+          />
+          <Text
+            fz="xs"
+            fw={600}
+            style={{ color: textColor, lineHeight: 1, whiteSpace: "nowrap" }}
+          >
+            © {name || "Organización"}
+          </Text>
+
+          {appVersion && (
+            <Text
+              fz={rem(9)}
+              style={{ color: textColor, opacity: 0.55, lineHeight: 1, whiteSpace: "nowrap" }}
+              visibleFrom="sm"
+            >
+              v{appVersion.buildDate}
             </Text>
-            {appVersion && (
-              <Text size="9px" opacity={0.7} style={{ color: textColor, lineHeight: 1 }}>
-                v{appVersion.buildDate}
-              </Text>
-            )}
-          </Box>
+          )}
         </Group>
 
-        {/* CENTRO: instalación PWA, actualización o limpiar caché */}
-        <Group gap={6} wrap="nowrap">
-          {deferredPrompt ? (
+        {/* CENTRO: botones PWA */}
+        <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+          {deferredPrompt && (
             <Button
               onClick={handleInstallClick}
               size="xs"
-              leftSection={<MdInstallMobile size={14} />}
+              leftSection={<MdInstallMobile size={13} />}
               style={{
-                backgroundColor: footerColor,
+                backgroundColor: "rgba(255,255,255,0.12)",
                 color: textColor,
                 border: `1px solid rgba(255,255,255,0.2)`,
                 height: rem(28),
@@ -184,38 +173,24 @@ export default function Footer() {
             >
               Instalar app
             </Button>
-          ) : null}
+          )}
 
-          {isUpdateSupported ? (
-            updateAvailable ? (
-              <Button
-                onClick={applyUpdate}
-                size="xs"
-                leftSection={<MdSystemUpdateAlt size={14} />}
-                style={{
-                  backgroundColor: footerColor,
-                  color: textColor,
-                  border: `1px solid rgba(255,255,255,0.2)`,
-                  height: rem(28),
-                  paddingInline: rem(10),
-                }}
-              >
-                Actualizar ahora
-              </Button>
-            ) : (
-              <Tooltip label="Buscar actualizaciones" withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  onClick={handleCheckUpdates}
-                  radius="xl"
-                  style={{ color: textColor }}
-                  aria-label="Buscar actualizaciones"
-                >
-                  <MdSystemUpdateAlt size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )
-          ) : null}
+          {updateAvailable && (
+            <Button
+              onClick={applyUpdate}
+              size="xs"
+              leftSection={<MdSystemUpdateAlt size={13} />}
+              style={{
+                backgroundColor: "rgba(255,255,255,0.12)",
+                color: textColor,
+                border: `1px solid rgba(255,255,255,0.2)`,
+                height: rem(28),
+                paddingInline: rem(10),
+              }}
+            >
+              Actualizar
+            </Button>
+          )}
 
           <Tooltip label="Limpiar caché del sitio" withArrow>
             <ActionIcon
@@ -226,30 +201,34 @@ export default function Footer() {
               style={{ color: textColor }}
               aria-label="Limpiar caché"
             >
-              <IconRefresh size={18} />
+              <IconRefresh size={17} />
             </ActionIcon>
           </Tooltip>
         </Group>
 
-        {/* DERECHA: acción auth */}
-        <Tooltip
-          label={isAuthenticated ? "Cerrar sesión" : "Entrar al panel"}
-          withArrow
-        >
-          <ActionIcon
-            variant="subtle"
-            aria-label={isAuthenticated ? "Cerrar sesión" : "Entrar"}
-            onClick={handleAuthAction}
-            radius="xl"
-            style={{ color: textColor }}
+        {/* DERECHA: auth */}
+        <Group gap={8} wrap="nowrap" style={{ flexShrink: 0 }}>
+
+          {/* Auth button */}
+          <Tooltip
+            label={isAuthenticated ? "Cerrar sesión" : "Acceso staff"}
+            withArrow
           >
-            {isAuthenticated ? (
-              <FaSignOutAlt size={18} />
-            ) : (
-              <FaUserShield size={18} />
-            )}
-          </ActionIcon>
-        </Tooltip>
+            <ActionIcon
+              variant="subtle"
+              aria-label={isAuthenticated ? "Cerrar sesión" : "Acceso staff"}
+              onClick={handleAuthAction}
+              radius="xl"
+              style={{ color: textColor }}
+            >
+              {isAuthenticated ? (
+                <FaSignOutAlt size={15} />
+              ) : (
+                <FaUserShield size={15} />
+              )}
+            </ActionIcon>
+          </Tooltip>
+        </Group>
       </Group>
     </Box>
   );
