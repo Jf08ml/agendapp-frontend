@@ -108,7 +108,7 @@ const addAuthHeader = (api: AxiosInstance) => {
 
           // Encolar la request actual hasta que el refresh termine
           if (isRefreshing) {
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
               subscribeTokenRefresh((newToken) => {
                 if (newToken) {
                   config.headers["Authorization"] = `Bearer ${newToken}`;
