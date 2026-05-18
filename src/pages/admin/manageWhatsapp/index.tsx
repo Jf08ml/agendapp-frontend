@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, {  useState } from "react";
+import React, { useState } from "react";
 import {
   Anchor,
   Badge,
@@ -16,6 +16,7 @@ import {
   Progress,
   SegmentedControl,
   Stack,
+  Switch,
   Text,
   TextInput,
   ThemeIcon,
@@ -23,8 +24,8 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { QRCodeCanvas } from "qrcode.react";
-import { useSelector } from "react-redux";
-import { RootState } from "../../../app/store";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState, AppDispatch } from "../../../app/store";
 import {
   BiCopy,
   BiInfoCircle,
@@ -35,6 +36,9 @@ import {
 } from "react-icons/bi";
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import type { WaCode } from "../../../utils/waRealtime";
+import { updateOrganization } from "../../../services/organizationService";
+import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
+import { notifications } from "@mantine/notifications";
 // import { computePrimaryCta } from "../../../utils/waUi";
 
 // -----------------------------
@@ -101,9 +105,15 @@ const WhatsappOrgSession: React.FC = () => {
   const organization = useSelector(
     (s: RootState) => s.organization.organization
   );
+  const dispatch = useDispatch<AppDispatch>();
 
   const initialClientId =
     (organization as any)?.clientIdWhatsapp || organization?._id || "";
+
+  // Estado del panel de Agente IA
+  const [waPhone, setWaPhone] = useState<string>((organization as any)?.waPhone ?? "");
+  const [waAgentEnabled, setWaAgentEnabled] = useState<boolean>((organization as any)?.waAgentEnabled ?? false);
+  const [savingAgent, setSavingAgent] = useState(false);
 
   // Hook centralizado
   const {
@@ -141,6 +151,20 @@ const WhatsappOrgSession: React.FC = () => {
   // Estado local para UI de conexión
   const [connectMode, setConnectMode] = useState<"qr" | "pairing">("qr");
   const [pairingPhone, setPairingPhone] = useState("");
+
+  const handleSaveAgentConfig = async () => {
+    if (!organization?._id) return;
+    setSavingAgent(true);
+    try {
+      await updateOrganization(organization._id, { waPhone: waPhone.trim() || null, waAgentEnabled });
+      await dispatch(fetchOrganizationConfig());
+      notifications.show({ color: "green", message: "Configuración del agente guardada." });
+    } catch {
+      notifications.show({ color: "red", message: "Error al guardar. Intenta de nuevo." });
+    } finally {
+      setSavingAgent(false);
+    }
+  };
 
   const ui = UI_STATUS[code];
 
@@ -432,6 +456,36 @@ const WhatsappOrgSession: React.FC = () => {
             </Button>
           </Group>
         )}
+
+        <Divider my="xs" />
+
+        {/* AGENTE IA */}
+        <Box>
+          <Title order={5} mb={4}>Agente IA de citas</Title>
+          <Text size="sm" c="dimmed" mb="md">
+            El agente lee las conversaciones del número de Baileys, detecta solicitudes de cita y confirma los detalles contigo por WhatsApp.
+          </Text>
+          <Stack gap="sm">
+            <TextInput
+              label="Número de WhatsApp del negocio (E.164)"
+              description='Número que Baileys está leyendo. Ej: +573218104634'
+              placeholder="+57300..."
+              value={waPhone}
+              onChange={(e) => setWaPhone(e.currentTarget.value)}
+            />
+            <Switch
+              label="Activar agente IA"
+              description="Cuando está activo, el agente analiza conversaciones y te notifica por WhatsApp para confirmar citas."
+              checked={waAgentEnabled}
+              onChange={(e) => setWaAgentEnabled(e.currentTarget.checked)}
+            />
+            <Group justify="flex-end">
+              <Button onClick={handleSaveAgentConfig} loading={savingAgent} size="sm">
+                Guardar configuración
+              </Button>
+            </Group>
+          </Stack>
+        </Box>
 
         <Divider my="xs" />
 

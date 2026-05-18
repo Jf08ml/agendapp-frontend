@@ -159,6 +159,9 @@ export interface Organization {
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "past_due" | "suspended" | "cancelled" | "none";
   hasAccessBlocked?: boolean;
+  // Agente WhatsApp (Baileys)
+  waPhone?: string | null;
+  waAgentEnabled?: boolean;
   // Límites del plan activo
   planLimits?: {
     maxEmployees?: number | null;
