@@ -421,9 +421,9 @@ export default function WhatsappTemplateEditor() {
         <Box>
           <Group align="center" gap="sm" mb={4}>
             <Title order={2}>📱 Editor de Mensajes de WhatsApp</Title>
-            {(organization as Record<string, unknown>)?.waConnectionType === "meta" ? (
+            {organization?.waConnectionType === "meta" ? (
               <Badge color="blue" size="sm">Meta Cloud API</Badge>
-            ) : (organization as Record<string, unknown>)?.waConnectionType === "baileys" ? (
+            ) : organization?.waConnectionType === "baileys" ? (
               <Badge color="green" size="sm">Baileys</Badge>
             ) : null}
           </Group>
@@ -480,7 +480,7 @@ export default function WhatsappTemplateEditor() {
                 );
               })}
               {/* Meta Cloud API tab — solo si la org usa Meta */}
-              {(organization as Record<string, unknown>)?.waConnectionType === "meta" && (
+              {organization?.waConnectionType === "meta" && (
                 <Tabs.Tab
                   value="meta-templates"
                   style={{ whiteSpace: 'nowrap' }}
@@ -685,7 +685,7 @@ export default function WhatsappTemplateEditor() {
             ))}
 
             {/* Meta Cloud API Panel */}
-            {(organization as Record<string, unknown>)?.waConnectionType === "meta" && organization?._id && (
+            {organization?.waConnectionType === "meta" && organization?._id && (
               <Tabs.Panel value="meta-templates" p="md">
                 <MetaTemplatesPanel organizationId={organization._id} />
               </Tabs.Panel>
