@@ -123,6 +123,7 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
         config_id: import.meta.env.VITE_META_CONFIG_ID,
         response_type: "code",
         override_default_response_type: true,
+        scope: "whatsapp_business_management,whatsapp_business_messaging",
       }
     );
   }
