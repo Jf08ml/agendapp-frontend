@@ -41,6 +41,7 @@ import whatsappTemplateService, {
   WhatsappTemplateSettings,
 } from "../../services/whatsappTemplateService";
 import { handleAxiosError } from "../../utils/handleAxiosError";
+import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
 
 const templateInfo = {
   scheduleAppointment: {
@@ -418,7 +419,14 @@ export default function WhatsappTemplateEditor() {
       <Container size="xl" py="md">
         <Stack gap="md">
         <Box>
-          <Title order={2} mb="xs">📱 Editor de Mensajes de WhatsApp</Title>
+          <Group align="center" gap="sm" mb={4}>
+            <Title order={2}>📱 Editor de Mensajes de WhatsApp</Title>
+            {(organization as Record<string, unknown>)?.waConnectionType === "meta" ? (
+              <Badge color="blue" size="sm">Meta Cloud API</Badge>
+            ) : (organization as Record<string, unknown>)?.waConnectionType === "baileys" ? (
+              <Badge color="green" size="sm">Baileys</Badge>
+            ) : null}
+          </Group>
           <Text c="dimmed" size="sm">
             Personaliza los mensajes que se envían automáticamente a tus clientes
           </Text>
@@ -471,8 +479,17 @@ export default function WhatsappTemplateEditor() {
                   </Tabs.Tab>
                 );
               })}
+              {/* Meta Cloud API tab — solo si la org usa Meta */}
+              {(organization as Record<string, unknown>)?.waConnectionType === "meta" && (
+                <Tabs.Tab
+                  value="meta-templates"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <Text size="sm" fw={500}>🔵 Plantillas Meta</Text>
+                </Tabs.Tab>
+              )}
               {/* 🆕 Nueva pestaña de configuración */}
-              <Tabs.Tab 
+              <Tabs.Tab
                 value="settings"
                 style={{ whiteSpace: 'nowrap' }}
                 styles={{
@@ -666,6 +683,13 @@ export default function WhatsappTemplateEditor() {
                 </Stack>
               </Tabs.Panel>
             ))}
+
+            {/* Meta Cloud API Panel */}
+            {(organization as Record<string, unknown>)?.waConnectionType === "meta" && organization?._id && (
+              <Tabs.Panel value="meta-templates" p="md">
+                <MetaTemplatesPanel organizationId={organization._id} />
+              </Tabs.Panel>
+            )}
 
             {/* 🆕 Panel de Configuración de Envíos */}
             <Tabs.Panel value="settings" p="md">

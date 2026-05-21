@@ -162,6 +162,13 @@ export interface Organization {
   // Agente WhatsApp (Baileys)
   waPhone?: string | null;
   waAgentEnabled?: boolean;
+  // Conexión híbrida WA
+  hideBaileysUI?: boolean;
+  waConnectionType?: 'baileys' | 'meta' | null;
+  metaWabaId?: string | null;
+  metaPhoneNumberId?: string | null;
+  metaAccessToken?: string | null;
+  metaPhone?: string | null;
   // Límites del plan activo
   planLimits?: {
     maxEmployees?: number | null;
@@ -242,6 +249,56 @@ export const deleteOrganization = async (
   } catch (error) {
     console.error("Error al eliminar la organización:", error);
   }
+};
+
+// ── Meta API connection ──────────────────────────────────────────────────────
+
+export const connectMetaOrg = async (
+  organizationId: string,
+  code: string,
+  redirectUri: string,
+  wabaId?: string,
+  phoneNumberId?: string
+): Promise<{ wabaId: string; phoneNumberId: string; phone: string; verifiedName: string }> => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-connect`, { code, redirectUri, wabaId, phoneNumberId });
+  return response.data.data;
+};
+
+export const disconnectMetaOrg = async (organizationId: string): Promise<void> => {
+  await apiOrganization.delete(`/${organizationId}/meta-disconnect`);
+};
+
+export const getMetaStatus = async (
+  organizationId: string
+): Promise<{ connected: boolean; phone?: string; wabaId?: string; phoneNumberId?: string; reason?: string }> => {
+  const response = await apiOrganization.get(`/${organizationId}/meta-status`);
+  return response.data.data;
+};
+
+// ── Meta Templates ───────────────────────────────────────────────────────────
+
+export const listMetaTemplates = async (organizationId: string) => {
+  const response = await apiOrganization.get(`/${organizationId}/meta-templates`);
+  return response.data.data;
+};
+
+export const createMetaTemplate = async (organizationId: string, template: object) => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-templates`, template);
+  return response.data.data;
+};
+
+export const updateMetaTemplate = async (organizationId: string, templateId: string, components: object[]) => {
+  const response = await apiOrganization.patch(`/${organizationId}/meta-templates/${templateId}`, { components });
+  return response.data.data;
+};
+
+export const deleteMetaTemplate = async (organizationId: string, templateName: string) => {
+  await apiOrganization.delete(`/${organizationId}/meta-templates/${templateName}`);
+};
+
+export const syncMetaTemplates = async (organizationId: string) => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-templates/sync`);
+  return response.data.data;
 };
 
 // Obtener organización según el dominio actual (branding automático)

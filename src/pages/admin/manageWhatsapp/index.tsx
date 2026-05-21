@@ -39,6 +39,7 @@ import type { WaCode } from "../../../utils/waRealtime";
 import { updateOrganization } from "../../../services/organizationService";
 import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
 import { notifications } from "@mantine/notifications";
+import MetaConnectionPanel from "./MetaConnectionPanel";
 // import { computePrimaryCta } from "../../../utils/waUi";
 
 // -----------------------------
@@ -209,6 +210,9 @@ const WhatsappOrgSession: React.FC = () => {
             {ui.title}
           </Badge>
         </Group>
+
+        {/* SECCIÓN BAILEYS */}
+        {!organization?.hideBaileysUI && (<>
 
         {/* CLIENT ID */}
         <Group align="end">
@@ -487,7 +491,14 @@ const WhatsappOrgSession: React.FC = () => {
           </Stack>
         </Box>
 
+        </>)}
+
         <Divider my="xs" />
+
+        {/* META API */}
+        {organization?._id && (
+          <MetaConnectionPanel organizationId={organization._id} />
+        )}
 
         {/* FOOTER */}
         <Text size="xs" c="dimmed">

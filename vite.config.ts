@@ -67,11 +67,7 @@ export default defineConfig({
       },
     }),
   ],
-  // server: {
-  //   proxy: {
-  //     // Proxy manifest y favicon al backend (ajusta el puerto si es necesario)
-  //     "/manifest.webmanifest": "http://localhost:5000",
-  //     "/favicon.ico": "http://localhost:5000",
-  //   },
-  // },
+  server: {
+    host: true, // expone en 0.0.0.0 para cloudflared / túneles
+  },
 });
