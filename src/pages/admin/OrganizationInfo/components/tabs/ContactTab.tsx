@@ -1,5 +1,7 @@
 import { SimpleGrid, Stack, TextInput, Textarea, Select } from "@mantine/core";
 import { useMemo } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../../app/store";
 import {
   IconBuilding,
   IconMail,
@@ -28,6 +30,9 @@ export default function ContactTab({
 }) {
   // Listas completas memoizadas (ya están memoizadas en geoData, pero useMemo
   // evita recalcular el .map() del Select en cada render).
+  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const canUseLanding = planLimits?.professionalLanding !== false;
+
   const countryData = useMemo(
     () => getAllCountries().map((c) => ({ value: c.value, label: c.label })),
     []
@@ -138,7 +143,13 @@ export default function ContactTab({
               { value: "modern", label: "Moderno - Con gradientes difuminados" },
               { value: "minimal", label: "Minimalista - Diseño limpio y simple" },
               { value: "cards", label: "Tarjetas - Enfoque en servicios" },
-              { value: "landing", label: "Landing - Página de presentación completa" },
+              {
+                value: "landing",
+                label: canUseLanding
+                  ? "Landing - Página de presentación completa"
+                  : "Landing - Página de presentación completa (Plan Marca/Pro)",
+                disabled: !canUseLanding,
+              },
             ]}
           />
           <TextInput

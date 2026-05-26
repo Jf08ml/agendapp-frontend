@@ -1,5 +1,7 @@
-import { Alert, Divider, List, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput } from "@mantine/core";
-import { IconBell, IconBulb, IconBrandWhatsapp } from "@tabler/icons-react";
+import { Alert, Divider, List, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
+import { IconBell, IconBulb, IconBrandWhatsapp, IconLock } from "@tabler/icons-react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -11,6 +13,11 @@ export default function ReminderSettingsTab({
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
 }) {
+  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const canUseReminders = planLimits?.autoReminders !== false;
+  const maxReminders = planLimits?.maxRemindersPerAppointment ?? 2;
+  const canUseSecondReminder = canUseReminders && maxReminders >= 2;
+
   const enabled = form.values.reminderSettings?.enabled;
   const hours = form.values.reminderSettings?.hoursBefore ?? 24;
   const start = form.values.reminderSettings?.sendTimeStart ?? "07:00";
@@ -25,12 +32,26 @@ export default function ReminderSettingsTab({
         iconColor="orange"
       >
         <Stack gap="md">
-          <Switch
-            label="Activar recordatorios automáticos"
-            description="Los clientes recibirán un mensaje de WhatsApp recordándoles su cita"
-            {...form.getInputProps("reminderSettings.enabled", { type: "checkbox" })}
-            disabled={!isEditing}
-          />
+          <Tooltip
+            label="Disponible en Plan Esencial o superior"
+            disabled={canUseReminders}
+            withArrow
+          >
+            <Switch
+              label="Activar recordatorios automáticos"
+              description={canUseReminders
+                ? "Los clientes recibirán un mensaje de WhatsApp recordándoles su cita"
+                : "Disponible en Plan Esencial o superior"}
+              {...form.getInputProps("reminderSettings.enabled", { type: "checkbox" })}
+              disabled={!isEditing || !canUseReminders}
+            />
+          </Tooltip>
+
+          {!canUseReminders && (
+            <Alert icon={<IconLock size={14} />} color="violet" variant="light">
+              <Text size="sm">Los recordatorios automáticos están disponibles desde el <strong>Plan Esencial</strong>.</Text>
+            </Alert>
+          )}
 
           {enabled && (
             <>
@@ -97,14 +118,28 @@ export default function ReminderSettingsTab({
 
               <Divider />
 
-              <Switch
-                label="Activar segundo recordatorio"
-                description="Envía un aviso adicional más cercano a la hora de la cita"
-                {...form.getInputProps("reminderSettings.secondReminder.enabled", { type: "checkbox" })}
-                disabled={!isEditing}
-              />
+              <Tooltip
+                label="Disponible en Plan Marca/Pro"
+                disabled={canUseSecondReminder}
+                withArrow
+              >
+                <Switch
+                  label="Activar segundo recordatorio"
+                  description={canUseSecondReminder
+                    ? "Envía un aviso adicional más cercano a la hora de la cita"
+                    : "Disponible en Plan Marca/Pro"}
+                  {...form.getInputProps("reminderSettings.secondReminder.enabled", { type: "checkbox" })}
+                  disabled={!isEditing || !canUseSecondReminder}
+                />
+              </Tooltip>
 
-              {form.values.reminderSettings?.secondReminder?.enabled && (
+              {!canUseSecondReminder && (
+                <Alert icon={<IconLock size={14} />} color="violet" variant="light">
+                  <Text size="sm">El segundo recordatorio está disponible en el <strong>Plan Marca/Pro</strong>.</Text>
+                </Alert>
+              )}
+
+              {canUseSecondReminder && form.values.reminderSettings?.secondReminder?.enabled && (
                 <NumberInput
                   label="Anticipación del segundo recordatorio"
                   description="Horas antes de la cita para el segundo mensaje"

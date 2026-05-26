@@ -111,6 +111,7 @@ const ReservationsList: React.FC = () => {
   );
   const orgPolicy = useSelector(selectReservationPolicy);
   const savingPolicy = useSelector(selectSavingPolicy);
+  const canAutoConfirm = (organization as any)?.planLimits?.autoConfirmations !== false;
 
   const theme = useMantineTheme();
   const { colorScheme } = useMantineColorScheme();
@@ -1566,7 +1567,10 @@ const ReservationsList: React.FC = () => {
                   { value: "manual", label: "Aprobación manual" },
                   {
                     value: "auto_if_available",
-                    label: "Automático si hay disponibilidad",
+                    label: canAutoConfirm
+                      ? "Automático si hay disponibilidad"
+                      : "Automático si hay disponibilidad (Plan Esencial o superior)",
+                    disabled: !canAutoConfirm,
                   },
                 ]}
                 disabled={!organization?._id || savingPolicy}

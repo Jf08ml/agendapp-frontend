@@ -24,6 +24,12 @@ export interface Plan {
     autoReminders: boolean;
     autoConfirmations: boolean;
     servicePackages: boolean;
+    campaignsWhatsapp: boolean;
+    classesModule: boolean;
+    loyaltyProgram: boolean;
+    professionalLanding: boolean;
+    brandingVisible: boolean;
+    maxRemindersPerAppointment: number;
   };
   description: string;
   isActive: boolean;
@@ -90,6 +96,35 @@ export interface MembershipStatus {
     showUpgradeButton: boolean;
   };
 }
+
+export interface PlanUsage {
+  employees: { current: number; max: number | null };
+  services: { current: number; max: number | null };
+  appointmentsThisMonth: { current: number; max: number | null };
+}
+
+export interface MyPlanInfo {
+  membership: {
+    status: Membership["status"];
+    currentPeriodEnd: string | null;
+    trialEnd: string | null;
+    plan: Plan;
+  };
+  usage: PlanUsage;
+}
+
+// Obtener info de plan activo con conteos de uso reales
+export const getMyPlanInfo = async (): Promise<MyPlanInfo | null> => {
+  try {
+    const response = await apiGeneral.get("/memberships/my-plan-info");
+    return response.data.data;
+  } catch (error: any) {
+    if (error.response?.status === 400 || error.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
 
 // Obtener membresía activa de una organización
 export const getCurrentMembership = async (
@@ -318,6 +353,12 @@ export type PlanInput = {
     autoReminders: boolean;
     autoConfirmations: boolean;
     servicePackages: boolean;
+    campaignsWhatsapp: boolean;
+    classesModule: boolean;
+    loyaltyProgram: boolean;
+    professionalLanding: boolean;
+    brandingVisible: boolean;
+    maxRemindersPerAppointment: number;
   };
 };
 

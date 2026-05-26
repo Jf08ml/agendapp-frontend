@@ -139,9 +139,10 @@ const AdminPackages: React.FC = () => {
         message: "El paquete ha sido guardado correctamente",
         color: "green",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      showNotification({ title: "Error", message: "Error al guardar el paquete", color: "red" });
+      const message = error?.response?.data?.message || error?.message || "Error al guardar el paquete";
+      showNotification({ title: "Error", message, color: "red" });
     }
   };
 

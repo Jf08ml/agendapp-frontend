@@ -72,6 +72,8 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     whatsappRead: hasPermission("whatsapp:read") && limits?.whatsappIntegration !== false,
     analyticsRead: hasPermission("analytics:read") && limits?.analyticsAdvanced !== false,
     packagesRead: hasPermission("packages:view") && limits?.servicePackages !== false,
+    classesRead: (hasPermission("appointments:view_all") || hasPermission("services:read")) && limits?.classesModule !== false,
+    campaignsRead: hasPermission("whatsapp:read") && limits?.campaignsWhatsapp !== false,
   };
 
   // Estilos consistentes sobre navbar de color
@@ -188,7 +190,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Módulo de Clases",
           to: "/gestionar-clases",
           icon: <IconSchool size={18} />,
-          canShow: can.apptsAll || can.servicesRead,
+          canShow: can.classesRead,
         },
         {
           label: "Gestionar WhatsApp",
@@ -206,7 +208,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           label: "Campañas WhatsApp",
           to: "/admin/campaigns",
           icon: <MdCampaign size={18} />,
-          canShow: can.whatsappRead,
+          canShow: can.campaignsRead,
         },
         {
           label: "Analíticas del negocio",

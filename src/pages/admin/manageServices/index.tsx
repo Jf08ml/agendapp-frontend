@@ -175,11 +175,12 @@ const AdminServices: React.FC = () => {
         message: "El servicio ha sido guardado correctamente",
         color: "green",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const message = error?.response?.data?.message || error?.message || "Error al guardar el servicio";
       showNotification({
         title: "Error",
-        message: "Error al guardar el servicio",
+        message,
         color: "red",
       });
     }

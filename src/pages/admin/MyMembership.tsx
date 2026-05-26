@@ -27,8 +27,10 @@ import { RootState } from "../../app/store";
 import {
   getCurrentMembership,
   getMembershipStatus,
+  getMyPlanInfo,
   Membership,
   MembershipStatus,
+  MyPlanInfo,
 } from "../../services/membershipService";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
 import { ActivatePlanModal } from "../../components/ActivatePlanModal";
@@ -58,6 +60,7 @@ export default function MyMembership() {
   const [publicPlans, setPublicPlans] = useState<PublicPlan[]>([]);
   const [plansError, setPlansError] = useState(false);
   const [activatePlan, setActivatePlan] = useState<PublicPlan | null>(null);
+  const [planInfo, setPlanInfo] = useState<MyPlanInfo | null>(null);
 
   const organization = useSelector(
     (state: RootState) => state.organization.organization
@@ -71,12 +74,14 @@ export default function MyMembership() {
     if (!organization?._id) return;
     setLoading(true);
     try {
-      const [membershipData, statusData] = await Promise.all([
+      const [membershipData, statusData, planInfoData] = await Promise.all([
         getCurrentMembership(organization._id),
         getMembershipStatus(organization._id),
+        getMyPlanInfo(),
       ]);
       setMembership(membershipData);
       setStatus(statusData);
+      setPlanInfo(planInfoData);
     } catch (error) {
       console.error("Error al cargar membresía:", error);
     } finally {
@@ -273,12 +278,13 @@ export default function MyMembership() {
                     day: "numeric",
                   })}
                 </strong>
-                . Después de esa fecha, tu cuenta pasará a modo de solo lectura
-                y no podrás crear ni modificar citas, clientes o servicios.
+                . Al terminar, tu cuenta pasará automáticamente al{" "}
+                <strong>Plan Gratuito</strong> (1 profesional, 5 servicios, sin
+                WhatsApp). Puedes continuar usando la plataforma o actualizar a un plan pago para desbloquear más funcionalidades.
               </Text>
               <Text size="sm" c="dimmed">
-                Elige un plan a continuación para seguir usando la plataforma
-                sin interrupciones.
+                Elige un plan a continuación para disfrutar de todas las
+                funcionalidades sin interrupciones.
               </Text>
             </Stack>
           </Alert>
@@ -496,74 +502,120 @@ export default function MyMembership() {
           </Paper>
         )}
 
-        {/* Límites del Plan (solo para planes activos, no trial) */}
+        {/* Límites del Plan con uso real */}
         {!isTrial && (
           <Paper withBorder p="lg" radius="md">
-            <Text size="lg" fw={600} mb="md">Límites y Restricciones</Text>
+            <Text size="lg" fw={600} mb="md">Uso del Plan</Text>
             <Grid>
-              <Grid.Col span={{ base: 12, md: 4 }}>
-                <div>
-                  <Text size="xs" c="dimmed">Profesionales Máximos</Text>
-                  <Text size="lg" fw={600}>{membership.planId.limits?.maxEmployees || "Ilimitado"}</Text>
-                </div>
+              {/* Profesionales */}
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack gap={4}>
+                  <Group justify="space-between">
+                    <Text size="sm">Profesionales</Text>
+                    <Text size="sm" fw={600}>
+                      {planInfo?.usage?.employees?.current ?? "—"}
+                      {membership.planId.limits?.maxEmployees != null
+                        ? ` / ${membership.planId.limits.maxEmployees}`
+                        : " / Ilimitados"}
+                    </Text>
+                  </Group>
+                  {membership.planId.limits?.maxEmployees != null && (
+                    <Progress
+                      value={Math.min(100, ((planInfo?.usage?.employees?.current ?? 0) / membership.planId.limits.maxEmployees) * 100)}
+                      color={
+                        (planInfo?.usage?.employees?.current ?? 0) >= membership.planId.limits.maxEmployees
+                          ? "red"
+                          : "blue"
+                      }
+                      size="sm"
+                      radius="xl"
+                    />
+                  )}
+                </Stack>
               </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 4 }}>
-                <div>
-                  <Text size="xs" c="dimmed">Servicios Máximos</Text>
-                  <Text size="lg" fw={600}>{membership.planId.limits?.maxServices || "Ilimitado"}</Text>
-                </div>
+
+              {/* Servicios */}
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack gap={4}>
+                  <Group justify="space-between">
+                    <Text size="sm">Servicios</Text>
+                    <Text size="sm" fw={600}>
+                      {planInfo?.usage?.services?.current ?? "—"}
+                      {membership.planId.limits?.maxServices != null
+                        ? ` / ${membership.planId.limits.maxServices}`
+                        : " / Ilimitados"}
+                    </Text>
+                  </Group>
+                  {membership.planId.limits?.maxServices != null && (
+                    <Progress
+                      value={Math.min(100, ((planInfo?.usage?.services?.current ?? 0) / membership.planId.limits.maxServices) * 100)}
+                      color={
+                        (planInfo?.usage?.services?.current ?? 0) >= membership.planId.limits.maxServices
+                          ? "red"
+                          : "teal"
+                      }
+                      size="sm"
+                      radius="xl"
+                    />
+                  )}
+                </Stack>
               </Grid.Col>
+
+              {/* Almacenamiento */}
               <Grid.Col span={{ base: 12, md: 4 }}>
                 <div>
                   <Text size="xs" c="dimmed">Almacenamiento</Text>
-                  <Text size="lg" fw={600}>{membership.planId.limits?.maxStorageGB || "Ilimitado"} GB</Text>
+                  <Text size="lg" fw={600}>
+                    {membership.planId.limits?.maxStorageGB != null
+                      ? `${membership.planId.limits.maxStorageGB} GB`
+                      : "Ilimitado"}
+                  </Text>
+                </div>
+              </Grid.Col>
+
+              {/* Recordatorios por cita */}
+              <Grid.Col span={{ base: 12, md: 4 }}>
+                <div>
+                  <Text size="xs" c="dimmed">Recordatorios por cita</Text>
+                  <Text size="lg" fw={600}>
+                    {membership.planId.limits?.maxRemindersPerAppointment > 0
+                      ? membership.planId.limits.maxRemindersPerAppointment
+                      : "—"}
+                  </Text>
                 </div>
               </Grid.Col>
             </Grid>
 
             <Divider my="md" />
 
+            <Text size="sm" fw={600} mb="sm" c="dimmed">Funcionalidades incluidas</Text>
             <Grid>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Group gap="xs">
-                  {membership.planId.limits?.customBranding ? (
-                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
-                  ) : (
-                    <BiX size={16} color="var(--mantine-color-red-6)" />
-                  )}
-                  <Text size="sm">Branding Personalizado</Text>
-                </Group>
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Group gap="xs">
-                  {membership.planId.limits?.whatsappIntegration ? (
-                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
-                  ) : (
-                    <BiX size={16} color="var(--mantine-color-red-6)" />
-                  )}
-                  <Text size="sm">Integración WhatsApp</Text>
-                </Group>
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Group gap="xs">
-                  {membership.planId.limits?.analyticsAdvanced ? (
-                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
-                  ) : (
-                    <BiX size={16} color="var(--mantine-color-red-6)" />
-                  )}
-                  <Text size="sm">Analíticas Avanzadas</Text>
-                </Group>
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Group gap="xs">
-                  {membership.planId.limits?.prioritySupport ? (
-                    <CheckIcon size={16} color="var(--mantine-color-green-6)" />
-                  ) : (
-                    <BiX size={16} color="var(--mantine-color-red-6)" />
-                  )}
-                  <Text size="sm">Soporte Prioritario</Text>
-                </Group>
-              </Grid.Col>
+              {(
+                [
+                  ["whatsappIntegration", "WhatsApp automático"],
+                  ["autoReminders", "Recordatorios automáticos"],
+                  ["campaignsWhatsapp", "Campañas WhatsApp"],
+                  ["loyaltyProgram", "Sistema de fidelización"],
+                  ["servicePackages", "Paquetes de sesiones"],
+                  ["classesModule", "Módulo de clases"],
+                  ["professionalLanding", "Landing profesional"],
+                  ["customBranding", "Branding personalizado"],
+                  ["prioritySupport", "Soporte prioritario"],
+                ] as [string, string][]
+              ).map(([key, label]) => (
+                <Grid.Col key={key} span={{ base: 12, md: 6 }}>
+                  <Group gap="xs">
+                    {(membership.planId.limits as any)?.[key] ? (
+                      <CheckIcon size={14} color="var(--mantine-color-green-6)" />
+                    ) : (
+                      <BiX size={16} color="var(--mantine-color-red-6)" />
+                    )}
+                    <Text size="sm" c={(membership.planId.limits as any)?.[key] ? undefined : "dimmed"}>
+                      {label}
+                    </Text>
+                  </Group>
+                </Grid.Col>
+              ))}
             </Grid>
           </Paper>
         )}

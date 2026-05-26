@@ -50,7 +50,10 @@ export default function Home() {
 
   const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
-  const homeLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing";
+  const planLimits = (organization as any)?.planLimits;
+  const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing";
+  // Si el plan no permite landing (downgrade), caer a modern sin tocar la BD
+  const homeLayout = rawLayout === "landing" && planLimits?.professionalLanding === false ? "modern" : rawLayout;
 
   const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
 

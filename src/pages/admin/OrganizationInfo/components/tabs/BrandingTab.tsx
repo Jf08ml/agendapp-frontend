@@ -13,6 +13,9 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
+import { IconLock } from "@tabler/icons-react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -45,11 +48,20 @@ export default function BrandingTab({
     key: "logoUrl" | "faviconUrl" | "pwaIcon"
   ) => void;
 }) {
+  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const canUseBranding = planLimits?.customBranding !== false;
+  const brandingDisabled = !isEditing || !canUseBranding;
+
   return (
     <SectionCard
       title="Branding"
       description="Controla identidad visual y datos de la PWA."
     >
+      {!canUseBranding && (
+        <Alert icon={<IconLock size={14} />} color="violet" variant="light" mb="md">
+          <Text size="sm">La personalización de branding (logo, colores, fuentes) está disponible desde el <strong>Plan Starter</strong>.</Text>
+        </Alert>
+      )}
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="md">
         {/* LOGO */}
         <Box>
@@ -92,7 +104,7 @@ export default function BrandingTab({
             <FileInput
               mt="xs"
               accept="image/*"
-              disabled={!isEditing || uploadingLogo}
+              disabled={brandingDisabled || uploadingLogo}
               placeholder={uploadingLogo ? "Cargando..." : "Cambiar logo"}
               onChange={(f) => onUpload(f as File, "logoUrl")}
               description="Sugerido: 256×256 PNG, fondo blanco o transparente."
@@ -141,7 +153,7 @@ export default function BrandingTab({
             <FileInput
               mt="xs"
               accept="image/*"
-              disabled={!isEditing || uploadingFavicon}
+              disabled={brandingDisabled || uploadingFavicon}
               placeholder={uploadingFavicon ? "Cargando..." : "Cambiar favicon"}
               onChange={(f) => onUpload(f as File, "faviconUrl")}
               description="Recomendado: 32×32 PNG."
@@ -188,7 +200,7 @@ export default function BrandingTab({
             <FileInput
               mt="xs"
               accept="image/*"
-              disabled={!isEditing || uploadingPwaIcon}
+              disabled={brandingDisabled || uploadingPwaIcon}
               placeholder={uploadingPwaIcon ? "Cargando..." : "Cambiar icono"}
               onChange={(f) => onUpload(f as File, "pwaIcon")}
               description="PNG 192×192 o 512×512. Ideal una versión maskable."
@@ -214,7 +226,7 @@ export default function BrandingTab({
               onChange={(val) =>
                 form.setFieldValue("branding.fontFamily", val as BrandingFont)
               }
-              disabled={!isEditing}
+              disabled={brandingDisabled}
               mb="xs"
               renderOption={({ option }) => {
                 const font = FONT_OPTIONS.find((f) => f.value === option.value)!;
@@ -253,22 +265,22 @@ export default function BrandingTab({
         <ColorInput
           label="Color primario"
           {...form.getInputProps("branding.primaryColor")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
         <ColorInput
           label="Color secundario"
           {...form.getInputProps("branding.secondaryColor")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
         <ColorInput
           label="Theme color (navegador)"
           {...form.getInputProps("branding.themeColor")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
         <ColorInput
           label="Texto del footer"
           {...form.getInputProps("branding.footerTextColor")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
       </SimpleGrid>
 
@@ -278,17 +290,17 @@ export default function BrandingTab({
         <TextInput
           label="Nombre de la app (PWA)"
           {...form.getInputProps("branding.pwaName")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
         <TextInput
           label="Nombre corto (Short name)"
           {...form.getInputProps("branding.pwaShortName")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
         <TextInput
           label="Descripción (PWA)"
           {...form.getInputProps("branding.pwaDescription")}
-          disabled={!isEditing}
+          disabled={brandingDisabled}
         />
       </SimpleGrid>
 

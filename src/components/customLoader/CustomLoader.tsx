@@ -17,7 +17,7 @@ export const CustomLoader = forwardRef<HTMLImageElement, CustomLoaderProps>(
       (state: RootState) => state.organization.organization
     );
     const finalLogo =
-      logoUrl || organization?.branding?.logoUrl || "/logo_default.png";
+      logoUrl || organization?.branding?.logoUrl || "/logo-default.png";
 
     return (
       <Box

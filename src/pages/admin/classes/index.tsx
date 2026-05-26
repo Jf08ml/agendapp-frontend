@@ -168,8 +168,8 @@ export default function ManageClasses() {
       setClassModal(false);
       setEditingClass(null);
       loadAll();
-    } catch (err) {
-      showNotification({ message: err instanceof Error ? err.message : "Error", color: "red" });
+    } catch (err: any) {
+      showNotification({ message: err?.response?.data?.message || err?.message || "Error", color: "red" });
     } finally {
       setSaving(false);
     }

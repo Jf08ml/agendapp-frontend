@@ -55,6 +55,8 @@ export default function Footer() {
   const organization = useSelector((s: RootState) => s.organization.organization);
 
   const { name, branding } = organization || {};
+  const planLimits = (organization as any)?.planLimits;
+  const showAgenditBranding = planLimits?.brandingVisible === true;
   const footerColor = branding?.primaryColor || branding?.themeColor || "#1C3461";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
   const textColor = branding?.footerTextColor || "#E2E8F0";
@@ -152,6 +154,16 @@ export default function Footer() {
               visibleFrom="sm"
             >
               v{appVersion.buildDate}
+            </Text>
+          )}
+
+          {showAgenditBranding && (
+            <Text
+              fz={rem(9)}
+              style={{ color: textColor, opacity: 0.6, lineHeight: 1, whiteSpace: "nowrap" }}
+              visibleFrom="sm"
+            >
+              · Creado con AgenditApp
             </Text>
           )}
         </Group>

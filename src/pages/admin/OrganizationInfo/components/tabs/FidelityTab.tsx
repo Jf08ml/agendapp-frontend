@@ -20,7 +20,10 @@ import {
   IconTrash,
   IconPlus,
   IconTrophy,
+  IconLock,
 } from "@tabler/icons-react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -140,6 +143,8 @@ export default function FidelityTab({
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
 }) {
+  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const canUseLoyalty = planLimits?.loyaltyProgram !== false;
   const programEnabled = form.values.showLoyaltyProgram;
   const serviceTiers: Tier[] = form.values.serviceTiers ?? [];
   const referralTiers: Tier[] = form.values.referralTiers ?? [];
@@ -155,14 +160,22 @@ export default function FidelityTab({
       iconColor="yellow"
     >
       <Stack gap="md">
+        {!canUseLoyalty && (
+          <Alert icon={<IconLock size={14} />} color="violet" variant="light">
+            <Text size="sm">El programa de fidelidad está disponible desde el <strong>Plan Starter</strong>.</Text>
+          </Alert>
+        )}
+
         <Switch
           label="Mostrar programa de fidelidad"
-          description="Los clientes podrán ver sus puntos y recompensas desde su perfil"
+          description={canUseLoyalty
+            ? "Los clientes podrán ver sus puntos y recompensas desde su perfil"
+            : "Disponible en Plan Starter o superior"}
           {...form.getInputProps("showLoyaltyProgram", { type: "checkbox" })}
-          disabled={!isEditing}
+          disabled={!isEditing || !canUseLoyalty}
         />
 
-        {!programEnabled && (
+        {canUseLoyalty && !programEnabled && (
           <Alert icon={<IconBulb size={14} />} color="gray" variant="light">
             <Text size="sm">
               Activa el programa para configurar los niveles de recompensa por referidos y servicios.
@@ -170,7 +183,7 @@ export default function FidelityTab({
           </Alert>
         )}
 
-        {programEnabled && (
+        {canUseLoyalty && programEnabled && (
           <>
             <Divider />
 

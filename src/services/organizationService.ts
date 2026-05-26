@@ -182,6 +182,12 @@ export interface Organization {
     autoReminders?: boolean;
     autoConfirmations?: boolean;
     servicePackages?: boolean;
+    campaignsWhatsapp?: boolean;
+    classesModule?: boolean;
+    loyaltyProgram?: boolean;
+    professionalLanding?: boolean;
+    brandingVisible?: boolean;
+    maxRemindersPerAppointment?: number;
   } | null;
 }
 

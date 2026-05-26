@@ -123,7 +123,7 @@ export default function CampaignWizard() {
       // Redirigir al detalle de la campaña
       navigate(`/admin/campaigns/${campaign._id}`);
     } catch (err: any) {
-      setError(err.message || "Error enviando campaña");
+      setError(err.response?.data?.message || err.message || "Error enviando campaña");
     } finally {
       setLoading(false);
     }

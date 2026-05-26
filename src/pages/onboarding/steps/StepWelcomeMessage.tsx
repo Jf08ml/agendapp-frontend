@@ -1,8 +1,10 @@
 import {
   Stack, TextInput, Textarea, Group, Button, Text, Paper,
-  SimpleGrid, Badge, Divider, Alert, Box, useMantineTheme,
+  SimpleGrid, Badge, Divider, Alert, Box, useMantineTheme, Tooltip,
 } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconInfoCircle, IconLock } from "@tabler/icons-react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../admin/OrganizationInfo/schema";
 
@@ -161,6 +163,8 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
   const selectedLayout = (form.values.homeLayout as LayoutId | undefined) ?? "modern";
+  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const canUseLanding = planLimits?.professionalLanding !== false;
 
   const title = form.values.welcomeTitle ?? "";
   const description = form.values.welcomeDescription ?? "";
@@ -211,34 +215,43 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           {LAYOUTS.map((layout) => {
             const isSelected = selectedLayout === layout.id;
+            const isLocked = layout.id === "landing" && !canUseLanding;
             return (
-              <Box
+              <Tooltip
                 key={layout.id}
-                onClick={() => form.setFieldValue("homeLayout", layout.id)}
-                style={{
-                  cursor: "pointer",
-                  borderRadius: 12,
-                  border: isSelected
-                    ? `2px solid var(--mantine-color-${layout.color}-6)`
-                    : "1px solid var(--mantine-color-gray-3)",
-                  overflow: "hidden",
-                  transition: "all 0.15s",
-                  boxShadow: isSelected ? `0 0 0 3px var(--mantine-color-${layout.color}-1)` : undefined,
-                }}
+                label="Disponible en Plan Marca/Pro"
+                disabled={!isLocked}
+                withArrow
               >
-                {/* Preview visual */}
-                <Box style={{ height: 180, overflow: "hidden", borderBottom: "1px solid var(--mantine-color-gray-2)" }}>
-                  {renderPreview(layout.id as LayoutId)}
+                <Box
+                  onClick={() => !isLocked && form.setFieldValue("homeLayout", layout.id)}
+                  style={{
+                    cursor: isLocked ? "not-allowed" : "pointer",
+                    borderRadius: 12,
+                    border: isSelected
+                      ? `2px solid var(--mantine-color-${layout.color}-6)`
+                      : "1px solid var(--mantine-color-gray-3)",
+                    overflow: "hidden",
+                    transition: "all 0.15s",
+                    boxShadow: isSelected ? `0 0 0 3px var(--mantine-color-${layout.color}-1)` : undefined,
+                    opacity: isLocked ? 0.5 : 1,
+                  }}
+                >
+                  {/* Preview visual */}
+                  <Box style={{ height: 180, overflow: "hidden", borderBottom: "1px solid var(--mantine-color-gray-2)" }}>
+                    {renderPreview(layout.id as LayoutId)}
+                  </Box>
+                  {/* Label + descripción */}
+                  <Box p="sm" style={{ background: isSelected ? `var(--mantine-color-${layout.color}-0)` : "#fff" }}>
+                    <Group gap="xs" mb={4}>
+                      <Text fw={700} size="sm">{layout.label}</Text>
+                      {isSelected && <Badge size="xs" color={layout.color}>Seleccionado</Badge>}
+                      {isLocked && <Badge size="xs" color="gray" leftSection={<IconLock size={10} />}>Plan Marca/Pro</Badge>}
+                    </Group>
+                    <Text size="xs" c="dimmed">{layout.description}</Text>
+                  </Box>
                 </Box>
-                {/* Label + descripción */}
-                <Box p="sm" style={{ background: isSelected ? `var(--mantine-color-${layout.color}-0)` : "#fff" }}>
-                  <Group gap="xs" mb={4}>
-                    <Text fw={700} size="sm">{layout.label}</Text>
-                    {isSelected && <Badge size="xs" color={layout.color}>Seleccionado</Badge>}
-                  </Group>
-                  <Text size="xs" c="dimmed">{layout.description}</Text>
-                </Box>
-              </Box>
+              </Tooltip>
             );
           })}
         </SimpleGrid>
