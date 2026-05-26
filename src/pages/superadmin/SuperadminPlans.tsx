@@ -67,12 +67,18 @@ const EMPTY_PLAN: PlanInput = {
     maxAppointmentsPerMonth: null,
     maxStorageGB: 5,
     customBranding: false,
-    whatsappIntegration: true,
-    analyticsAdvanced: false,
+    whatsappIntegration: false,
+    analyticsAdvanced: true,
     prioritySupport: false,
     autoReminders: false,
     autoConfirmations: false,
     servicePackages: false,
+    campaignsWhatsapp: false,
+    classesModule: false,
+    loyaltyProgram: false,
+    professionalLanding: false,
+    brandingVisible: false,
+    maxRemindersPerAppointment: 0,
   },
 };
 
@@ -153,6 +159,12 @@ export default function SuperadminPlans() {
         autoReminders: plan.limits.autoReminders,
         autoConfirmations: plan.limits.autoConfirmations,
         servicePackages: plan.limits.servicePackages ?? false,
+        campaignsWhatsapp: plan.limits.campaignsWhatsapp ?? false,
+        classesModule: plan.limits.classesModule ?? false,
+        loyaltyProgram: plan.limits.loyaltyProgram ?? false,
+        professionalLanding: plan.limits.professionalLanding ?? false,
+        brandingVisible: plan.limits.brandingVisible ?? false,
+        maxRemindersPerAppointment: plan.limits.maxRemindersPerAppointment ?? 0,
       },
     });
     setNewChar("");
