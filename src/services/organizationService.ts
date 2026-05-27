@@ -147,6 +147,7 @@ export interface Organization {
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards" | "landing";
   reminderSettings?: ReminderSettings;
+  autoMarkAttended?: boolean;
   cancellationPolicy?: CancellationPolicy;
   termsAndConditions?: {
     enabled?: boolean;

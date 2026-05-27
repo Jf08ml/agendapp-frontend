@@ -180,7 +180,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     appointments: Appointment[],
     advances: Advance[]
   ) => {
-    const confirmedAppointments = appointments.filter((a) => a.status === "confirmed" || a.status === "attended");
+    const confirmedAppointments = appointments.filter((a) => a.status === "attended");
     const totalRevenue = confirmedAppointments.reduce(
       (total, appointment) => total + (appointment.totalPrice || 0),
       0

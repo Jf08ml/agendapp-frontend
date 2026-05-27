@@ -1,5 +1,5 @@
 import { Alert, Divider, List, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
-import { IconBell, IconBulb, IconBrandWhatsapp, IconLock } from "@tabler/icons-react";
+import { IconBell, IconBulb, IconBrandWhatsapp, IconLock, IconUserCheck } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
@@ -162,6 +162,28 @@ export default function ReminderSettingsTab({
               </Text>
             </Alert>
           )}
+        </Stack>
+      </SectionCard>
+
+      <SectionCard
+        title="Gestión de asistencia"
+        description="Define cómo se registra la asistencia de las citas pasadas para el cálculo de nómina y comisiones."
+        icon={<IconUserCheck size={16} />}
+        iconColor="teal"
+      >
+        <Stack gap="md">
+          <Switch
+            label="Marcar asistencia automáticamente"
+            description='Cada noche se marcan como "Asistió" las citas confirmadas que ya pasaron. Si está desactivado, el admin registra manualmente la asistencia.'
+            {...form.getInputProps("autoMarkAttended", { type: "checkbox" })}
+            disabled={!isEditing}
+          />
+          <Alert icon={<IconBulb size={14} />} color="blue" variant="light">
+            <Text size="sm">
+              El cálculo de nómina y comisiones solo toma en cuenta las citas con estado <strong>"Asistió"</strong>.
+              Si desactivas esta opción, deberás marcar manualmente cada cita para que cuente en los reportes.
+            </Text>
+          </Alert>
         </Stack>
       </SectionCard>
     </Stack>

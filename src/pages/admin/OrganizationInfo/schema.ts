@@ -233,6 +233,7 @@ export const schema = z.object({
       label: z.string().optional(),
     })).optional(),
   }).optional(),
+  autoMarkAttended: z.boolean().optional(),
   // Moneda de la organización (ISO 4217)
   currency: z.string().length(3, "Código de moneda inválido (ISO 4217)").optional(),
   // Formato de hora

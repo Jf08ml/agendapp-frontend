@@ -420,9 +420,10 @@ const MetaTemplateFormTab: React.FC<Props> = ({
         <Group grow>
           <TextInput
             label="Nombre de la plantilla"
-            description="Solo minúsculas y guiones bajos"
+            description="Fijo — el sistema lo usa para enviar mensajes automáticamente"
             value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.currentTarget.value.toLowerCase().replace(/\s+/g, "_") }))}
+            readOnly
+            styles={{ input: { cursor: "default", background: "var(--mantine-color-gray-0)", color: "var(--mantine-color-dimmed)", fontFamily: "monospace" } }}
           />
           <Select
             label="Categoría"

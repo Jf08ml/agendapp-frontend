@@ -39,6 +39,7 @@ import {
   IconSettings,
   IconChevronLeft,
   IconMessage,
+  IconClock,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -209,7 +210,7 @@ const templateInfo = {
 const SIDEBAR_GROUPS = [
   { label: "Citas", keys: ["scheduleAppointmentBatch", "recurringAppointmentSeries"] },
   { label: "Recordatorios", keys: ["reminder", "secondReminder"] },
-  { label: "Reservas", keys: ["statusReservationApproved", "statusReservationRejected"] },
+  { label: "Reservas", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
   { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
 ] as const;
@@ -485,33 +486,39 @@ export default function WhatsappTemplateEditor() {
                     {SIDEBAR_GROUPS.map((group, gi) => (
                       <Box key={group.label}>
                         {gi > 0 && <Divider />}
-                        <Text
-                          size="xs"
-                          fw={700}
-                          tt="uppercase"
-                          c="dimmed"
-                          px="md"
-                          pt="sm"
-                          pb={rem(4)}
-                          style={{ letterSpacing: "0.05em" }}
-                        >
-                          {group.label}
-                        </Text>
+                        <Group px="md" pt="sm" pb={rem(4)} gap={6} wrap="nowrap">
+                          <Text
+                            size="xs"
+                            fw={700}
+                            tt="uppercase"
+                            c="dimmed"
+                            style={{ letterSpacing: "0.05em" }}
+                          >
+                            {group.label}
+                          </Text>
+                          {"disabled" in group && group.disabled && (
+                            <Tooltip label={group.disabledReason} position="right" withArrow>
+                              <IconClock size={12} color="var(--mantine-color-dimmed)" />
+                            </Tooltip>
+                          )}
+                        </Group>
                         {group.keys.map((key) => {
                           const dot = isMeta ? getMetaStatusDot(key) : null;
                           const isCustom = !isMeta && templates[key as TemplateType]?.isCustom;
-                          return (
+                          const isGroupDisabled = "disabled" in group && group.disabled;
+                          const navLink = (
                             <NavLink
                               key={key}
                               label={
-                                <Text size="sm" lineClamp={1}>
+                                <Text size="sm" lineClamp={1} c={isGroupDisabled ? "dimmed" : undefined}>
                                   {templateInfo[key as TemplateType].shortTitle}
                                 </Text>
                               }
-                              active={selectedKey === key}
-                              onClick={() => handleSelectKey(key)}
+                              active={!isGroupDisabled && selectedKey === key}
+                              onClick={isGroupDisabled ? undefined : () => handleSelectKey(key)}
+                              disabled={isGroupDisabled}
                               rightSection={
-                                dot ? (
+                                !isGroupDisabled && dot ? (
                                   <Tooltip label={dot.title} position="right" withArrow>
                                     <Box
                                       style={{
@@ -523,7 +530,7 @@ export default function WhatsappTemplateEditor() {
                                       }}
                                     />
                                   </Tooltip>
-                                ) : isCustom ? (
+                                ) : !isGroupDisabled && isCustom ? (
                                   <Tooltip label="Personalizada" position="right" withArrow>
                                     <Box
                                       style={{
@@ -542,6 +549,11 @@ export default function WhatsappTemplateEditor() {
                               }}
                             />
                           );
+                          return isGroupDisabled ? (
+                            <Tooltip key={key} label={group.disabledReason} position="right" withArrow>
+                              <Box>{navLink}</Box>
+                            </Tooltip>
+                          ) : navLink;
                         })}
                       </Box>
                     ))}
