@@ -4,8 +4,6 @@ import {
   Container,
   Title,
   Text,
-  Paper,
-  Tabs,
   Textarea,
   Button,
   Alert,
@@ -21,7 +19,12 @@ import {
   rem,
   Modal,
   Switch,
+  NavLink,
+  ScrollArea,
+  Paper,
+  ThemeIcon,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
   IconDeviceFloppy,
   IconRestore,
@@ -33,6 +36,9 @@ import {
   IconPhone,
   IconVideo,
   IconAlertCircle,
+  IconSettings,
+  IconChevronLeft,
+  IconMessage,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -41,11 +47,15 @@ import whatsappTemplateService, {
   WhatsappTemplateSettings,
 } from "../../services/whatsappTemplateService";
 import { handleAxiosError } from "../../utils/handleAxiosError";
-import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
+import MetaTemplateFormTab, { MetaTemplateStatus } from "./MetaTemplateFormTab";
+import { listMetaTemplates } from "../../services/organizationService";
+
+// ─── Metadata de plantillas ───────────────────────────────────────────────────
 
 const templateInfo = {
   scheduleAppointment: {
-    title: "Confirmación de Cita (No utilizado)",
+    title: "Confirmación de Cita",
+    shortTitle: "Confirmación (individual)",
     description: "Mensaje enviado cuando se agenda una cita individual",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -59,6 +69,7 @@ const templateInfo = {
   },
   scheduleAppointmentBatch: {
     title: "Confirmación de Citas",
+    shortTitle: "Confirmación de citas",
     description: "Mensaje enviado cuando se agendan varias citas juntas",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -71,8 +82,9 @@ const templateInfo = {
     ],
   },
   recurringAppointmentSeries: {
-    title: "Mensaje de citas recurrentes",
-    description: "Mensaje enviado cuando se crea una serie de citas recurrentes (semanal, quincenal, etc.)",
+    title: "Citas Recurrentes",
+    shortTitle: "Citas recurrentes",
+    description: "Mensaje enviado cuando se crea una serie de citas recurrentes",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
@@ -83,41 +95,44 @@ const templateInfo = {
     ],
   },
   reminder: {
-    title: "Primer recordatorio",
-    description: "Mensaje de recordatorio enviado antes de la cita (ej: 24 horas antes)",
+    title: "Primer Recordatorio",
+    shortTitle: "Primer recordatorio",
+    description: "Recordatorio enviado antes de la cita (ej: 24 horas antes)",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
-      { name: "{{count}}", desc: "Número de citas (1, 2, 3...)" },
+      { name: "{{count}}", desc: "Número de citas" },
       { name: "{{cita_pal}}", desc: "'cita' o 'citas' (automático)" },
       { name: "{{agendada_pal}}", desc: "'agendada' o 'agendadas' (automático)" },
       { name: "{{date_range}}", desc: "Fecha o rango de fechas" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
       { name: "{{address}}", desc: "Dirección del negocio" },
       { name: "{{services_list}}", desc: "Lista de servicios" },
-      { name: "{{employee}}", desc: "Nombre del profesional o profesionales" },
-      { name: "{{manage_block}}", desc: "Enlace para confirmar o cancelar la cita" },
-      { name: "{{recommendations}}", desc: "Recomendaciones del servicio (si existen)" },
+      { name: "{{employee}}", desc: "Nombre del profesional" },
+      { name: "{{manage_block}}", desc: "Enlace para confirmar o cancelar" },
+      { name: "{{recommendations}}", desc: "Recomendaciones del servicio" },
     ],
   },
   secondReminder: {
     title: "Segundo Recordatorio",
-    description: "Mensaje de segundo recordatorio enviado poco antes de la cita (ej: 2 horas antes)",
+    shortTitle: "Segundo recordatorio",
+    description: "Recordatorio enviado poco antes de la cita (ej: 2 horas antes)",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
-      { name: "{{count}}", desc: "Número de citas (1, 2, 3...)" },
+      { name: "{{count}}", desc: "Número de citas" },
       { name: "{{cita_pal}}", desc: "'cita' o 'citas' (automático)" },
       { name: "{{agendada_pal}}", desc: "'agendada' o 'agendadas' (automático)" },
       { name: "{{date_range}}", desc: "Fecha o rango de fechas" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
       { name: "{{address}}", desc: "Dirección del negocio" },
       { name: "{{services_list}}", desc: "Lista de servicios" },
-      { name: "{{employee}}", desc: "Nombre del profesional o profesionales" },
-      { name: "{{manage_block}}", desc: "Enlace para confirmar o cancelar la cita" },
-      { name: "{{recommendations}}", desc: "Recomendaciones del servicio (si existen)" },
+      { name: "{{employee}}", desc: "Nombre del profesional" },
+      { name: "{{manage_block}}", desc: "Enlace para confirmar o cancelar" },
+      { name: "{{recommendations}}", desc: "Recomendaciones del servicio" },
     ],
   },
   statusReservationApproved: {
     title: "Reserva Aprobada",
+    shortTitle: "Reserva aprobada",
     description: "Mensaje cuando una reserva es aprobada",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -130,6 +145,7 @@ const templateInfo = {
   },
   statusReservationRejected: {
     title: "Reserva Rechazada",
+    shortTitle: "Reserva rechazada",
     description: "Mensaje cuando una reserva no puede ser confirmada",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -138,7 +154,8 @@ const templateInfo = {
     ],
   },
   clientConfirmationAck: {
-    title: "Agradecimiento por Confirmación",
+    title: "Confirmación de Asistencia",
+    shortTitle: "Confirmar asistencia",
     description: "Mensaje enviado al cliente cuando confirma su asistencia",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -146,7 +163,8 @@ const templateInfo = {
     ],
   },
   clientCancellationAck: {
-    title: "Aviso de Cancelación al Cliente",
+    title: "Aviso de Cancelación",
+    shortTitle: "Aviso cancelación",
     description: "Mensaje enviado al cliente cuando cancela su(s) cita(s)",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -155,6 +173,7 @@ const templateInfo = {
   },
   clientNoShowAck: {
     title: "Aviso de No Asistencia",
+    shortTitle: "No asistencia",
     description: "Mensaje enviado al cliente cuando se marca que no asistió a su cita",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -164,8 +183,9 @@ const templateInfo = {
     ],
   },
   loyaltyServiceReward: {
-    title: "🏆 Premio de Fidelidad (Servicios)",
-    description: "Mensaje enviado al cliente cuando completa su meta de servicios y gana una recompensa",
+    title: "Premio de Fidelidad (Servicios)",
+    shortTitle: "Premio fidelidad",
+    description: "Mensaje cuando el cliente completa su meta de servicios",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
@@ -173,8 +193,9 @@ const templateInfo = {
     ],
   },
   loyaltyReferralReward: {
-    title: "🎁 Premio de Referidos",
-    description: "Mensaje enviado al cliente cuando completa su meta de referidos y gana una recompensa",
+    title: "Premio de Referidos",
+    shortTitle: "Premio referidos",
+    description: "Mensaje cuando el cliente completa su meta de referidos",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
@@ -183,51 +204,60 @@ const templateInfo = {
   },
 };
 
-type TemplateType = keyof WhatsappTemplates;
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-// Mover templateKeys fuera del componente para que sea constante
+const SIDEBAR_GROUPS = [
+  { label: "Citas", keys: ["scheduleAppointmentBatch", "recurringAppointmentSeries"] },
+  { label: "Recordatorios", keys: ["reminder", "secondReminder"] },
+  { label: "Reservas", keys: ["statusReservationApproved", "statusReservationRejected"] },
+  { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
+  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
+] as const;
+
+// Nombre Meta por defecto para mostrar estado en sidebar
+const META_DEFAULT_NAMES: Record<string, string> = {
+  scheduleAppointmentBatch: "confirmacion_cita",
+  recurringAppointmentSeries: "citas_recurrentes",
+  reminder: "recordatorio_cita",
+  secondReminder: "segundo_recordatorio",
+  statusReservationApproved: "reserva_aprobada",
+  statusReservationRejected: "reserva_no_disponible",
+  clientConfirmationAck: "confirmacion_asistencia",
+  clientCancellationAck: "aviso_cancelacion",
+  clientNoShowAck: "aviso_no_asistencia",
+  loyaltyServiceReward: "premio_fidelidad",
+  loyaltyReferralReward: "premio_referidos",
+};
+
+const META_STATUS_DOT: Record<string, string> = {
+  APPROVED: "var(--mantine-color-green-6)",
+  PENDING: "var(--mantine-color-yellow-6)",
+  REJECTED: "var(--mantine-color-red-6)",
+  DISABLED: "var(--mantine-color-gray-5)",
+};
+
+type TemplateType = keyof WhatsappTemplates;
 const templateKeys = Object.keys(templateInfo) as TemplateType[];
+
+// ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function WhatsappTemplateEditor() {
   const { organization } = useSelector((state: RootState) => state.organization);
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
-  // CSS para layout responsive
-  const responsiveStyles = `
-    .template-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: ${rem(20)};
-      align-items: start;
-    }
-    
-    .variables-panel {
-      position: relative;
-    }
-    
-    @media (min-width: 769px) {
-      .template-layout {
-        grid-template-columns: 1fr 320px;
-      }
-      
-      .variables-panel {
-        position: sticky;
-        top: ${rem(20)};
-      }
-    }
-  `;
-  
-  const [activeTab, setActiveTab] = useState<string | null>("scheduleAppointmentBatch");
+  const [selectedKey, setSelectedKey] = useState<string>("scheduleAppointmentBatch");
+  const [mobileView, setMobileView] = useState<"list" | "editor">("list");
+
   const [templates, setTemplates] = useState<WhatsappTemplates | null>(null);
+  const [metaTemplates, setMetaTemplates] = useState<MetaTemplateStatus[] | undefined>(undefined);
   const [defaultTemplates, setDefaultTemplates] = useState<Record<string, string>>({});
   const [editedTemplates, setEditedTemplates] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string>("");
-  const [, setShowPreview] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  
-  // 🆕 Estado para configuración de envíos
+
   const [templateSettings, setTemplateSettings] = useState<WhatsappTemplateSettings>({
     scheduleAppointment: true,
     scheduleAppointmentBatch: true,
@@ -245,117 +275,83 @@ export default function WhatsappTemplateEditor() {
 
   const loadTemplates = useCallback(async () => {
     if (!organization?._id) return;
-
     try {
       setLoading(true);
       const data = await whatsappTemplateService.getTemplates(organization._id);
       setTemplates(data.templates);
       setDefaultTemplates(data.defaultTemplates);
-      
-      // 🆕 Cargar configuración de envíos
       const settings = await whatsappTemplateService.getTemplateSettings(organization._id);
       setTemplateSettings(settings);
-      
-      // Inicializar templates editados con los actuales
       const edited: Record<string, string> = {};
-      templateKeys.forEach((key) => {
-        edited[key] = data.templates[key].content;
-      });
+      templateKeys.forEach((key) => { edited[key] = data.templates[key].content; });
       setEditedTemplates(edited);
     } catch (error) {
-      try {
-        handleAxiosError(error, "Error al cargar plantillas");
-      } catch (err) {
-        setMessage({ type: "error", text: (err as Error).message });
-      }
+      try { handleAxiosError(error, "Error al cargar plantillas"); }
+      catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
     } finally {
       setLoading(false);
     }
-  }, [organization?._id]); // Remover templateKeys de las dependencias
+  }, [organization?._id]);
 
-  useEffect(() => {
-    if (organization?._id) {
-      loadTemplates();
+  useEffect(() => { if (organization?._id) loadTemplates(); }, [loadTemplates]);
+
+  const loadMetaTemplates = useCallback(async () => {
+    if (!organization?._id || organization.waConnectionType !== "meta") return;
+    try {
+      const list = await listMetaTemplates(organization._id);
+      setMetaTemplates(list);
+    } catch {
+      setMetaTemplates([]);
     }
-  }, [loadTemplates]); // Ahora loadTemplates solo cambia cuando organization._id cambia
+  }, [organization?._id, organization?.waConnectionType]);
 
-  const handleTemplateChange = (templateKey: string, value: string) => {
-    setEditedTemplates((prev) => ({
-      ...prev,
-      [templateKey]: value,
-    }));
-    setShowPreview(false);
+  useEffect(() => { loadMetaTemplates(); }, [loadMetaTemplates]);
+
+  const handleTemplateChange = (key: string, value: string) => {
+    setEditedTemplates((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async (templateKey: string) => {
+  const handleSave = async (key: string) => {
     if (!organization?._id) return;
-
     try {
       setSaving(true);
-      await whatsappTemplateService.updateTemplate(
-        organization._id,
-        templateKey,
-        editedTemplates[templateKey]
-      );
-      
+      await whatsappTemplateService.updateTemplate(organization._id, key, editedTemplates[key]);
       setMessage({ type: "success", text: "Plantilla guardada correctamente" });
       await loadTemplates();
     } catch (error) {
-      try {
-        handleAxiosError(error, "Error al guardar plantilla");
-      } catch (err) {
-        setMessage({ type: "error", text: (err as Error).message });
-      }
-    } finally {
-      setSaving(false);
-    }
+      try { handleAxiosError(error, "Error al guardar plantilla"); }
+      catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
+    } finally { setSaving(false); }
   };
 
-  const handleRestore = async (templateKey: string) => {
+  const handleRestore = async (key: string) => {
     if (!organization?._id) return;
-
     try {
       setSaving(true);
-      await whatsappTemplateService.resetTemplate(organization._id, templateKey);
-      
+      await whatsappTemplateService.resetTemplate(organization._id, key);
       setMessage({ type: "success", text: "Plantilla restaurada a versión por defecto" });
       await loadTemplates();
     } catch (error) {
-      try {
-        handleAxiosError(error, "Error al restaurar plantilla");
-      } catch (err) {
-        setMessage({ type: "error", text: (err as Error).message });
-      }
-    } finally {
-      setSaving(false);
-    }
+      try { handleAxiosError(error, "Error al restaurar plantilla"); }
+      catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
+    } finally { setSaving(false); }
   };
 
-  const handlePreview = async (templateKey: string) => {
+  const handlePreview = async (key: string) => {
     try {
-      const previewText = await whatsappTemplateService.previewTemplate(
-        templateKey,
-        editedTemplates[templateKey]
-      );
-      setPreview(previewText);
+      const text = await whatsappTemplateService.previewTemplate(key, editedTemplates[key]);
+      setPreview(text);
       setPreviewModalOpen(true);
     } catch (error) {
-      try {
-        handleAxiosError(error, "Error al generar preview");
-      } catch (err) {
-        setMessage({ type: "error", text: (err as Error).message });
-      }
+      try { handleAxiosError(error, "Error al generar preview"); }
+      catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
     }
   };
 
-  // 🆕 Guardar configuración de envíos
   const handleSaveSettings = async () => {
     if (!organization?._id) return;
-
     try {
       setSaving(true);
-      
-      // Filtrar solo los campos válidos (sin _id, __v, etc.)
       const validSettings: WhatsappTemplateSettings = {
         scheduleAppointment: templateSettings.scheduleAppointment,
         scheduleAppointmentBatch: templateSettings.scheduleAppointmentBatch,
@@ -367,36 +363,45 @@ export default function WhatsappTemplateEditor() {
         clientConfirmationAck: templateSettings.clientConfirmationAck,
         clientCancellationAck: templateSettings.clientCancellationAck,
       };
-      
-      await whatsappTemplateService.updateTemplateSettings(
-        organization._id,
-        validSettings
-      );
-      
+      await whatsappTemplateService.updateTemplateSettings(organization._id, validSettings);
       setMessage({ type: "success", text: "Configuración de envíos actualizada correctamente" });
     } catch (error) {
-      try {
-        handleAxiosError(error, "Error al guardar configuración");
-      } catch (err) {
-        setMessage({ type: "error", text: (err as Error).message });
-      }
-    } finally {
-      setSaving(false);
-    }
+      try { handleAxiosError(error, "Error al guardar configuración"); }
+      catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
+    } finally { setSaving(false); }
   };
 
-  const handleCopyDefault = (templateKey: string) => {
-    setEditedTemplates((prev) => ({
-      ...prev,
-      [templateKey]: defaultTemplates[templateKey],
-    }));
+  const handleCopyDefault = (key: string) => {
+    setEditedTemplates((prev) => ({ ...prev, [key]: defaultTemplates[key] }));
     setMessage({ type: "success", text: "Plantilla por defecto copiada al editor" });
   };
 
+  const handleSelectKey = (key: string) => {
+    setSelectedKey(key);
+    if (isMobile) setMobileView("editor");
+  };
+
+  // ─── Helpers sidebar ─────────────────────────────────────────────────────────
+
+  const isMeta = organization?.waConnectionType === "meta";
+
+  function getMetaStatusDot(key: string): { color: string; title: string } | null {
+    if (!metaTemplates) return null;
+    const name = META_DEFAULT_NAMES[key];
+    if (!name) return null;
+    const found = metaTemplates.find((t) => t.name === name);
+    if (!found) return { color: "var(--mantine-color-gray-4)", title: "No enviada" };
+    const color = META_STATUS_DOT[found.status] ?? "var(--mantine-color-gray-5)";
+    const titles: Record<string, string> = { APPROVED: "Aprobada", PENDING: "En revisión", REJECTED: "Rechazada", DISABLED: "Desactivada" };
+    return { color, title: titles[found.status] ?? found.status };
+  }
+
+  // ─── Loading ─────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <Container size="lg" py="xl">
-        <Box style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+      <Container size="xl" py="xl">
+        <Box style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
           <Loader size="lg" />
         </Box>
       </Container>
@@ -405,523 +410,452 @@ export default function WhatsappTemplateEditor() {
 
   if (!templates) {
     return (
-      <Container size="lg" py="xl">
-        <Alert color="red" title="Error">
-          Error al cargar las plantillas
-        </Alert>
+      <Container size="xl" py="xl">
+        <Alert color="red" title="Error">Error al cargar las plantillas</Alert>
       </Container>
     );
   }
 
+  const showSidebar = !isMobile || mobileView === "list";
+  const showEditor = !isMobile || mobileView === "editor";
+  const currentInfo = selectedKey !== "settings" ? templateInfo[selectedKey as TemplateType] : null;
+
+  // ─── JSX ─────────────────────────────────────────────────────────────────────
+
   return (
     <>
-      <style>{responsiveStyles}</style>
       <Container size="xl" py="md">
         <Stack gap="md">
-        <Box>
-          <Group align="center" gap="sm" mb={4}>
-            <Title order={2}>📱 Editor de Mensajes de WhatsApp</Title>
-            {organization?.waConnectionType === "meta" ? (
-              <Badge color="blue" size="sm">Meta Cloud API</Badge>
-            ) : organization?.waConnectionType === "baileys" ? (
-              <Badge color="green" size="sm">Baileys</Badge>
-            ) : null}
+
+          {/* ── Cabecera ─────────────────────────────────────────── */}
+          <Group align="center" gap="sm">
+            <ThemeIcon size="lg" radius="md" variant="light" color="green">
+              <IconMessage size={18} />
+            </ThemeIcon>
+            <Box>
+              <Title order={3} lh={1.2}>Mensajes de WhatsApp</Title>
+              <Text size="xs" c="dimmed">Personaliza los mensajes que se envían automáticamente</Text>
+            </Box>
+            {isMeta ? (
+              <Badge color="blue" size="sm" ml="auto">Meta Cloud API</Badge>
+            ) : (
+              <Badge color="green" size="sm" ml="auto">Baileys</Badge>
+            )}
           </Group>
-          <Text c="dimmed" size="sm">
-            Personaliza los mensajes que se envían automáticamente a tus clientes
-          </Text>
-        </Box>
 
-        {message && (
-          <Alert
-            color={message.type === "error" ? "red" : "green"}
-            title={message.type === "error" ? "Error" : "Éxito"}
-            withCloseButton
-            onClose={() => setMessage(null)}
-          >
-            {message.text}
-          </Alert>
-        )}
-
-        <Paper withBorder radius="md" p={0}>
-          <Tabs value={activeTab} onChange={setActiveTab} orientation="horizontal" variant="default">
-            <Tabs.List 
-              px="md" 
-              pt="sm"
-              style={{ 
-                overflowX: 'auto', 
-                flexWrap: 'nowrap',
-                WebkitOverflowScrolling: 'touch'
-              }}
+          {message && (
+            <Alert
+              color={message.type === "error" ? "red" : "green"}
+              withCloseButton
+              onClose={() => setMessage(null)}
             >
-              {templateKeys.map((key) => {
-                const isDisabled = key === 'scheduleAppointment' || key === 'statusReservationApproved' || key === 'statusReservationRejected';
-                return (
-                  <Tabs.Tab 
-                    key={key} 
-                    value={key}
-                    disabled={isDisabled}
-                    style={{
-                      whiteSpace: 'nowrap',
-                      opacity: isDisabled ? 0.5 : 1,
-                      cursor: isDisabled ? 'not-allowed' : 'pointer',
-                    }}
-                    styles={{
-                      tab: {
-                        '@media (max-width: 768px)': {
-                          padding: `${rem(12)} ${rem(16)}`,
-                          fontSize: rem(15),
-                        },
-                      },
-                    }}
-                  >
-                    <Text size="sm" fw={500}>{templateInfo[key].title}</Text>
-                  </Tabs.Tab>
-                );
-              })}
-              {/* Meta Cloud API tab — solo si la org usa Meta */}
-              {organization?.waConnectionType === "meta" && (
-                <Tabs.Tab
-                  value="meta-templates"
-                  style={{ whiteSpace: 'nowrap' }}
+              {message.text}
+            </Alert>
+          )}
+
+          {/* ── Layout principal ─────────────────────────────────── */}
+          <Paper withBorder radius="md" style={{ overflow: "hidden" }}>
+            <Box style={{ display: "flex", minHeight: rem(580) }}>
+
+              {/* ── Sidebar ──────────────────────────────────────── */}
+              {showSidebar && (
+                <Box
+                  style={{
+                    width: isMobile ? "100%" : rem(240),
+                    flexShrink: 0,
+                    borderRight: isMobile ? "none" : "1px solid var(--mantine-color-gray-3)",
+                    display: "flex",
+                    flexDirection: "column",
+                    background: "var(--mantine-color-gray-0)",
+                  }}
                 >
-                  <Text size="sm" fw={500}>🔵 Plantillas Meta</Text>
-                </Tabs.Tab>
-              )}
-              {/* 🆕 Nueva pestaña de configuración */}
-              <Tabs.Tab
-                value="settings"
-                style={{ whiteSpace: 'nowrap' }}
-                styles={{
-                  tab: {
-                    '@media (max-width: 768px)': {
-                      padding: `${rem(12)} ${rem(16)}`,
-                      fontSize: rem(15),
-                    },
-                  },
-                }}
-              >
-                <Text size="sm" fw={500}>⚙️ Configuración</Text>
-              </Tabs.Tab>
-            </Tabs.List>
+                  {/* Título sidebar */}
+                  <Box
+                    px="md"
+                    py="sm"
+                    style={{ borderBottom: "1px solid var(--mantine-color-gray-3)" }}
+                  >
+                    <Group justify="space-between">
+                      <Text size="sm" fw={600} c="dimmed">Plantillas</Text>
+                      {isMeta && metaTemplates === undefined && <Loader size="xs" />}
+                    </Group>
+                  </Box>
 
-            {templateKeys.map((key) => (
-              <Tabs.Panel 
-                key={key} 
-                value={key}
-                styles={{
-                  panel: {
-                    '@media (max-width: 768px)': {
-                      padding: 'var(--mantine-spacing-sm)',
-                    },
-                  },
-                }}
-                p="md"
-              >
-                <Stack gap="lg">
-                  {/* Descripción */}
-                  <Alert icon={<IconInfoCircle size={20} />} color="blue" variant="light" radius="md">
-                    <Text size="sm" fw={500}>
-                      {templateInfo[key].description}
-                    </Text>
-                  </Alert>
-
-                  {/* Layout Principal: Editor + Variables */}
-                  <Box className="template-layout">
-                    {/* Columna Izquierda: Editor y Preview */}
-                    <Stack gap="md">
-                      {/* Editor */}
-                      <Box>
-                        <Group justify="space-between" mb="sm">
-                          <Group gap="xs">
-                            <Text fw={600} size="lg">✏️ Editor de Mensaje</Text>
-                            {templates[key].isCustom ? (
-                              <Badge color="green" variant="light" size="sm">
-                                Personalizado
-                              </Badge>
-                            ) : (
-                              <Badge color="gray" variant="light" size="sm">
-                                Por Defecto
-                              </Badge>
-                            )}
-                          </Group>
-                          <Tooltip label="Copiar plantilla por defecto como punto de partida">
-                            <Button
-                              variant="subtle"
-                              size="xs"
-                              leftSection={<IconCopy size={16} />}
-                              onClick={() => handleCopyDefault(key)}
-                            >
-                              Copiar plantilla original
-                            </Button>
-                          </Tooltip>
-                        </Group>
-
-                        <Textarea
-                          value={editedTemplates[key] || ""}
-                          onChange={(e) => handleTemplateChange(key, e.target.value)}
-                          placeholder="Escribe tu mensaje aquí..."
-                          minRows={16}
-                          autosize
-                          maxRows={25}
-                          styles={{
-                            input: {
-                              fontFamily: "'Courier New', monospace",
-                              fontSize: rem(14),
-                              lineHeight: 1.6,
-                              '@media (max-width: 768px)': {
-                                fontSize: rem(15),
-                                padding: rem(12),
-                                minHeight: rem(300),
-                              },
-                            },
-                          }}
-                        />
-
-                        <Group 
-                          gap="xs" 
-                          mt="md"
-                          styles={{
-                            root: {
-                              '@media (max-width: 768px)': {
-                                flexDirection: 'column',
-                                gap: rem(12),
-                                '& > button': {
-                                  width: '100%',
-                                  height: rem(48),
-                                  fontSize: rem(15),
-                                },
-                              },
-                            },
-                          }}
+                  <ScrollArea style={{ flex: 1 }}>
+                    {SIDEBAR_GROUPS.map((group, gi) => (
+                      <Box key={group.label}>
+                        {gi > 0 && <Divider />}
+                        <Text
+                          size="xs"
+                          fw={700}
+                          tt="uppercase"
+                          c="dimmed"
+                          px="md"
+                          pt="sm"
+                          pb={rem(4)}
+                          style={{ letterSpacing: "0.05em" }}
                         >
-                          <Button
-                            size="md"
-                            leftSection={<IconDeviceFloppy size={20} />}
-                            onClick={() => handleSave(key)}
-                            loading={saving}
-                          >
-                            Guardar Cambios
-                          </Button>
-                          <Button
-                            size="md"
-                            variant="light"
-                            leftSection={<IconEye size={20} />}
-                            onClick={() => handlePreview(key)}
-                          >
-                            Vista Previa
-                          </Button>
-                          {templates[key].isCustom && (
+                          {group.label}
+                        </Text>
+                        {group.keys.map((key) => {
+                          const dot = isMeta ? getMetaStatusDot(key) : null;
+                          const isCustom = !isMeta && templates[key as TemplateType]?.isCustom;
+                          return (
+                            <NavLink
+                              key={key}
+                              label={
+                                <Text size="sm" lineClamp={1}>
+                                  {templateInfo[key as TemplateType].shortTitle}
+                                </Text>
+                              }
+                              active={selectedKey === key}
+                              onClick={() => handleSelectKey(key)}
+                              rightSection={
+                                dot ? (
+                                  <Tooltip label={dot.title} position="right" withArrow>
+                                    <Box
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        background: dot.color,
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  </Tooltip>
+                                ) : isCustom ? (
+                                  <Tooltip label="Personalizada" position="right" withArrow>
+                                    <Box
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        background: "var(--mantine-color-teal-6)",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                  </Tooltip>
+                                ) : null
+                              }
+                              styles={{
+                                root: { paddingInline: rem(12) },
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    ))}
+
+                    <Divider my="xs" />
+                    <NavLink
+                      label={<Text size="sm">Configuración de envíos</Text>}
+                      leftSection={<IconSettings size={15} />}
+                      active={selectedKey === "settings"}
+                      onClick={() => handleSelectKey("settings")}
+                      styles={{ root: { paddingInline: rem(12) } }}
+                    />
+                  </ScrollArea>
+
+                  {/* Leyenda dots — solo Meta */}
+                  {isMeta && (
+                    <Box
+                      px="md"
+                      py="xs"
+                      style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}
+                    >
+                      <Box
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: `${rem(4)} ${rem(8)}`,
+                        }}
+                      >
+                        {[
+                          { color: "var(--mantine-color-green-6)", label: "Aprobada" },
+                          { color: "var(--mantine-color-yellow-6)", label: "En revisión" },
+                          { color: "var(--mantine-color-red-6)", label: "Rechazada" },
+                          { color: "var(--mantine-color-gray-4)", label: "No enviada" },
+                        ].map(({ color, label }) => (
+                          <Group key={label} gap={rem(4)} wrap="nowrap">
+                            <Box style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                            <Text size="xs" c="dimmed" lineClamp={1}>{label}</Text>
+                          </Group>
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* ── Panel editor ─────────────────────────────────── */}
+              {showEditor && (
+                <Box style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+
+                  {/* Header del editor */}
+                  <Box
+                    px="lg"
+                    py="sm"
+                    style={{ borderBottom: "1px solid var(--mantine-color-gray-3)", background: "white" }}
+                  >
+                    <Group justify="space-between" wrap="nowrap">
+                      <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                        {isMobile && (
+                          <ActionIcon variant="subtle" color="gray" onClick={() => setMobileView("list")}>
+                            <IconChevronLeft size={18} />
+                          </ActionIcon>
+                        )}
+                        <Box style={{ minWidth: 0 }}>
+                          <Text fw={600} size="md" lineClamp={1}>
+                            {selectedKey === "settings" ? "Configuración de envíos" : currentInfo?.title}
+                          </Text>
+                          {currentInfo && (
+                            <Text size="xs" c="dimmed" lineClamp={1}>{currentInfo.description}</Text>
+                          )}
+                        </Box>
+                      </Group>
+
+                      {/* Botón preview Baileys */}
+                      {!isMeta && selectedKey !== "settings" && (
+                        <Button
+                          size="xs"
+                          variant="light"
+                          leftSection={<IconEye size={13} />}
+                          onClick={() => handlePreview(selectedKey)}
+                          style={{ flexShrink: 0 }}
+                        >
+                          Vista previa
+                        </Button>
+                      )}
+                    </Group>
+                  </Box>
+
+                  {/* Cuerpo del editor */}
+                  <ScrollArea style={{ flex: 1 }}>
+                    <Box p="lg">
+                      {selectedKey === "settings" ? (
+                        // ── Panel configuración ───────────────────
+                        <Stack gap="md">
+                          <Alert icon={<IconInfoCircle size={18} />} color="blue" variant="light" radius="md">
+                            <Text size="sm">
+                              Habilita o deshabilita el envío automático de cada tipo de mensaje.
+                            </Text>
+                          </Alert>
+
+                          <Stack gap="xs">
+                            {[
+                              { key: "scheduleAppointment", label: "Confirmación de cita individual", desc: "Al crear una cita individual" },
+                              { key: "scheduleAppointmentBatch", label: "Confirmación de citas múltiples", desc: "Al crear varias citas juntas" },
+                              { key: "recurringAppointmentSeries", label: "Confirmación de citas recurrentes", desc: "Al crear una serie de citas" },
+                              { key: "clientConfirmationAck", label: "Agradecimiento por confirmación", desc: "Cuando el cliente confirma asistencia" },
+                              { key: "clientCancellationAck", label: "Aviso de cancelación al cliente", desc: "Cuando el cliente cancela" },
+                              { key: "clientNoShowAck", label: "Aviso de no asistencia", desc: "Cuando se marca como no asistió" },
+                            ].map(({ key, label, desc }) => (
+                              <Paper key={key} withBorder p="sm" radius="md">
+                                <Group justify="space-between">
+                                  <Box>
+                                    <Text size="sm" fw={500}>{label}</Text>
+                                    <Text size="xs" c="dimmed">{desc}</Text>
+                                  </Box>
+                                  <Switch
+                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
+                                    onChange={(e) =>
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
+                                    }
+                                  />
+                                </Group>
+                              </Paper>
+                            ))}
+
+                            <Alert icon={<IconAlertCircle size={18} />} color="green" radius="md">
+                              <Group justify="space-between">
+                                <Box>
+                                  <Text size="sm" fw={500}>Recordatorios de citas</Text>
+                                  <Text size="xs" c="dimmed">Se envían automáticamente 24h antes de cada cita</Text>
+                                </Box>
+                                <Badge color="green" variant="filled">Siempre activo</Badge>
+                              </Group>
+                            </Alert>
+
+                            <Divider label="Plan de fidelidad" labelPosition="center" />
+
+                            {[
+                              { key: "loyaltyServiceReward", label: "Premio de fidelidad (servicios)", desc: "Al completar meta de servicios" },
+                              { key: "loyaltyReferralReward", label: "Premio de referidos", desc: "Al completar meta de referidos" },
+                            ].map(({ key, label, desc }) => (
+                              <Paper key={key} withBorder p="sm" radius="md">
+                                <Group justify="space-between">
+                                  <Box>
+                                    <Text size="sm" fw={500}>{label}</Text>
+                                    <Text size="xs" c="dimmed">{desc}</Text>
+                                  </Box>
+                                  <Switch
+                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
+                                    onChange={(e) =>
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
+                                    }
+                                  />
+                                </Group>
+                              </Paper>
+                            ))}
+                          </Stack>
+
+                          <Group justify="flex-end">
                             <Button
-                              size="md"
-                              variant="outline"
-                              color="orange"
-                              leftSection={<IconRestore size={20} />}
-                              onClick={() => handleRestore(key)}
+                              leftSection={<IconDeviceFloppy size={16} />}
+                              onClick={handleSaveSettings}
                               loading={saving}
                             >
-                              Restaurar Original
+                              Guardar configuración
                             </Button>
-                          )}
-                        </Group>
-                      </Box>
-                    </Stack>
-
-                    {/* Columna Derecha: Variables Disponibles (sticky en desktop, accordion en mobile) */}
-                    <Box className="variables-panel">
-                      <Card withBorder radius="md" p="md">
-                        <Box>
-                          <Text fw={600} size="md" mb="sm">🏷️ Variables Disponibles</Text>
-                          <Text size="xs" c="dimmed" mb="md" display={{ base: 'block', md: 'block' }}>
-                            Haz clic en una variable para copiarla. Se reemplazarán automáticamente con datos reales.
-                          </Text>
-                        </Box>
-                        <Divider mb="md" />
-                        <Stack gap="sm">
-                          {templateInfo[key].variables.map((v) => (
-                            <Box
-                              key={v.name}
-                              p="xs"
-                              style={{
-                                borderRadius: rem(6),
-                                cursor: "pointer",
-                                transition: "background-color 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = "var(--mantine-color-gray-1)";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = "transparent";
-                              }}
-                              onClick={() => {
-                                navigator.clipboard.writeText(v.name);
-                                setMessage({ type: "success", text: `Copiado: ${v.name}` });
-                                setTimeout(() => setMessage(null), 2000);
-                              }}
-                            >
-                              <Badge
-                                variant="light"
-                                color="blue"
-                                size="md"
-                                fullWidth
-                                style={{ 
-                                  fontFamily: "monospace",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {v.name}
-                              </Badge>
-                              <Text size="xs" c="dimmed" mt={4} pl={4}>
-                                {v.desc}
-                              </Text>
-                            </Box>
-                          ))}
+                          </Group>
                         </Stack>
-                      </Card>
+
+                      ) : isMeta && organization?._id ? (
+                        // ── Editor Meta ───────────────────────────
+                        <MetaTemplateFormTab
+                          key={selectedKey}
+                          templateKey={selectedKey}
+                          organizationId={organization._id}
+                          metaTemplates={metaTemplates}
+                          onRefreshMetaTemplates={loadMetaTemplates}
+                        />
+
+                      ) : (
+                        // ── Editor Baileys ────────────────────────
+                        <Box
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr",
+                            gap: rem(20),
+                            alignItems: "start",
+                          }}
+                          className="baileys-editor-grid"
+                        >
+                          <style>{`
+                            @media (min-width: 900px) {
+                              .baileys-editor-grid { grid-template-columns: 1fr 280px !important; }
+                              .baileys-vars-panel { position: sticky; top: ${rem(20)}; }
+                            }
+                          `}</style>
+
+                          {/* Textarea */}
+                          <Stack gap="sm">
+                            <Group justify="space-between">
+                              <Group gap="xs">
+                                <Text fw={600}>Editor de mensaje</Text>
+                                {templates[selectedKey as TemplateType]?.isCustom ? (
+                                  <Badge color="teal" variant="light" size="sm">Personalizado</Badge>
+                                ) : (
+                                  <Badge color="gray" variant="light" size="sm">Por defecto</Badge>
+                                )}
+                              </Group>
+                              <Tooltip label="Copiar plantilla por defecto como punto de partida">
+                                <Button
+                                  variant="subtle"
+                                  size="xs"
+                                  leftSection={<IconCopy size={14} />}
+                                  onClick={() => handleCopyDefault(selectedKey)}
+                                >
+                                  Copiar original
+                                </Button>
+                              </Tooltip>
+                            </Group>
+
+                            <Textarea
+                              value={editedTemplates[selectedKey] || ""}
+                              onChange={(e) => handleTemplateChange(selectedKey, e.target.value)}
+                              placeholder="Escribe tu mensaje aquí..."
+                              minRows={16}
+                              autosize
+                              maxRows={30}
+                              styles={{
+                                input: {
+                                  fontFamily: "'Courier New', monospace",
+                                  fontSize: rem(13),
+                                  lineHeight: 1.6,
+                                },
+                              }}
+                            />
+
+                            <Group gap="xs">
+                              <Button
+                                leftSection={<IconDeviceFloppy size={16} />}
+                                onClick={() => handleSave(selectedKey)}
+                                loading={saving}
+                              >
+                                Guardar
+                              </Button>
+                              {templates[selectedKey as TemplateType]?.isCustom && (
+                                <Button
+                                  variant="outline"
+                                  color="orange"
+                                  leftSection={<IconRestore size={16} />}
+                                  onClick={() => handleRestore(selectedKey)}
+                                  loading={saving}
+                                >
+                                  Restaurar original
+                                </Button>
+                              )}
+                            </Group>
+                          </Stack>
+
+                          {/* Variables panel */}
+                          <Box className="baileys-vars-panel">
+                            <Card withBorder radius="md" p="md">
+                              <Text fw={600} mb="xs">Variables disponibles</Text>
+                              <Text size="xs" c="dimmed" mb="md">
+                                Haz clic para copiar. Se reemplazan con datos reales al enviar.
+                              </Text>
+                              <Divider mb="md" />
+                              <Stack gap="xs">
+                                {currentInfo?.variables.map((v) => (
+                                  <Box
+                                    key={v.name}
+                                    p="xs"
+                                    style={{
+                                      borderRadius: rem(6),
+                                      cursor: "pointer",
+                                      transition: "background-color 0.15s",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = "var(--mantine-color-gray-1)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = "transparent";
+                                    }}
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(v.name);
+                                      setMessage({ type: "success", text: `Copiado: ${v.name}` });
+                                      setTimeout(() => setMessage(null), 2000);
+                                    }}
+                                  >
+                                    <Badge
+                                      variant="light"
+                                      color="blue"
+                                      size="sm"
+                                      fullWidth
+                                      style={{ fontFamily: "monospace", cursor: "pointer" }}
+                                    >
+                                      {v.name}
+                                    </Badge>
+                                    <Text size="xs" c="dimmed" mt={2} pl={4}>{v.desc}</Text>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            </Card>
+                          </Box>
+                        </Box>
+                      )}
                     </Box>
-                  </Box>
-                </Stack>
-              </Tabs.Panel>
-            ))}
+                  </ScrollArea>
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        </Stack>
+      </Container>
 
-            {/* Meta Cloud API Panel */}
-            {organization?.waConnectionType === "meta" && organization?._id && (
-              <Tabs.Panel value="meta-templates" p="md">
-                <MetaTemplatesPanel organizationId={organization._id} />
-              </Tabs.Panel>
-            )}
-
-            {/* 🆕 Panel de Configuración de Envíos */}
-            <Tabs.Panel value="settings" p="md">
-              <Stack gap="lg">
-                <Alert icon={<IconInfoCircle size={20} />} color="blue" variant="light" radius="md">
-                  <Text size="sm" fw={500}>
-                    Aquí puedes habilitar o deshabilitar el envío automático de confirmación 
-                    para cada tipo de cita. Los recordatorios siempre se enviarán.
-                  </Text>
-                </Alert>
-
-                <Stack gap="md">
-                  {/* Confirmación Única */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Confirmación de Cita Única</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando se crea una cita individual
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.scheduleAppointment ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            scheduleAppointment: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Confirmación Múltiple */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Confirmación de Citas Múltiples</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando se crean varias citas juntas
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.scheduleAppointmentBatch ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            scheduleAppointmentBatch: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Confirmación Recurrente */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Confirmación de Citas Recurrentes</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando se crea una serie de citas recurrentes
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.recurringAppointmentSeries ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            recurringAppointmentSeries: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Recordatorio (Siempre activo) */}
-                  <Alert icon={<IconAlertCircle size={20} />} color="green" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Recordatorio de Citas</Text>
-                        <Text size="sm" c="dimmed">
-                          Siempre activo - se envía automáticamente 24h antes de cada cita
-                        </Text>
-                      </Box>
-                      <Badge color="green" variant="filled">
-                        Siempre Activo
-                      </Badge>
-                    </Group>
-                  </Alert>
-
-                  {/* Agradecimiento por Confirmación */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Agradecimiento por Confirmación</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando el cliente confirma su asistencia
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.clientConfirmationAck ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            clientConfirmationAck: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Aviso de Cancelación al Cliente */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Aviso de Cancelación al Cliente</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando el cliente cancela su(s) cita(s)
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.clientCancellationAck ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            clientCancellationAck: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Aviso de No Asistencia */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>Aviso de No Asistencia</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando se marca que el cliente no asistió a su cita
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.clientNoShowAck ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            clientNoShowAck: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  <Divider label="Plan de Fidelidad" labelPosition="center" />
-
-                  {/* Premio de Fidelidad - Servicios */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>🏆 Premio de Fidelidad (Servicios)</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando el cliente completa su meta de servicios
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.loyaltyServiceReward ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            loyaltyServiceReward: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Premio de Referidos */}
-                  <Paper withBorder p="md" radius="md">
-                    <Group justify="space-between">
-                      <Box>
-                        <Text fw={600}>🎁 Premio de Referidos</Text>
-                        <Text size="sm" c="dimmed">
-                          Se envía cuando el cliente completa su meta de referidos
-                        </Text>
-                      </Box>
-                      <Switch
-                        checked={templateSettings.loyaltyReferralReward ?? true}
-                        onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          setTemplateSettings(prev => ({
-                            ...prev,
-                            loyaltyReferralReward: checked
-                          }));
-                        }}
-                        size="lg"
-                      />
-                    </Group>
-                  </Paper>
-
-                  {/* Botón de guardar */}
-                  <Group gap="xs" mt="md">
-                    <Button
-                      size="md"
-                      leftSection={<IconDeviceFloppy size={20} />}
-                      onClick={handleSaveSettings}
-                      loading={saving}
-                    >
-                      💾 Guardar Configuración
-                    </Button>
-                  </Group>
-                </Stack>
-              </Stack>
-            </Tabs.Panel>
-          </Tabs>
-        </Paper>
-      </Stack>
-
-      {/* Modal de Vista Previa estilo WhatsApp */}
+      {/* ── Modal preview Baileys ─────────────────────────────────────── */}
       <Modal
         opened={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
@@ -930,12 +864,8 @@ export default function WhatsappTemplateEditor() {
         radius="lg"
         centered
         withCloseButton={false}
-        styles={{
-          body: { padding: 0 },
-          content: { overflow: "hidden" },
-        }}
+        styles={{ body: { padding: 0 }, content: { overflow: "hidden" } }}
       >
-        {/* Simulación de Teléfono */}
         <Box
           style={{
             background: "linear-gradient(180deg, #1e1e1e 0%, #2d2d2d 100%)",
@@ -943,7 +873,6 @@ export default function WhatsappTemplateEditor() {
             borderRadius: rem(12),
           }}
         >
-          {/* Pantalla del Teléfono */}
           <Box
             style={{
               background: "white",
@@ -953,7 +882,7 @@ export default function WhatsappTemplateEditor() {
               position: "relative",
             }}
           >
-            {/* Notch del teléfono */}
+            {/* Notch */}
             <Box
               style={{
                 position: "absolute",
@@ -967,15 +896,8 @@ export default function WhatsappTemplateEditor() {
                 zIndex: 10,
               }}
             />
-
-            {/* Header de WhatsApp */}
-            <Box
-              style={{
-                background: "#075E54",
-                padding: `${rem(40)} ${rem(16)} ${rem(12)}`,
-                color: "white",
-              }}
-            >
+            {/* Header WA */}
+            <Box style={{ background: "#075E54", padding: `${rem(40)} ${rem(16)} ${rem(12)}`, color: "white" }}>
               <Group justify="space-between" align="center">
                 <Group gap="xs">
                   <ActionIcon variant="transparent" color="white" size="lg">
@@ -983,149 +905,84 @@ export default function WhatsappTemplateEditor() {
                   </ActionIcon>
                   <Box
                     style={{
-                      width: rem(40),
-                      height: rem(40),
-                      borderRadius: "50%",
-                      background: "#25D366",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 700,
-                      fontSize: rem(18),
+                      width: rem(40), height: rem(40), borderRadius: "50%",
+                      background: "#25D366", display: "flex", alignItems: "center",
+                      justifyContent: "center", fontWeight: 700, fontSize: rem(18),
                     }}
                   >
                     {organization?.name?.charAt(0).toUpperCase() || "A"}
                   </Box>
                   <Box>
-                    <Text fw={600} size="md" c="white">
-                      {organization?.name || "Mi Negocio"}
-                    </Text>
-                    <Text size="xs" c="rgba(255,255,255,0.7)">
-                      en línea
-                    </Text>
+                    <Text fw={600} size="md" c="white">{organization?.name || "Mi Negocio"}</Text>
+                    <Text size="xs" c="rgba(255,255,255,0.7)">en línea</Text>
                   </Box>
                 </Group>
                 <Group gap="md">
-                  <ActionIcon variant="transparent" color="white">
-                    <IconVideo size={22} />
-                  </ActionIcon>
-                  <ActionIcon variant="transparent" color="white">
-                    <IconPhone size={22} />
-                  </ActionIcon>
-                  <ActionIcon variant="transparent" color="white">
-                    <IconDotsVertical size={22} />
-                  </ActionIcon>
+                  <ActionIcon variant="transparent" color="white"><IconVideo size={22} /></ActionIcon>
+                  <ActionIcon variant="transparent" color="white"><IconPhone size={22} /></ActionIcon>
+                  <ActionIcon variant="transparent" color="white"><IconDotsVertical size={22} /></ActionIcon>
                 </Group>
               </Group>
             </Box>
-
-            {/* Área de Conversación */}
+            {/* Conversación */}
             <Box
               style={{
                 background: "#ECE5DD",
-                backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYSIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTAgMGw0MCA0ME0wIDQwbDQwLTQwIiBzdHJva2U9IiNkZGQ3Y2UiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjYSkiLz48L3N2Zz4=')",
                 padding: rem(16),
-                minHeight: rem(400),
-                maxHeight: rem(500),
+                minHeight: rem(350),
+                maxHeight: rem(450),
                 overflowY: "auto",
               }}
             >
-              {/* Burbuja del Mensaje */}
               <Box style={{ display: "flex", justifyContent: "flex-start", marginBottom: rem(8) }}>
                 <Box
                   style={{
                     background: "white",
                     borderRadius: `${rem(8)} ${rem(8)} ${rem(8)} ${rem(2)}`,
                     padding: rem(10),
-                    maxWidth: "80%",
+                    maxWidth: "82%",
                     boxShadow: "0 1px 0.5px rgba(0,0,0,0.13)",
-                    position: "relative",
                   }}
                 >
                   <Text
                     size="sm"
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      lineHeight: 1.5,
-                      color: "#303030",
-                    }}
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5, color: "#303030" }}
                   >
                     {preview}
                   </Text>
-                  <Group gap={4} justify="flex-end" mt={4}>
-                    <Text size="xs" c="dimmed" style={{ fontSize: rem(11) }}>
-                      {new Date().toLocaleTimeString("es-ES", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </Text>
-                  </Group>
+                  <Text size="xs" c="dimmed" ta="right" mt={4} style={{ fontSize: rem(11) }}>
+                    {new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                  </Text>
                 </Box>
               </Box>
-
-              {/* Nota informativa */}
               <Box mt="xl" style={{ textAlign: "center" }}>
-                <Paper
-                  p="xs"
-                  radius="md"
-                  bg="rgba(255,255,255,0.8)"
-                  style={{ display: "inline-block" }}
-                >
-                  <Text size="xs" c="dimmed">
-                    💡 Vista previa con datos de ejemplo
-                  </Text>
+                <Paper p="xs" radius="md" bg="rgba(255,255,255,0.8)" style={{ display: "inline-block" }}>
+                  <Text size="xs" c="dimmed">Vista previa con datos de ejemplo</Text>
                 </Paper>
               </Box>
             </Box>
-
-            {/* Barra de Input (simulada) */}
-            <Box
-              style={{
-                background: "#F0F0F0",
-                padding: rem(8),
-                borderTop: "1px solid #e0e0e0",
-              }}
-            >
+            {/* Barra input simulada */}
+            <Box style={{ background: "#F0F0F0", padding: rem(8), borderTop: "1px solid #e0e0e0" }}>
               <Group gap="xs">
                 <Box
                   style={{
-                    flex: 1,
-                    background: "white",
-                    borderRadius: rem(20),
-                    padding: `${rem(8)} ${rem(16)}`,
-                    border: "1px solid #ddd",
+                    flex: 1, background: "white", borderRadius: rem(20),
+                    padding: `${rem(8)} ${rem(16)}`, border: "1px solid #ddd",
                   }}
                 >
-                  <Text size="sm" c="dimmed">
-                    Escribe un mensaje...
-                  </Text>
+                  <Text size="sm" c="dimmed">Escribe un mensaje...</Text>
                 </Box>
-                <ActionIcon
-                  size="lg"
-                  radius="xl"
-                  variant="filled"
-                  color="teal"
-                  style={{ background: "#25D366" }}
-                >
+                <ActionIcon size="lg" radius="xl" variant="filled" style={{ background: "#25D366" }}>
                   <Text size="lg">🎤</Text>
                 </ActionIcon>
               </Group>
             </Box>
           </Box>
-
-          {/* Botón para cerrar */}
-          <Button
-            fullWidth
-            mt="md"
-            variant="light"
-            onClick={() => setPreviewModalOpen(false)}
-          >
-            Cerrar Vista Previa
+          <Button fullWidth mt="md" variant="light" onClick={() => setPreviewModalOpen(false)}>
+            Cerrar
           </Button>
         </Box>
       </Modal>
-      </Container>
     </>
   );
 }
