@@ -28,6 +28,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { CustomLoader } from "./components/customLoader/CustomLoader";
+import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
@@ -274,11 +275,7 @@ function AppContent() {
 
   // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
   if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !organization) {
-    return (
-      <CustomLoader
-        loadingText="Cargando organización..."
-      />
-    );
+    return <CustomLoaderHtml loadingText="Cargando organización..." />;
   }
 
   return (
