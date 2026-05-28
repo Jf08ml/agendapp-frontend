@@ -12,8 +12,8 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { BiCheckCircle, BiError, BiLinkExternal, BiX } from "react-icons/bi";
-import { connectMetaOrg, disconnectMetaOrg, getMetaStatus } from "../../../services/organizationService";
+import { BiCheckCircle, BiError, BiLinkExternal, BiRefresh, BiX } from "react-icons/bi";
+import { connectMetaOrg, disconnectMetaOrg, getMetaStatus, registerMetaPhone } from "../../../services/organizationService";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "../../../app/store";
 import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
@@ -48,6 +48,7 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const sdkReady = useRef(false);
 
   useEffect(() => {
@@ -128,6 +129,19 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
     );
   }
 
+  async function handleRegister() {
+    setRegistering(true);
+    try {
+      await registerMetaPhone(organizationId);
+      notifications.show({ color: "green", message: "Número registrado en la Cloud API. Ya puedes enviar mensajes." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al registrar el número";
+      notifications.show({ color: "red", message: msg });
+    } finally {
+      setRegistering(false);
+    }
+  }
+
   async function handleDisconnect() {
     setDisconnecting(true);
     try {
@@ -165,6 +179,16 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
             <Text size="xs" c="dimmed">WABA ID: {status.wabaId}</Text>
           </Alert>
           <Group justify="flex-end">
+            <Button
+              color="blue"
+              variant="subtle"
+              size="sm"
+              leftSection={<BiRefresh size={16} />}
+              onClick={handleRegister}
+              loading={registering}
+            >
+              Registrar número
+            </Button>
             <Button
               color="red"
               variant="subtle"

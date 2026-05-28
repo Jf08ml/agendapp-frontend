@@ -271,6 +271,11 @@ export const connectMetaOrg = async (
   return response.data.data;
 };
 
+export const registerMetaPhone = async (organizationId: string): Promise<{ success: boolean; phone: string }> => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-register-phone`);
+  return response.data.data;
+};
+
 export const disconnectMetaOrg = async (organizationId: string): Promise<void> => {
   await apiOrganization.delete(`/${organizationId}/meta-disconnect`);
 };
