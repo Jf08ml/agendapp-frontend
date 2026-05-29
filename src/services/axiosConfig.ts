@@ -331,6 +331,7 @@ const apiClass: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/classes`);
 const apiClassPublic: AxiosInstance = createPublicAxiosInstance(`${API_BASE_URL}/classes`);
 const apiEnrollment: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/enrollments`);
 const apiEnrollmentPublic: AxiosInstance = createPublicAxiosInstance(`${API_BASE_URL}/enrollments`);
+const apiAgent: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/admin/agents`);
 
 export {
   apiGeneral,
@@ -355,4 +356,5 @@ export {
   apiClassPublic,
   apiEnrollment,
   apiEnrollmentPublic,
+  apiAgent,
 };

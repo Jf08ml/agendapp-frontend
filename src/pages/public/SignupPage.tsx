@@ -62,6 +62,7 @@ const signupSchema = z.object({
   default_country: z.string().optional(),
   timezone: z.string().optional(),
   currency: z.string().optional(),
+  referralCode: z.string().optional(),
 });
 
 const COUNTRY_CURRENCY_MAP: Record<string, string> = {
@@ -154,6 +155,7 @@ function detectRegionalDefaults() {
 
 export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [referralLocked, setReferralLocked] = useState(false);
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export default function SignupPage() {
       default_country: regionalDefaults.country,
       timezone: regionalDefaults.timezone,
       currency: regionalDefaults.currency,
+      referralCode: "",
     },
   });
 
@@ -230,6 +233,21 @@ export default function SignupPage() {
 
   useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); }, []);
 
+  // Auto-fill referral code from ?ref= URL param or localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refParam = params.get("ref");
+    if (refParam) {
+      form.setFieldValue("referralCode", refParam.toUpperCase());
+      localStorage.setItem("signup_referral_code", refParam.toUpperCase());
+      setReferralLocked(true);
+    } else {
+      const stored = localStorage.getItem("signup_referral_code");
+      if (stored) { form.setFieldValue("referralCode", stored); setReferralLocked(true); }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (supportTimer.current) clearTimeout(supportTimer.current);
     if (supportState === "expanded") {
@@ -268,7 +286,9 @@ export default function SignupPage() {
         phone: values.phone, turnstileToken: token,
         default_country: values.default_country || undefined,
         timezone: values.timezone || undefined, currency: values.currency || undefined,
+        referralCode: values.referralCode || undefined,
       });
+      localStorage.removeItem("signup_referral_code");
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
       const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
       setSuccessInfo({ displayUrl, redirectUrl });
@@ -666,6 +686,20 @@ export default function SignupPage() {
                     styles={inputStyles}
                   />
                 </SimpleGrid>
+
+                <TextInput
+                  label={
+                    <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 600 }}>
+                      Código de referido{" "}
+                      {!referralLocked && <span style={{ fontWeight: 400 }}>(opcional)</span>}
+                    </span>
+                  }
+                  placeholder="Ej: AB12CD34"
+                  value={form.values.referralCode ?? ""}
+                  onChange={(e) => form.setFieldValue("referralCode", e.currentTarget.value.toUpperCase())}
+                  disabled={referralLocked}
+                  styles={inputStyles}
+                />
 
                 <Box mt={4}>
                   <Turnstile

@@ -342,6 +342,14 @@ export default function SuperadminOrganizations() {
         >
           Gestión de membresías
         </Button>
+        <Button
+          variant="light"
+          leftSection={<BiUserCheck size={16} />}
+          size="sm"
+          onClick={() => navigate("/superadmin/agentes")}
+        >
+          Agentes
+        </Button>
       </Group>
 
       <Group justify="space-between" mb="md">

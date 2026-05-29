@@ -19,6 +19,7 @@ export interface RegisterData {
   default_country?: string;
   timezone?: string;
   currency?: string;
+  referralCode?: string;
 }
 
 export interface RegisterResponse {

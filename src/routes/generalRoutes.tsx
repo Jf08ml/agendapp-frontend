@@ -35,6 +35,7 @@ import SignupPage from "../pages/public/SignupPage";
 import ExchangePage from "../pages/public/ExchangePage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
+import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
 import HelpPage from "../pages/admin/HelpPage";
 import AuditLogPage from "../pages/admin/auditLog";
 import ManageClasses from "../pages/admin/classes";
@@ -428,6 +429,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestión de Planes",
       description: "Crea y edita los planes de la plataforma",
+    },
+  },
+  {
+    path: "/superadmin/agentes",
+    component: SuperadminAgents,
+    MediaMetadata: {
+      title: "Agentes / Referidores",
+      description: "Gestión de agentes y tracking de referidos",
     },
   },
   {
