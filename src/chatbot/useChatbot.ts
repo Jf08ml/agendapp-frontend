@@ -57,12 +57,18 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone, agentName
     }
   }, [autoStart, sendInternal]);
 
-  // Mensaje de bienvenida cuando no es autoStart
+  // Inicializa o actualiza el mensaje de bienvenida cuando cambia el agentName,
+  // siempre que la conversación todavía no haya comenzado (sin mensajes del usuario).
   useEffect(() => {
-    if (!autoStart && messages.length === 0) {
-      setMessages([buildWelcomeMessage(agentName)]);
-    }
-  }, [autoStart, messages.length, agentName]);
+    if (autoStart) return;
+    setMessages((prev) => {
+      const conversationNotStarted =
+        prev.length === 0 ||
+        (prev.length === 1 && prev[0].role === "assistant");
+      if (conversationNotStarted) return [buildWelcomeMessage(agentName)];
+      return prev;
+    });
+  }, [autoStart, agentName]);
 
   const reset = useCallback(() => {
     sessionId.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

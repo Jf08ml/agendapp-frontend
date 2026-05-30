@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack, TextInput, Textarea, Select } from "@mantine/core";
+import { SimpleGrid, Stack, TextInput, Textarea, Select, Text } from "@mantine/core";
 import { useMemo } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
@@ -13,6 +13,7 @@ import {
   IconLayoutColumns,
   IconWriting,
   IconClockHour3,
+  IconRobot,
 } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
@@ -124,6 +125,26 @@ export default function ContactTab({
             disabled
           />
         </SimpleGrid>
+      </SectionCard>
+
+      <SectionCard
+        title="Asistente IA"
+        description="Personaliza el nombre del asistente inteligente que aparece en el panel de administración."
+        icon={<IconRobot size={16} />}
+      >
+        <Stack gap="xs">
+          <TextInput
+            label="Nombre del asistente"
+            placeholder="Ej: Roxi, Luna, Max…"
+            leftSection={<IconRobot size={16} />}
+            maxLength={50}
+            {...form.getInputProps("aiAssistantName")}
+            disabled={!isEditing}
+          />
+          <Text size="xs" c="dimmed">
+            Este nombre se mostrará en el botón del footer, en el encabezado del chat y en el mensaje de bienvenida del asistente.
+          </Text>
+        </Stack>
       </SectionCard>
 
       <SectionCard

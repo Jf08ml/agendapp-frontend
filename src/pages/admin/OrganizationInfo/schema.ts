@@ -238,6 +238,15 @@ export const schema = z.object({
   currency: z.string().length(3, "Código de moneda inválido (ISO 4217)").optional(),
   // Formato de hora
   timeFormat: z.enum(['12h', '24h']).optional(),
+  // Nombre del agente IA administrador
+  aiAssistantName: z
+    .union([
+      z.string().min(1, "Mínimo 1 caracter").max(50, "Máximo 50 caracteres"),
+      z.literal(""),
+      z.null(),
+      z.undefined(),
+    ])
+    .optional(),
 });
 
 export type FormValues = z.infer<typeof schema>;

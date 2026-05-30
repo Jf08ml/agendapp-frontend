@@ -295,9 +295,13 @@ export default function MultiBookingWizard() {
     setCurrentStep(0);
   };
 
+  // Altura disponible = 100dvh - header (50px) - footer (30px) - bordes/padding (~10px)
+  const FULL_H = "calc(100dvh - 90px)";
+
   if (mode === "choice") {
     return (
-      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}
+        style={{ minHeight: FULL_H, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <BookingChoiceScreen
           onSelectAI={() => setMode("chat")}
           onSelectManual={() => setMode("manual")}
@@ -311,7 +315,8 @@ export default function MultiBookingWizard() {
       ? services.find((s) => s._id === preselectedServiceId)
       : undefined;
     return (
-      <Card withBorder radius="md" p={0} style={{ overflow: "hidden" }}>
+      <Card withBorder radius="md" p={0}
+        style={{ overflow: "hidden", height: FULL_H, display: "flex", flexDirection: "column" }}>
         <BookingChatPanel
           onBack={() => setMode("choice")}
           preselectedService={preselectedService}
@@ -433,7 +438,7 @@ export default function MultiBookingWizard() {
       withBorder
       radius="md"
       p={isMobile ? "md" : "xl"}
-      style={{ position: "relative" }}
+      style={{ position: "relative", minHeight: FULL_H }}
     >
       <LoadingOverlay visible={submitting} zIndex={1000} />
       <div ref={contentTopRef} />

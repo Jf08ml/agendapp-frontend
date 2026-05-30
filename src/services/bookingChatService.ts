@@ -57,3 +57,11 @@ export const sendBookingMessage = async (
     bookingPayload: data.data.bookingPayload ?? null,
   };
 };
+
+export const sendBookingFeedback = async (payload: {
+  rating: 1 | 2 | 3 | 4 | 5;
+  message?: string;
+  sessionId?: string;
+}): Promise<void> => {
+  await api.post("/feedback", payload);
+};
