@@ -9,7 +9,7 @@ import {
   Anchor,
   Drawer,
 } from "@mantine/core";
-import { useDisclosure, useMediaQuery } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import ChatPanel from "./chatbot/ChatPanel";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
@@ -61,7 +61,7 @@ function AppContent() {
   );
   const [opened, { toggle, close }] = useDisclosure(false);
   const [chatOpen, { open: openChat, toggle: toggleChat, close: closeChat }] = useDisclosure(false);
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  // const isMobile = useMediaQuery("(max-width: 768px)");
   const [chatAutoStart, setChatAutoStart] = useState(false);
   const isSuperadmin = role === "superadmin";
 
