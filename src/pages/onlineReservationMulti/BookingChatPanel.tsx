@@ -18,7 +18,6 @@ import {
   Divider,
   UnstyledButton,
   Modal,
-  Tooltip,
   rem,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
