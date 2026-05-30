@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { sendMessage, ChatMessage } from "./chatbotService";
 
-const WELCOME_MESSAGE: ChatMessage = {
+const buildWelcomeMessage = (agentName: string): ChatMessage => ({
   role: "assistant",
-  content: "¡Hola! Soy tu asistente de AgenditApp. Estoy aquí para ayudarte a configurar tu negocio y responder tus preguntas. ¿Por dónde empezamos?",
-};
+  content: `¡Hola! Soy **${agentName}**, tu asistente de AgenditApp. Estoy aquí para ayudarte a configurar tu negocio y responder tus preguntas. ¿Por dónde empezamos?`,
+});
 
 const ONBOARDING_TRIGGER = "Hola, quiero comenzar la configuración inicial de mi negocio.";
 
@@ -12,9 +12,10 @@ interface UseChatbotOptions {
   onInvalidate?: (invalidates: string[]) => void;
   autoStart?: boolean;
   onAutoStartDone?: () => void;
+  agentName?: string;
 }
 
-export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone }: UseChatbotOptions = {}) => {
+export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone, agentName = "Roxi" }: UseChatbotOptions = {}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,16 +60,16 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone }: UseChat
   // Mensaje de bienvenida cuando no es autoStart
   useEffect(() => {
     if (!autoStart && messages.length === 0) {
-      setMessages([WELCOME_MESSAGE]);
+      setMessages([buildWelcomeMessage(agentName)]);
     }
-  }, [autoStart, messages.length]);
+  }, [autoStart, messages.length, agentName]);
 
   const reset = useCallback(() => {
     sessionId.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    setMessages(autoStart ? [] : [WELCOME_MESSAGE]);
+    setMessages(autoStart ? [] : [buildWelcomeMessage(agentName)]);
     setError(null);
     autoStarted.current = false;
-  }, [autoStart]);
+  }, [autoStart, agentName]);
 
   return { messages, loading, error, send, reset, sessionId: sessionId.current };
 };

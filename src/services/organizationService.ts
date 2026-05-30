@@ -155,6 +155,7 @@ export interface Organization {
   };
   currency?: string;
   timeFormat?: '12h' | '24h';
+  aiAssistantName?: string;
   clientFormConfig?: ClientFormConfig;
   // Sistema de membresías
   currentMembershipId?: string;

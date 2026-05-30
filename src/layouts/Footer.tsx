@@ -11,7 +11,7 @@ import {
   Avatar,
 } from "@mantine/core";
 import { MdInstallMobile, MdSystemUpdateAlt } from "react-icons/md";
-import { IconRefresh } from "@tabler/icons-react";
+import { IconRefresh, IconRobot } from "@tabler/icons-react";
 import { FaSignOutAlt, FaUserShield } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -42,7 +42,12 @@ async function clearSiteData() {
   window.location.reload();
 }
 
-export default function Footer() {
+interface FooterProps {
+  chatOpen?: boolean;
+  onToggleChat?: () => void;
+}
+
+export default function Footer({ chatOpen = false, onToggleChat }: FooterProps) {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [appVersion, setAppVersion] = useState<Version | null>(null);
@@ -56,6 +61,7 @@ export default function Footer() {
 
   const { name, branding } = organization || {};
   const planLimits = (organization as any)?.planLimits;
+  const agentName = organization?.aiAssistantName || "Roxi";
   const showAgenditBranding = planLimits?.brandingVisible === true;
   const footerColor = branding?.primaryColor || branding?.themeColor || "#1C3461";
   const logoUrl = branding?.logoUrl || "/logo-default.png";
@@ -168,8 +174,31 @@ export default function Footer() {
           )}
         </Group>
 
-        {/* CENTRO: botones PWA */}
+        {/* CENTRO: agente IA + botones PWA */}
         <Group gap={6} wrap="nowrap" style={{ flexShrink: 0 }}>
+          {/* Botón del agente IA admin — solo cuando está autenticado */}
+          {isAuthenticated && onToggleChat && (
+            <Tooltip label="Asistente IA administrador" withArrow>
+              <Button
+                onClick={onToggleChat}
+                size="compact-xs"
+                leftSection={<IconRobot size={12} />}
+                style={{
+                  background: chatOpen ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.12)",
+                  color: chatOpen ? footerColor : textColor,
+                  border: `1px solid ${chatOpen ? "transparent" : "rgba(255,255,255,0.25)"}`,
+                  height: rem(22),
+                  paddingInline: rem(8),
+                  fontSize: rem(11),
+                  fontWeight: 600,
+                  transition: "background 0.2s, color 0.2s",
+                }}
+              >
+                {agentName}
+              </Button>
+            </Tooltip>
+          )}
+
           {deferredPrompt && (
             <Button
               onClick={handleInstallClick}
