@@ -4,6 +4,7 @@ import {
   Table,
   Button,
   TextInput,
+  NumberInput,
   Textarea,
   Modal,
   Group,
@@ -63,6 +64,7 @@ const emptyForm = (): CreateAgentPayload & { status?: "active" | "inactive" } =>
   notes: "",
   code: "",
   status: "active",
+  trialDays: 7,
 });
 
 export default function SuperadminAgents() {
@@ -112,6 +114,7 @@ export default function SuperadminAgents() {
       notes: agent.notes ?? "",
       code: agent.code,
       status: agent.status,
+      trialDays: agent.trialDays ?? 7,
     });
     setModalOpen(true);
   };
@@ -131,6 +134,7 @@ export default function SuperadminAgents() {
           type: form.type as AgentType,
           notes: form.notes || undefined,
           status: form.status,
+          trialDays: form.trialDays,
         });
         notifications.show({ message: "Agente actualizado", color: "green" });
       } else {
@@ -141,6 +145,7 @@ export default function SuperadminAgents() {
           type: form.type as AgentType,
           notes: form.notes || undefined,
           code: form.code || undefined,
+          trialDays: form.trialDays,
         });
         notifications.show({ message: "Agente creado", color: "green" });
       }
@@ -350,6 +355,14 @@ export default function SuperadminAgents() {
               onChange={(v) => v && setForm({ ...form, status: v as "active" | "inactive" })}
             />
           )}
+          <NumberInput
+            label="Días de trial"
+            description="Días de acceso completo que reciben los referidos de este agente"
+            min={1}
+            max={365}
+            value={form.trialDays ?? 7}
+            onChange={(v) => setForm({ ...form, trialDays: typeof v === "number" ? v : 7 })}
+          />
           <Textarea
             label="Notas"
             value={form.notes}

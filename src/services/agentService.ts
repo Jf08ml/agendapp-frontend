@@ -28,6 +28,7 @@ export interface Agent {
   type: AgentType;
   code: string;
   status: "active" | "inactive";
+  trialDays: number;
   notes: string | null;
   referralCount?: number;
   conversionCount?: number;
@@ -53,6 +54,7 @@ export interface CreateAgentPayload {
   type: AgentType;
   notes?: string;
   code?: string;
+  trialDays?: number;
 }
 
 export interface UpdateAgentPayload {
@@ -62,6 +64,7 @@ export interface UpdateAgentPayload {
   type?: AgentType;
   notes?: string;
   status?: "active" | "inactive";
+  trialDays?: number;
 }
 
 export const agentService = {
