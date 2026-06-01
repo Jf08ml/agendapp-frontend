@@ -167,10 +167,9 @@ export interface Organization {
   // Conexión híbrida WA
   hideBaileysUI?: boolean;
   waConnectionType?: 'baileys' | 'meta' | null;
-  metaWabaId?: string | null;
   metaPhoneNumberId?: string | null;
-  metaAccessToken?: string | null;
   metaPhone?: string | null;
+  metaCoexistenceEnabled?: boolean;
   // Límites del plan activo
   planLimits?: {
     maxEmployees?: number | null;
@@ -259,21 +258,55 @@ export const deleteOrganization = async (
   }
 };
 
-// ── Meta API connection ──────────────────────────────────────────────────────
+// ── Meta API connection (WABA único de AgenditApp — flujo de 3 pasos) ────────
 
-export const connectMetaOrg = async (
+/** Paso 1: solicita código SMS/Voz para verificar el número */
+export const requestMetaVerification = async (
+  organizationId: string,
+  cc: string,
+  phone: string,
+  verifiedName?: string,
+  method: "SMS" | "VOICE" = "SMS"
+): Promise<{ phoneNumberId: string; phone: string }> => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-request-verification`, {
+    cc,
+    phone,
+    verifiedName,
+    method,
+  });
+  return response.data.data;
+};
+
+/** Paso 2: verifica el código recibido */
+export const verifyMetaCode = async (
+  organizationId: string,
+  code: string
+): Promise<{ verified: boolean; phone: string }> => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-verify-code`, { code });
+  return response.data.data;
+};
+
+/** Flujo B — Embedded Signup: intercambia code de FB, guarda WABA+phone (sin activar) */
+export const embeddedConnectMeta = async (
   organizationId: string,
   code: string,
   redirectUri: string,
   wabaId?: string,
   phoneNumberId?: string
 ): Promise<{ wabaId: string; phoneNumberId: string; phone: string; verifiedName: string }> => {
-  const response = await apiOrganization.post(`/${organizationId}/meta-connect`, { code, redirectUri, wabaId, phoneNumberId });
+  const response = await apiOrganization.post(`/${organizationId}/meta-embedded-connect`, {
+    code, redirectUri, wabaId, phoneNumberId,
+  });
   return response.data.data;
 };
 
-export const registerMetaPhone = async (organizationId: string): Promise<{ success: boolean; phone: string }> => {
-  const response = await apiOrganization.post(`/${organizationId}/meta-register-phone`);
+/** Paso 3: activa el modo de conexión elegido */
+export const activateMetaModo = async (
+  organizationId: string,
+  mode: "coexistence" | "cloud_only",
+  pin?: string
+): Promise<{ phone: string; coexistence: boolean }> => {
+  const response = await apiOrganization.post(`/${organizationId}/meta-activate`, { mode, pin });
   return response.data.data;
 };
 
@@ -283,7 +316,16 @@ export const disconnectMetaOrg = async (organizationId: string): Promise<void> =
 
 export const getMetaStatus = async (
   organizationId: string
-): Promise<{ connected: boolean; phone?: string; wabaId?: string; phoneNumberId?: string; reason?: string }> => {
+): Promise<{
+  connected: boolean;
+  pending: boolean;
+  phone?: string;
+  phoneNumberId?: string;
+  coexistence?: boolean;
+  platformType?: string;
+  verifiedName?: string;
+  reason?: string;
+}> => {
   const response = await apiOrganization.get(`/${organizationId}/meta-status`);
   return response.data.data;
 };

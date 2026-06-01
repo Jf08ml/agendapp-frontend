@@ -497,7 +497,7 @@ const WhatsappOrgSession: React.FC = () => {
 
         {/* META API */}
         {organization?._id && (
-          <MetaConnectionPanel organizationId={organization._id} />
+          <MetaConnectionPanel organizationId={organization._id} organizationName={organization.name} />
         )}
 
         {/* FOOTER */}
