@@ -192,8 +192,6 @@ export default function CampaignWizard() {
             title={wizardState.title}
             message={wizardState.message}
             templateName={wizardState.templateName}
-            templateLanguage={wizardState.templateLanguage}
-            templateBody={wizardState.templateBody}
             image={wizardState.image}
             media={wizardState.media}
             onUpdate={updateWizardState}
