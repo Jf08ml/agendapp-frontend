@@ -20,7 +20,6 @@ import type { CampaignWizardState } from "../../../types/campaign";
 import AudienceSelector from "./components/AudienceSelector";
 import MessageComposer from "./components/MessageComposer";
 import CampaignSummary from "./components/CampaignSummary";
-import { validateCampaignData } from "../../../utils/campaignValidations";
 
 const steps = [
   "Seleccionar Audiencia",

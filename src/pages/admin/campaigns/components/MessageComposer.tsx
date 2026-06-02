@@ -41,8 +41,6 @@ interface MessageComposerProps {
   title: string;
   message: string;
   templateName?: string;
-  templateLanguage?: string;
-  templateBody?: string;
   media?: { url: string; type: MediaType; fileId?: string };
   image?: string;
   onUpdate: (updates: {
@@ -71,8 +69,6 @@ export default function MessageComposer({
   title,
   message,
   templateName,
-  templateLanguage,
-  templateBody,
   media,
   image,
   onUpdate,

@@ -36,7 +36,6 @@ import {
   IconClock,
   IconCurrencyDollar,
   IconCopy,
-  IconGift,
   IconStarFilled,
 } from "@tabler/icons-react";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
