@@ -64,3 +64,14 @@ export const exchangeCodeForToken = async (
   const response = await apiRegistration.post("/exchange", { code });
   return response.data.data;
 };
+
+export interface AgentPublicInfo {
+  found: boolean;
+  name: string | null;
+  trialDays?: number;
+}
+
+export const getAgentPublicInfo = async (code: string): Promise<AgentPublicInfo> => {
+  const response = await apiRegistration.get(`/agent-info/${encodeURIComponent(code)}`);
+  return response.data.data;
+};

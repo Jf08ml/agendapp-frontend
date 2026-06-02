@@ -10,7 +10,10 @@ import {
   Title,
   Alert,
   Group,
+  Text,
+  Anchor,
 } from "@mantine/core";
+import { BiInfoCircle } from "react-icons/bi";
 import { useAppSelector } from "../../../app/store";
 import campaignService from "../../../services/campaignService";
 import type { CampaignWizardState } from "../../../types/campaign";
@@ -27,10 +30,9 @@ const steps = [
 
 export default function CampaignWizard() {
   const navigate = useNavigate();
-  const organization = useAppSelector(
-    (state) => state.organization.organization
-  );
+  const organization = useAppSelector((state) => state.organization.organization);
   const orgId = organization?._id || "";
+  const isMeta = organization?.waConnectionType === "meta";
 
   const [wizardState, setWizardState] = useState<CampaignWizardState>({
     step: 1,
@@ -45,6 +47,24 @@ export default function CampaignWizard() {
       reviewedMessage: false,
     },
   });
+
+  // Bloqueo temprano si no hay conexión Meta
+  if (!isMeta) {
+    return (
+      <Container size="lg" py="xl">
+        <Paper shadow="sm" p="xl" radius="md">
+          <Alert color="orange" icon={<BiInfoCircle size={20} />} title="Conexión Meta requerida">
+            <Text size="sm">
+              Las campañas de WhatsApp solo funcionan con conexión Meta activa.
+              Conecta tu número en{" "}
+              <Anchor href="/admin/gestionar-whatsapp" size="sm">Gestionar WhatsApp</Anchor>
+              {" "}para poder enviar campañas.
+            </Text>
+          </Alert>
+        </Paper>
+      </Container>
+    );
+  }
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,17 +103,14 @@ export default function CampaignWizard() {
         setLoading(false);
       }
     } else if (wizardState.step === 2) {
-      const validationResult = validateCampaignData({
-        title: wizardState.title,
-        message: wizardState.message,
-        recipients: wizardState.recipients,
-      });
-
-      if (!validationResult.valid) {
-        setError(validationResult.errors.join(". "));
+      if (!wizardState.title.trim()) {
+        setError("El título de la campaña es obligatorio");
         return;
       }
-
+      if (!wizardState.templateName) {
+        setError("Debes seleccionar una plantilla aprobada para la campaña");
+        return;
+      }
       setWizardState((prev) => ({ ...prev, step: 3 }));
     }
   };
@@ -113,11 +130,11 @@ export default function CampaignWizard() {
     try {
       const campaign = await campaignService.createCampaign(orgId, {
         title: wizardState.title,
-        message: wizardState.message,
+        message: wizardState.templateBody || "",
         recipients: wizardState.recipients,
-        image: wizardState.image,
-        media: wizardState.media,
         dryRun,
+        templateName: wizardState.templateName,
+        templateLanguage: wizardState.templateLanguage,
       });
 
       // Redirigir al detalle de la campaña
@@ -168,11 +185,16 @@ export default function CampaignWizard() {
           />
         )}
 
-        {/* Paso 2: Mensaje */}
+        {/* Paso 2: Mensaje / Plantilla */}
         {wizardState.step === 2 && (
           <MessageComposer
+            orgId={orgId}
+            isMeta={isMeta}
             title={wizardState.title}
             message={wizardState.message}
+            templateName={wizardState.templateName}
+            templateLanguage={wizardState.templateLanguage}
+            templateBody={wizardState.templateBody}
             image={wizardState.image}
             media={wizardState.media}
             onUpdate={updateWizardState}

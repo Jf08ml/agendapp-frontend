@@ -49,6 +49,8 @@ export interface Campaign {
   image?: string; // Legacy
   media?: CampaignMedia;
   bulkId?: string;
+  metaTemplateName?: string;
+  metaTemplateLanguage?: string;
   status: CampaignStatus;
   isDryRun: boolean;
   stats: CampaignStats;
@@ -63,11 +65,13 @@ export interface Campaign {
 
 export interface CreateCampaignRequest {
   title: string;
-  message: string;
+  message?: string;         // Cuerpo del template (para display)
   recipients: CampaignRecipient[];
   image?: string; // Legacy
   media?: CampaignMedia;
   dryRun?: boolean;
+  templateName?: string;
+  templateLanguage?: string;
 }
 
 export interface PhoneValidation {
@@ -128,9 +132,12 @@ export interface CampaignWizardState {
   recipients: CampaignRecipient[];
   selectedClientIds: string[];
   rawPhones: string;
-  // Paso 2: Mensaje
+  // Paso 2: Mensaje / Plantilla Meta
   title: string;
-  message: string;
+  message: string;        // Texto libre legacy (no usado en Meta)
+  templateName?: string;  // Nombre de la plantilla Meta seleccionada (sin prefijo)
+  templateLanguage?: string;
+  templateBody?: string;  // Cuerpo del template para preview/display
   image?: string; // Legacy
   media?: CampaignMedia;
   // Paso 3: Confirmación

@@ -36,12 +36,15 @@ import {
   IconClock,
   IconCurrencyDollar,
   IconCopy,
+  IconGift,
+  IconStarFilled,
 } from "@tabler/icons-react";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
 import { detectUserCountry } from "../../utils/phoneUtils";
 import {
   checkSlugAvailability,
   registerOrganization,
+  getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
 
@@ -86,7 +89,7 @@ const COUNTRY_CURRENCY_MAP: Record<string, string> = {
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
-const SUPPORT_WA_URL = "https://wa.me/573184345284";
+const SUPPORT_WA_BASE = "https://wa.me/573184345284";
 const SUPPORT_AUTO_COLLAPSE_MS = 3000;
 
 // Inputs compactos sobre panel oscuro
@@ -170,6 +173,13 @@ export default function SignupPage() {
 
   const [supportState, setSupportState] = useState<"expanded" | "collapsed" | "hidden">("expanded");
   const supportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [agentName, setAgentName] = useState<string | null>(null);
+
+  const supportWaUrl = useMemo(() => {
+    if (!agentName) return SUPPORT_WA_BASE;
+    const msg = `Hola, me estoy registrando en AgenditApp invitado por ${agentName}`;
+    return `${SUPPORT_WA_BASE}?text=${encodeURIComponent(msg)}`;
+  }, [agentName]);
 
   const countryData = useMemo(() => getAllCountries().map((c) => ({ value: c.value, label: c.label })), []);
   const timezoneData = useMemo(() => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })), []);
@@ -233,17 +243,22 @@ export default function SignupPage() {
 
   useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); }, []);
 
-  // Auto-fill referral code from ?ref= URL param or localStorage
+  // Auto-fill referral code from ?ref= URL param or localStorage + fetch agent name
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refParam = params.get("ref");
-    if (refParam) {
-      form.setFieldValue("referralCode", refParam.toUpperCase());
-      localStorage.setItem("signup_referral_code", refParam.toUpperCase());
+    const code = refParam
+      ? refParam.toUpperCase()
+      : localStorage.getItem("signup_referral_code") ?? null;
+
+    if (code) {
+      form.setFieldValue("referralCode", code);
+      if (refParam) localStorage.setItem("signup_referral_code", code);
       setReferralLocked(true);
-    } else {
-      const stored = localStorage.getItem("signup_referral_code");
-      if (stored) { form.setFieldValue("referralCode", stored); setReferralLocked(true); }
+      // Fetch agent name silently
+      getAgentPublicInfo(code)
+        .then((info) => { if (info.found && info.name) setAgentName(info.name); })
+        .catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -416,7 +431,7 @@ export default function SignupPage() {
               </Text>
               <Text size="sm" c="#64748B" mb={16}>Si necesitas ayuda, contáctanos.</Text>
 
-              <Anchor href={SUPPORT_WA_URL} target="_blank" style={{ textDecoration: "none" }}>
+              <Anchor href={supportWaUrl} target="_blank" style={{ textDecoration: "none" }}>
                 <Group
                   gap={10}
                   style={{
@@ -687,6 +702,31 @@ export default function SignupPage() {
                   />
                 </SimpleGrid>
 
+                {/* Banner de referido — solo si hay agente */}
+                {agentName && (
+                  <Box
+                    style={{
+                      background: "linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.10) 100%)",
+                      border: "1px solid rgba(16,185,129,0.35)",
+                      borderRadius: 10,
+                      padding: "10px 14px",
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                    }}
+                  >
+                    <IconStarFilled size={18} style={{ color: "#10B981", flexShrink: 0, marginTop: 2 }} />
+                    <Box>
+                      <Text size="xs" fw={700} style={{ color: "#10B981", lineHeight: 1.3 }}>
+                        Invitado por {agentName}
+                      </Text>
+                      <Text size="xs" style={{ color: "rgba(255,255,255,0.55)", lineHeight: 1.4, marginTop: 2 }}>
+                        Gracias por confiar en AgenditApp. Tu período de prueba está listo para comenzar.
+                      </Text>
+                    </Box>
+                  </Box>
+                )}
+
                 <TextInput
                   label={
                     <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 600 }}>
@@ -749,7 +789,7 @@ export default function SignupPage() {
               <Group gap={6}>
                 <ActionIcon
                   radius="xl" size={44} variant="filled" color="green"
-                  component="a" href={SUPPORT_WA_URL} target="_blank"
+                  component="a" href={supportWaUrl} target="_blank"
                   aria-label="Soporte WhatsApp"
                 >
                   <IconBrandWhatsapp size={22} />
