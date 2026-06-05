@@ -267,7 +267,9 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
           : "¡Conexión Cloud API activada!",
       });
     } catch (err: unknown) {
-      notifications.show({ color: "red", message: err instanceof Error ? err.message : "Error al activar" });
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? (err instanceof Error ? err.message : "Error al activar");
+      notifications.show({ color: "red", message: msg });
     } finally {
       setActivating(false);
     }
@@ -301,7 +303,9 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
       setSmsStep("code");
       notifications.show({ color: "green", message: `Código enviado al +${cc}${phone.replace(/\D/g, "")}` });
     } catch (err: unknown) {
-      notifications.show({ color: "red", message: err instanceof Error ? err.message : "Error al enviar código" });
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? (err instanceof Error ? err.message : "Error al enviar código");
+      notifications.show({ color: "red", message: msg });
     } finally {
       setSendingCode(false);
     }
@@ -315,7 +319,9 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
       setSmsStep("mode");
       notifications.show({ color: "green", message: "¡Número verificado!" });
     } catch (err: unknown) {
-      notifications.show({ color: "red", message: err instanceof Error ? err.message : "Código incorrecto" });
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? (err instanceof Error ? err.message : "Código incorrecto");
+      notifications.show({ color: "red", message: msg });
     } finally {
       setVerifying(false);
     }
@@ -346,7 +352,9 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
             setFbStep("mode");
             notifications.show({ color: "green", message: "Cuenta conectada. Elige el modo de activación." });
           } catch (err: unknown) {
-            notifications.show({ color: "red", message: err instanceof Error ? err.message : "Error al conectar" });
+            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+              ?? (err instanceof Error ? err.message : "Error al conectar");
+            notifications.show({ color: "red", message: msg });
           } finally {
             setConnecting(false);
           }
@@ -357,6 +365,10 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
         response_type: "code",
         override_default_response_type: true,
         scope: "whatsapp_business_management,whatsapp_business_messaging",
+        extras: {
+          featureType: "whatsapp_business_app_onboarding",
+          sessionInfoVersion: "3",
+        },
       }
     );
   }
