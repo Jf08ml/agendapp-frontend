@@ -36,8 +36,9 @@ import ExchangePage from "../pages/public/ExchangePage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
-import HelpPage from "../pages/admin/HelpPage";
+import SuperadminAnnouncements from "../pages/superadmin/SuperadminAnnouncements";
 import AuditLogPage from "../pages/admin/auditLog";
+import SystemUpdates from "../pages/admin/SystemUpdates";
 import ManageClasses from "../pages/admin/classes";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
@@ -195,18 +196,6 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Paquetes",
       description: "Gestiona los paquetes de sesiones.",
-    },
-  },
-  {
-    path: "/instrucciones",
-    component: (props: JSX.IntrinsicAttributes) => (
-      <ProtectedRoute>
-        <HelpPage {...props} />
-      </ProtectedRoute>
-    ),
-    MediaMetadata: {
-      title: "Instrucciones y ayuda",
-      description: "Guía de uso y preguntas frecuentes de la plataforma.",
     },
   },
   {
@@ -395,6 +384,18 @@ const generalRoutes = [
       description: "Registro de eliminaciones realizadas en la plataforma",
     },
   },
+  {
+    path: "/novedades",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <SystemUpdates {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Novedades del sistema",
+      description: "Últimas actualizaciones y mejoras de la plataforma.",
+    },
+  },
 
   // Superadmin routes
   {
@@ -437,6 +438,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Agentes / Referidores",
       description: "Gestión de agentes y tracking de referidos",
+    },
+  },
+  {
+    path: "/superadmin/anuncios",
+    component: SuperadminAnnouncements,
+    MediaMetadata: {
+      title: "Anuncios del sistema",
+      description: "Gestiona las novedades visibles para los administradores",
     },
   },
   {

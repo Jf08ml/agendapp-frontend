@@ -16,13 +16,14 @@ import { GiClawSlashes, GiPriceTag } from "react-icons/gi";
 import { FaCashRegister, FaIdeal, FaUsers, FaWhatsapp } from "react-icons/fa";
 import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
-import { BsChatText, BsQuestionCircle } from "react-icons/bs";
+import { BsChatText } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage, IconShieldCheck, IconSchool } from "@tabler/icons-react";
+import { IconPackage, IconShieldCheck, IconSchool, IconSettings, IconBell } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import CustomLoader from "../components/customLoader/CustomLoader";
+import { useAnnouncementBadge } from "../hooks/useAnnouncementBadge";
 
 interface NavbarLinksProps {
   closeNavbar: () => void;
@@ -33,6 +34,7 @@ type LinkItem = {
   to: string;
   icon: React.ReactNode;
   canShow: boolean;
+  rightSection?: React.ReactNode;
 };
 
 export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
@@ -68,7 +70,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     apptsAll: hasPermission("appointments:view_all"),
     apptsOwn: hasPermission("appointments:view_own"),
     onlineRes: hasPermission("reservationOnline:read"),
-    cashRead: hasPermission("cashManagement:read"), // <-- fix typo
+    cashRead: hasPermission("cashManagement:read"),
     whatsappRead: hasPermission("whatsapp:read") && limits?.whatsappIntegration !== false,
     analyticsRead: hasPermission("analytics:read") && limits?.analyticsAdvanced !== false,
     packagesRead: hasPermission("packages:view") && limits?.servicePackages !== false,
@@ -76,12 +78,25 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     campaignsRead: hasPermission("whatsapp:read") && limits?.campaignsWhatsapp !== false,
   };
 
+  const hasNewUpdates = useAnnouncementBadge();
+
+  const newUpdatesDot = hasNewUpdates ? (
+    <Box
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        backgroundColor: "var(--mantine-color-red-5)",
+        flexShrink: 0,
+      }}
+    />
+  ) : undefined;
+
   // Estilos consistentes sobre navbar de color
   const textColor = "white";
   const activeBg = "rgba(255,255,255,0.18)";
   const hoverBg = "rgba(255,255,255,0.12)";
 
-  // SECCIONES EN ORDEN FIJO
   const sections: { title?: string; items: LinkItem[] }[] = [
     {
       title: "Explora",
@@ -113,17 +128,8 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
       ],
     },
     {
-      title:
-        can.businessInfo || can.apptsAll || can.apptsOwn
-          ? "Gestión de cuenta"
-          : undefined,
+      title: "Operaciones",
       items: [
-        {
-          label: "Gestión de caja",
-          to: "/gestion-caja",
-          icon: <FaCashRegister size={18} />,
-          canShow: can.cashRead,
-        },
         {
           label: "Gestionar agenda",
           to: "/gestionar-agenda",
@@ -137,30 +143,15 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           canShow: can.onlineRes,
         },
         {
-          label: "Configuración del negocio",
-          to: "/informacion-negocio",
-          icon: <MdOutlineLoyalty size={18} />,
-          canShow: can.businessInfo,
-        },
-        {
-          label: "Información del profesional",
-          to: "/informacion-profesional",
-          icon: <MdOutlineLoyalty size={18} />,
-          canShow: can.employeeInfo,
-        },
-        {
-          label: "Instrucciones y ayuda",
-          to: "/instrucciones",
-          icon: <BsQuestionCircle size={18} />,
-          canShow: can.businessInfo,
+          label: "Gestión de caja",
+          to: "/gestion-caja",
+          icon: <FaCashRegister size={18} />,
+          canShow: can.cashRead,
         },
       ],
     },
     {
-      title:
-        can.clientsRead || can.servicesRead || can.employeesRead
-          ? "Sección administrativa"
-          : undefined,
+      title: "Gestión",
       items: [
         {
           label: "Gestionar clientes",
@@ -192,6 +183,11 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           icon: <IconSchool size={18} />,
           canShow: can.classesRead,
         },
+      ],
+    },
+    {
+      title: "Comunicación",
+      items: [
         {
           label: "Gestionar WhatsApp",
           to: "/gestionar-whatsapp",
@@ -210,23 +206,57 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           icon: <MdCampaign size={18} />,
           canShow: can.campaignsRead,
         },
+      ],
+    },
+    {
+      title: "Reportes",
+      items: [
         {
           label: "Analíticas del negocio",
           to: "/analytics-dashboard",
           icon: <IoAnalytics size={18} />,
           canShow: can.analyticsRead,
         },
+      ],
+    },
+    {
+      title: "Configuración",
+      items: [
+        {
+          label: "Configuración del negocio",
+          to: "/informacion-negocio",
+          icon: <IconSettings size={18} />,
+          canShow: can.businessInfo,
+        },
+        {
+          label: "Información del profesional",
+          to: "/informacion-profesional",
+          icon: <MdOutlineLoyalty size={18} />,
+          canShow: can.employeeInfo,
+        },
         {
           label: "Mi Membresía",
           to: "/my-membership",
           icon: <FaCrown size={18} />,
-          canShow: can.businessInfo, // Solo admins ven esto
+          canShow: can.businessInfo,
         },
+      ],
+    },
+    {
+      title: "Sistema",
+      items: [
         {
           label: "Historial de eliminaciones",
           to: "/historial-eliminaciones",
           icon: <IconShieldCheck size={18} />,
-          canShow: can.businessInfo, // Solo admins
+          canShow: can.businessInfo,
+        },
+        {
+          label: "Novedades del sistema",
+          to: "/novedades",
+          icon: <IconBell size={18} />,
+          canShow: can.businessInfo,
+          rightSection: newUpdatesDot,
         },
       ],
     },
@@ -257,6 +287,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
         label={item.label}
         onClick={closeNavbar}
         active={active}
+        rightSection={item.rightSection}
         styles={{
           ...linkStyles,
           root: {
