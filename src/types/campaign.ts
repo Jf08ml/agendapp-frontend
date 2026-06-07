@@ -72,6 +72,7 @@ export interface CreateCampaignRequest {
   dryRun?: boolean;
   templateName?: string;
   templateLanguage?: string;
+  templateVariables?: Record<string, string>; // {{2}} → valor fijo, {{3}} → valor fijo...
 }
 
 export interface PhoneValidation {
@@ -138,6 +139,7 @@ export interface CampaignWizardState {
   templateName?: string;  // Nombre de la plantilla Meta seleccionada (sin prefijo)
   templateLanguage?: string;
   templateBody?: string;  // Cuerpo del template para preview/display
+  templateVariables?: Record<string, string>; // {{2}} → "valor fijo", {{3}} → "valor fijo"...
   image?: string; // Legacy
   media?: CampaignMedia;
   // Paso 3: Confirmación

@@ -19,7 +19,7 @@ import {
   CopyButton,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { BiBuildings, BiCreditCard, BiEdit, BiTrash, BiLink, BiUserCheck } from "react-icons/bi";
+import { BiBuildings, BiCreditCard, BiEdit, BiTrash, BiLink, BiUserCheck, BiBarChartAlt2 } from "react-icons/bi";
 import {
   agentService,
   Agent,
@@ -203,6 +203,9 @@ export default function SuperadminAgents() {
         </Button>
         <Button variant="filled" leftSection={<BiUserCheck size={16} />} size="sm">
           Agentes
+        </Button>
+        <Button variant="light" leftSection={<BiBarChartAlt2 size={16} />} size="sm" onClick={() => navigate("/superadmin/analiticas")}>
+          Analítica
         </Button>
       </Group>
 

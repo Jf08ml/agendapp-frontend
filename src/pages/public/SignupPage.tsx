@@ -88,7 +88,7 @@ const COUNTRY_CURRENCY_MAP: Record<string, string> = {
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
-const SUPPORT_WA_BASE = "https://wa.me/573184345284";
+const SUPPORT_WA_BASE = "https://wa.me/573506674686";
 const SUPPORT_AUTO_COLLAPSE_MS = 3000;
 
 // Inputs compactos sobre panel oscuro

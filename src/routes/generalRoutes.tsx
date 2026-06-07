@@ -37,6 +37,7 @@ import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
 import SuperadminAnnouncements from "../pages/superadmin/SuperadminAnnouncements";
+import SuperadminAnalytics from "../pages/superadmin/SuperadminAnalytics";
 import AuditLogPage from "../pages/admin/auditLog";
 import SystemUpdates from "../pages/admin/SystemUpdates";
 import ManageClasses from "../pages/admin/classes";
@@ -446,6 +447,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Anuncios del sistema",
       description: "Gestiona las novedades visibles para los administradores",
+    },
+  },
+  {
+    path: "/superadmin/analiticas",
+    component: SuperadminAnalytics,
+    MediaMetadata: {
+      title: "Analítica de plataforma",
+      description: "Métricas globales de actividad, crecimiento y membresías de AgenditApp",
     },
   },
   {

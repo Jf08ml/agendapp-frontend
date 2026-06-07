@@ -40,6 +40,7 @@ import {
   IconChevronLeft,
   IconMessage,
   IconClock,
+  IconBell,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -49,6 +50,7 @@ import whatsappTemplateService, {
 } from "../../services/whatsappTemplateService";
 import { handleAxiosError } from "../../utils/handleAxiosError";
 import MetaTemplateFormTab, { MetaTemplateStatus } from "./MetaTemplateFormTab";
+import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
 import { listMetaTemplates } from "../../services/organizationService";
 
 // ─── Metadata de plantillas ───────────────────────────────────────────────────
@@ -419,7 +421,10 @@ export default function WhatsappTemplateEditor() {
 
   const showSidebar = !isMobile || mobileView === "list";
   const showEditor = !isMobile || mobileView === "editor";
-  const currentInfo = selectedKey !== "settings" ? templateInfo[selectedKey as TemplateType] : null;
+  const currentInfo =
+    selectedKey !== "settings" && selectedKey !== "campaign_templates"
+      ? templateInfo[selectedKey as TemplateType]
+      : null;
 
   // ─── JSX ─────────────────────────────────────────────────────────────────────
 
@@ -558,6 +563,19 @@ export default function WhatsappTemplateEditor() {
                       </Box>
                     ))}
 
+                    {isMeta && (
+                      <>
+                        <Divider my="xs" />
+                        <NavLink
+                          label={<Text size="sm">Plantillas de campaña</Text>}
+                          leftSection={<IconBell size={15} />}
+                          active={selectedKey === "campaign_templates"}
+                          onClick={() => handleSelectKey("campaign_templates")}
+                          styles={{ root: { paddingInline: rem(12) } }}
+                        />
+                      </>
+                    )}
+
                     <Divider my="xs" />
                     <NavLink
                       label={<Text size="sm">Configuración de envíos</Text>}
@@ -618,11 +636,19 @@ export default function WhatsappTemplateEditor() {
                         )}
                         <Box style={{ minWidth: 0 }}>
                           <Text fw={600} size="md" lineClamp={1}>
-                            {selectedKey === "settings" ? "Configuración de envíos" : currentInfo?.title}
+                            {selectedKey === "settings"
+                              ? "Configuración de envíos"
+                              : selectedKey === "campaign_templates"
+                              ? "Plantillas de campaña"
+                              : currentInfo?.title}
                           </Text>
-                          {currentInfo && (
+                          {selectedKey === "campaign_templates" ? (
+                            <Text size="xs" c="dimmed" lineClamp={1}>
+                              Crea y gestiona plantillas aprobadas por Meta para usar en campañas
+                            </Text>
+                          ) : currentInfo ? (
                             <Text size="xs" c="dimmed" lineClamp={1}>{currentInfo.description}</Text>
-                          )}
+                          ) : null}
                         </Box>
                       </Group>
 
@@ -644,7 +670,11 @@ export default function WhatsappTemplateEditor() {
                   {/* Cuerpo del editor */}
                   <ScrollArea style={{ flex: 1 }}>
                     <Box p="lg">
-                      {selectedKey === "settings" ? (
+                      {selectedKey === "campaign_templates" && organization?._id ? (
+                        // ── Panel plantillas de campaña (Meta) ────
+                        <MetaTemplatesPanel organizationId={organization._id} />
+
+                      ) : selectedKey === "settings" ? (
                         // ── Panel configuración ───────────────────
                         <Stack gap="md">
                           <Alert icon={<IconInfoCircle size={18} />} color="blue" variant="light" radius="md">

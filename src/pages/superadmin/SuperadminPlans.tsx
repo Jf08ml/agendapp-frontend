@@ -38,7 +38,7 @@ import {
   IconX,
   IconCheck,
 } from "@tabler/icons-react";
-import { BiBuildings, BiArrowBack } from "react-icons/bi";
+import { BiBuildings, BiArrowBack, BiBarChartAlt2 } from "react-icons/bi";
 import {
   getAllPlans,
   createPlan,
@@ -318,6 +318,9 @@ export default function SuperadminPlans() {
           </Button>
           <Button variant="filled" leftSection={<IconTag size={16} />} size="sm">
             Planes
+          </Button>
+          <Button variant="light" leftSection={<BiBarChartAlt2 size={16} />} size="sm" onClick={() => navigate("/superadmin/analiticas")}>
+            Analítica
           </Button>
         </Group>
 

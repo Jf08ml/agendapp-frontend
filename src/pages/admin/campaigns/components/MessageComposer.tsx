@@ -41,6 +41,7 @@ interface MessageComposerProps {
   title: string;
   message: string;
   templateName?: string;
+  templateVariables?: Record<string, string>;
   media?: { url: string; type: MediaType; fileId?: string };
   image?: string;
   onUpdate: (updates: {
@@ -49,6 +50,7 @@ interface MessageComposerProps {
     templateName?: string;
     templateLanguage?: string;
     templateBody?: string;
+    templateVariables?: Record<string, string>;
     media?: { url: string; type: MediaType; fileId?: string };
     image?: string;
   }) => void;
@@ -69,6 +71,7 @@ export default function MessageComposer({
   title,
   message,
   templateName,
+  templateVariables = {},
   media,
   image,
   onUpdate,
@@ -203,49 +206,79 @@ export default function MessageComposer({
           </Box>
 
           {/* Preview del template seleccionado */}
-          {selectedTemplate && (
-            <>
-              {/* Variables info */}
-              {countVars(getBodyText(selectedTemplate.components)) > 0 && (
-                <Alert color="blue" icon={<BiInfoCircle size={16} />}>
-                  <Text size="sm" fw={500}>Variables de la plantilla</Text>
-                  <Text size="xs" mt={4}>
-                    <strong>{"{{1}}"}</strong> → se reemplaza con el nombre de cada destinatario automáticamente.
-                    {countVars(getBodyText(selectedTemplate.components)) > 1 && (
-                      <> Las demás variables {"{{2}}"}, {"{{3}}"}... se envían vacías — considera crear una plantilla con una sola variable.</>
+          {selectedTemplate && (() => {
+            const bodyText = getBodyText(selectedTemplate.components);
+            const allVarIndices = [...new Set(
+              (bodyText.match(/\{\{(\d+)\}\}/g) || []).map(m => parseInt(m.replace(/\{\{|\}\}/g, "")))
+            )].sort((a, b) => a - b);
+            const fixedVars = allVarIndices.filter(i => i > 1); // {{2}}, {{3}}, etc.
+
+            return (
+              <>
+                {/* Variables — {{1}} auto + inputs para las demás */}
+                {allVarIndices.length > 0 && (
+                  <Box>
+                    <Text size="sm" fw={600} mb="xs">Variables de la plantilla</Text>
+                    <Stack gap="xs">
+                      {/* {{1}} siempre automático */}
+                      <Paper withBorder p="xs" radius="sm">
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text size="sm" ff="monospace" fw={600} c="blue">{"{{1}}"}</Text>
+                          <Text size="xs" c="dimmed">Nombre del destinatario (automático)</Text>
+                        </Group>
+                      </Paper>
+
+                      {/* Variables adicionales con input */}
+                      {fixedVars.map(i => (
+                        <Paper key={i} withBorder p="xs" radius="sm">
+                          <Group wrap="nowrap" gap="sm">
+                            <Text size="sm" ff="monospace" fw={600} c="violet" style={{ flexShrink: 0 }}>{`{{${i}}}`}</Text>
+                            <TextInput
+                              style={{ flex: 1 }}
+                              placeholder={`Texto fijo para {{${i}}} (igual para todos los destinatarios)`}
+                              value={templateVariables[String(i)] || ""}
+                              onChange={(e) =>
+                                onUpdate({ templateVariables: { ...templateVariables, [String(i)]: e.currentTarget.value } })
+                              }
+                              size="xs"
+                            />
+                          </Group>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+
+                {/* Preview estilo WhatsApp */}
+                <Box>
+                  <Text size="sm" fw={500} mb="xs">Vista previa</Text>
+                  <Paper p="md" style={{ backgroundColor: "#e5ddd5", maxWidth: 400, borderRadius: 8 }}>
+                    <Box style={{ backgroundColor: "white", padding: 12, borderRadius: 8, boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
+                      <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {bodyText
+                          .replace(/\{\{1\}\}/g, previewRecipient?.name || "[nombre]")
+                          .replace(/\{\{(\d+)\}\}/g, (_, n) => templateVariables[n] || `[var ${n}]`)
+                          || "Sin cuerpo de mensaje"}
+                      </Text>
+                      <Text size="xs" c="dimmed" ta="right" mt="xs">
+                        {new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      </Text>
+                    </Box>
+                    {previewRecipient?.name && (
+                      <Badge size="sm" mt="sm">Vista previa para: {previewRecipient.name}</Badge>
                     )}
+                  </Paper>
+                </Box>
+
+                <Alert color="teal" icon={<BiInfoCircle size={16} />}>
+                  <Text size="xs">
+                    Esta plantilla se enviará como mensaje de WhatsApp oficial desde tu número.
+                    Meta cobra por mensaje de marketing enviado según tu tier de conversaciones.
                   </Text>
                 </Alert>
-              )}
-
-              {/* Preview estilo WhatsApp */}
-              <Box>
-                <Text size="sm" fw={500} mb="xs">Vista previa</Text>
-                <Paper p="md" style={{ backgroundColor: "#e5ddd5", maxWidth: 400, borderRadius: 8 }}>
-                  <Box style={{ backgroundColor: "white", padding: 12, borderRadius: 8, boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}>
-                    <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                      {getBodyText(selectedTemplate.components)
-                        .replace(/\{\{1\}\}/g, previewRecipient?.name || "[nombre]")
-                        .replace(/\{\{(\d+)\}\}/g, "[]") || "Sin cuerpo de mensaje"}
-                    </Text>
-                    <Text size="xs" c="dimmed" ta="right" mt="xs">
-                      {new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
-                  </Box>
-                  {previewRecipient?.name && (
-                    <Badge size="sm" mt="sm">Vista previa para: {previewRecipient.name}</Badge>
-                  )}
-                </Paper>
-              </Box>
-
-              <Alert color="teal" icon={<BiInfoCircle size={16} />}>
-                <Text size="xs">
-                  Esta plantilla se enviará como mensaje de WhatsApp oficial desde tu número.
-                  Meta cobra por mensaje de marketing enviado según tu tier de conversaciones.
-                </Text>
-              </Alert>
-            </>
-          )}
+              </>
+            );
+          })()}
         </Stack>
       )}
 

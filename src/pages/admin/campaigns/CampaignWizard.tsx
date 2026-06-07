@@ -134,6 +134,7 @@ export default function CampaignWizard() {
         dryRun,
         templateName: wizardState.templateName,
         templateLanguage: wizardState.templateLanguage,
+        templateVariables: wizardState.templateVariables,
       });
 
       // Redirigir al detalle de la campaña
@@ -192,6 +193,7 @@ export default function CampaignWizard() {
             title={wizardState.title}
             message={wizardState.message}
             templateName={wizardState.templateName}
+            templateVariables={wizardState.templateVariables}
             image={wizardState.image}
             media={wizardState.media}
             onUpdate={updateWizardState}

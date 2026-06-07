@@ -20,7 +20,7 @@ import {
   Tooltip,
   ActionIcon,
 } from "@mantine/core";
-import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard, BiTrash } from "react-icons/bi";
+import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard, BiTrash, BiBarChartAlt2 } from "react-icons/bi";
 import {
   getOrganizations,
   Organization,
@@ -349,6 +349,14 @@ export default function SuperadminOrganizations() {
           onClick={() => navigate("/superadmin/agentes")}
         >
           Agentes
+        </Button>
+        <Button
+          variant="light"
+          leftSection={<BiBarChartAlt2 size={16} />}
+          size="sm"
+          onClick={() => navigate("/superadmin/analiticas")}
+        >
+          Analítica
         </Button>
       </Group>
 
