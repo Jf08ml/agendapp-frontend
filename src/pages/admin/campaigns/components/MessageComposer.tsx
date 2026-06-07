@@ -61,10 +61,6 @@ function getBodyText(components: MetaTemplate["components"]): string {
   return components.find((c) => c.type === "BODY")?.text || "";
 }
 
-function countVars(body: string): number {
-  return (body.match(/\{\{(\d+)\}\}/g) || []).length;
-}
-
 export default function MessageComposer({
   orgId,
   isMeta,
