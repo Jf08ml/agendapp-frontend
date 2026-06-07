@@ -110,6 +110,20 @@ export default function CampaignWizard() {
         setError("Debes seleccionar una plantilla aprobada para la campaña");
         return;
       }
+
+      // Validar que las variables fijas ({{2}}, {{3}}, ...) tengan texto —
+      // Meta rechaza el envío completo si un parámetro de texto llega vacío
+      const bodyText = wizardState.templateBody || "";
+      const varIndices = [...new Set(
+        (bodyText.match(/\{\{(\d+)\}\}/g) || []).map((m) => parseInt(m.replace(/\{\{|\}\}/g, ""), 10))
+      )];
+      const fixedVarIndices = varIndices.filter((i) => i > 1);
+      const missingVars = fixedVarIndices.filter((i) => !(wizardState.templateVariables?.[String(i)] || "").trim());
+      if (missingVars.length > 0) {
+        setError(`Debes completar el texto fijo para: ${missingVars.map((i) => `{{${i}}}`).join(", ")}`);
+        return;
+      }
+
       setWizardState((prev) => ({ ...prev, step: 3 }));
     }
   };
