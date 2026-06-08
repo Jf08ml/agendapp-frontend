@@ -39,22 +39,21 @@ type LinkItem = {
 
 export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
   const { hasPermission } = usePermissions();
-  const { organization, loading } = useSelector(
+  const { organization } = useSelector(
     (s: RootState) => s.organization
   );
   const role = useSelector((s: RootState) => s.auth.role);
   const location = useLocation();
+  const hasNewUpdates = useAnnouncementBadge();
 
   // Superadmin de plataforma: no mostrar navbar de org (no hay org cargada)
   if (role === "superadmin") return null;
 
-  if (loading || !organization) {
-    return (
-      <CustomLoader
-        loadingText={`Cargando ${organization?.name || "organización"}...`}
-        logoUrl={organization?.branding?.logoUrl}
-      />
-    );
+  // Solo bloquea con loader si aún no hay organización cargada — un refetch en
+  // segundo plano (loading: true con organization ya presente) no debe
+  // desmontar el navbar ni alterar el conteo de hooks entre renders.
+  if (!organization) {
+    return <CustomLoader loadingText="Cargando organización..." />;
   }
 
   // Límites del plan activo
@@ -77,8 +76,6 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     classesRead: (hasPermission("appointments:view_all") || hasPermission("services:read")) && limits?.classesModule !== false,
     campaignsRead: hasPermission("whatsapp:read") && limits?.campaignsWhatsapp !== false,
   };
-
-  const hasNewUpdates = useAnnouncementBadge();
 
   const newUpdatesDot = hasNewUpdates ? (
     <Box
