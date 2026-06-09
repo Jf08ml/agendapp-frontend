@@ -48,8 +48,30 @@ interface BookingChatPanelProps {
   preselectedService?: { _id: string; name: string };
 }
 
-const buildGreeting = (agentName: string) =>
-  `¡Hola! Soy **${agentName}**, tu asistente de reservas. Cuéntame qué servicio necesitas y te ayudo a encontrar el horario perfecto. 😊`;
+const buildGreeting = (
+  agentName: string,
+  orgName: string,
+  identifierField: "phone" | "email" | "documentId"
+) => {
+  const contactLabel =
+    identifierField === "email"
+      ? "correo electrónico"
+      : identifierField === "documentId"
+      ? "número de documento"
+      : "número de teléfono (con código de país, ej: +573001234567)";
+
+  return `¡Hola! Soy **${agentName}**, el asistente de reservas de **${orgName}**. 😊
+
+Para agilizar tu reserva, cuéntame en un solo mensaje:
+- **¿Qué servicio(s) necesitas?**
+- **¿Para cuándo? (día y hora aproximada)**
+- **Tu nombre completo**
+- **Tu ${contactLabel}**
+
+Por ejemplo: *"Corte de cabello, mañana por la tarde, Juan Pérez, +573001234567"*
+
+¡Con eso te agendo en un momento!`;
+};
 
 const RATINGS: { value: 1|3|5; emoji: string; label: string }[] = [
   { value: 5, emoji: "😊", label: "¡Excelente!" },
@@ -62,8 +84,10 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
   const color = org?.branding?.primaryColor || "#1C3461";
   const agentName = org?.aiAssistantName || "Roxi";
 
+  const identifierField = (org?.clientFormConfig?.identifierField as "phone" | "email" | "documentId") ?? "phone";
+
   const [messages, setMessages] = useState<BookingChatMessage[]>([
-    { role: "assistant", content: buildGreeting(agentName) },
+    { role: "assistant", content: buildGreeting(agentName, org?.name ?? "", identifierField) },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
