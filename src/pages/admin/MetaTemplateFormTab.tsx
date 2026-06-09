@@ -94,6 +94,15 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "⏰ ¡Hola, {{nombre_cliente}}!\n\nTu cita es *muy pronto*.\n\n🗓️ Fecha: {{fecha_cita}}\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n\n✨ Servicios:\n{{lista_servicios}}\n\n👩‍💼 Te atenderá: {{profesional}}\n{{recomendaciones}}\nSi no puedes asistir, cancela tu cita desde el siguiente enlace:\n{{enlace_gestion}}\n\n💖 ¡Te esperamos!",
     footerText: "",
   },
+  statusReservationPending: {
+    name: "reserva_pendiente",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Solicitud de reserva recibida",
+    bodyText:
+      "⏳ ¡Hola, {{nombre_cliente}}!\n\nHemos recibido tu solicitud de reserva en *{{nombre_negocio}}*.\n\n📅 Fecha solicitada: {{fecha_cita}}\n✨ Servicio(s): {{lista_servicios}}\n\nTu reserva está *pendiente de confirmación*. Te notificaremos en cuanto sea aprobada.\n\nSi tienes alguna pregunta, responde a este mensaje. ¡Gracias!",
+    footerText: "",
+  },
   statusReservationApproved: {
     name: "reserva_aprobada",
     category: "UTILITY",

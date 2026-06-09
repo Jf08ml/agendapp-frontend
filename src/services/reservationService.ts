@@ -21,9 +21,10 @@ export interface Reservation {
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted";
-  groupId?: string; // 👥 ID de grupo para reservas múltiples
-  appointmentId?: string | { _id: string; [key: string]: unknown } | null; // 🔗 Cita vinculada (cuando fue aprobada); objeto si está poblada, null si no existe
-  errorMessage?: string; // ⚠️ Mensaje de error cuando falla la creación automática
+  groupId?: string;
+  appointmentId?: string | { _id: string; [key: string]: unknown } | null;
+  errorMessage?: string;
+  source?: "ai_chatbot" | "manual_booking" | "admin";
 }
 
 export interface CreateReservationPayload {
@@ -69,8 +70,9 @@ export interface CreateMultipleReservationsPayload {
     notes?: string;
   };
   organizationId: string;
-  clientPackageId?: string; // ID del paquete de sesiones del cliente (si aplica)
-  recurrencePattern?: RecurrencePattern; // 🔁 Patrón de recurrencia (opcional)
+  clientPackageId?: string;
+  recurrencePattern?: RecurrencePattern;
+  source?: "ai_chatbot" | "manual_booking" | "admin";
 }
 
 // Obtener todas las reservas de una organización

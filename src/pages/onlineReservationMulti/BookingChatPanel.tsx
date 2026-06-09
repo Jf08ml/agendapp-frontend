@@ -128,7 +128,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setConfirming(true);
     setReservationError(null);
     try {
-      await createMultipleReservations(pendingPayload as any);
+      await createMultipleReservations({ ...(pendingPayload as any), source: "ai_chatbot" });
       setReservationDone(true);
       setPendingPayload(null);
     } catch (err: any) {

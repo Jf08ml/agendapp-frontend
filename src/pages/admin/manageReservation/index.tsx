@@ -26,6 +26,9 @@ import {
   Checkbox,
   List,
   ScrollArea,
+  RingProgress,
+  SimpleGrid,
+  ThemeIcon,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
@@ -397,6 +400,28 @@ const ReservationsList: React.FC = () => {
   }, [filteredReservations]);
 
   const hasReservations = reservations.length > 0;
+
+  const sourceStats = useMemo(() => {
+    const nonCancelled = reservations.filter(
+      (r) => r.status !== "cancelled_by_customer" && r.status !== "cancelled_by_admin"
+    );
+    const uniqueGroups = new Set<string>();
+    const counted: Reservation[] = [];
+    for (const r of nonCancelled) {
+      if (r.groupId) {
+        if (!uniqueGroups.has(r.groupId)) {
+          uniqueGroups.add(r.groupId);
+          counted.push(r);
+        }
+      } else {
+        counted.push(r);
+      }
+    }
+    const total = counted.length;
+    const ai = counted.filter((r) => r.source === "ai_chatbot").length;
+    const manual = counted.filter((r) => r.source !== "ai_chatbot").length;
+    return { total, ai, manual };
+  }, [reservations]);
 
   // ------- ACTIONS -------
   const handleUpdateStatus = async (
@@ -1590,6 +1615,61 @@ const ReservationsList: React.FC = () => {
         </Group>
 
         <Divider mb="md" />
+
+        {/* ESTADÍSTICAS DE ORIGEN */}
+        {!initialLoading && sourceStats.total > 0 && (
+          <SimpleGrid cols={{ base: 1, xs: 3 }} mb="md" spacing="sm">
+            <Card withBorder radius="md" p="sm">
+              <Group gap="xs" align="center">
+                <ThemeIcon size="lg" radius="md" variant="light" color="blue">
+                  <Text size="sm" fw={700}>#</Text>
+                </ThemeIcon>
+                <Stack gap={0}>
+                  <Text size="xs" c="dimmed">Total solicitudes</Text>
+                  <Text size="xl" fw={700}>{sourceStats.total}</Text>
+                </Stack>
+              </Group>
+            </Card>
+
+            <Card withBorder radius="md" p="sm">
+              <Group gap="xs" align="center" wrap="nowrap">
+                <RingProgress
+                  size={52}
+                  thickness={5}
+                  sections={[{ value: sourceStats.total > 0 ? Math.round((sourceStats.ai / sourceStats.total) * 100) : 0, color: "violet" }]}
+                  label={
+                    <Text ta="center" size="xs" fw={700} c="violet">
+                      {sourceStats.total > 0 ? Math.round((sourceStats.ai / sourceStats.total) * 100) : 0}%
+                    </Text>
+                  }
+                />
+                <Stack gap={0}>
+                  <Text size="xs" c="dimmed">Asistente IA</Text>
+                  <Text size="xl" fw={700} c="violet">{sourceStats.ai}</Text>
+                </Stack>
+              </Group>
+            </Card>
+
+            <Card withBorder radius="md" p="sm">
+              <Group gap="xs" align="center" wrap="nowrap">
+                <RingProgress
+                  size={52}
+                  thickness={5}
+                  sections={[{ value: sourceStats.total > 0 ? Math.round((sourceStats.manual / sourceStats.total) * 100) : 0, color: "teal" }]}
+                  label={
+                    <Text ta="center" size="xs" fw={700} c="teal">
+                      {sourceStats.total > 0 ? Math.round((sourceStats.manual / sourceStats.total) * 100) : 0}%
+                    </Text>
+                  }
+                />
+                <Stack gap={0}>
+                  <Text size="xs" c="dimmed">Manual</Text>
+                  <Text size="xl" fw={700} c="teal">{sourceStats.manual}</Text>
+                </Stack>
+              </Group>
+            </Card>
+          </SimpleGrid>
+        )}
 
         {/* FILTROS */}
         <Box

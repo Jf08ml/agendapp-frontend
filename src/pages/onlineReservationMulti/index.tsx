@@ -244,7 +244,7 @@ export default function MultiBookingWizard() {
       }
 
       const payload = buildMultiplePayload();
-      const result = await createMultipleReservations(payload);
+      const result = await createMultipleReservations({ ...payload, source: "manual_booking" });
 
       let reservationIds: string[] = [];
       if (result && Array.isArray(result)) {
