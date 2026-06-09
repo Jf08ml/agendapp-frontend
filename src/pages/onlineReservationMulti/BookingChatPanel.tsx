@@ -126,7 +126,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setLoading(true);
 
     try {
-      const greeting = buildGreeting(agentName);
+      const greeting = buildGreeting(agentName, org?.name ?? "", identifierField);
       const history = next.filter(
         (m) => !(m.role === "assistant" && m.content === greeting)
       );
