@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { getLatestAnnouncementDate } from "../services/announcementService";
 import { NOVEDADES_STORAGE_KEY } from "../pages/admin/SystemUpdates";
+import { RootState } from "../app/store";
 
 const CACHE_KEY = "announcements_badge_cache";
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
@@ -30,6 +32,8 @@ function hasUnseenUpdates(isoDate: string): boolean {
 }
 
 export function useAnnouncementBadge(): boolean {
+  const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
+
   const [hasNew, setHasNew] = useState<boolean>(() => {
     const cache = readCache();
     if (!cache || !isCacheFresh(cache)) return false;
@@ -43,10 +47,12 @@ export function useAnnouncementBadge(): boolean {
     return () => window.removeEventListener("announcements-seen", handler);
   }, []);
 
-  // Fetch con cache TTL de 1 hora
+  // Fetch con cache TTL de 1 hora — solo si está autenticado
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const cache = readCache();
-    if (cache && isCacheFresh(cache)) return; // Cache vigente, no hay que volver a pedir
+    if (cache && isCacheFresh(cache)) return;
 
     getLatestAnnouncementDate()
       .then(({ isoDate }) => {
@@ -55,7 +61,7 @@ export function useAnnouncementBadge(): boolean {
         setHasNew(hasUnseenUpdates(date));
       })
       .catch(() => {});
-  }, []);
+  }, [isAuthenticated]);
 
   return hasNew;
 }
