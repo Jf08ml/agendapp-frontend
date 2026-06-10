@@ -179,10 +179,35 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   const [fbStep, setFbStep]     = useState<FbStep>("idle");
   const [connecting, setConnecting] = useState(false);
 
+  // Datos capturados via postMessage del popup de Embedded Signup
+  // (waba_id / phone_number_id no siempre vienen en el authResponse de FB.login,
+  // sobre todo al reconectar un número que ya tenía permisos otorgados)
+  const embeddedDataRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+
   useEffect(() => {
     loadStatus();
     loadFbSdk();
   }, [organizationId]);
+
+  useEffect(() => {
+    function handleEmbeddedSignupMessage(event: MessageEvent) {
+      if (!event.origin.endsWith("facebook.com")) return;
+      let data: { type?: string; event?: string; data?: { waba_id?: string; phone_number_id?: string } };
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (data?.type === "WA_EMBEDDED_SIGNUP" && (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA")) {
+        embeddedDataRef.current = {
+          wabaId: data.data?.waba_id,
+          phoneNumberId: data.data?.phone_number_id,
+        };
+      }
+    }
+    window.addEventListener("message", handleEmbeddedSignupMessage);
+    return () => window.removeEventListener("message", handleEmbeddedSignupMessage);
+  }, []);
 
   async function loadStatus() {
     setLoadingStatus(true);
@@ -269,11 +294,12 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
       return;
     }
     setConnecting(true);
+    embeddedDataRef.current = {};
     window.FB.login(
       (res) => {
         const fbCode = res.authResponse?.code;
-        const wabaId = res.authResponse?.waba_id;
-        const phoneNumberId = res.authResponse?.phone_number_id;
+        const wabaId = res.authResponse?.waba_id || embeddedDataRef.current.wabaId;
+        const phoneNumberId = res.authResponse?.phone_number_id || embeddedDataRef.current.phoneNumberId;
         if (!fbCode) {
           setConnecting(false);
           notifications.show({ color: "orange", message: "Conexión cancelada." });
