@@ -182,7 +182,7 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   // Datos capturados via postMessage del popup de Embedded Signup
   // (waba_id / phone_number_id no siempre vienen en el authResponse de FB.login,
   // sobre todo al reconectar un número que ya tenía permisos otorgados)
-  const embeddedDataRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
+  const embeddedDataRef = useRef<{ wabaId?: string; phoneNumberId?: string; error?: string }>({});
 
   useEffect(() => {
     loadStatus();
@@ -192,16 +192,38 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   useEffect(() => {
     function handleEmbeddedSignupMessage(event: MessageEvent) {
       if (!event.origin.endsWith("facebook.com")) return;
-      let data: { type?: string; event?: string; data?: { waba_id?: string; phone_number_id?: string } };
+      let data: {
+        type?: string;
+        event?: string;
+        data?: { waba_id?: string; phone_number_id?: string; error_message?: string; current_step?: string };
+      };
       try {
         data = JSON.parse(event.data);
       } catch {
         return;
       }
-      if (data?.type === "WA_EMBEDDED_SIGNUP" && (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA")) {
+      if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
+
+      console.log("[MetaConnect] WA_EMBEDDED_SIGNUP message:", data);
+
+      if (
+        data.event === "FINISH" ||
+        data.event === "FINISH_ONLY_WABA" ||
+        data.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"
+      ) {
         embeddedDataRef.current = {
           wabaId: data.data?.waba_id,
           phoneNumberId: data.data?.phone_number_id,
+        };
+      } else if (data.event === "ERROR") {
+        embeddedDataRef.current = {
+          ...embeddedDataRef.current,
+          error: data.data?.error_message || `Error en el paso "${data.data?.current_step}"`,
+        };
+      } else if (data.event === "CANCEL") {
+        embeddedDataRef.current = {
+          ...embeddedDataRef.current,
+          error: `Cancelado en el paso "${data.data?.current_step}"`,
         };
       }
     }
@@ -297,12 +319,16 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
     embeddedDataRef.current = {};
     window.FB.login(
       (res) => {
+        console.log("[MetaConnect] FB.login response:", res);
         const fbCode = res.authResponse?.code;
         const wabaId = res.authResponse?.waba_id || embeddedDataRef.current.wabaId;
         const phoneNumberId = res.authResponse?.phone_number_id || embeddedDataRef.current.phoneNumberId;
         if (!fbCode) {
           setConnecting(false);
-          notifications.show({ color: "orange", message: "Conexión cancelada." });
+          notifications.show({
+            color: "orange",
+            message: embeddedDataRef.current.error || "Conexión cancelada.",
+          });
           return;
         }
         (async () => {
