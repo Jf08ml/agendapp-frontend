@@ -9,11 +9,8 @@ import {
   Loader,
   PinInput,
   Radio,
-  Select,
   Stack,
-  Tabs,
   Text,
-  TextInput,
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
@@ -21,7 +18,6 @@ import {
   BiCheckCircle,
   BiError,
   BiLinkExternal,
-  BiPhone,
   BiX,
 } from "react-icons/bi";
 import { FaFacebook } from "react-icons/fa";
@@ -29,8 +25,6 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "../../../app/store";
 import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
 import {
-  requestMetaVerification,
-  verifyMetaCode,
   activateMetaModo,
   embeddedConnectMeta,
   disconnectMetaOrg,
@@ -42,23 +36,8 @@ import {
 const FB_APP_ID = import.meta.env.VITE_META_APP_ID;
 const META_REDIRECT_ORIGIN = import.meta.env.VITE_META_REDIRECT_ORIGIN || window.location.origin;
 
-const COUNTRY_CODES = [
-  { value: "57", label: "🇨🇴 +57 Colombia" },
-  { value: "1",  label: "🇺🇸 +1 EE.UU. / CA" },
-  { value: "52", label: "🇲🇽 +52 México" },
-  { value: "54", label: "🇦🇷 +54 Argentina" },
-  { value: "56", label: "🇨🇱 +56 Chile" },
-  { value: "51", label: "🇵🇪 +51 Perú" },
-  { value: "58", label: "🇻🇪 +58 Venezuela" },
-  { value: "593", label: "🇪🇨 +593 Ecuador" },
-  { value: "502", label: "🇬🇹 +502 Guatemala" },
-  { value: "34", label: "🇪🇸 +34 España" },
-  { value: "55", label: "🇧🇷 +55 Brasil" },
-];
-
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
-type SmsStep = "phone" | "code" | "mode";
 type FbStep  = "idle" | "mode";
 type Mode    = "coexistence" | "cloud_only";
 
@@ -180,7 +159,7 @@ const ModePicker: React.FC<ModePickerProps> = ({
 
 // ── Panel principal ───────────────────────────────────────────────────────────
 
-const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName }) => {
+const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   const dispatch = useDispatch<AppDispatch>();
   const sdkReady = useRef(false);
 
@@ -195,15 +174,6 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
   const [activating, setActivating] = useState(false);
   const [generatedPin]        = useState(() => String(Math.floor(100000 + Math.random() * 900000)));
   const [disconnecting, setDisconnecting] = useState(false);
-
-  // ── Tab SMS ──
-  const [smsStep, setSmsStep]   = useState<SmsStep>("phone");
-  const [cc, setCc]             = useState("57");
-  const [phone, setPhone]       = useState("");
-  const [smsMethod, setSmsMethod] = useState<"SMS" | "VOICE">("SMS");
-  const [sendingCode, setSendingCode] = useState(false);
-  const [code, setCode]         = useState("");
-  const [verifying, setVerifying] = useState(false);
 
   // ── Tab FB ──
   const [fbStep, setFbStep]     = useState<FbStep>("idle");
@@ -223,7 +193,6 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
         setConnected(true);
       } else if (s.pending) {
         // phoneNumberId guardado pero no activado → mostrar selector de modo
-        setSmsStep("mode");
         setFbStep("mode");
       }
     } catch {
@@ -281,49 +250,14 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
       await disconnectMetaOrg(organizationId);
       await dispatch(fetchOrganizationConfig());
       setConnected(false);
-      setSmsStep("phone");
       setFbStep("idle");
-      setCode(""); setPhone(""); setPin("");
+      setPin("");
       setStatus({ connected: false, pending: false });
       notifications.show({ color: "teal", message: "Conexión Meta desvinculada." });
     } catch {
       notifications.show({ color: "red", message: "Error al desconectar." });
     } finally {
       setDisconnecting(false);
-    }
-  }
-
-  // ── SMS handlers ─────────────────────────────────────────────────────────
-
-  async function handleSendCode() {
-    if (!phone.trim()) { notifications.show({ color: "orange", message: "Ingresa el número." }); return; }
-    setSendingCode(true);
-    try {
-      await requestMetaVerification(organizationId, cc, phone.replace(/\D/g, ""), organizationName, smsMethod);
-      setSmsStep("code");
-      notifications.show({ color: "green", message: `Código enviado al +${cc}${phone.replace(/\D/g, "")}` });
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? (err instanceof Error ? err.message : "Error al enviar código");
-      notifications.show({ color: "red", message: msg });
-    } finally {
-      setSendingCode(false);
-    }
-  }
-
-  async function handleVerifyCode() {
-    if (code.length < 6) { notifications.show({ color: "orange", message: "Código incompleto." }); return; }
-    setVerifying(true);
-    try {
-      await verifyMetaCode(organizationId, code);
-      setSmsStep("mode");
-      notifications.show({ color: "green", message: "¡Número verificado!" });
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? (err instanceof Error ? err.message : "Código incorrecto");
-      notifications.show({ color: "red", message: msg });
-    } finally {
-      setVerifying(false);
     }
   }
 
@@ -416,113 +350,42 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId, organizationName
         </Stack>
       )}
 
-      {/* ── NO CONECTADO: dos tabs ── */}
+      {/* ── NO CONECTADO: solo Facebook (único flujo que soporta coexistencia) ── */}
       {!connected && (
-        <Tabs defaultValue="sms">
-          <Tabs.List mb="md">
-            <Tabs.Tab value="sms" leftSection={<BiPhone size={14} />}>
-              Código de verificación
-            </Tabs.Tab>
-            <Tabs.Tab value="fb" leftSection={<FaFacebook size={14} />}>
-              Facebook Business
-            </Tabs.Tab>
-          </Tabs.List>
+        <Stack gap="sm">
+          {fbStep === "idle" && (
+            <Stack gap="sm">
+              <Text size="xs" c="dimmed">
+                Conecta tu cuenta de WhatsApp Business mediante Facebook.
+                El número se vincula a tu propio WABA y tú gestionas tu facturación con Meta directamente.
+              </Text>
+              <Button
+                leftSection={<FaFacebook size={16} />}
+                onClick={handleFbConnect}
+                loading={connecting}
+                variant="light"
+                color="blue"
+              >
+                Conectar con Facebook
+              </Button>
+              <Text size="xs" c="dimmed">
+                Se abrirá un popup de Facebook para seleccionar tu número de WhatsApp Business.
+              </Text>
+            </Stack>
+          )}
 
-          {/* ── TAB SMS ── */}
-          <Tabs.Panel value="sms">
-            {smsStep === "phone" && (
-              <Stack gap="sm">
-                <Text size="xs" c="dimmed">
-                  Ingresa tu número y te enviaremos un código de verificación.
-                  <br />No necesitas cuenta de Facebook.
-                </Text>
-                <Group align="flex-end" gap="xs">
-                  <Select label="País" data={COUNTRY_CODES} value={cc}
-                    onChange={(v) => setCc(v ?? "57")} w={200} searchable />
-                  <TextInput label="Número (sin código de país)" placeholder="3001234567"
-                    value={phone} onChange={(e) => setPhone(e.currentTarget.value)} style={{ flex: 1 }} />
-                </Group>
-                <Radio.Group label="Método" value={smsMethod}
-                  onChange={(v) => setSmsMethod(v as "SMS" | "VOICE")}>
-                  <Group mt={4}>
-                    <Radio value="SMS" label="SMS" />
-                    <Radio value="VOICE" label="Llamada de voz" />
-                  </Group>
-                </Radio.Group>
-                <Button leftSection={<BiPhone size={16} />} onClick={handleSendCode}
-                  loading={sendingCode} variant="light">
-                  Enviar código de verificación
-                </Button>
-              </Stack>
-            )}
-
-            {smsStep === "code" && (
-              <Stack gap="sm">
-                <Alert color="blue" icon={<BiPhone size={16} />}>
-                  <Text size="sm">
-                    Código enviado al <strong>+{cc}{phone.replace(/\D/g, "")}</strong>
-                    {" "}vía {smsMethod === "SMS" ? "SMS" : "llamada de voz"}.
-                  </Text>
-                </Alert>
-                <Text size="sm" fw={500}>Ingresa el código de 6 dígitos</Text>
-                <PinInput length={6} type="number" value={code} onChange={setCode} size="md" />
-                <Group>
-                  <Button variant="subtle" size="sm" onClick={() => setSmsStep("phone")}>← Cambiar número</Button>
-                  <Button onClick={handleVerifyCode} loading={verifying} disabled={code.length < 6}>Verificar</Button>
-                </Group>
-                <Text size="xs" c="dimmed">El código expira en 10 minutos.</Text>
-              </Stack>
-            )}
-
-            {smsStep === "mode" && (
-              <ModePicker
-                mode={mode} setMode={setMode}
-                has2sv={has2sv} setHas2sv={setHas2sv}
-                pin={pin} setPin={setPin}
-                generatedPin={generatedPin}
-                activating={activating}
-                onActivate={handleActivate}
-                onBack={() => setSmsStep("phone")}
-              />
-            )}
-          </Tabs.Panel>
-
-          {/* ── TAB FACEBOOK ── */}
-          <Tabs.Panel value="fb">
-            {fbStep === "idle" && (
-              <Stack gap="sm">
-                <Text size="xs" c="dimmed">
-                  Conecta tu cuenta de WhatsApp Business mediante Facebook.
-                  El número se vincula a tu propio WABA y tú gestionas tu facturación con Meta directamente.
-                </Text>
-                <Button
-                  leftSection={<FaFacebook size={16} />}
-                  onClick={handleFbConnect}
-                  loading={connecting}
-                  variant="light"
-                  color="blue"
-                >
-                  Conectar con Facebook
-                </Button>
-                <Text size="xs" c="dimmed">
-                  Se abrirá un popup de Facebook para seleccionar tu número de WhatsApp Business.
-                </Text>
-              </Stack>
-            )}
-
-            {fbStep === "mode" && (
-              <ModePicker
-                mode={mode} setMode={setMode}
-                has2sv={has2sv} setHas2sv={setHas2sv}
-                pin={pin} setPin={setPin}
-                generatedPin={generatedPin}
-                activating={activating}
-                onActivate={handleActivate}
-                onBack={() => setFbStep("idle")}
-              />
-            )}
-          </Tabs.Panel>
-        </Tabs>
+          {fbStep === "mode" && (
+            <ModePicker
+              mode={mode} setMode={setMode}
+              has2sv={has2sv} setHas2sv={setHas2sv}
+              pin={pin} setPin={setPin}
+              generatedPin={generatedPin}
+              activating={activating}
+              onActivate={handleActivate}
+              onBack={() => setFbStep("idle")}
+            />
+          )}
+        </Stack>
       )}
 
       <Divider mt="md" />
