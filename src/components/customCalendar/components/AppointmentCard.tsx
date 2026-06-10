@@ -127,7 +127,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   );
 
   const [customPrice, setCustomPrice] = useState<number | null>(
-    appointment.customPrice || 0
+    appointment.customPrice ?? null
   );
   const [additionalItems, setAdditionalItems] = useState(
     appointment.additionalItems || []
@@ -317,8 +317,7 @@ ${clientServices}`;
   const isBirthday = getIsBirthday(appointment.client.birthDate);
 
   // 💰 Cálculos de cobro para esta cita
-  // Usar || en lugar de ?? porque customPrice se inicializa como 0 cuando no hay precio personalizado
-  const thisTotal = (customPrice || appointment.totalPrice || 0) +
+  const thisTotal = (customPrice ?? appointment.totalPrice ?? 0) +
     additionalItems.reduce((s, i) => s + (i.price || 0), 0);
   const totalPaid = (appointment.advancePayment || 0) +
     payments.reduce((s, p) => s + (p.amount || 0), 0);
@@ -328,7 +327,7 @@ ${clientServices}`;
     paid:    { color: "green",  label: "Pagado" },
     partial: { color: "yellow", label: "Abono" },
     unpaid:  { color: "red",    label: "Sin pagar" },
-    free:    { color: "blue",   label: "Incluido en paquete" },
+    free:    { color: "blue",   label: appointment.clientPackageId ? "Incluido en paquete" : "Gratis" },
   };
   const psConfig = paymentStatusConfig[paymentStatus as keyof typeof paymentStatusConfig] ?? paymentStatusConfig.unpaid;
 
@@ -620,11 +619,14 @@ ${clientServices}`;
 
                     <NumberInput
                       label="Cambiar precio"
+                      description="Déjalo vacío para usar el precio del servicio. Escribe 0 para una cita gratuita."
                       prefix="$ "
                       thousandSeparator=","
-                      value={customPrice || ""}
+                      min={0}
+                      placeholder={String(appointment.totalPrice ?? 0)}
+                      value={customPrice ?? ""}
                       onChange={(value) =>
-                        setCustomPrice(Number(value) || null)
+                        setCustomPrice(value === "" ? null : Number(value))
                       }
                     />
                   </Box>
@@ -757,7 +759,7 @@ ${clientServices}`;
                               ) || 0;
 
                             const usedPrice =
-                              appt.customPrice || appt.totalPrice || 0;
+                              appt.customPrice ?? appt.totalPrice ?? 0;
                             const total = usedPrice + additionalTotal;
 
                             return (
@@ -779,7 +781,7 @@ ${clientServices}`;
                                       organization?.currency || "COP"
                                     )}
                                   </Text>
-                                  {appt.customPrice && (
+                                  {appt.customPrice != null && (
                                     <Text size="xs" c="dimmed">
                                       No usado
                                     </Text>
@@ -793,7 +795,7 @@ ${clientServices}`;
                                       organization?.currency || "COP"
                                     )}
                                   </Text>
-                                  {appt.customPrice && (
+                                  {appt.customPrice != null && (
                                     <Text size="xs" c="green">
                                       Personalizado
                                     </Text>

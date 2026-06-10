@@ -190,12 +190,13 @@ const PAYMENT_STATUS_META: Record<string, { label: string; color: string }> = {
   free:    { label: "Gratis",  color: "blue" },
 };
 
-function PaymentBadge({ status }: { status?: string }) {
+function PaymentBadge({ status, clientPackageId }: { status?: string; clientPackageId?: string | null }) {
   if (!status) return null;
   const meta = PAYMENT_STATUS_META[status] || { label: status, color: "gray" };
+  const label = status === "free" && clientPackageId ? "Incluido en paquete" : meta.label;
   return (
     <Badge variant="light" color={meta.color} size="sm">
-      {meta.label}
+      {label}
     </Badge>
   );
 }
@@ -978,7 +979,7 @@ const DailyCashbox: React.FC = () => {
                   </Text>
                   <Group gap="xs" mt={4} align="center" wrap="wrap">
                     <Text size="sm" fw={700}>{formatCurrency(total, currency)}</Text>
-                    <PaymentBadge status={appointment.paymentStatus} />
+                    <PaymentBadge status={appointment.paymentStatus} clientPackageId={appointment.clientPackageId} />
                     <PaymentMethods payments={appointment.payments} />
                     {isCustom && <CustomPriceBadge isMobile={true} />}
                     {additionalTotal > 0 && <Badge variant="light" color="blue" size="xs">+ Adic.</Badge>}
@@ -1060,7 +1061,7 @@ const DailyCashbox: React.FC = () => {
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    <PaymentBadge status={appointment.paymentStatus} />
+                    <PaymentBadge status={appointment.paymentStatus} clientPackageId={appointment.clientPackageId} />
                     <PaymentMethods payments={appointment.payments} />
                   </Table.Td>
                   <Table.Td><StatusBadge status={status} /></Table.Td>
@@ -1226,7 +1227,7 @@ const DailyCashbox: React.FC = () => {
               <Paper withBorder p="sm" radius="md">
                 <Group justify="space-between" mb="sm">
                   <Text size="sm" fw={700}>Cobro</Text>
-                  <PaymentBadge status={drawerPaymentStatus} />
+                  <PaymentBadge status={drawerPaymentStatus} clientPackageId={selectedAppt?.clientPackageId} />
                 </Group>
 
                 {/* Resumen numérico */}

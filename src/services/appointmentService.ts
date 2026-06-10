@@ -37,6 +37,7 @@ export interface Appointment {
   totalPrice: number; // Precio total calculado para la cita
   payments?: PaymentRecord[];
   paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'free';
+  clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
   reminderSent?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -148,7 +149,7 @@ export interface CreateAppointmentsBatchPayload {
   /** { [serviceId]: duración en minutos } - Duraciones personalizadas por servicio */
   customDurations?: Record<string, number>;
   /** ID del paquete de sesiones del cliente (si aplica) */
-  clientPackageId?: string;
+  clientPackageId?: string | null;
   /** { [serviceId]: clientPackageId } - mapeo servicio → paquete */
   usePackageForServices?: Record<string, string>;
 }

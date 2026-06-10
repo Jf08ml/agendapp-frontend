@@ -91,7 +91,7 @@ export interface CreateAppointmentPayload {
   // Clave: serviceId, Valor: duración en minutos
   customDurations?: Record<string, number>;
   // Paquete de sesiones del cliente (si aplica)
-  clientPackageId?: string;
+  clientPackageId?: string | null;
   usePackageForServices?: Record<string, string>; // serviceId -> clientPackageId
 }
 
