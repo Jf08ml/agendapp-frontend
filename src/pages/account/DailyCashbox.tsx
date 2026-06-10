@@ -37,6 +37,7 @@ import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
+import { usePermissions } from "../../hooks/usePermissions";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { formatInTimezone } from "../../utils/timezoneUtils";
 import { startOfWeek, addDays, startOfMonth, endOfMonth } from "date-fns";
@@ -60,6 +61,7 @@ import {
   IconUserCheck,
   IconUserX,
   IconBan,
+  IconPackage,
 } from "@tabler/icons-react";
 
 import {
@@ -75,6 +77,13 @@ import {
   addAppointmentPayment,
   removeAppointmentPayment,
 } from "../../services/appointmentService";
+import {
+  ClientPackage,
+  PackagePaymentRecord,
+  getAllOrgClientPackages,
+  addClientPackagePayment,
+  removeClientPackagePayment,
+} from "../../services/packageService";
 
 const IconArrowRight = IconChevronRight;
 
@@ -279,10 +288,21 @@ const DailyCashbox: React.FC = () => {
   const [drawerNewItem, setDrawerNewItem] = useState({ name: "", price: 0 });
   const [drawerSavingPrice, setDrawerSavingPrice] = useState(false);
 
+  // Pagos de paquetes/planes
+  const [clientPackages, setClientPackages] = useState<ClientPackage[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(false);
+  const [packageSearch, setPackageSearch] = useState("");
+  const [payingPackageId, setPayingPackageId] = useState<string | null>(null);
+  const [newPackagePayment, setNewPackagePayment] = useState({ amount: 0, method: "cash", note: "" });
+  const [savingPackagePayment, setSavingPackagePayment] = useState(false);
+
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
   const org = useSelector(selectOrganization);
+  const { hasPermission } = usePermissions();
+  const canManagePackagePayments =
+    hasPermission("packages:view") && org?.planLimits?.servicePackages !== false;
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const currency = org?.currency || "COP";
@@ -375,6 +395,14 @@ const DailyCashbox: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, startDate, endDate]);
 
+  // Trae paquetes de clientes de la org (independiente del rango de fechas)
+  useEffect(() => {
+    if (organizationId && canManagePackagePayments) {
+      fetchClientPackages();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, canManagePackagePayments]);
+
   useEffect(() => {
     // UX: si el usuario elige "Personalizado" en mobile, abre filtros automáticamente
     if (isMobile && interval === "custom") {
@@ -423,6 +451,19 @@ const DailyCashbox: React.FC = () => {
       setIncomes(data.filter((e) => e.type === "income"));
     } catch (error) {
       console.error("Error al obtener gastos:", error);
+    }
+  };
+
+  const fetchClientPackages = async () => {
+    if (!organizationId) return;
+    setLoadingPackages(true);
+    try {
+      const data = await getAllOrgClientPackages(organizationId);
+      setClientPackages(data);
+    } catch (error) {
+      console.error("Error al obtener paquetes de clientes:", error);
+    } finally {
+      setLoadingPackages(false);
     }
   };
 
@@ -667,6 +708,69 @@ const DailyCashbox: React.FC = () => {
     }
   };
 
+  const handleTogglePayPackage = (pkgId: string) => {
+    setPayingPackageId((current) => (current === pkgId ? null : pkgId));
+    setNewPackagePayment({ amount: 0, method: "cash", note: "" });
+  };
+
+  const handlePackageFullPayment = async (pkg: ClientPackage) => {
+    const pending = getPackagePending(pkg);
+    if (pending <= 0) return;
+    setSavingPackagePayment(true);
+    try {
+      const updated = await addClientPackagePayment(pkg._id, {
+        amount: pending,
+        method: newPackagePayment.method as PackagePaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: "",
+      });
+      if (updated) {
+        setClientPackages((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
+        setPayingPackageId(null);
+        showNotification({ title: "Pago completo registrado", message: "", color: "green", autoClose: 2500, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setSavingPackagePayment(false);
+    }
+  };
+
+  const handlePackageAddPayment = async (pkg: ClientPackage) => {
+    if (!newPackagePayment.amount || newPackagePayment.amount <= 0) return;
+    setSavingPackagePayment(true);
+    try {
+      const updated = await addClientPackagePayment(pkg._id, {
+        amount: newPackagePayment.amount,
+        method: newPackagePayment.method as PackagePaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: newPackagePayment.note,
+      });
+      if (updated) {
+        setClientPackages((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
+        setNewPackagePayment({ amount: 0, method: "cash", note: "" });
+        setPayingPackageId(null);
+        showNotification({ title: "Pago registrado", message: "", color: "green", autoClose: 2500, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setSavingPackagePayment(false);
+    }
+  };
+
+  const handleRemovePackagePayment = async (pkg: ClientPackage, paymentId: string) => {
+    try {
+      const updated = await removeClientPackagePayment(pkg._id, paymentId);
+      if (updated) {
+        setClientPackages((prev) => prev.map((p) => (p._id === updated._id ? updated : p)));
+        showNotification({ title: "Pago eliminado", message: "", color: "orange", autoClose: 2000, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo eliminar el pago", color: "red", autoClose: 3000, position: "top-right" });
+    }
+  };
+
   // Cálculos del drawer (usan estados locales de precio para reflejar cambios antes de guardar)
   const drawerTotal = selectedAppt
     ? (drawerCustomPrice ?? selectedAppt.totalPrice ?? 0) +
@@ -895,6 +999,63 @@ const DailyCashbox: React.FC = () => {
         totalCashCollected: cashCollected,
       };
     }, [filteredAppointments, totalGeneralExpenses, totalGeneralIncomes]);
+
+  // ---- Pagos de paquetes/planes ----
+  const getPackageName = (pkg: ClientPackage): string => {
+    if (typeof pkg.servicePackageId === "object" && pkg.servicePackageId !== null) {
+      return (pkg.servicePackageId as any).name || "Paquete";
+    }
+    return "Paquete";
+  };
+
+  const getPackageClientInfo = (pkg: ClientPackage): { name: string; phone: string } => {
+    if (typeof pkg.clientId === "object" && pkg.clientId !== null) {
+      const c = pkg.clientId as any;
+      return { name: c.name || "—", phone: c.phoneNumber || "" };
+    }
+    return { name: "—", phone: "" };
+  };
+
+  const getPackagePending = (pkg: ClientPackage): number => {
+    const paid = (pkg.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+    return Math.max(0, (pkg.totalPrice || 0) - paid);
+  };
+
+  const packagePaymentsInRange = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+    const rows: { payment: PackagePaymentRecord; pkg: ClientPackage }[] = [];
+    for (const pkg of clientPackages) {
+      for (const payment of pkg.payments || []) {
+        const time = new Date(payment.date).getTime();
+        if (time >= start && time <= end) {
+          rows.push({ payment, pkg });
+        }
+      }
+    }
+    return rows.sort(
+      (a, b) => new Date(b.payment.date).getTime() - new Date(a.payment.date).getTime()
+    );
+  }, [clientPackages, startDate, endDate]);
+
+  const totalPackagePayments = useMemo(
+    () => packagePaymentsInRange.reduce((s, row) => s + (row.payment.amount || 0), 0),
+    [packagePaymentsInRange]
+  );
+
+  const totalReceivedCombined = totalCollected + totalGeneralIncomes + totalPackagePayments;
+
+  const packagesWithBalance = useMemo(() => {
+    const search = packageSearch.trim().toLowerCase();
+    return clientPackages
+      .filter((pkg) => pkg.status !== "cancelled" && pkg.paymentStatus !== "paid")
+      .filter((pkg) => {
+        if (!search) return true;
+        const { name } = getPackageClientInfo(pkg);
+        return name.toLowerCase().includes(search);
+      });
+  }, [clientPackages, packageSearch]);
 
   const formattedRangeLabel =
     startDate && endDate
@@ -1509,6 +1670,20 @@ const DailyCashbox: React.FC = () => {
             <Text fw={900} size="xl" c="green">{formatCurrency(totalCollected, currency)}</Text>
           </Paper>
 
+          {canManagePackagePayments && totalPackagePayments > 0 && (
+            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-grape-6)" }}>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>Pagos de paquetes</Text>
+              <Text fw={900} size="xl" c="grape">{formatCurrency(totalPackagePayments, currency)}</Text>
+            </Paper>
+          )}
+
+          {canManagePackagePayments && (
+            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-violet-6)" }}>
+              <Text size="xs" c="dimmed" fw={500} mb={4}>Total recibido</Text>
+              <Text fw={900} size="xl" c="violet">{formatCurrency(totalReceivedCombined, currency)}</Text>
+            </Paper>
+          )}
+
           <Paper withBorder p="md" radius="md"
             style={totalPending > 0 ? { borderLeft: "3px solid var(--mantine-color-orange-6)" } : undefined}>
             <Text size="xs" c="dimmed" fw={500} mb={4}>Pendiente</Text>
@@ -1591,6 +1766,134 @@ const DailyCashbox: React.FC = () => {
             </>
           )}
         </Card>
+
+        {/* ── Pagos de paquetes/planes ── */}
+        {canManagePackagePayments && (
+        <Card shadow="sm" radius="md" withBorder>
+          <Group gap="xs" mb="sm">
+            <IconPackage size={18} />
+            <Title order={4}>Pagos de paquetes</Title>
+            <Badge variant="light" color="gray">{packagesWithBalance.length}</Badge>
+            {totalPackagePayments > 0 && (
+              <Badge color="grape" variant="light">+{formatCurrency(totalPackagePayments, currency)}</Badge>
+            )}
+          </Group>
+
+          <Text fw={600} size="sm" mb="xs">Registrar pago a paquete</Text>
+          <TextInput
+            placeholder="Buscar cliente..."
+            value={packageSearch}
+            onChange={(e) => setPackageSearch(e.currentTarget.value)}
+            mb="sm"
+          />
+
+          {loadingPackages ? (
+            <Flex justify="center" py="md"><Loader size={28} /></Flex>
+          ) : packagesWithBalance.length === 0 ? (
+            <Text c="dimmed" ta="center" size="sm" py="sm">No hay paquetes con saldo pendiente.</Text>
+          ) : (
+            <Stack gap="xs" mb="md">
+              {packagesWithBalance.map((pkg) => {
+                const { name, phone } = getPackageClientInfo(pkg);
+                const pending = getPackagePending(pkg);
+                const isExpanded = payingPackageId === pkg._id;
+                return (
+                  <Paper key={pkg._id} withBorder p="sm" radius="md">
+                    <Group justify="space-between" wrap="wrap">
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <Text size="sm" fw={600} lineClamp={1}>{name}</Text>
+                        <Text size="xs" c="dimmed">{getPackageName(pkg)}{phone ? ` · ${phone}` : ""}</Text>
+                      </div>
+                      <Group gap="xs" wrap="nowrap">
+                        <Badge color="orange" variant="light">Saldo: {formatCurrency(pending, currency)}</Badge>
+                        <Button size="xs" variant={isExpanded ? "filled" : "light"} onClick={() => handleTogglePayPackage(pkg._id)}>
+                          {isExpanded ? "Cerrar" : "Registrar pago"}
+                        </Button>
+                      </Group>
+                    </Group>
+
+                    {isExpanded && (
+                      <Stack gap="xs" mt="sm">
+                        <Select
+                          size="sm" label="Método"
+                          value={newPackagePayment.method}
+                          onChange={(v) => setNewPackagePayment({ ...newPackagePayment, method: v || "cash" })}
+                          data={[
+                            { value: "cash", label: "Efectivo" },
+                            { value: "card", label: "Tarjeta" },
+                            { value: "transfer", label: "Transferencia" },
+                            { value: "other", label: "Otro" },
+                          ]}
+                        />
+                        <Button fullWidth size="sm" color="teal" onClick={() => handlePackageFullPayment(pkg)} loading={savingPackagePayment}>
+                          Pago completo ({formatCurrency(pending, currency)})
+                        </Button>
+                        <Divider label="o monto parcial" labelPosition="center" />
+                        <Group gap="xs" wrap="wrap">
+                          <NumberInput
+                            size="sm" label="Monto"
+                            prefix="$ " thousandSeparator="." decimalSeparator=","
+                            value={newPackagePayment.amount || ""}
+                            onChange={(v) => setNewPackagePayment({ ...newPackagePayment, amount: typeof v === "number" ? v : 0 })}
+                            min={0} style={{ flex: 1, minWidth: 100 }}
+                          />
+                          <TextInput
+                            size="sm" label="Nota (opcional)"
+                            value={newPackagePayment.note}
+                            onChange={(e) => setNewPackagePayment({ ...newPackagePayment, note: e.currentTarget.value })}
+                            style={{ flex: 1, minWidth: 100 }}
+                          />
+                        </Group>
+                        <Button
+                          fullWidth size="sm" variant="light"
+                          disabled={!newPackagePayment.amount || newPackagePayment.amount <= 0}
+                          onClick={() => handlePackageAddPayment(pkg)} loading={savingPackagePayment}
+                        >
+                          Registrar abono
+                        </Button>
+                      </Stack>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Stack>
+          )}
+
+          <Divider label="Pagos registrados en este período" labelPosition="center" mb="sm" />
+
+          {packagePaymentsInRange.length === 0 ? (
+            <Text c="dimmed" ta="center" size="sm" py="sm">No hay pagos de paquetes en este período.</Text>
+          ) : (
+            <Stack gap="xs">
+              {packagePaymentsInRange.map(({ payment, pkg }) => {
+                const { name } = getPackageClientInfo(pkg);
+                return (
+                  <Group key={payment._id} justify="space-between" wrap="nowrap"
+                    style={{ borderBottom: "1px solid var(--mantine-color-gray-2)", paddingBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Group gap="xs" wrap="nowrap">
+                        <Text size="sm" fw={600} lineClamp={1}>{name}</Text>
+                        <Badge size="xs" variant="dot" color="gray">{getPackageName(pkg)}</Badge>
+                      </Group>
+                      <Text size="xs" c="dimmed">
+                        {formatInTimezone(payment.date, timezone, "DD/MM/YYYY")} · {METHOD_LABELS[payment.method] || payment.method}
+                      </Text>
+                    </div>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text fw={700} c="grape" size="sm">+{formatCurrency(payment.amount, currency)}</Text>
+                      <Tooltip label="Eliminar" withArrow>
+                        <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleRemovePackagePayment(pkg, payment._id)}>
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                );
+              })}
+            </Stack>
+          )}
+        </Card>
+        )}
 
         {/* ── Movimientos ── */}
         <Card id="cashbox-movements" shadow="sm" radius="md" withBorder>
