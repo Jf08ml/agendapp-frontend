@@ -40,6 +40,7 @@ import {
   BiPackage,
   BiUserCheck,
   BiBarChartAlt2,
+  BiBot,
 } from "react-icons/bi";
 import { notifications } from "@mantine/notifications";
 import { formatCurrency } from "../../utils/formatCurrency";
@@ -218,6 +219,14 @@ export default function SuperadminAnalytics() {
             size="sm"
           >
             Analítica
+          </Button>
+          <Button
+            variant="light"
+            leftSection={<BiBot size={16} />}
+            size="sm"
+            onClick={() => navigate("/superadmin/chatbots")}
+          >
+            Chatbots IA
           </Button>
         </Group>
 

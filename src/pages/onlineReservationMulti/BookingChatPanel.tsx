@@ -38,6 +38,7 @@ import { RootState } from "../../app/store";
 import {
   sendBookingMessage,
   sendBookingFeedback,
+  markBookingConverted,
   BookingChatMessage,
   BookingPayload,
 } from "../../services/bookingChatService";
@@ -153,6 +154,8 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setReservationError(null);
     try {
       await createMultipleReservations({ ...(pendingPayload as any), source: "ai_chatbot" });
+      // Marcar conversión en el ChatLog (fire-and-forget, no afecta la UX)
+      markBookingConverted(sessionId.current).catch(() => {});
       setReservationDone(true);
       setPendingPayload(null);
     } catch (err: any) {

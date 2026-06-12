@@ -58,6 +58,12 @@ export const sendBookingMessage = async (
   };
 };
 
+// Marca la sesión como convertida (reserva creada tras el clic en "Sí, confirmar").
+// Fire-and-forget: un fallo aquí no debe afectar la UX de la reserva.
+export const markBookingConverted = async (sessionId: string): Promise<void> => {
+  await api.post("/converted", { sessionId });
+};
+
 export const sendBookingFeedback = async (payload: {
   rating: 1 | 2 | 3 | 4 | 5;
   message?: string;

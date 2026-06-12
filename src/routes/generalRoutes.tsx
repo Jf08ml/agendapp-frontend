@@ -38,6 +38,7 @@ import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
 import SuperadminAnnouncements from "../pages/superadmin/SuperadminAnnouncements";
 import SuperadminAnalytics from "../pages/superadmin/SuperadminAnalytics";
+import SuperadminChatbots from "../pages/superadmin/SuperadminChatbots";
 import AuditLogPage from "../pages/admin/auditLog";
 import SystemUpdates from "../pages/admin/SystemUpdates";
 import ManageClasses from "../pages/admin/classes";
@@ -455,6 +456,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Analítica de plataforma",
       description: "Métricas globales de actividad, crecimiento y membresías de AgenditApp",
+    },
+  },
+  {
+    path: "/superadmin/chatbots",
+    component: SuperadminChatbots,
+    MediaMetadata: {
+      title: "Analítica de chatbots IA",
+      description: "Uso, conversión y costos de los asistentes IA de AgenditApp",
     },
   },
   {
