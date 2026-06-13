@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   Box, Group, Text, Stack, Title, Progress, Badge,
-  ScrollArea, Loader, Center, Stepper,
+  ScrollArea, Loader, Center, Stepper, Button,
   ThemeIcon, useMantineTheme, rem, Paper, SimpleGrid,
 } from "@mantine/core";
 import { IconRobotFace, IconListDetails } from "@tabler/icons-react";
@@ -19,7 +19,7 @@ import {
 } from "@tabler/icons-react";
 
 import { RootState } from "../../app/store";
-import { updateOrganization } from "../../services/organizationService";
+import { updateOrganization, seedDemoData } from "../../services/organizationService";
 import { updateOrganizationState } from "../../features/organization/sliceOrganization";
 import { zodResolver } from "../../utils/zodResolver";
 import { schema, FormValues } from "../admin/OrganizationInfo/schema";
@@ -78,6 +78,7 @@ export default function SetupWizard() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [skippingSetup, setSkippingSetup] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   // IDs creados en pasos 0 y 1
@@ -185,7 +186,14 @@ export default function SetupWizard() {
         setupCompleted: true,
       });
       if (updated) dispatch(updateOrganizationState(updated));
-      navigate("/gestionar-whatsapp", { replace: true });
+      // Aterrizar en la agenda (primer momento de valor), no en una página técnica
+      navigate("/gestionar-agenda", { replace: true });
+      showNotification({
+        title: "🎉 ¡Tu negocio está configurado!",
+        message: "Toca un día del calendario y luego la columna de tu profesional para crear tu primera cita.",
+        color: "green",
+        autoClose: 12000,
+      });
     } catch {
       showNotification({ title: "Error", message: "No se pudo finalizar la configuración", color: "red" });
     } finally {
@@ -203,6 +211,37 @@ export default function SetupWizard() {
       </Center>
     );
   }
+
+  // Explorar sin configurar: siembra servicios y profesionales de ejemplo,
+  // activa el horario por defecto y deja entrar a una agenda ya funcional.
+  const handleExploreFirst = async () => {
+    if (!organizationId || skippingSetup) return;
+    setSkippingSetup(true);
+    try {
+      const result = await seedDemoData(organizationId);
+      // Reflejar setupCompleted en Redux para que ProtectedRoute deje pasar
+      dispatch(updateOrganizationState({ ...(organization as any), setupCompleted: true }));
+      navigate("/gestionar-agenda", { replace: true });
+      showNotification({
+        title: "🎉 ¡Listo para explorar!",
+        message: result.seeded
+          ? "Creamos servicios y profesionales de ejemplo. Toca un día del calendario y crea una cita de prueba — puedes editar o eliminar los ejemplos cuando quieras."
+          : "Bienvenido a tu agenda. Crea tus servicios y profesionales cuando quieras.",
+        color: "green",
+        autoClose: 12000,
+      });
+    } catch {
+      // Fallback: dejar entrar sin datos demo para no bloquear al usuario
+      try {
+        const updated = await updateOrganization(organizationId, { setupCompleted: true } as any);
+        if (updated) dispatch(updateOrganizationState(updated));
+        navigate("/gestionar-agenda", { replace: true });
+      } catch {
+        showNotification({ title: "Error", message: "No se pudo abrir la plataforma. Intenta de nuevo.", color: "red" });
+        setSkippingSetup(false);
+      }
+    }
+  };
 
   // Pantalla de elección
   if (mode === "choice") {
@@ -225,7 +264,11 @@ export default function SetupWizard() {
               p="xl"
               radius="lg"
               style={{ cursor: "pointer", transition: "box-shadow .15s" }}
-              onClick={() => navigate("/gestionar-agenda?asistente=onboarding")}
+              onClick={() => {
+                // Flag para que ProtectedRoute no rebote la agenda durante el onboarding IA
+                sessionStorage.setItem("ai_onboarding_active", "1");
+                navigate("/gestionar-agenda?asistente=onboarding");
+              }}
               styles={{ root: { "&:hover": { boxShadow: theme.shadows.md } } }}
             >
               <Stack align="center" gap="sm">
@@ -259,6 +302,16 @@ export default function SetupWizard() {
               </Stack>
             </Paper>
           </SimpleGrid>
+
+          <Button
+            variant="subtle"
+            color="gray"
+            size="sm"
+            loading={skippingSetup}
+            onClick={handleExploreFirst}
+          >
+            Prefiero explorar primero con datos de ejemplo →
+          </Button>
         </Stack>
       </Center>
     );

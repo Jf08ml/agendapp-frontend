@@ -138,6 +138,13 @@ export interface Organization {
   enableOnlineBooking?: boolean;
   enableClassBooking?: boolean;
   setupCompleted?: boolean;
+  onboardingMilestones?: {
+    setupCompletedAt?: string | null;
+    seededDemoAt?: string | null;
+    firstAppointmentAt?: string | null;
+    whatsappConnectedAt?: string | null;
+    firstAutoMessageAt?: string | null;
+  };
   blockHolidaysForReservations?: boolean;
   allowedHolidayDates?: string[];
   paymentMethods?: PaymentMethod[];
@@ -230,6 +237,29 @@ export const getOrganizationById = async (
     console.error("Error al obtener la organización:", error);
     return null;
   }
+};
+
+// Sembrar datos de ejemplo (onboarding "Explorar primero"): crea servicios y
+// profesionales demo, activa el horario por defecto y marca setupCompleted.
+export const seedDemoData = async (
+  organizationId: string
+): Promise<{ seeded: boolean }> => {
+  const response: AxiosResponse<{ data: { seeded: boolean } }> =
+    await apiOrganization.post(`/${organizationId}/seed-demo`);
+  return response.data.data;
+};
+
+// Al conectar WhatsApp por primera vez: envía al propio número del negocio el
+// recordatorio de ejemplo (el "aha"). Idempotente en el backend (salvo force).
+// `phone` = número conectado (de `me`); `force` reenvía aunque ya se haya mandado.
+export const sendWhatsappWelcomeTest = async (
+  organizationId: string,
+  phone?: string,
+  force?: boolean
+): Promise<{ sent: boolean; alreadySent?: boolean; reason?: string }> => {
+  const response: AxiosResponse<{ data: { sent: boolean; alreadySent?: boolean; reason?: string } }> =
+    await apiOrganization.post(`/${organizationId}/wa/welcome-test`, { phone, force });
+  return response.data.data;
 };
 
 // Actualizar una organización

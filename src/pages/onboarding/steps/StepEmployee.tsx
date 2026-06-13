@@ -68,12 +68,14 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId]);
 
+  // El correo es opcional: sin él, el profesional no tendrá acceso propio
+  // (se genera un placeholder no-login) pero puede recibir citas igual.
+  const wantsOwnAccess = email.trim().length > 0;
   const canSave =
     names.trim().length > 1 &&
     position.trim().length > 0 &&
     phoneNumber.trim().length > 5 &&
-    email.trim().length > 3 &&
-    password.trim().length > 5;
+    (!wantsOwnAccess || (email.trim().length > 3 && password.trim().length > 5));
 
   const handleDrop = async (files: File[]) => {
     setIsUploading(true);
@@ -101,12 +103,20 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
         .map((id) => serviceOptions.find((s) => s._id === id))
         .filter(Boolean) as ServiceOption[];
 
+      // Sin correo: placeholder único no-login + contraseña aleatoria (el modelo los exige)
+      const finalEmail = wantsOwnAccess
+        ? email.trim()
+        : `profesional-${Date.now().toString(36)}@sin-acceso.agenditapp.com`;
+      const finalPassword = wantsOwnAccess
+        ? password
+        : Math.random().toString(36).slice(-10) + "A1!";
+
       const created = await createEmployee({
         names,
         position,
-        email,
+        email: finalEmail,
         phoneNumber,
-        password,
+        password: finalPassword,
         organizationId,
         isActive: true,
         profileImage,
@@ -175,27 +185,29 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
               onChange={(e) => setPhoneNumber(e.currentTarget.value)}
             />
             <TextInput
-              label="Correo electrónico"
-              withAsterisk
+              label="Correo electrónico (opcional)"
+              description="Si lo dejas vacío, el profesional recibirá citas igual pero no tendrá acceso propio a la plataforma. Podrás asignarle un correo después."
               type="email"
               placeholder="correo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.currentTarget.value)}
             />
-            <TextInput
-              label="Contraseña de acceso"
-              withAsterisk
-              description="El profesional usará esta contraseña para acceder a la plataforma"
-              type={showPassword ? "text" : "password"}
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-              rightSection={
-                <ActionIcon variant="transparent" onClick={() => setShowPassword((p) => !p)}>
-                  {showPassword ? <IoEyeOff size={16} /> : <FaEye size={16} />}
-                </ActionIcon>
-              }
-            />
+            {wantsOwnAccess && (
+              <TextInput
+                label="Contraseña de acceso"
+                withAsterisk
+                description="El profesional usará esta contraseña para acceder a la plataforma"
+                type={showPassword ? "text" : "password"}
+                placeholder="Mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                rightSection={
+                  <ActionIcon variant="transparent" onClick={() => setShowPassword((p) => !p)}>
+                    {showPassword ? <IoEyeOff size={16} /> : <FaEye size={16} />}
+                  </ActionIcon>
+                }
+              />
+            )}
 
             <ColorInput
               label="Color identificador"

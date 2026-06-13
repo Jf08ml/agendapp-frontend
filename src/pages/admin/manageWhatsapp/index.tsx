@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Anchor,
   Badge,
@@ -39,10 +39,11 @@ import {
 } from "react-icons/bi";
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import type { WaCode } from "../../../utils/waRealtime";
-import { updateOrganization } from "../../../services/organizationService";
+import { updateOrganization, sendWhatsappWelcomeTest } from "../../../services/organizationService";
 import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
 import { notifications } from "@mantine/notifications";
 import MetaConnectionPanel from "./MetaConnectionPanel";
+import WhatsappConnectGuide from "./components/WhatsappConnectGuide";
 
 // -----------------------------
 // 1) Mapeo UI por estado
@@ -167,6 +168,69 @@ const WhatsappOrgSession: React.FC = () => {
   };
 
   const ui = UI_STATUS[code];
+
+  // 🎉 Aha moment: al conectar WhatsApp, enviar al propio número del negocio el
+  // recordatorio de ejemplo para que el dueño vea lo que reciben sus clientes.
+  // Se dispara una vez por montaje al llegar a "ready"; el backend es idempotente
+  // por `firstAutoMessageAt` (no por la conexión), así que volver a llamar es seguro.
+  const welcomeTriggered = useRef(false);
+  useEffect(() => {
+    if (code !== "ready" || welcomeTriggered.current || !organization?._id) return;
+    welcomeTriggered.current = true;
+    const selfPhone = me?.id ? me.id.split("@")[0].split(":")[0] : undefined;
+    sendWhatsappWelcomeTest(organization._id, selfPhone)
+      .then((r) => {
+        if (r.sent) {
+          notifications.show({
+            color: "green",
+            autoClose: 14000,
+            title: "🎉 ¡WhatsApp conectado!",
+            message:
+              "Te enviamos a tu propio número el recordatorio de ejemplo que recibirían tus clientes. Revísalo en tu WhatsApp 👀",
+          });
+        } else if (!r.alreadySent) {
+          // No silenciar la falla: avisar el motivo y ofrecer reintento manual
+          const reasons: Record<string, string> = {
+            no_phone: "No encontramos tu número de teléfono. Verifícalo en la configuración del negocio.",
+            plan_limit: "Tu plan no incluye el envío por WhatsApp.",
+            send_failed: "No se pudo enviar el mensaje. Usa el botón “Enviar ejemplo a mi WhatsApp”.",
+          };
+          notifications.show({
+            color: "yellow",
+            autoClose: 10000,
+            title: "No se envió el mensaje de ejemplo",
+            message: reasons[r.reason || ""] || "Inténtalo con el botón “Enviar ejemplo a mi WhatsApp”.",
+          });
+        }
+        dispatch(fetchOrganizationConfig());
+      })
+      .catch(() => {});
+  }, [code, me, organization, dispatch]);
+
+  // Botón manual: reenviar el recordatorio de ejemplo al propio WhatsApp (force).
+  const [sendingWelcome, setSendingWelcome] = useState(false);
+  const handleSendWelcomeTest = async () => {
+    if (!organization?._id || sendingWelcome) return;
+    setSendingWelcome(true);
+    try {
+      const selfPhone = me?.id ? me.id.split("@")[0].split(":")[0] : undefined;
+      const r = await sendWhatsappWelcomeTest(organization._id, selfPhone, true);
+      if (r.sent) {
+        notifications.show({ color: "green", title: "Mensaje enviado", message: "Revisa tu WhatsApp 👀" });
+      } else {
+        const reasons: Record<string, string> = {
+          no_phone: "No encontramos tu número. Verifícalo en la configuración del negocio.",
+          plan_limit: "Tu plan no incluye el envío por WhatsApp.",
+          send_failed: "No se pudo enviar. Asegúrate de que WhatsApp esté conectado.",
+        };
+        notifications.show({ color: "red", title: "No se pudo enviar", message: reasons[r.reason || ""] || "Intenta de nuevo." });
+      }
+    } catch {
+      notifications.show({ color: "red", title: "Error", message: "No se pudo enviar el mensaje." });
+    } finally {
+      setSendingWelcome(false);
+    }
+  };
 
   // Handler manual para el botón de conectar
   const handleConnect = () => {
@@ -295,6 +359,8 @@ const WhatsappOrgSession: React.FC = () => {
                   {/* ========================================================= */}
                   {code !== "ready" && (
                     <Box>
+                      <WhatsappConnectGuide />
+
                       <Text fw={600} mb="xs">
                         Método de vinculación
                       </Text>
@@ -444,6 +510,15 @@ const WhatsappOrgSession: React.FC = () => {
                   {/* ACCIONES cuando está READY */}
                   {code === "ready" && (
                     <Group justify="center" mt="sm">
+                      <Button
+                        color="teal"
+                        variant="light"
+                        leftSection={<BiInfoCircle size={16} />}
+                        onClick={handleSendWelcomeTest}
+                        loading={sendingWelcome}
+                      >
+                        Enviar ejemplo a mi WhatsApp
+                      </Button>
                       <Button
                         variant="default"
                         onClick={restart}

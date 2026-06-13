@@ -65,7 +65,21 @@ const signupSchema = z.object({
   timezone: z.string().optional(),
   currency: z.string().optional(),
   referralCode: z.string().optional(),
+  businessVertical: z.string().optional(),
 });
+
+// Rubros del negocio — pre-cargan un catálogo de servicios de ejemplo en el onboarding
+const BUSINESS_VERTICALS = [
+  { value: "barberia", label: "Barbería" },
+  { value: "unas", label: "Uñas / Manicure" },
+  { value: "salon", label: "Salón de belleza / Peluquería" },
+  { value: "spa", label: "Spa / Masajes" },
+  { value: "estetica", label: "Estética / Skincare" },
+  { value: "consultorio", label: "Consultorio / Salud" },
+  { value: "clases", label: "Clases / Academia" },
+  { value: "mascotas", label: "Peluquería de mascotas" },
+  { value: "otro", label: "Otro" },
+];
 
 const COUNTRY_CURRENCY_MAP: Record<string, string> = {
   AR: "ARS", BO: "BOB", BR: "BRL", CL: "CLP", CO: "COP",
@@ -198,6 +212,7 @@ export default function SignupPage() {
       timezone: regionalDefaults.timezone,
       currency: regionalDefaults.currency,
       referralCode: "",
+      businessVertical: "",
     },
   });
 
@@ -301,6 +316,7 @@ export default function SignupPage() {
         default_country: values.default_country || undefined,
         timezone: values.timezone || undefined, currency: values.currency || undefined,
         referralCode: values.referralCode || undefined,
+        businessVertical: values.businessVertical || undefined,
       });
       localStorage.removeItem("signup_referral_code");
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
@@ -630,6 +646,18 @@ export default function SignupPage() {
                       </Group>
                     )}
                   </Box>
+
+                  <Select
+                    label="Tipo de negocio"
+                    placeholder="Elige tu rubro"
+                    leftSection={<IconBuildingStore size={13} style={{ color: "#64748B" }} />}
+                    value={form.values.businessVertical ?? null}
+                    onChange={(v) => form.setFieldValue("businessVertical", v ?? "")}
+                    data={BUSINESS_VERTICALS}
+                    comboboxProps={{ zIndex: 10001 }}
+                    styles={{ ...selectStyles, description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 } }}
+                    description="Pre-cargamos servicios de ejemplo de tu rubro para que arranques más rápido"
+                  />
                 </SimpleGrid>
 
                 {/* ── Región ── */}
@@ -637,7 +665,7 @@ export default function SignupPage() {
 
                 <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={8}>
                   <Select
-                    label={<RLabel>País</RLabel>}
+                    label="País"
                     placeholder="País"
                     leftSection={<IconGlobe size={13} style={{ color: "#64748B" }} />}
                     value={form.values.default_country ?? null}
@@ -649,7 +677,7 @@ export default function SignupPage() {
                     styles={selectStyles}
                   />
                   <Select
-                    label={<RLabel>Zona horaria</RLabel>}
+                    label="Zona horaria"
                     placeholder="Zona horaria"
                     leftSection={<IconClock size={13} style={{ color: "#64748B" }} />}
                     {...form.getInputProps("timezone")}
@@ -659,7 +687,7 @@ export default function SignupPage() {
                     styles={selectStyles}
                   />
                   <Select
-                    label={<RLabel>Moneda</RLabel>}
+                    label="Moneda"
                     placeholder="Moneda"
                     leftSection={<IconCurrencyDollar size={13} style={{ color: "#64748B" }} />}
                     {...form.getInputProps("currency")}

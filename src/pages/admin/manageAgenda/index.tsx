@@ -62,6 +62,8 @@ import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
+import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
+import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
 import { IconShieldCog } from "@tabler/icons-react";
 
@@ -1183,6 +1185,28 @@ const ScheduleView: React.FC = () => {
 
       {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
       {employees.length === 0 && <SetupGuide employees={employees} />}
+
+      {/* Guía de activación — empuja a crear la primera cita cuando ya hay
+          profesionales pero ninguna cita creada todavía */}
+      {employees.length > 0 &&
+        !organization?.onboardingMilestones?.firstAppointmentAt &&
+        appointments.length === 0 && (
+          <FirstAppointmentGuide
+            seeded={!!organization?.onboardingMilestones?.seededDemoAt}
+            onCreateFirst={() => openModal(new Date(), new Date())}
+          />
+        )}
+
+      {/* Puente al aha de WhatsApp — ya hay citas pero WhatsApp no está conectado:
+          invita a conectarlo para notificar a los clientes (descartable) */}
+      {employees.length > 0 &&
+        appointments.length > 0 &&
+        !isWhatsAppReady && (
+          <ConnectWhatsappGuide
+            organizationId={organization?._id}
+            onConnect={() => navigate("/gestionar-whatsapp")}
+          />
+        )}
 
       {/* Calendario principal — ocupa todo el alto restante */}
       <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>

@@ -75,6 +75,9 @@ function AppContent() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("asistente") === "onboarding" && isAuthenticated && !isSuperadmin) {
+      // Persistir el flag antes de limpiar la URL: ProtectedRoute lo usa para no
+      // rebotar al wizard mientras el onboarding IA está en curso
+      sessionStorage.setItem("ai_onboarding_active", "1");
       openChat();
       setChatAutoStart(true);
       // Limpiar el param de la URL sin recargar

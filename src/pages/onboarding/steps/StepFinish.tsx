@@ -14,16 +14,16 @@ interface Props {
 
 const NEXT_STEPS = [
   {
+    icon: <IconCalendar size={18} />,
+    color: "blue",
+    title: "Crea tu primera cita",
+    description: "Toca un día del calendario y la columna de tu profesional. En menos de un minuto verás tu agenda funcionando.",
+  },
+  {
     icon: <IconBrandWhatsapp size={18} />,
     color: "green",
     title: "Conecta tu WhatsApp",
     description: "Vincula tu número de WhatsApp para enviar confirmaciones y recordatorios automáticos a tus clientes.",
-  },
-  {
-    icon: <IconCalendar size={18} />,
-    color: "blue",
-    title: "Revisa tu agenda",
-    description: "Explora el calendario de citas y familiarízate con las vistas diaria, semanal y mensual.",
   },
   {
     icon: <IconUsers size={18} />,
@@ -115,14 +115,13 @@ export default function StepFinish({ onFinish, saving }: Props) {
 
       <Button
         size="lg"
-        leftSection={<IconBrandWhatsapp size={20} />}
-        color="green"
+        leftSection={<IconCalendar size={20} />}
         onClick={onFinish}
         loading={saving}
         fullWidth
         maw={400}
       >
-        Ir a conectar WhatsApp
+        Ir a mi agenda y crear mi primera cita
       </Button>
 
       <Text size="xs" c="dimmed" ta="center">

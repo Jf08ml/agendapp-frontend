@@ -20,6 +20,7 @@ export interface RegisterData {
   timezone?: string;
   currency?: string;
   referralCode?: string;
+  businessVertical?: string;
 }
 
 export interface RegisterResponse {

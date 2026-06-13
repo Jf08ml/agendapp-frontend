@@ -30,6 +30,7 @@ import {
   BiUserCheck,
   BiBarChartAlt2,
   BiBot,
+  BiTrendingUp,
 } from "react-icons/bi";
 import { notifications } from "@mantine/notifications";
 import dayjs from "dayjs";
@@ -198,6 +199,14 @@ export default function SuperadminChatbots() {
           </Button>
           <Button variant="filled" leftSection={<BiBot size={16} />} size="sm">
             Chatbots IA
+          </Button>
+          <Button
+            variant="light"
+            leftSection={<BiTrendingUp size={16} />}
+            size="sm"
+            onClick={() => navigate("/superadmin/activacion")}
+          >
+            Activación
           </Button>
         </Group>
 

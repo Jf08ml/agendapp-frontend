@@ -33,11 +33,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/my-membership" />;
   }
 
+  // Onboarding guiado por IA: ocurre sobre /gestionar-agenda con el chat abierto.
+  // Mientras esté activo, no rebotar al wizard aunque el setup siga incompleto
+  // (App.tsx limpia el query param, por eso también se persiste en sessionStorage).
+  const aiOnboardingActive =
+    new URLSearchParams(location.search).get("asistente") === "onboarding" ||
+    sessionStorage.getItem("ai_onboarding_active") === "1";
+
+  if (organization?.setupCompleted && sessionStorage.getItem("ai_onboarding_active")) {
+    sessionStorage.removeItem("ai_onboarding_active");
+  }
+
   // Si la org ya cargó y el setup inicial no está completo, forzar al wizard
   if (
     organization &&
     organization.setupCompleted === false &&
-    location.pathname !== "/configuracion-inicial"
+    location.pathname !== "/configuracion-inicial" &&
+    !aiOnboardingActive
   ) {
     return <Navigate to="/configuracion-inicial" replace />;
   }
