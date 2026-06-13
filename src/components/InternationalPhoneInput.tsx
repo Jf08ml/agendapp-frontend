@@ -167,14 +167,16 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
 
   return (
     <Box>
-      <Text size="sm" fw={500} mb={5}>
-        {label}{" "}
-        {required && (
-          <Text component="span" color="red">
-            *
-          </Text>
-        )}
-      </Text>
+      {label && (
+        <Text size="sm" fw={500} mb={5}>
+          {label}{" "}
+          {required && (
+            <Text component="span" color="red">
+              *
+            </Text>
+          )}
+        </Text>
+      )}
 
       <Group align="flex-start" style={{ width: "100%" }}>
         <Select

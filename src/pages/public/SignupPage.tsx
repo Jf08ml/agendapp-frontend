@@ -40,6 +40,8 @@ import {
 } from "@tabler/icons-react";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
 import { detectUserCountry } from "../../utils/phoneUtils";
+import InternationalPhoneInput from "../../components/InternationalPhoneInput";
+import { type CountryCode } from "libphonenumber-js";
 import {
   checkSlugAvailability,
   registerOrganization,
@@ -715,12 +717,20 @@ export default function SignupPage() {
                     {...form.getInputProps("email")}
                     styles={inputStyles}
                   />
-                  <TextInput
-                    label={<RLabel>Teléfono</RLabel>}
-                    placeholder="+57 300 123 4567"
-                    {...form.getInputProps("phone")}
-                    styles={inputStyles}
-                  />
+                  <Box>
+                    <RLabel>Teléfono</RLabel>
+                    <Box mt={3}>
+                      <InternationalPhoneInput
+                        label=""
+                        compact
+                        placeholder="300 000 0000"
+                        value={form.values.phone}
+                        defaultCountry={(form.values.default_country as CountryCode) || regionalDefaults.country as CountryCode}
+                        onChange={(e164) => form.setFieldValue("phone", e164 || "")}
+                        error={form.errors.phone as string | undefined}
+                      />
+                    </Box>
+                  </Box>
                   <PasswordInput
                     label={<RLabel>Contraseña</RLabel>}
                     placeholder="Mínimo 6 caracteres"
