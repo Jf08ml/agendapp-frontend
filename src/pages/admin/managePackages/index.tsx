@@ -45,6 +45,7 @@ import {
   ServicePackage,
 } from "../../../services/packageService";
 import { getServicesByOrganizationId, Service } from "../../../services/serviceService";
+import { getClasses, ClassType } from "../../../services/classService";
 import ModalCreateEditPackage from "./components/ModalCreateEditPackage";
 import ModalAssignPackage from "./components/ModalAssignPackage";
 import ClientPackagesTab from "./components/ClientPackagesTab";
@@ -55,6 +56,7 @@ const AdminPackages: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [classes, setClasses] = useState<ClassType[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchTerm, 250);
@@ -77,13 +79,15 @@ const AdminPackages: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [pkgs, svcs, clientsRes] = await Promise.all([
+      const [pkgs, svcs, cls, clientsRes] = await Promise.all([
         getServicePackages(organizationId!),
         getServicesByOrganizationId(organizationId!),
+        getClasses().catch(() => []),
         apiClient.get(`/organization/${organizationId}`).then((r) => r.data.data).catch(() => []),
       ]);
       setPackages(pkgs);
       setServices(svcs);
+      setClasses(cls);
       setClients(clientsRes);
     } catch (error) {
       console.error(error);
@@ -220,6 +224,12 @@ const AdminPackages: React.FC = () => {
     if (typeof serviceId === "object" && serviceId?.name) return serviceId.name;
     const svc = services.find((s) => s._id === serviceId);
     return svc?.name || "Servicio";
+  };
+
+  const getClassName = (classId: string | any): string => {
+    if (typeof classId === "object" && classId?.name) return classId.name;
+    const cls = classes.find((c) => c._id === classId);
+    return cls?.name || "Clase";
   };
 
   const Toolbar = (
@@ -391,23 +401,45 @@ const AdminPackages: React.FC = () => {
                   </Text>
                 )}
 
-                <Paper withBorder p="xs" radius="sm" mb="sm" bg="gray.0">
-                  <Text size="xs" fw={600} mb={4} c="dimmed">
-                    SERVICIOS INCLUIDOS
-                  </Text>
-                  <Stack gap={4}>
-                    {pkg.services.map((svc: any, idx: number) => (
-                      <Group key={idx} justify="space-between" gap="xs">
-                        <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
-                          {getServiceName(svc.serviceId)}
-                        </Text>
-                        <Badge variant="light" size="sm" color="violet">
-                          {svc.sessionsIncluded} sesiones
-                        </Badge>
-                      </Group>
-                    ))}
-                  </Stack>
-                </Paper>
+                {pkg.services.length > 0 && (
+                  <Paper withBorder p="xs" radius="sm" mb="sm" bg="gray.0">
+                    <Text size="xs" fw={600} mb={4} c="dimmed">
+                      SERVICIOS INCLUIDOS
+                    </Text>
+                    <Stack gap={4}>
+                      {pkg.services.map((svc: any, idx: number) => (
+                        <Group key={idx} justify="space-between" gap="xs">
+                          <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
+                            {getServiceName(svc.serviceId)}
+                          </Text>
+                          <Badge variant="light" size="sm" color="violet">
+                            {svc.sessionsIncluded} sesiones
+                          </Badge>
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Paper>
+                )}
+
+                {(pkg.classes?.length ?? 0) > 0 && (
+                  <Paper withBorder p="xs" radius="sm" mb="sm" bg="gray.0">
+                    <Text size="xs" fw={600} mb={4} c="dimmed">
+                      CLASES INCLUIDAS
+                    </Text>
+                    <Stack gap={4}>
+                      {pkg.classes!.map((cls: any, idx: number) => (
+                        <Group key={idx} justify="space-between" gap="xs">
+                          <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
+                            {getClassName(cls.classId)}
+                          </Text>
+                          <Badge variant="light" size="sm" color="grape">
+                            {cls.sessionsIncluded} sesiones
+                          </Badge>
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Paper>
+                )}
 
                 <Group justify="space-between" align="center">
                   <Badge color="teal" variant="light" size="xl" radius="md">
@@ -467,6 +499,7 @@ const AdminPackages: React.FC = () => {
         servicePackage={editingPackage}
         onSave={handleSavePackage}
         availableServices={services}
+        availableClasses={classes}
       />
 
       <ModalAssignPackage

@@ -359,6 +359,7 @@ export const adminCreateEnrollments = async (data: {
   attendees: Attendee[];
   applyDiscount?: boolean;
   notes?: string;
+  clientPackageId?: string;
 }): Promise<Enrollment[] | undefined> => {
   try {
     const res = await apiEnrollment.post<ApiResponse<Enrollment[]>>("/", data);
@@ -374,12 +375,56 @@ export const createPublicEnrollment = async (data: {
   attendee: Attendee;
   companion?: Attendee;
   notes?: string;
+  clientPackageId?: string;
 }): Promise<Enrollment[] | undefined> => {
   try {
     const res = await apiEnrollmentPublic.post<ApiResponse<Enrollment[]>>("/public", data);
     return res.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al crear la inscripción");
+  }
+};
+
+export interface EnrollmentCancelInfo {
+  organizationName: string;
+  timezone: string;
+  isGroup: boolean;
+  enrollments: {
+    id: string;
+    attendeeName: string;
+    className: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    isCancelled: boolean;
+    isPast: boolean;
+    totalPrice: number;
+  }[];
+}
+
+export const getEnrollmentByToken = async (token: string): Promise<EnrollmentCancelInfo | undefined> => {
+  try {
+    const res = await apiEnrollmentPublic.get<ApiResponse<EnrollmentCancelInfo>>("/public/cancel", {
+      params: { token },
+    });
+    return res.data.data;
+  } catch (error) {
+    handleAxiosError(error, "No se pudo cargar la inscripción");
+  }
+};
+
+export const cancelEnrollmentByToken = async (
+  token: string,
+  enrollmentIds?: string[]
+): Promise<{ cancelled: string[] } | undefined> => {
+  try {
+    const res = await apiEnrollmentPublic.post<ApiResponse<{ cancelled: string[] }>>("/public/cancel", {
+      token,
+      enrollmentIds,
+    });
+    return res.data.data;
+  } catch (error) {
+    handleAxiosError(error, "No se pudo cancelar la inscripción");
   }
 };
 

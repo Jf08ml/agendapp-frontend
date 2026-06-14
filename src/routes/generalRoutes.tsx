@@ -25,6 +25,7 @@ import MyMembership from "../pages/admin/MyMembership";
 import MultiBookingWizard from "../pages/onlineReservationMulti";
 import AdminAnalyticsDashboard from "../pages/admin/analyticsDashboard";
 import PublicCancelPage from "../pages/public/PublicCancelPage";
+import PublicCancelClassPage from "../pages/public/PublicCancelClassPage";
 import WhatsappTemplateEditor from "../pages/admin/WhatsappTemplateEditor";
 import MembershipPlans from "../pages/public/MembershipPlans";
 import CampaignList from "../pages/admin/campaigns/CampaignList";
@@ -70,6 +71,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Cancelar Reserva",
       description: "Cancelación de reserva o cita.",
+    },
+  },
+  {
+    path: "/cancelar-clase",
+    component: PublicCancelClassPage,
+    MediaMetadata: {
+      title: "Cancelar Inscripción",
+      description: "Cancelación de inscripción a clase.",
     },
   },
   {

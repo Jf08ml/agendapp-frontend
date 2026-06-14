@@ -166,6 +166,43 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "🎉 ¡Felicitaciones, {{nombre_cliente}}!\n\nHas alcanzado tu meta de referidos en *{{nombre_negocio}}*.\n\n🎁 Tu recompensa: *{{premio}}*\n\nPreséntate en tu próxima visita y reclama tu beneficio. ¡Gracias por recomendar nuestros servicios!",
     footerText: "",
   },
+  // 📚 Módulo de Clases
+  classEnrollmentConfirmed: {
+    name: "clase_confirmada",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Inscripción confirmada",
+    bodyText:
+      "✅ ¡Hola, {{nombre_cliente}}!\n\nTu inscripción a la clase ha sido confirmada.\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n💰 Valor: {{precio}}\n\n❌ Si necesitas cancelar tu inscripción, hazlo aquí:\n{{enlace_cancelacion}}\n\n¡Te esperamos!",
+    footerText: "",
+  },
+  classEnrollmentPending: {
+    name: "clase_pendiente",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Solicitud recibida",
+    bodyText:
+      "⏳ ¡Hola, {{nombre_cliente}}!\n\nHemos recibido tu solicitud de inscripción.\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 Lugar: {{nombre_negocio}}\n💰 Valor: {{precio}}\n\nTu inscripción está pendiente de aprobación. Te avisaremos en cuanto sea confirmada.",
+    footerText: "",
+  },
+  classEnrollmentCancelled: {
+    name: "clase_cancelada",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Inscripción cancelada",
+    bodyText:
+      "❌ ¡Hola, {{nombre_cliente}}!\n\nTu inscripción a la siguiente clase ha sido cancelada:\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 {{nombre_negocio}}\n\nSi deseas inscribirte en otra sesión, responde a este mensaje y con gusto te ayudamos.",
+    footerText: "",
+  },
+  classReminder: {
+    name: "recordatorio_clase",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Recordatorio de clase",
+    bodyText:
+      "🔔 ¡Hola, {{nombre_cliente}}!\n\nTe recordamos tu próxima clase:\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n\n¡Te esperamos! Si no puedes asistir, responde a este mensaje.",
+    footerText: "",
+  },
 };
 
 // ─── Ejemplos de variables para revisión de Meta ─────────────────────────────
@@ -187,6 +224,12 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   cantidad_citas: "2",
   cita_o_citas: "citas",
   agendada_o_agendadas: "agendadas",
+  // 📚 Módulo de Clases
+  nombre_clase: "Yoga para principiantes",
+  fecha_clase: "lunes 13 de enero de 2026",
+  hora_inicio: "07:00 AM",
+  hora_fin: "08:00 AM",
+  precio: "$25.000",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

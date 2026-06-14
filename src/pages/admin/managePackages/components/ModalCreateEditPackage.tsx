@@ -20,9 +20,10 @@ import {
   Badge,
   Tooltip,
 } from "@mantine/core";
-import { IconPackage, IconTrash } from "@tabler/icons-react";
+import { IconPackage, IconTrash, IconSchool } from "@tabler/icons-react";
 import { Service } from "../../../../services/serviceService";
-import { ServicePackage, PackageServiceItem } from "../../../../services/packageService";
+import { ServicePackage, PackageServiceItem, PackageClassItem } from "../../../../services/packageService";
+import { ClassType } from "../../../../services/classService";
 import { Autocomplete } from "@mantine/core";
 
 interface ModalCreateEditPackageProps {
@@ -31,11 +32,18 @@ interface ModalCreateEditPackageProps {
   servicePackage: ServicePackage | null;
   onSave: (data: any) => void;
   availableServices: Service[];
+  availableClasses?: ClassType[];
 }
 
 interface EditingPackageService {
   serviceId: string;
   serviceName: string;
+  sessionsIncluded: number;
+}
+
+interface EditingPackageClass {
+  classId: string;
+  className: string;
   sessionsIncluded: number;
 }
 
@@ -45,6 +53,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
   servicePackage,
   onSave,
   availableServices,
+  availableClasses = [],
 }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -53,6 +62,8 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
   const [isActive, setIsActive] = useState(true);
   const [selectedServices, setSelectedServices] = useState<EditingPackageService[]>([]);
   const [serviceSearch, setServiceSearch] = useState("");
+  const [selectedClasses, setSelectedClasses] = useState<EditingPackageClass[]>([]);
+  const [classSearch, setClassSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,6 +81,14 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
           sessionsIncluded: svc.sessionsIncluded,
         }))
       );
+      setSelectedClasses(
+        (servicePackage.classes || []).map((cls: any) => ({
+          classId: typeof cls.classId === "object" ? cls.classId._id : cls.classId,
+          className: typeof cls.classId === "object" ? cls.classId.name :
+            availableClasses.find((c) => c._id === cls.classId)?.name || "Clase",
+          sessionsIncluded: cls.sessionsIncluded,
+        }))
+      );
     } else {
       setName("");
       setDescription("");
@@ -77,8 +96,10 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
       setValidityDays(30);
       setIsActive(true);
       setSelectedServices([]);
+      setSelectedClasses([]);
     }
     setServiceSearch("");
+    setClassSearch("");
   }, [servicePackage, isOpen]);
 
   const handleAddService = (serviceName: string) => {
@@ -105,7 +126,30 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     );
   };
 
-  const canSave = name.trim().length > 0 && price >= 0 && validityDays > 0 && selectedServices.length > 0;
+  const handleAddClass = (className: string) => {
+    const cls = availableClasses.find((c) => c.name === className);
+    if (!cls) return;
+    if (selectedClasses.some((c) => c.classId === cls._id)) return;
+    setSelectedClasses((prev) => [
+      ...prev,
+      { classId: cls._id, className: cls.name, sessionsIncluded: 1 },
+    ]);
+    setClassSearch("");
+  };
+
+  const handleRemoveClass = (classId: string) => {
+    setSelectedClasses((prev) => prev.filter((c) => c.classId !== classId));
+  };
+
+  const handleClassSessionsChange = (classId: string, sessions: number) => {
+    setSelectedClasses((prev) =>
+      prev.map((c) => (c.classId === classId ? { ...c, sessionsIncluded: sessions } : c))
+    );
+  };
+
+  const canSave =
+    name.trim().length > 0 && price >= 0 && validityDays > 0 &&
+    (selectedServices.length > 0 || selectedClasses.length > 0);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -114,6 +158,10 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
       const services: PackageServiceItem[] = selectedServices.map((s) => ({
         serviceId: s.serviceId,
         sessionsIncluded: s.sessionsIncluded,
+      }));
+      const classes: PackageClassItem[] = selectedClasses.map((c) => ({
+        classId: c.classId,
+        sessionsIncluded: c.sessionsIncluded,
       }));
 
       await onSave({
@@ -124,6 +172,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
         validityDays,
         isActive,
         services,
+        classes,
       });
     } finally {
       setSaving(false);
@@ -133,6 +182,10 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
   const availableForSelect = availableServices
     .filter((s) => s.isActive && !selectedServices.some((sel) => sel.serviceId === s._id))
     .map((s) => s.name);
+
+  const availableClassesForSelect = availableClasses
+    .filter((c) => c.isActive && !selectedClasses.some((sel) => sel.classId === c._id))
+    .map((c) => c.name);
 
   return (
     <Modal
@@ -283,10 +336,74 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
           )}
         </Paper>
 
+        {/* 📚 Clases Incluidas */}
+        <Paper withBorder p="md" radius="md" shadow="xs">
+          <Group justify="space-between" mb="sm">
+            <Group gap="xs">
+              <ThemeIcon variant="light" color="grape" size="md" radius="md">
+                <IconSchool size={16} />
+              </ThemeIcon>
+              <Title order={5}>Clases Incluidas</Title>
+            </Group>
+            {selectedClasses.length > 0 && (
+              <Badge variant="light" color="grape" size="lg">
+                {selectedClasses.length} clase{selectedClasses.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+          </Group>
+          <Divider mb="md" />
+
+          {availableClasses.length === 0 ? (
+            <Text c="dimmed" ta="center" py="md" size="sm">
+              No hay clases activas en tu organización para agregar.
+            </Text>
+          ) : (
+            <Autocomplete
+              label="Agregar clase"
+              placeholder="Busca una clase para agregar..."
+              data={availableClassesForSelect}
+              value={classSearch}
+              onChange={setClassSearch}
+              onOptionSubmit={handleAddClass}
+              mb="md"
+            />
+          )}
+
+          {selectedClasses.length > 0 && (
+            <Stack gap="sm">
+              {selectedClasses.map((cls) => (
+                <Paper key={cls.classId} withBorder p="sm" radius="sm">
+                  <Group justify="space-between" align="center">
+                    <Text fw={500} style={{ flex: 1 }}>{cls.className}</Text>
+                    <Group gap="xs" align="center">
+                      <NumberInput
+                        label="Sesiones"
+                        value={cls.sessionsIncluded}
+                        onChange={(value) =>
+                          handleClassSessionsChange(cls.classId, typeof value === "number" ? value : 1)
+                        }
+                        min={1}
+                        max={100}
+                        w={100}
+                        size="xs"
+                      />
+                      <Tooltip label="Quitar clase">
+                        <ActionIcon variant="light" color="red" onClick={() => handleRemoveClass(cls.classId)} mt={20}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </Paper>
+
         <Divider />
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            {!canSave && "Completa nombre, precio, vigencia y al menos un servicio"}
+            {!canSave && "Completa nombre, precio, vigencia y al menos un servicio o clase"}
           </Text>
           <Group>
             <Button variant="default" onClick={onClose} size="md">

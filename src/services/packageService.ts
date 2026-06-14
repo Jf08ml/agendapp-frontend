@@ -10,12 +10,19 @@ export interface PackageServiceItem {
   sessionsIncluded: number;
 }
 
+// 📚 Clase incluida en la plantilla de paquete
+export interface PackageClassItem {
+  classId: string;
+  sessionsIncluded: number;
+}
+
 export interface ServicePackage {
   _id: string;
   name: string;
   description: string;
   organizationId: string;
   services: PackageServiceItem[];
+  classes?: PackageClassItem[];
   price: number;
   validityDays: number;
   isActive: boolean;
@@ -32,9 +39,22 @@ export interface ClientPackageService {
   sessionsRemaining: number;
 }
 
+// 📚 Crédito de clase en el paquete del cliente
+export interface ClientPackageClass {
+  classId:
+    | string
+    | { _id: string; name: string; color?: string | null; pricePerPerson?: number; duration?: number };
+  sessionsIncluded: number;
+  sessionsUsed: number;
+  sessionsRemaining: number;
+}
+
 export interface ConsumptionHistoryItem {
-  appointmentId: string;
-  serviceId: string;
+  appointmentId?: string;
+  serviceId?: string;
+  enrollmentId?: string;
+  classId?: string;
+  itemType?: "service" | "class";
   action: "consume" | "refund";
   date: string;
 }
@@ -56,6 +76,7 @@ export interface ClientPackage {
     | { _id: string; name: string; description: string };
   organizationId: string;
   services: ClientPackageService[];
+  classes?: ClientPackageClass[];
   purchaseDate: string;
   expirationDate: string;
   status: "active" | "expired" | "exhausted" | "cancelled";
@@ -251,6 +272,24 @@ export const getActivePackagesForService = async (
   }
 };
 
+// 📚 Paquetes activos del cliente con créditos para una clase
+export const getActivePackagesForClass = async (
+  clientId: string,
+  classId: string,
+  organizationId: string
+): Promise<ClientPackage[]> => {
+  try {
+    const response = await apiPackage.get<Response<ClientPackage[]>>(
+      `/client/${clientId}/class/${classId}`,
+      { params: { organizationId } }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al verificar paquetes activos para la clase");
+    return [];
+  }
+};
+
 // =============================================
 // Pagos de ClientPackage
 // =============================================
@@ -311,6 +350,54 @@ export const checkClientPackagesPublic = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al verificar paquetes del cliente");
+    return { client: null, packages: [] };
+  }
+};
+
+// 📚 Verificar paquetes con créditos de clase por teléfono (reserva pública)
+export const checkClientClassPackagesPublic = async (
+  phone: string,
+  classIds: string[],
+  organizationId: string
+): Promise<ClientPackageCheckResult> => {
+  try {
+    const response = await apiPackagePublic.get<
+      Response<ClientPackageCheckResult>
+    >("/public/client-class-check", {
+      params: {
+        phone,
+        classIds: classIds.join(","),
+        organizationId,
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al verificar paquetes de clase del cliente");
+    return { client: null, packages: [] };
+  }
+};
+
+// 📚 Verificar paquetes de clase por el identificador configurado (reserva pública)
+export const checkClientClassPackagesByIdentifier = async (
+  field: "phone" | "email" | "documentId",
+  value: string,
+  classIds: string[],
+  organizationId: string
+): Promise<ClientPackageCheckResult> => {
+  try {
+    const response = await apiPackagePublic.get<
+      Response<ClientPackageCheckResult>
+    >("/public/client-class-check-by-identifier", {
+      params: {
+        field,
+        value,
+        classIds: classIds.join(","),
+        organizationId,
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al verificar paquetes de clase del cliente");
     return { client: null, packages: [] };
   }
 };

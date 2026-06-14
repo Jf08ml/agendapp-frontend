@@ -20,6 +20,11 @@ export interface WhatsappTemplates {
   clientNoShowAck: WhatsappTemplate;
   loyaltyServiceReward: WhatsappTemplate;
   loyaltyReferralReward: WhatsappTemplate;
+  // 📚 Módulo de Clases (opcionales: el editor de clases las consume)
+  classEnrollmentConfirmed?: WhatsappTemplate;
+  classEnrollmentPending?: WhatsappTemplate;
+  classEnrollmentCancelled?: WhatsappTemplate;
+  classReminder?: WhatsappTemplate;
 }
 
 export interface TemplatesResponse {
@@ -38,6 +43,10 @@ export interface TemplatesResponse {
     clientNoShowAck: string;
     loyaltyServiceReward: string;
     loyaltyReferralReward: string;
+    classEnrollmentConfirmed?: string;
+    classEnrollmentPending?: string;
+    classEnrollmentCancelled?: string;
+    classReminder?: string;
   };
 }
 
@@ -55,6 +64,11 @@ export interface WhatsappTemplateSettings {
   clientNoShowAck?: boolean;
   loyaltyServiceReward?: boolean;
   loyaltyReferralReward?: boolean;
+  // 📚 Módulo de Clases
+  classEnrollmentConfirmed?: boolean;
+  classEnrollmentPending?: boolean;
+  classEnrollmentCancelled?: boolean;
+  classReminder?: boolean;
 }
 
 const whatsappTemplateService = {

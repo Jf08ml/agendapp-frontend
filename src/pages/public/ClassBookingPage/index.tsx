@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Card, Stack, Stepper, Button, Group, Text, Paper, Divider,
-  Center, Title, LoadingOverlay,
+  Center, Title, LoadingOverlay, Switch,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { IconCheck } from "@tabler/icons-react";
@@ -15,6 +15,7 @@ import {
   ClassType, ClassSession,
   getClassesByOrganization, getAvailableSessions, createPublicEnrollment,
 } from "../../../services/classService";
+import { checkClientClassPackagesByIdentifier } from "../../../services/packageService";
 
 import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
@@ -53,6 +54,11 @@ export default function ClassBookingWizard() {
   // Info pantalla de éxito
   const [finishName, setFinishName] = useState("");
 
+  // 📦 Paquete del cliente que cubre la inscripción
+  const [pkgId, setPkgId] = useState<string | null>(null);
+  const [pkgRemaining, setPkgRemaining] = useState<number>(0);
+  const [usePkg, setUsePkg] = useState(true);
+
   // Cargar clases al montar
   useEffect(() => {
     if (!organization?._id) return;
@@ -78,6 +84,43 @@ export default function ClassBookingWizard() {
     contentTopRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [currentStep]);
 
+  // 📦 Al llegar al resumen, detectar paquete del cliente (por el identificador configurado)
+  useEffect(() => {
+    const idValue =
+      identifierField === "phone" ? (attendee.phone_e164 || attendee.phone)
+      : identifierField === "email" ? attendee.email.trim()
+      : attendee.documentId.trim();
+    if (currentStep !== 3 || !selectedClass || !organization?._id || !idValue) {
+      setPkgId(null);
+      setPkgRemaining(0);
+      return;
+    }
+    checkClientClassPackagesByIdentifier(identifierField, idValue, [selectedClass._id], organization._id)
+      .then((res) => {
+        let found: string | null = null;
+        let remaining = 0;
+        for (const pkg of res.packages) {
+          for (const c of pkg.classes || []) {
+            const cId = typeof c.classId === "object" ? c.classId._id : c.classId;
+            if (cId === selectedClass._id && c.sessionsRemaining > 0) {
+              found = pkg._id;
+              remaining = c.sessionsRemaining;
+              break;
+            }
+          }
+          if (found) break;
+        }
+        setPkgId(found);
+        setPkgRemaining(remaining);
+        setUsePkg(true);
+      })
+      .catch(() => {
+        setPkgId(null);
+        setPkgRemaining(0);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, selectedClass?._id, organization?._id, identifierField, attendee.phone_e164, attendee.phone, attendee.email, attendee.documentId]);
+
   if (!organization?._id) {
     return (
       <Center h={300}>
@@ -101,7 +144,7 @@ export default function ClassBookingWizard() {
     0: !!selectedClass,
     1: !!selectedSession,
     2: !!attendee.name.trim() && attendeeHasIdentifier(attendee) &&
-       (!companion || (!!companion.name.trim() && !!(companion.phone_e164 || companion.phone))),
+       (!companion || (!!companion.name.trim() && attendeeHasIdentifier(companion))),
     3: true,
   };
 
@@ -123,6 +166,7 @@ export default function ClassBookingWizard() {
       await createPublicEnrollment({
         organizationId: organization._id,
         sessionId: selectedSession._id,
+        clientPackageId: usePkg && pkgId ? pkgId : undefined,
         attendee: {
           name: attendee.name,
           phone: attendee.phone_e164 || attendee.phone,
@@ -139,6 +183,7 @@ export default function ClassBookingWizard() {
               phone_e164: companion.phone_e164 || undefined,
               phone_country: companion.phone_country || undefined,
               email: companion.email || undefined,
+              documentId: companion.documentId || undefined,
             }
           : undefined,
       });
@@ -195,7 +240,7 @@ export default function ClassBookingWizard() {
             onAttendeeChange={handleAttendeeChange}
             onCompanionChange={handleCompanionChange}
             onCompanionToggle={handleCompanionToggle}
-            organizationCountry={(organization as any)?.country || "CO"}
+            organizationCountry={(organization as any)?.default_country || "CO"}
           />
         );
       case 3:
@@ -283,6 +328,26 @@ export default function ClassBookingWizard() {
               Hacer otra reserva
             </Button>
           </Stack>
+        )}
+
+        {/* 📦 Opción de usar paquete (paso resumen) */}
+        {currentStep === 3 && pkgId && (
+          <Paper withBorder p="sm" radius="md" style={{ borderColor: "var(--mantine-color-grape-4)" }}>
+            <Group justify="space-between" wrap="nowrap">
+              <div>
+                <Text size="sm" fw={600} c="grape">Tienes un paquete con créditos para esta clase</Text>
+                <Text size="xs" c="dimmed">
+                  Créditos disponibles: {pkgRemaining}. Si lo usas, tu lugar no tendrá costo
+                  (se descuenta 1 crédito). El acompañante usa su propio paquete si tiene.
+                </Text>
+              </div>
+              <Switch
+                checked={usePkg}
+                onChange={(e) => setUsePkg(e.currentTarget.checked)}
+                label={usePkg ? "Usar paquete" : "No usar"}
+              />
+            </Group>
+          </Paper>
         )}
 
         {/* ── Botones de navegación ────────────────────── */}

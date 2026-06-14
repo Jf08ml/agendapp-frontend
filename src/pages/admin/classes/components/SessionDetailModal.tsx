@@ -3,22 +3,35 @@ import React, { useEffect, useState } from "react";
 import {
   Modal, Text, Badge, Table, Group, Button, Stack, Loader,
   Center, ActionIcon, Menu, Divider, NumberInput,
-  Select, ScrollArea, Alert, Progress,
+  Select, ScrollArea, Alert, Progress, Collapse, TextInput, Checkbox, Paper,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import {
   IconCheck, IconX, IconCash, IconDots,
-  IconUserCheck, IconUserX, IconAlertCircle,
+  IconUserCheck, IconUserX, IconAlertCircle, IconUserPlus,
 } from "@tabler/icons-react";
+import { useSelector } from "react-redux";
+import { type CountryCode } from "libphonenumber-js";
+import { RootState } from "../../../../app/store";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import {
   ClassSession, Enrollment,
   getSessionEnrollments, approveEnrollment, cancelEnrollment,
-  updateAttendance, addEnrollmentPayment,
+  updateAttendance, addEnrollmentPayment, adminCreateEnrollments,
 } from "../../../../services/classService";
+import InternationalPhoneInput from "../../../../components/InternationalPhoneInput";
+import { getActivePackagesForClass } from "../../../../services/packageService";
+import { getClientByIdentifier } from "../../../../services/clientService";
+import { DEFAULT_CLIENT_FORM_CONFIG, type ClientFieldConfig } from "../../../../services/organizationService";
+
+const IDENTIFIER_LABELS: Record<string, string> = {
+  phone: "Teléfono",
+  email: "Correo electrónico",
+  documentId: "Número de documento",
+};
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -54,6 +67,23 @@ interface Props {
 }
 
 export default function SessionDetailModal({ opened, onClose, session, timezone: tz = "America/Bogota" }: Props) {
+  const org = useSelector((s: RootState) => s.organization.organization) as unknown as {
+    _id?: string;
+    default_country?: string;
+    clientFormConfig?: { identifierField?: "phone" | "email" | "documentId"; fields?: ClientFieldConfig[] };
+  } | null;
+  const orgCountry = org?.default_country || "CO";
+
+  // Config del formulario de cliente de la organización
+  const identifierField: "phone" | "email" | "documentId" =
+    org?.clientFormConfig?.identifierField ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+  const configFields: ClientFieldConfig[] =
+    org?.clientFormConfig?.fields?.length ? org.clientFormConfig.fields : DEFAULT_CLIENT_FORM_CONFIG.fields;
+  const fieldCfg = (key: ClientFieldConfig["key"]) =>
+    configFields.find((f) => f.key === key) ?? { key, enabled: false, required: false };
+  const phoneCfg = fieldCfg("phone");
+  const emailCfg = fieldCfg("email");
+  const documentIdCfg = fieldCfg("documentId");
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -62,6 +92,41 @@ export default function SessionDetailModal({ opened, onClose, session, timezone:
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMethod, setPayMethod] = useState<string>("cash");
+
+  // Estado para inscripción manual (admin)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addPhone, setAddPhone] = useState<string | null>(null);
+  const [addPhoneCountry, setAddPhoneCountry] = useState<string | null>(null);
+  const [addEmail, setAddEmail] = useState("");
+  const [addDocumentId, setAddDocumentId] = useState("");
+  const [addApplyDiscount, setAddApplyDiscount] = useState(false);
+  // 📦 Paquete del cliente para cubrir la inscripción
+  const [pkgOptions, setPkgOptions] = useState<{ value: string; label: string }[]>([]);
+  const [selectedPkgId, setSelectedPkgId] = useState<string | null>(null);
+  const [searchingPkg, setSearchingPkg] = useState(false);
+  const [foundClientName, setFoundClientName] = useState<string | null>(null);
+
+  const resetAddForm = () => {
+    setAddName("");
+    setAddPhone(null);
+    setAddPhoneCountry(null);
+    setAddEmail("");
+    setAddDocumentId("");
+    setAddApplyDiscount(false);
+    setPkgOptions([]);
+    setSelectedPkgId(null);
+    setFoundClientName(null);
+  };
+
+  // Valor del identificador configurado para esta inscripción
+  const identifierValue = (): string => {
+    if (identifierField === "phone") return addPhone || "";
+    if (identifierField === "email") return addEmail.trim();
+    return addDocumentId.trim();
+  };
+  const hasIdentifier = !!identifierValue();
 
   const load = async () => {
     if (!session) return;
@@ -150,6 +215,88 @@ export default function SessionDetailModal({ opened, onClose, session, timezone:
     }
   };
 
+  // Al escribir el identificador: busca el cliente, autocompleta sus datos
+  // y detecta sus paquetes activos para esta clase.
+  const handleIdentifierLookup = async () => {
+    if (!session || !org?._id || !hasIdentifier) return;
+    const classId = typeof session.classId === "object" ? session.classId._id : session.classId;
+    setSearchingPkg(true);
+    setFoundClientName(null);
+    try {
+      const client = await getClientByIdentifier(identifierField, identifierValue(), org._id);
+      if (!client) {
+        setPkgOptions([]);
+        setSelectedPkgId(null);
+        return;
+      }
+      // Autocompletar datos del cliente (sin pisar lo que ya escribió el admin)
+      if (!addName.trim() && client.name) setAddName(client.name);
+      if (!addEmail.trim() && client.email) setAddEmail(client.email);
+      if (!addDocumentId.trim() && (client as { documentId?: string }).documentId) {
+        setAddDocumentId((client as { documentId?: string }).documentId || "");
+      }
+      setFoundClientName(client.name || null);
+
+      // Detectar paquetes activos del cliente para esta clase
+      const packages = await getActivePackagesForClass(client._id, classId, org._id);
+      const opts = packages.flatMap((pkg) =>
+        (pkg.classes || [])
+          .filter((c) => {
+            const cId = typeof c.classId === "object" ? c.classId._id : c.classId;
+            return cId === classId && c.sessionsRemaining > 0;
+          })
+          .map((c) => {
+            const pkgName = typeof pkg.servicePackageId === "object" ? pkg.servicePackageId.name : "Paquete";
+            return { value: pkg._id, label: `${pkgName} · ${c.sessionsRemaining} crédito(s)` };
+          })
+      );
+      setPkgOptions(opts);
+      setSelectedPkgId(opts.length ? opts[0].value : null);
+    } catch {
+      // silencioso
+    } finally {
+      setSearchingPkg(false);
+    }
+  };
+
+  const handleAddEnrollment = async () => {
+    if (!session) return;
+    if (!addName.trim()) {
+      showNotification({ message: "Ingresa el nombre del asistente", color: "red" });
+      return;
+    }
+    if (!hasIdentifier) {
+      showNotification({ message: `Ingresa ${IDENTIFIER_LABELS[identifierField].toLowerCase()}`, color: "red" });
+      return;
+    }
+    setAddSaving(true);
+    try {
+      await adminCreateEnrollments({
+        sessionId: session._id,
+        attendees: [
+          {
+            name: addName.trim(),
+            phone: addPhone || "",
+            phone_e164: addPhone || undefined,
+            phone_country: addPhoneCountry || undefined,
+            email: addEmail.trim() || undefined,
+            documentId: addDocumentId.trim() || undefined,
+          },
+        ],
+        applyDiscount: addApplyDiscount,
+        clientPackageId: selectedPkgId || undefined,
+      });
+      showNotification({ message: "Asistente inscrito", color: "green" });
+      resetAddForm();
+      setAddOpen(false);
+      load();
+    } catch (err) {
+      showNotification({ message: err instanceof Error ? err.message : "Error", color: "red" });
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   if (!session) return null;
 
   const classDoc = typeof session.classId === "object" ? session.classId : null;
@@ -195,6 +342,157 @@ export default function SessionDetailModal({ opened, onClose, session, timezone:
         </div>
 
         <Divider />
+
+        {/* Inscripción manual (admin) */}
+        {session.status !== "cancelled" && session.status !== "completed" && (
+          <div>
+            <Group justify="space-between">
+              <Text size="sm" fw={600}>Inscritos</Text>
+              <Button
+                size="xs"
+                variant={addOpen ? "default" : "light"}
+                leftSection={<IconUserPlus size={14} />}
+                disabled={activeEnrollments.length >= session.capacity}
+                onClick={() => setAddOpen((o) => !o)}
+              >
+                {addOpen ? "Cerrar" : "Agregar asistente"}
+              </Button>
+            </Group>
+
+            <Collapse in={addOpen}>
+              <Paper withBorder p="sm" radius="md" mt="xs" bg="var(--mantine-color-gray-0)">
+                <Stack gap="xs">
+                  {/* Identificador configurado por la organización */}
+                  {identifierField === "phone" && (
+                    <InternationalPhoneInput
+                      label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+                      required
+                      organizationDefaultCountry={orgCountry as CountryCode}
+                      onChange={(e164, country) => {
+                        setAddPhone(e164);
+                        setAddPhoneCountry(country);
+                      }}
+                      onBlur={handleIdentifierLookup}
+                    />
+                  )}
+                  {identifierField === "email" && (
+                    <TextInput
+                      size="xs"
+                      label={emailCfg.label || IDENTIFIER_LABELS.email}
+                      placeholder="correo@ejemplo.com"
+                      type="email"
+                      required
+                      value={addEmail}
+                      onChange={(e) => setAddEmail(e.currentTarget.value)}
+                      onBlur={handleIdentifierLookup}
+                    />
+                  )}
+                  {identifierField === "documentId" && (
+                    <TextInput
+                      size="xs"
+                      label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+                      placeholder="Cédula, pasaporte, etc."
+                      required
+                      value={addDocumentId}
+                      onChange={(e) => setAddDocumentId(e.currentTarget.value)}
+                      onBlur={handleIdentifierLookup}
+                    />
+                  )}
+
+                  {/* Feedback de búsqueda del cliente */}
+                  {searchingPkg && (
+                    <Group gap="xs">
+                      <Loader size="xs" />
+                      <Text size="xs" c="dimmed">Buscando cliente...</Text>
+                    </Group>
+                  )}
+                  {foundClientName && !searchingPkg && (
+                    <Group gap="xs">
+                      <Text size="xs" c="dimmed">Cliente encontrado:</Text>
+                      <Badge size="sm" variant="light">{foundClientName}</Badge>
+                    </Group>
+                  )}
+
+                  <TextInput
+                    size="xs"
+                    label="Nombre"
+                    placeholder="Nombre del asistente"
+                    value={addName}
+                    onChange={(e) => setAddName(e.currentTarget.value)}
+                    required
+                  />
+
+                  {/* Campos secundarios habilitados (distintos al identificador) */}
+                  {phoneCfg.enabled && identifierField !== "phone" && (
+                    <InternationalPhoneInput
+                      label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+                      required={phoneCfg.required}
+                      organizationDefaultCountry={orgCountry as CountryCode}
+                      onChange={(e164, country) => {
+                        setAddPhone(e164);
+                        setAddPhoneCountry(country);
+                      }}
+                    />
+                  )}
+                  {emailCfg.enabled && identifierField !== "email" && (
+                    <TextInput
+                      size="xs"
+                      label={emailCfg.label || IDENTIFIER_LABELS.email}
+                      placeholder="correo@ejemplo.com"
+                      type="email"
+                      required={emailCfg.required}
+                      value={addEmail}
+                      onChange={(e) => setAddEmail(e.currentTarget.value)}
+                    />
+                  )}
+                  {documentIdCfg.enabled && identifierField !== "documentId" && (
+                    <TextInput
+                      size="xs"
+                      label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+                      placeholder="Cédula, pasaporte, etc."
+                      required={documentIdCfg.required}
+                      value={addDocumentId}
+                      onChange={(e) => setAddDocumentId(e.currentTarget.value)}
+                    />
+                  )}
+
+                  {/* 📦 Paquete del cliente (detectado automáticamente al escribir el identificador) */}
+                  {pkgOptions.length > 0 && (
+                    <Select
+                      size="xs"
+                      label="Usar paquete"
+                      placeholder="Sin paquete"
+                      clearable
+                      data={pkgOptions}
+                      value={selectedPkgId}
+                      onChange={setSelectedPkgId}
+                    />
+                  )}
+                  {selectedPkgId && (
+                    <Text size="xs" c="grape">Esta inscripción se cubrirá con 1 crédito del paquete (precio $0).</Text>
+                  )}
+
+                  {classDoc?.groupDiscount?.enabled && !selectedPkgId && (
+                    <Checkbox
+                      size="xs"
+                      label={`Aplicar descuento grupal (${classDoc.groupDiscount.discountPercent}%)`}
+                      checked={addApplyDiscount}
+                      onChange={(e) => setAddApplyDiscount(e.currentTarget.checked)}
+                    />
+                  )}
+                  <Group justify="flex-end" gap="xs">
+                    <Button size="xs" variant="default" onClick={() => { resetAddForm(); setAddOpen(false); }}>
+                      Cancelar
+                    </Button>
+                    <Button size="xs" loading={addSaving} onClick={handleAddEnrollment}>
+                      Inscribir
+                    </Button>
+                  </Group>
+                </Stack>
+              </Paper>
+            </Collapse>
+          </div>
+        )}
 
         {/* Lista de inscritos */}
         {loading ? (

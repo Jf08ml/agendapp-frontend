@@ -87,6 +87,13 @@ const getServiceName = (svc: ClientPackageService): string => {
   return "Servicio";
 };
 
+const getClassNameFromCredit = (cls: any): string => {
+  if (typeof cls.classId === "object" && cls.classId !== null) {
+    return cls.classId.name || "Clase";
+  }
+  return "Clase";
+};
+
 const getPackageName = (pkg: ClientPackage): string => {
   if (typeof pkg.servicePackageId === "object" && pkg.servicePackageId !== null) {
     return (pkg.servicePackageId as any).name || "Paquete";
@@ -103,9 +110,11 @@ const getClientInfo = (pkg: ClientPackage): { name: string; phone: string } => {
 };
 
 const getTotalSessionsSummary = (pkg: ClientPackage): { remaining: number; total: number } => {
-  const total     = pkg.services.reduce((s, svc) => s + svc.sessionsIncluded,  0);
-  const remaining = pkg.services.reduce((s, svc) => s + svc.sessionsRemaining, 0);
-  return { remaining, total };
+  const svcTotal     = pkg.services.reduce((s, svc) => s + svc.sessionsIncluded,  0);
+  const svcRemaining = pkg.services.reduce((s, svc) => s + svc.sessionsRemaining, 0);
+  const clsTotal     = (pkg.classes || []).reduce((s, c) => s + c.sessionsIncluded,  0);
+  const clsRemaining = (pkg.classes || []).reduce((s, c) => s + c.sessionsRemaining, 0);
+  return { remaining: svcRemaining + clsRemaining, total: svcTotal + clsTotal };
 };
 
 // ─── Package card ─────────────────────────────────────────────────────────────
@@ -326,6 +335,7 @@ function PackageCard({
           <Stack gap="md">
 
             {/* Per-service progress */}
+            {pkg.services.length > 0 && (
             <Box>
               <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
                 Sesiones por servicio
@@ -355,6 +365,40 @@ function PackageCard({
                 })}
               </Stack>
             </Box>
+            )}
+
+            {/* Per-class progress */}
+            {(pkg.classes?.length ?? 0) > 0 && (
+            <Box>
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
+                Sesiones por clase
+              </Text>
+              <Stack gap="xs">
+                {pkg.classes!.map((cls, idx) => {
+                  const clsName      = getClassNameFromCredit(cls);
+                  const clsTotal     = cls.sessionsIncluded;
+                  const clsUsed      = cls.sessionsUsed;
+                  const clsRemaining = cls.sessionsRemaining;
+                  const pct          = clsTotal > 0 ? (clsUsed / clsTotal) * 100 : 0;
+                  return (
+                    <Box
+                      key={idx}
+                      p="xs"
+                      style={{ background: "var(--mantine-color-gray-0)", borderRadius: 8, border: "1px solid var(--mantine-color-gray-2)" }}
+                    >
+                      <Group justify="space-between" mb={4}>
+                        <Text size="xs" fw={600}>{clsName}</Text>
+                        <Badge size="xs" color={clsRemaining > 0 ? "grape" : "red"} variant="light">
+                          {clsRemaining}/{clsTotal} restantes
+                        </Badge>
+                      </Group>
+                      <Progress value={pct} color={clsRemaining > 0 ? "grape" : "red"} size="xs" radius="xl" />
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+            )}
 
             {/* Payment history */}
             <Box>

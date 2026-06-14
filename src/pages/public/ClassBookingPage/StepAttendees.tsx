@@ -314,6 +314,41 @@ export default function StepAttendees({
             <Text fw={600} size="sm">Datos del acompañante</Text>
           </Group>
           <Stack gap="sm">
+            {/* Identificador configurado por la organización */}
+            {identifierField === "phone" && (
+              <InternationalPhoneInput
+                label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+                value={companion.phone_e164 || companion.phone}
+                organizationDefaultCountry={organizationCountry as CountryCode}
+                onChange={(e164, country) => {
+                  onCompanionChange("phone_e164", e164 ?? "");
+                  onCompanionChange("phone", e164 ?? "");
+                  onCompanionChange("phone_country", country ?? "CO");
+                }}
+                required
+                compact
+              />
+            )}
+            {identifierField === "email" && (
+              <TextInput
+                label={emailCfg.label || IDENTIFIER_LABELS.email}
+                placeholder="Correo del acompañante"
+                type="email"
+                required
+                value={companion.email}
+                onChange={(e) => onCompanionChange("email", e.currentTarget.value)}
+              />
+            )}
+            {identifierField === "documentId" && (
+              <TextInput
+                label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+                placeholder="Cédula, pasaporte, etc."
+                required
+                value={companion.documentId}
+                onChange={(e) => onCompanionChange("documentId", e.currentTarget.value)}
+              />
+            )}
+
             <TextInput
               label="Nombre completo"
               placeholder="Nombre de tu acompañante"
@@ -321,24 +356,41 @@ export default function StepAttendees({
               value={companion.name}
               onChange={(e) => onCompanionChange("name", e.currentTarget.value)}
             />
-            <InternationalPhoneInput
-              label="Teléfono (WhatsApp)"
-              value={companion.phone_e164 || companion.phone}
-              organizationDefaultCountry={organizationCountry as CountryCode}
-              onChange={(e164, country) => {
-                onCompanionChange("phone_e164", e164 ?? "");
-                onCompanionChange("phone", e164 ?? "");
-                onCompanionChange("phone_country", country ?? "CO");
-              }}
-              compact
-            />
-            <TextInput
-              label="Correo electrónico"
-              placeholder="opcional"
-              type="email"
-              value={companion.email}
-              onChange={(e) => onCompanionChange("email", e.currentTarget.value)}
-            />
+
+            {/* Campos secundarios habilitados (distintos al identificador) */}
+            {phoneCfg.enabled && identifierField !== "phone" && (
+              <InternationalPhoneInput
+                label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+                value={companion.phone_e164 || companion.phone}
+                organizationDefaultCountry={organizationCountry as CountryCode}
+                onChange={(e164, country) => {
+                  onCompanionChange("phone_e164", e164 ?? "");
+                  onCompanionChange("phone", e164 ?? "");
+                  onCompanionChange("phone_country", country ?? "CO");
+                }}
+                required={phoneCfg.required}
+                compact
+              />
+            )}
+            {emailCfg.enabled && identifierField !== "email" && (
+              <TextInput
+                label={emailCfg.label || IDENTIFIER_LABELS.email}
+                placeholder="opcional"
+                type="email"
+                required={emailCfg.required}
+                value={companion.email}
+                onChange={(e) => onCompanionChange("email", e.currentTarget.value)}
+              />
+            )}
+            {documentIdCfg.enabled && identifierField !== "documentId" && (
+              <TextInput
+                label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+                placeholder="Cédula, pasaporte, etc."
+                required={documentIdCfg.required}
+                value={companion.documentId}
+                onChange={(e) => onCompanionChange("documentId", e.currentTarget.value)}
+              />
+            )}
           </Stack>
         </Card>
       )}

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Box, Title, Tabs, Button, Group, Text, Badge, Card, Stack,
   ActionIcon, Tooltip, Table, ScrollArea, Skeleton, Center,
-  Menu, Alert, Progress, SimpleGrid,  Checkbox,
+  Menu, Alert, Progress, SimpleGrid,  Checkbox, SegmentedControl,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
@@ -36,6 +36,7 @@ import SessionFormModal from "./components/SessionFormModal";
 import SessionDetailModal from "./components/SessionDetailModal";
 import BulkSessionModal from "./components/BulkSessionModal";
 import ClassWhatsappTemplates from "./components/ClassWhatsappTemplates";
+import ClassCalendar from "./components/ClassCalendar";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -83,6 +84,7 @@ export default function ManageClasses() {
   const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
   const [selectedSession, setSelectedSession] = useState<ClassSession | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sessionView, setSessionView] = useState<"table" | "calendar">("table");
 
   const loadAll = useCallback(async () => {
     if (!organizationId) return;
@@ -376,7 +378,16 @@ export default function ManageClasses() {
           <Group justify="space-between" mb="md">
             <Group gap="xs">
               <Text fw={600}>Sesiones programadas</Text>
-              {selectedIds.size > 0 && (
+              <SegmentedControl
+                size="xs"
+                value={sessionView}
+                onChange={(v) => setSessionView(v as "table" | "calendar")}
+                data={[
+                  { value: "table", label: "Tabla" },
+                  { value: "calendar", label: "Calendario" },
+                ]}
+              />
+              {sessionView === "table" && selectedIds.size > 0 && (
                 <Button
                   size="xs"
                   color="red"
@@ -417,6 +428,12 @@ export default function ManageClasses() {
                 </Button>
               </Stack>
             </Center>
+          ) : sessionView === "calendar" ? (
+            <ClassCalendar
+              sessions={sessions}
+              timezone={tz}
+              onSelectSession={(s) => { setSelectedSession(s); setDetailModal(true); }}
+            />
           ) : (
             <ScrollArea>
               <Table striped highlightOnHover withTableBorder>
