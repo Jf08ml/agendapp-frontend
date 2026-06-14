@@ -252,7 +252,7 @@ const META_STATUS_DOT: Record<string, string> = {
   DISABLED: "var(--mantine-color-gray-5)",
 };
 
-type TemplateType = keyof WhatsappTemplates;
+type TemplateType = keyof typeof templateInfo;
 const templateKeys = Object.keys(templateInfo) as TemplateType[];
 
 // ─── Componente ───────────────────────────────────────────────────────────────

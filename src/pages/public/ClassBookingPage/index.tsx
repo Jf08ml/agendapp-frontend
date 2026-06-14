@@ -84,6 +84,10 @@ export default function ClassBookingWizard() {
     contentTopRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [currentStep]);
 
+  // Identificador configurado por la organización (phone | email | documentId)
+  const identifierField = organization?.clientFormConfig?.identifierField
+    ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+
   // 📦 Al llegar al resumen, detectar paquete del cliente (por el identificador configurado)
   useEffect(() => {
     const idValue =
@@ -128,9 +132,6 @@ export default function ClassBookingWizard() {
       </Center>
     );
   }
-
-  const identifierField = organization?.clientFormConfig?.identifierField
-    ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
 
   const attendeeHasIdentifier = (a: typeof attendee) => {
     if (identifierField === "phone") return !!(a.phone_e164 || a.phone);
