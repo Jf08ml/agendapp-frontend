@@ -11,7 +11,7 @@ export default defineConfig({
       srcDir: "src",
       filename: "custom-sw.js",
       injectManifest: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6 MB (el bundle principal supera 3 MB)
       },
       includeAssets: [
         "favicon.svg",
@@ -67,6 +67,23 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Split conservador: separa solo librerías pesadas en sus propios chunks.
+        // React + Redux + Router quedan juntos en "vendor" para evitar problemas
+        // de orden de inicialización.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@mantine")) return "mantine";
+          if (id.includes("recharts") || id.includes("/d3-")) return "charts";
+          if (id.includes("@dnd-kit") || id.includes("@hello-pangea")) return "dnd";
+          if (id.includes("@tabler/icons-react")) return "icons";
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     host: true, // expone en 0.0.0.0 para cloudflared / túneles
   },
