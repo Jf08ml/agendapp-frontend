@@ -73,6 +73,9 @@ export interface CreateMultipleReservationsPayload {
   clientPackageId?: string;
   recurrencePattern?: RecurrencePattern;
   source?: "ai_chatbot" | "manual_booking" | "admin";
+  // sessionId del chatbot de reserva: permite al backend marcar la conversión
+  // (prepare → reserva real) de forma confiable, en la misma request.
+  chatSessionId?: string;
 }
 
 // Obtener todas las reservas de una organización

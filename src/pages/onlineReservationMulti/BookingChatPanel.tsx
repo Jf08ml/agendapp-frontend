@@ -153,8 +153,13 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setConfirming(true);
     setReservationError(null);
     try {
-      await createMultipleReservations({ ...(pendingPayload as any), source: "ai_chatbot" });
-      // Marcar conversión en el ChatLog (fire-and-forget, no afecta la UX)
+      await createMultipleReservations({
+        ...(pendingPayload as any),
+        source: "ai_chatbot",
+        chatSessionId: sessionId.current, // el backend marca la conversión server-side
+      });
+      // Complemento (best-effort): el backend ya marcó la conversión en la misma
+      // request, esto solo cubre el caso de que el endpoint server-side cambie.
       markBookingConverted(sessionId.current).catch(() => {});
       setReservationDone(true);
       setPendingPayload(null);
