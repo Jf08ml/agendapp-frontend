@@ -150,6 +150,8 @@ export interface Organization {
   paymentMethods?: PaymentMethod[];
   requireReservationDeposit?: boolean;
   reservationDepositPercentage?: number;
+  // Cobro de depósito vía Mercado Pago. El endpoint público solo expone `connected`.
+  mpCollect?: { connected?: boolean };
   welcomeTitle?: string;
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards" | "landing";

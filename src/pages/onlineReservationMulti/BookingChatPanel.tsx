@@ -42,7 +42,7 @@ import {
   BookingChatMessage,
   BookingPayload,
 } from "../../services/bookingChatService";
-import { createMultipleReservations } from "../../services/reservationService";
+import { createMultipleReservations, createReservationCheckout } from "../../services/reservationService";
 
 interface BookingChatPanelProps {
   onBack: () => void;
@@ -153,6 +153,26 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setConfirming(true);
     setReservationError(null);
     try {
+      // 💳 Pay-to-confirm: si la org exige depósito y tiene MP conectado, generamos
+      // el cobro y redirigimos a Mercado Pago en vez de crear la reserva directo.
+      const depositRequired =
+        !!org?.requireReservationDeposit &&
+        (org?.reservationDepositPercentage ?? 0) > 0 &&
+        !!org?.mpCollect?.connected;
+
+      if (depositRequired) {
+        const checkout = await createReservationCheckout({
+          ...(pendingPayload as any),
+          source: "ai_chatbot",
+          chatSessionId: sessionId.current,
+        });
+        if (checkout?.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl;
+          return;
+        }
+        throw new Error("No se pudo iniciar el pago del depósito.");
+      }
+
       await createMultipleReservations({
         ...(pendingPayload as any),
         source: "ai_chatbot",

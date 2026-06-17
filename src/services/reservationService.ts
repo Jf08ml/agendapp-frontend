@@ -78,6 +78,31 @@ export interface CreateMultipleReservationsPayload {
   chatSessionId?: string;
 }
 
+// Respuesta del checkout de depósito (pay-to-confirm con Mercado Pago)
+export interface ReservationCheckoutResult {
+  checkoutUrl: string;
+  orderId: string;
+  externalReference: string;
+  amount: number;
+  currency: string;
+}
+
+// Crea las reservas en hold + el cobro del depósito y devuelve la URL de pago de
+// Mercado Pago. No crea las citas: eso ocurre cuando el webhook confirma el pago.
+export const createReservationCheckout = async (
+  data: CreateMultipleReservationsPayload
+): Promise<ReservationCheckoutResult | undefined> => {
+  try {
+    const response = await apiReservation.post<Response<ReservationCheckoutResult>>(
+      "/checkout",
+      data
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "No se pudo iniciar el pago del depósito");
+  }
+};
+
 // Obtener todas las reservas de una organización
 export const getReservationsByOrganization = async (
   organizationId: string

@@ -47,6 +47,7 @@ import ManageClasses from "../pages/admin/classes";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
 import TermsAndConditionsPage from "../pages/public/TermsAndConditionsPage";
+import PublicReservationPaymentPage from "../pages/public/PublicReservationPaymentPage";
 
 const generalRoutes = [
   {
@@ -71,6 +72,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Cancelar Reserva",
       description: "Cancelación de reserva o cita.",
+    },
+  },
+  {
+    path: "/reserva/pago",
+    component: PublicReservationPaymentPage,
+    MediaMetadata: {
+      title: "Pago de reserva",
+      description: "Confirmación del pago del depósito de tu reserva.",
     },
   },
   {

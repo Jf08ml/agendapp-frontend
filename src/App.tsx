@@ -91,6 +91,10 @@ function AppContent() {
   // Las rutas /superadmin* no necesitan org (ni antes de login ni después)
   const isSuperadminPath = location.pathname.startsWith("/superadmin");
   const isSignupPath = location.pathname === "/signup";
+  // La pantalla de retorno del pago de reserva es tenant-agnóstica (solo usa el
+  // ?ref para el polling). MP puede redirigir a un dominio no registrado como
+  // org (p. ej. un túnel de dev), así que no debe quedar bloqueada por el loader.
+  const isReservationPaymentPath = location.pathname === "/reserva/pago";
   const isImpersonating = localStorage.getItem("sa_is_impersonating") === "true";
 
   const handleReturnToSuperadmin = useCallback(() => {
@@ -213,7 +217,7 @@ function AppContent() {
   }, [isAuthenticated, userId]);
 
   // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
-  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !organization) {
+  if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !isReservationPaymentPath && !organization) {
     return <CustomLoaderHtml loadingText="Cargando organización..." />;
   }
 

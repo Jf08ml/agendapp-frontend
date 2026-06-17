@@ -40,6 +40,7 @@ import {
 import { useMediaQuery } from "@mantine/hooks";
 import {
   createMultipleReservations,
+  createReservationCheckout,
   type CreateMultipleReservationsPayload,
   type Reservation,
 } from "../../services/reservationService";
@@ -244,6 +245,26 @@ export default function MultiBookingWizard() {
       }
 
       const payload = buildMultiplePayload();
+
+      // 💳 Pay-to-confirm: si la org exige depósito y tiene MP conectado, en vez de
+      // crear la reserva directo, generamos el cobro y redirigimos a Mercado Pago.
+      // (El depósito no aplica a series recurrentes en esta versión.)
+      const depositRequired =
+        !!organization?.requireReservationDeposit &&
+        (organization?.reservationDepositPercentage ?? 0) > 0 &&
+        !!organization?.mpCollect?.connected &&
+        recurrencePattern.type !== "weekly";
+
+      if (depositRequired) {
+        const checkout = await createReservationCheckout({ ...payload, source: "manual_booking" });
+        if (checkout?.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl; // redirección al checkout de MP
+          return;
+        }
+        // Si falló el checkout, no continuar creando la reserva sin pago.
+        return;
+      }
+
       const result = await createMultipleReservations({ ...payload, source: "manual_booking" });
 
       let reservationIds: string[] = [];

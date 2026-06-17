@@ -40,6 +40,7 @@ import LocationTab from "./components/tabs/LocationTab";
 import FidelityTab from "./components/tabs/FidelityTab";
 import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
+import MercadoPagoConnectCard from "./components/MercadoPagoConnectCard";
 import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
 import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
 import ClientFormTab from "./components/tabs/ClientFormTab";
@@ -320,6 +321,8 @@ export default function OrganizationInfo() {
         </Tabs.Panel>
 
         <Tabs.Panel value="payments" pt="md">
+          <MercadoPagoConnectCard organizationId={organizationId} />
+          <Divider my="md" />
           <PaymentMethodsTab form={form} isEditing={true} />
         </Tabs.Panel>
 
