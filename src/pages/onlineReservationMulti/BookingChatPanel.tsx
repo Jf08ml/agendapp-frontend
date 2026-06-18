@@ -43,6 +43,7 @@ import {
   BookingPayload,
 } from "../../services/bookingChatService";
 import { createMultipleReservations, createReservationCheckout } from "../../services/reservationService";
+import { MpDepositNotice } from "../../components/MpDepositNotice";
 
 interface BookingChatPanelProps {
   onBack: () => void;
@@ -502,6 +503,16 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                       <Text size="xs">{reservationError}</Text>
                     </Alert>
                   )}
+
+                  {!!org?.requireReservationDeposit &&
+                    (org?.reservationDepositPercentage ?? 0) > 0 &&
+                    !!org?.mpCollect?.connected && (
+                      <MpDepositNotice
+                        percentage={org!.reservationDepositPercentage ?? 0}
+                        currency={org?.currency ?? "COP"}
+                        objectLabel="tu reserva"
+                      />
+                    )}
 
                   <Flex gap="sm">
                     <Button

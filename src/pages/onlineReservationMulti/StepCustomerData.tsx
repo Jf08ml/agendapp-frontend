@@ -23,7 +23,7 @@ import { RootState } from "../../app/store";
 import { Reservation } from "../../services/reservationService";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { CountryCode } from "libphonenumber-js";
-import { checkClientPackagesPublic, ClientPackage } from "../../services/packageService";
+import { checkClientPackagesByIdentifierPublic, ClientPackage } from "../../services/packageService";
 import { Paper, Checkbox, Anchor } from "@mantine/core";
 import { IconPackage } from "@tabler/icons-react";
 import {
@@ -180,13 +180,14 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         });
         if (client.name) setFoundName(client.name);
 
-        // Detección de paquetes activos (usa teléfono del cliente encontrado o el actual)
-        const phoneForPkg =
-          field === "phone" ? value : (client.phone_e164 || "");
-        if (selectedServiceIds.length > 0 && phoneForPkg) {
+        // Detección de paquetes activos por el identificador configurado
+        // (phone/email/documentId), no solo por teléfono → funciona aunque el
+        // cliente no tenga teléfono guardado.
+        if (selectedServiceIds.length > 0) {
           try {
-            const pkgResult = await checkClientPackagesPublic(
-              phoneForPkg,
+            const pkgResult = await checkClientPackagesByIdentifierPublic(
+              field,
+              value,
               selectedServiceIds,
               orgId
             );

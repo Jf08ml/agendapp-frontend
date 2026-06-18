@@ -354,6 +354,32 @@ export const checkClientPackagesPublic = async (
   }
 };
 
+// Verificar paquetes de SERVICIO por el identificador configurado (phone/email/documentId).
+// Funciona aunque el cliente no tenga teléfono guardado (a diferencia de checkClientPackagesPublic).
+export const checkClientPackagesByIdentifierPublic = async (
+  field: "phone" | "email" | "documentId",
+  value: string,
+  serviceIds: string[],
+  organizationId: string
+): Promise<ClientPackageCheckResult> => {
+  try {
+    const response = await apiPackagePublic.get<
+      Response<ClientPackageCheckResult>
+    >("/public/client-check-by-identifier", {
+      params: {
+        field,
+        value,
+        serviceIds: serviceIds.join(","),
+        organizationId,
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al verificar paquetes del cliente");
+    return { client: null, packages: [] };
+  }
+};
+
 // 📚 Verificar paquetes con créditos de clase por teléfono (reserva pública)
 export const checkClientClassPackagesPublic = async (
   phone: string,

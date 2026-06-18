@@ -48,6 +48,7 @@ import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
 import TermsAndConditionsPage from "../pages/public/TermsAndConditionsPage";
 import PublicReservationPaymentPage from "../pages/public/PublicReservationPaymentPage";
+import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage";
 
 const generalRoutes = [
   {
@@ -370,6 +371,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Reservar Clase",
       description: "Reserva tu lugar en nuestras clases grupales.",
+    },
+  },
+
+  {
+    path: "/comprar-paquete",
+    component: PublicPackagePurchasePage,
+    MediaMetadata: {
+      title: "Comprar Paquete",
+      description: "Compra un paquete de sesiones y págalo en línea.",
     },
   },
 

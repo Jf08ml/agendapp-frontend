@@ -5,7 +5,7 @@ import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
-import { IconSchool } from "@tabler/icons-react";
+import { IconSchool, IconPackage } from "@tabler/icons-react";
 import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout } from "./HomeLayouts";
 
 export default function Home() {
@@ -32,6 +32,15 @@ export default function Home() {
       icon: <IconSchool size={28} />,
       link: "/reservar-clase",
       show: organization?.enableClassBooking ?? false,
+    },
+    {
+      title: "Comprar paquetes",
+      icon: <IconPackage size={28} />,
+      link: "/comprar-paquete",
+      // Solo si el plan incluye paquetes y MP está conectado (la compra es online).
+      show:
+        (organization as any)?.planLimits?.servicePackages !== false &&
+        !!organization?.mpCollect?.connected,
     },
     {
       title: "Plan de fidelidad",

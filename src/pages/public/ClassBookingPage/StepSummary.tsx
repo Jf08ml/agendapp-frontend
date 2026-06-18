@@ -8,6 +8,7 @@ import utc from "dayjs/plugin/utc";
 import "dayjs/locale/es";
 import { ClassType, ClassSession } from "../../../services/classService";
 import { AttendeeForm } from "./StepAttendees";
+import { MpDepositNotice } from "../../../components/MpDepositNotice";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -19,9 +20,11 @@ interface Props {
   attendee: AttendeeForm;
   companion: AttendeeForm | null;
   timezone?: string;
+  /** Si la inscripción exige abono online (MP), info del depósito a mostrar. */
+  deposit?: { percentage: number; currency: string } | null;
 }
 
-export default function StepSummary({ classDoc, session, attendee, companion, timezone: tz = "America/Bogota" }: Props) {
+export default function StepSummary({ classDoc, session, attendee, companion, timezone: tz = "America/Bogota", deposit }: Props) {
   if (!classDoc || !session) return null;
 
   const numPeople = companion ? 2 : 1;
@@ -148,6 +151,16 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
           )}
         </Stack>
       </Card>
+
+      {/* Aviso de abono (pay-to-confirm vía Mercado Pago) */}
+      {deposit && deposit.percentage > 0 && (
+        <MpDepositNotice
+          percentage={deposit.percentage}
+          currency={deposit.currency}
+          amount={Math.round((total * deposit.percentage) / 100)}
+          objectLabel="tu inscripción"
+        />
+      )}
     </Stack>
   );
 }

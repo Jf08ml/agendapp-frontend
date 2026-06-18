@@ -49,6 +49,7 @@ import dayjs from "dayjs";
 import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
+import { MpDepositNotice } from "../../components/MpDepositNotice";
 
 type BookingMode = "choice" | "chat" | "manual";
 
@@ -436,19 +437,40 @@ export default function MultiBookingWizard() {
             onTermsAcceptedChange={setTermsAccepted}
           />
         );
-      case 4:
+      case 4: {
+        const depositPct = organization?.reservationDepositPercentage ?? 0;
+        const depositActive =
+          !!organization?.requireReservationDeposit &&
+          depositPct > 0 &&
+          !!organization?.mpCollect?.connected &&
+          recurrencePattern.type !== "weekly";
+        const depositSubtotal = dates.reduce((total, date) => {
+          const service = services.find((s) => s._id === date.serviceId);
+          return total + (service?.price || 0);
+        }, 0);
         return (
-          <StepMultiServiceSummary
-            services={services}
-            employees={employees}
-            dates={dates}
-            times={times}
-            currency={organization?.currency}
-            recurrencePattern={recurrencePattern}
-            seriesPreview={seriesPreview}
-            timeFormat={organization?.timeFormat}
-          />
+          <Stack gap={isMobile ? "md" : "lg"}>
+            <StepMultiServiceSummary
+              services={services}
+              employees={employees}
+              dates={dates}
+              times={times}
+              currency={organization?.currency}
+              recurrencePattern={recurrencePattern}
+              seriesPreview={seriesPreview}
+              timeFormat={organization?.timeFormat}
+            />
+            {depositActive && (
+              <MpDepositNotice
+                percentage={depositPct}
+                currency={organization?.currency ?? "COP"}
+                amount={Math.round((depositSubtotal * depositPct) / 100)}
+                objectLabel="tu reserva"
+              />
+            )}
+          </Stack>
         );
+      }
       default:
         return null;
     }

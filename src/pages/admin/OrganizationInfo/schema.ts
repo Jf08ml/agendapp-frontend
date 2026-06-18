@@ -223,6 +223,12 @@ export const schema = z.object({
     z.null(),
     z.undefined()
   ]).optional(),
+  requireClassDeposit: z.boolean().optional(),
+  classDepositPercentage: z.union([
+    z.number().min(0).max(100),
+    z.null(),
+    z.undefined()
+  ]).optional(),
 
   clientFormConfig: z.object({
     identifierField: z.enum(['phone', 'email', 'documentId']).optional(),

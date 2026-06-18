@@ -19,7 +19,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getOrderStatus, type OrderStatus } from "../../services/collectionService";
 
-// Pantalla de retorno tras pagar el depósito de la reserva en Mercado Pago.
+// Pantalla de retorno tras pagar en Mercado Pago (reserva, clase o paquete).
 // MP redirige aquí (back_urls) con ?status=success|failure|pending&ref=<externalReference>.
 // La confirmación real la da el webhook → hacemos polling al estado del Order.
 
@@ -27,6 +27,29 @@ const POLL_INTERVAL_MS = 4000; // cada 4 segundos
 const MAX_ATTEMPTS = 15; // ~60 segundos
 
 type PageStatus = "waiting" | "paid" | "failed" | "timeout";
+type OrderType = "reservation" | "class" | "package";
+
+// Copys por tipo de objeto pagado.
+const COPY: Record<OrderType, { paidTitle: string; paidText: string; retryPath: string; retryLabel: string }> = {
+  reservation: {
+    paidTitle: "¡Reserva confirmada!",
+    paidText: "Recibimos tu depósito y tu reserva quedó confirmada. Te enviaremos los detalles por WhatsApp.",
+    retryPath: "/online-reservation",
+    retryLabel: "Reservar de nuevo",
+  },
+  class: {
+    paidTitle: "¡Inscripción confirmada!",
+    paidText: "Recibimos tu depósito y tu cupo en la clase quedó reservado. Te enviaremos los detalles por WhatsApp.",
+    retryPath: "/",
+    retryLabel: "Volver al inicio",
+  },
+  package: {
+    paidTitle: "¡Paquete activado!",
+    paidText: "Recibimos tu pago y tu paquete quedó activo. Ya puedes usar tus sesiones.",
+    retryPath: "/",
+    retryLabel: "Volver al inicio",
+  },
+};
 
 export default function PublicReservationPaymentPage() {
   const navigate = useNavigate();
@@ -35,8 +58,11 @@ export default function PublicReservationPaymentPage() {
   const mpStatus = params.get("status"); // pista de MP (no autoritativa)
 
   const [pageStatus, setPageStatus] = useState<PageStatus>("waiting");
+  const [orderType, setOrderType] = useState<OrderType>("reservation");
   const [attempts, setAttempts] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const copy = COPY[orderType];
 
   const stopPolling = () => {
     if (intervalRef.current) {
@@ -59,6 +85,9 @@ export default function PublicReservationPaymentPage() {
     }
     const order = await getOrderStatus(ref);
     if (order) {
+      if (order.type === "class" || order.type === "package") {
+        setOrderType(order.type);
+      }
       const mapped = mapOrderStatus(order.status);
       if (mapped) {
         stopPolling();
@@ -138,11 +167,10 @@ export default function PublicReservationPaymentPage() {
         </ThemeIcon>
         <Stack align="center" gap="xs">
           <Title order={2} ta="center">
-            ¡Reserva confirmada!
+            {copy.paidTitle}
           </Title>
           <Text c="dimmed" ta="center">
-            Recibimos tu depósito y tu reserva quedó confirmada. Te enviaremos
-            los detalles por WhatsApp.
+            {copy.paidText}
           </Text>
         </Stack>
         <Button size="md" onClick={() => navigate("/")}>
@@ -164,12 +192,12 @@ export default function PublicReservationPaymentPage() {
             No se completó el pago
           </Title>
           <Text c="dimmed" ta="center">
-            Tu reserva no se confirmó porque el depósito no se completó. Puedes
-            intentar reservar de nuevo.
+            El pago no se completó, así que no quedó confirmado. Puedes intentarlo
+            de nuevo.
           </Text>
         </Stack>
-        <Button size="md" onClick={() => navigate("/online-reservation")}>
-          Reservar de nuevo
+        <Button size="md" onClick={() => navigate(copy.retryPath)}>
+          {copy.retryLabel}
         </Button>
       </Stack>
     );

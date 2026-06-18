@@ -11,7 +11,7 @@ import {
   Alert,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import { IconCreditCard, IconCircleCheck, IconInfoCircle } from "@tabler/icons-react";
+import { IconCreditCard, IconCircleCheck, IconInfoCircle, IconReceiptTax } from "@tabler/icons-react";
 import {
   getMpStatus,
   getMpConnectUrl,
@@ -164,6 +164,27 @@ export default function MercadoPagoConnectCard({ organizationId }: Props) {
             </Text>
           </Alert>
         )}
+
+        {/* Nota sobre comisiones */}
+        <Alert icon={<IconReceiptTax size={16} />} color="gray" variant="light">
+          <Stack gap={4}>
+            <Text size="sm" fw={600}>
+              Sobre las comisiones
+            </Text>
+            <Text size="xs" c="dimmed">
+              Mercado Pago descuenta su propia comisión por procesar cada pago. Ese
+              costo lo define Mercado Pago y varía según tu país y el medio de pago
+              (tarjeta, PSE, saldo, etc.); se descuenta del dinero que recibes en tu
+              cuenta. Puedes consultar las tarifas vigentes en tu panel de Mercado Pago.
+            </Text>
+            <Text size="xs" c="dimmed">
+              <Text span fw={600}>
+                AgenditApp no cobra ninguna comisión adicional
+              </Text>{" "}
+              por estos pagos.
+            </Text>
+          </Stack>
+        </Alert>
       </Stack>
     </Card>
   );

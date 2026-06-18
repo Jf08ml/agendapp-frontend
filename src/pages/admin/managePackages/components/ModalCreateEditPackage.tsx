@@ -179,13 +179,23 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     }
   };
 
-  const availableForSelect = availableServices
-    .filter((s) => s.isActive && !selectedServices.some((sel) => sel.serviceId === s._id))
-    .map((s) => s.name);
+  // Dedup por nombre: el Autocomplete usa el nombre como valor de opción y
+  // Mantine v7 lanza si hay valores duplicados (ej. dos servicios "Retiro").
+  const availableForSelect = Array.from(
+    new Set(
+      availableServices
+        .filter((s) => s.isActive && !selectedServices.some((sel) => sel.serviceId === s._id))
+        .map((s) => s.name)
+    )
+  );
 
-  const availableClassesForSelect = availableClasses
-    .filter((c) => c.isActive && !selectedClasses.some((sel) => sel.classId === c._id))
-    .map((c) => c.name);
+  const availableClassesForSelect = Array.from(
+    new Set(
+      availableClasses
+        .filter((c) => c.isActive && !selectedClasses.some((sel) => sel.classId === c._id))
+        .map((c) => c.name)
+    )
+  );
 
   return (
     <Modal

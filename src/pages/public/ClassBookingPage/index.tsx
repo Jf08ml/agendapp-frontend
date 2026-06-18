@@ -16,6 +16,7 @@ import {
   getClassesByOrganization, getAvailableSessions, createPublicEnrollment,
 } from "../../../services/classService";
 import { checkClientClassPackagesByIdentifier } from "../../../services/packageService";
+import { createClassCheckout } from "../../../services/collectionService";
 
 import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
@@ -58,6 +59,13 @@ export default function ClassBookingWizard() {
   const [pkgId, setPkgId] = useState<string | null>(null);
   const [pkgRemaining, setPkgRemaining] = useState<number>(0);
   const [usePkg, setUsePkg] = useState(true);
+
+  // ¿La inscripción exige pagar un depósito online (y no se cubre con paquete)?
+  const classDepositNeeded =
+    !(usePkg && pkgId) &&
+    !!organization?.requireClassDeposit &&
+    (organization?.classDepositPercentage ?? 0) > 0 &&
+    !!organization?.mpCollect?.connected;
 
   // Cargar clases al montar
   useEffect(() => {
@@ -164,29 +172,58 @@ export default function ClassBookingWizard() {
     if (!organization?._id || !selectedSession) return;
     setSubmitting(true);
     try {
+      const attendeePayload = {
+        name: attendee.name,
+        phone: attendee.phone_e164 || attendee.phone,
+        phone_e164: attendee.phone_e164 || undefined,
+        phone_country: attendee.phone_country || undefined,
+        email: attendee.email || undefined,
+        documentId: attendee.documentId || undefined,
+        notes: attendee.notes || undefined,
+      };
+      const companionPayload = companion
+        ? {
+            name: companion.name,
+            phone: companion.phone_e164 || companion.phone,
+            phone_e164: companion.phone_e164 || undefined,
+            phone_country: companion.phone_country || undefined,
+            email: companion.email || undefined,
+            documentId: companion.documentId || undefined,
+          }
+        : undefined;
+
+      // Pay-to-confirm: si la org exige depósito de clase y tiene MP conectado
+      // (y el cupo NO se cubre con un paquete), redirigir al checkout de Mercado
+      // Pago en vez de crear la inscripción directamente.
+      const usingPackage = usePkg && !!pkgId;
+      const needsDeposit =
+        !usingPackage &&
+        !!organization.requireClassDeposit &&
+        (organization.classDepositPercentage ?? 0) > 0 &&
+        !!organization.mpCollect?.connected;
+
+      if (needsDeposit) {
+        const checkout = await createClassCheckout({
+          organizationId: organization._id,
+          sessionId: selectedSession._id,
+          attendee: attendeePayload,
+          companion: companionPayload,
+          notes: attendee.notes || undefined,
+        });
+        if (checkout?.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl;
+          return; // navegamos fuera; el webhook confirma la inscripción
+        }
+        // Si no se pudo crear el checkout, no creamos la inscripción gratis.
+        return;
+      }
+
       await createPublicEnrollment({
         organizationId: organization._id,
         sessionId: selectedSession._id,
         clientPackageId: usePkg && pkgId ? pkgId : undefined,
-        attendee: {
-          name: attendee.name,
-          phone: attendee.phone_e164 || attendee.phone,
-          phone_e164: attendee.phone_e164 || undefined,
-          phone_country: attendee.phone_country || undefined,
-          email: attendee.email || undefined,
-          documentId: attendee.documentId || undefined,
-          notes: attendee.notes || undefined,
-        },
-        companion: companion
-          ? {
-              name: companion.name,
-              phone: companion.phone_e164 || companion.phone,
-              phone_e164: companion.phone_e164 || undefined,
-              phone_country: companion.phone_country || undefined,
-              email: companion.email || undefined,
-              documentId: companion.documentId || undefined,
-            }
-          : undefined,
+        attendee: attendeePayload,
+        companion: companionPayload,
       });
       setFinishName(attendee.name);
       setCompleted(true);
@@ -252,6 +289,14 @@ export default function ClassBookingWizard() {
             attendee={attendee}
             companion={companion}
             timezone={tz}
+            deposit={
+              classDepositNeeded
+                ? {
+                    percentage: organization?.classDepositPercentage ?? 0,
+                    currency: organization?.currency ?? "COP",
+                  }
+                : null
+            }
           />
         );
       default:
@@ -399,7 +444,7 @@ export default function ClassBookingWizard() {
                 color="green"
                 onClick={handleSubmit}
               >
-                Confirmar inscripción
+                {classDepositNeeded ? "Pagar y confirmar" : "Confirmar inscripción"}
               </Button>
             )}
           </Group>

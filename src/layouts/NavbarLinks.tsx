@@ -122,6 +122,13 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           icon: <IconSchool size={18} />,
           canShow: organization?.enableClassBooking ?? false,
         },
+        {
+          label: "Comprar paquetes",
+          to: "/comprar-paquete",
+          // Solo si el plan incluye paquetes y MP está conectado (la compra es online).
+          icon: <IconPackage size={18} />,
+          canShow: limits?.servicePackages !== false && !!organization?.mpCollect?.connected,
+        },
       ],
     },
     {

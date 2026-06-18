@@ -49,6 +49,8 @@ export default function PaymentMethodsTab({
   const methods = form.values.paymentMethods || [];
   const requireDeposit = form.values.requireReservationDeposit ?? false;
   const depositPercentage = form.values.reservationDepositPercentage ?? 50;
+  const requireClassDeposit = form.values.requireClassDeposit ?? false;
+  const classDepositPercentage = form.values.classDepositPercentage ?? 50;
 
   const [modalOpened, setModalOpened] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -183,6 +185,37 @@ export default function PaymentMethodsTab({
               description="Porcentaje del total que el cliente debe abonar"
               value={depositPercentage}
               onChange={(val) => form.setFieldValue("reservationDepositPercentage", val as number)}
+              min={0}
+              max={100}
+              suffix="%"
+              step={5}
+              disabled={!isEditing}
+            />
+          )}
+        </Stack>
+      </Card>
+
+      {/* Configuración de depósito para inscripción a clases */}
+      <Card withBorder padding="md">
+        <Stack gap="md">
+          <Text size="md" fw={600}>
+            Depósito para Clases
+          </Text>
+
+          <Switch
+            label="Requerir abono para confirmar inscripción a clases"
+            description="Los clientes deberán pagar un abono (Mercado Pago) antes de confirmar su cupo en la clase"
+            checked={requireClassDeposit}
+            onChange={(e) => form.setFieldValue("requireClassDeposit", e.currentTarget.checked)}
+            disabled={!isEditing}
+          />
+
+          {requireClassDeposit && (
+            <NumberInput
+              label="Porcentaje de abono requerido (clases)"
+              description="Porcentaje del precio de la clase que el cliente debe abonar"
+              value={classDepositPercentage}
+              onChange={(val) => form.setFieldValue("classDepositPercentage", val as number)}
               min={0}
               max={100}
               suffix="%"
