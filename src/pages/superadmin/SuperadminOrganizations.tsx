@@ -20,7 +20,8 @@ import {
   Tooltip,
   ActionIcon,
 } from "@mantine/core";
-import { BiEdit, BiKey, BiUserCheck, BiBuildings, BiCreditCard, BiTrash, BiBarChartAlt2 } from "react-icons/bi";
+import { BiEdit, BiKey, BiUserCheck, BiTrash } from "react-icons/bi";
+import SuperadminNav from "./SuperadminNav";
 import {
   getOrganizations,
   Organization,
@@ -325,39 +326,9 @@ export default function SuperadminOrganizations() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "auto", padding: 24 }}>
-      {/* Navegación superadmin */}
-      <Group mb="lg" gap="xs">
-        <Button
-          variant="filled"
-          leftSection={<BiBuildings size={16} />}
-          size="sm"
-        >
-          Organizaciones
-        </Button>
-        <Button
-          variant="light"
-          leftSection={<BiCreditCard size={16} />}
-          size="sm"
-          onClick={() => navigate("/superadmin")}
-        >
-          Gestión de membresías
-        </Button>
-        <Button
-          variant="light"
-          leftSection={<BiUserCheck size={16} />}
-          size="sm"
-          onClick={() => navigate("/superadmin/agentes")}
-        >
-          Agentes
-        </Button>
-        <Button
-          variant="light"
-          leftSection={<BiBarChartAlt2 size={16} />}
-          size="sm"
-          onClick={() => navigate("/superadmin/analiticas")}
-        >
-          Analítica
-        </Button>
+      {/* Navegación superadmin (compartida) */}
+      <Group mb="lg">
+        <SuperadminNav />
       </Group>
 
       <Group justify="space-between" mb="md">

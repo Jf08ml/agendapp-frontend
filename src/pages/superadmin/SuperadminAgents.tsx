@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Table,
   Button,
@@ -19,7 +18,8 @@ import {
   CopyButton,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { BiBuildings, BiCreditCard, BiEdit, BiTrash, BiLink, BiUserCheck, BiBarChartAlt2 } from "react-icons/bi";
+import { BiEdit, BiTrash, BiLink } from "react-icons/bi";
+import SuperadminNav from "./SuperadminNav";
 import {
   agentService,
   Agent,
@@ -68,7 +68,6 @@ const emptyForm = (): CreateAgentPayload & { status?: "active" | "inactive" } =>
 });
 
 export default function SuperadminAgents() {
-  const navigate = useNavigate();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -193,20 +192,9 @@ export default function SuperadminAgents() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "auto", padding: 24 }}>
-      {/* Navegación superadmin */}
-      <Group mb="lg" gap="xs">
-        <Button variant="light" leftSection={<BiCreditCard size={16} />} size="sm" onClick={() => navigate("/superadmin")}>
-          Membresías
-        </Button>
-        <Button variant="light" leftSection={<BiBuildings size={16} />} size="sm" onClick={() => navigate("/superadmin/orgs")}>
-          Organizaciones
-        </Button>
-        <Button variant="filled" leftSection={<BiUserCheck size={16} />} size="sm">
-          Agentes
-        </Button>
-        <Button variant="light" leftSection={<BiBarChartAlt2 size={16} />} size="sm" onClick={() => navigate("/superadmin/analiticas")}>
-          Analítica
-        </Button>
+      {/* Navegación superadmin (compartida) */}
+      <Group mb="lg">
+        <SuperadminNav />
       </Group>
 
       <Group justify="space-between" mb="md">

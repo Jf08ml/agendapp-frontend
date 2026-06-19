@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/superadmin/SuperadminAnalytics.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -17,7 +16,6 @@ import {
   Loader,
   SegmentedControl,
   Select,
-  Button,
   ScrollArea,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
@@ -34,17 +32,9 @@ import {
 } from "recharts";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import {
-  BiBuildings,
-  BiCreditCard,
-  BiPackage,
-  BiUserCheck,
-  BiBarChartAlt2,
-  BiBot,
-  BiTrendingUp,
-} from "react-icons/bi";
 import { notifications } from "@mantine/notifications";
 import { formatCurrency } from "../../utils/formatCurrency";
+import SuperadminNav from "./SuperadminNav";
 import {
   getPlatformOverview,
   getPlatformTimeSeries,
@@ -105,7 +95,6 @@ function KpiCard({
 }
 
 export default function SuperadminAnalytics() {
-  const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const [loading, setLoading] = useState(true);
@@ -180,64 +169,8 @@ export default function SuperadminAnalytics() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
-        {/* Navegación superadmin */}
-        <Group gap="xs">
-          <Button
-            variant="light"
-            leftSection={<BiCreditCard size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin")}
-          >
-            Membresías
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiBuildings size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/orgs")}
-          >
-            Organizaciones
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiPackage size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/planes")}
-          >
-            Planes
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiUserCheck size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/agentes")}
-          >
-            Agentes
-          </Button>
-          <Button
-            variant="filled"
-            leftSection={<BiBarChartAlt2 size={16} />}
-            size="sm"
-          >
-            Analítica
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiBot size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/chatbots")}
-          >
-            Chatbots IA
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiTrendingUp size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/activacion")}
-          >
-            Activación
-          </Button>
-        </Group>
+        {/* Navegación superadmin (compartida) */}
+        <SuperadminNav />
 
         {/* Header + filtros */}
         <Card withBorder radius="md" p="md">

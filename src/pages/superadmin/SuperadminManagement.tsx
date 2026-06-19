@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/superadmin/SuperadminManagement.tsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -39,12 +38,12 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
-import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus, BiBuildings, BiPackage, BiUserCheck, BiBarChartAlt2, BiBell } from "react-icons/bi";
+import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
+import SuperadminNav from "./SuperadminNav";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
 export default function SuperadminManagement() {
-  const navigate = useNavigate();
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -332,56 +331,8 @@ export default function SuperadminManagement() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
-        {/* Navegación superadmin */}
-        <Group gap="xs">
-          <Button
-            variant="light"
-            leftSection={<BiBuildings size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/orgs")}
-          >
-            Organizaciones
-          </Button>
-          <Button
-            variant="filled"
-            leftSection={<BiCreditCard size={16} />}
-            size="sm"
-          >
-            Membresías
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiPackage size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/planes")}
-          >
-            Planes
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiUserCheck size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/agentes")}
-          >
-            Agentes
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiBarChartAlt2 size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/analiticas")}
-          >
-            Analítica
-          </Button>
-          <Button
-            variant="light"
-            leftSection={<BiBell size={16} />}
-            size="sm"
-            onClick={() => navigate("/superadmin/anuncios")}
-          >
-            Anuncios
-          </Button>
-        </Group>
+        {/* Navegación superadmin (compartida) */}
+        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">

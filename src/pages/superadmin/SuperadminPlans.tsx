@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/superadmin/SuperadminPlans.tsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -38,7 +37,7 @@ import {
   IconX,
   IconCheck,
 } from "@tabler/icons-react";
-import { BiBuildings, BiArrowBack, BiBarChartAlt2 } from "react-icons/bi";
+import SuperadminNav from "./SuperadminNav";
 import {
   getAllPlans,
   createPlan,
@@ -92,7 +91,6 @@ function toSlug(text: string) {
 }
 
 export default function SuperadminPlans() {
-  const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -308,21 +306,8 @@ export default function SuperadminPlans() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
 
-        {/* Navegación superadmin */}
-        <Group gap="xs">
-          <Button variant="light" leftSection={<BiArrowBack size={16} />} size="sm" onClick={() => navigate("/superadmin")}>
-            Membresías
-          </Button>
-          <Button variant="light" leftSection={<BiBuildings size={16} />} size="sm" onClick={() => navigate("/superadmin/orgs")}>
-            Organizaciones
-          </Button>
-          <Button variant="filled" leftSection={<IconTag size={16} />} size="sm">
-            Planes
-          </Button>
-          <Button variant="light" leftSection={<BiBarChartAlt2 size={16} />} size="sm" onClick={() => navigate("/superadmin/analiticas")}>
-            Analítica
-          </Button>
-        </Group>
+        {/* Navegación superadmin (compartida) */}
+        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">

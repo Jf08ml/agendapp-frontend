@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -28,12 +27,10 @@ import {
   IconRefresh,
   IconCheck,
   IconX,
-  IconBell,
   IconEye,
   IconEyeOff,
-  IconTag,
 } from "@tabler/icons-react";
-import { BiBuildings, BiArrowBack } from "react-icons/bi";
+import SuperadminNav from "./SuperadminNav";
 import {
   adminGetAnnouncements,
   adminCreateAnnouncement,
@@ -81,7 +78,6 @@ const TYPE_COLOR: Record<UpdateType, string> = {
 };
 
 export default function SuperadminAnnouncements() {
-  const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -256,21 +252,8 @@ export default function SuperadminAnnouncements() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
-        {/* Nav superadmin */}
-        <Group gap="xs">
-          <Button variant="light" leftSection={<BiArrowBack size={16} />} size="sm" onClick={() => navigate("/superadmin")}>
-            Membresías
-          </Button>
-          <Button variant="light" leftSection={<BiBuildings size={16} />} size="sm" onClick={() => navigate("/superadmin/orgs")}>
-            Organizaciones
-          </Button>
-          <Button variant="light" leftSection={<IconTag size={16} />} size="sm" onClick={() => navigate("/superadmin/planes")}>
-            Planes
-          </Button>
-          <Button variant="filled" leftSection={<IconBell size={16} />} size="sm">
-            Anuncios
-          </Button>
-        </Group>
+        {/* Navegación superadmin (compartida) */}
+        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">
