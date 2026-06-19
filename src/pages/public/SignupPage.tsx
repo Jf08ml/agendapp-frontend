@@ -259,17 +259,19 @@ export default function SignupPage() {
 
   useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); }, []);
 
-  // Auto-fill referral code from ?ref= URL param or localStorage + fetch agent name
+  // Auto-fill referral code from ?ref= URL param or sessionStorage + fetch agent name.
+  // Se usa sessionStorage (no localStorage) para que la atribución dure solo la
+  // sesión/visita actual y no quede un código viejo colgado indefinidamente.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refParam = params.get("ref");
     const code = refParam
       ? refParam.toUpperCase()
-      : localStorage.getItem("signup_referral_code") ?? null;
+      : sessionStorage.getItem("signup_referral_code") ?? null;
 
     if (code) {
       form.setFieldValue("referralCode", code);
-      if (refParam) localStorage.setItem("signup_referral_code", code);
+      if (refParam) sessionStorage.setItem("signup_referral_code", code);
       setReferralLocked(true);
       // Fetch agent name silently
       getAgentPublicInfo(code)
@@ -320,7 +322,7 @@ export default function SignupPage() {
         referralCode: values.referralCode || undefined,
         businessVertical: values.businessVertical || undefined,
       });
-      localStorage.removeItem("signup_referral_code");
+      sessionStorage.removeItem("signup_referral_code");
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
       const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
       setSuccessInfo({ displayUrl, redirectUrl });
