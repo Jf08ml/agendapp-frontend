@@ -6,6 +6,11 @@ export interface AnnouncementItem {
   detail?: string;
 }
 
+export interface AnnouncementViewer {
+  _id: string;
+  name: string;
+}
+
 export interface Announcement {
   _id: string;
   version: string;
@@ -14,6 +19,7 @@ export interface Announcement {
   items: AnnouncementItem[];
   published: boolean;
   viewCount?: number;
+  viewers?: AnnouncementViewer[]; // nombres de orgs que lo vieron (solo endpoint superadmin)
   createdAt: string;
   updatedAt: string;
 }

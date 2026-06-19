@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Container, Title, Text, Stack, Group, Card, Paper, Badge, Table,
-  Divider, Loader, ScrollArea, Progress, Alert,
+  Divider, Loader, ScrollArea, Progress, Alert, HoverCard,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { IconBulb } from "@tabler/icons-react";
@@ -103,7 +103,33 @@ export default function SuperadminOnboarding() {
             {(data?.funnel ?? []).map((step) => (
               <div key={step.clave}>
                 <Group justify="space-between" mb={4}>
-                  <Text size="sm" fw={500}>{step.hito}</Text>
+                  {step.orgs && step.orgs.length > 0 ? (
+                    <HoverCard width={300} shadow="md" position="right" withArrow openDelay={150}>
+                      <HoverCard.Target>
+                        <Text
+                          size="sm"
+                          fw={500}
+                          style={{ cursor: "pointer", textDecoration: "underline dotted" }}
+                        >
+                          {step.hito}
+                        </Text>
+                      </HoverCard.Target>
+                      <HoverCard.Dropdown>
+                        <Text size="xs" fw={700} mb={6}>
+                          {step.hito} — {step.total} organización(es)
+                        </Text>
+                        <ScrollArea.Autosize mah={260}>
+                          <Stack gap={2} pr="xs">
+                            {step.orgs.map((o) => (
+                              <Text key={o.id} size="xs">{o.name}</Text>
+                            ))}
+                          </Stack>
+                        </ScrollArea.Autosize>
+                      </HoverCard.Dropdown>
+                    </HoverCard>
+                  ) : (
+                    <Text size="sm" fw={500}>{step.hito}</Text>
+                  )}
                   <Group gap="xs">
                     <Text size="sm" fw={700}>{step.total.toLocaleString("es-CO")}</Text>
                     <Badge size="sm" variant="light" color={step.clave === "convertidasPago" ? "green" : "blue"}>

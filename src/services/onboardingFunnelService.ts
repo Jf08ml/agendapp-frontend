@@ -1,10 +1,16 @@
 import { apiGeneral } from "./axiosConfig";
 
+export interface FunnelOrg {
+  id: string;
+  name: string;
+}
+
 export interface FunnelStep {
   hito: string;
   clave: string;
   total: number;
   pct: number;
+  orgs?: FunnelOrg[]; // organizaciones que alcanzaron este hito
 }
 
 export interface ConversionPorHito {

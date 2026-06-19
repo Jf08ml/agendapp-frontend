@@ -18,6 +18,8 @@ import {
   Divider,
   Paper,
   Loader,
+  HoverCard,
+  ScrollArea,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
@@ -215,7 +217,35 @@ export default function SuperadminAnnouncements() {
         </Group>
       </Table.Td>
       <Table.Td>
-        <Text size="sm" fw={500}>{a.viewCount ?? 0}</Text>
+        {a.viewCount && a.viewCount > 0 && a.viewers?.length ? (
+          <HoverCard width={280} shadow="md" position="left" withArrow openDelay={150}>
+            <HoverCard.Target>
+              <Text
+                size="sm"
+                fw={500}
+                style={{ cursor: "pointer", textDecoration: "underline dotted" }}
+              >
+                {a.viewCount}
+              </Text>
+            </HoverCard.Target>
+            <HoverCard.Dropdown>
+              <Text size="xs" fw={700} mb={6}>
+                Organizaciones que lo vieron
+              </Text>
+              <ScrollArea.Autosize mah={220}>
+                <Stack gap={2} pr="xs">
+                  {a.viewers.map((v) => (
+                    <Text key={v._id} size="xs">
+                      {v.name}
+                    </Text>
+                  ))}
+                </Stack>
+              </ScrollArea.Autosize>
+            </HoverCard.Dropdown>
+          </HoverCard>
+        ) : (
+          <Text size="sm" fw={500}>{a.viewCount ?? 0}</Text>
+        )}
         <Text size="xs" c="dimmed">organizaciones</Text>
       </Table.Td>
       <Table.Td>
