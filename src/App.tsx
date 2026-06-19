@@ -32,6 +32,7 @@ import { loginSuccess } from "./features/auth/sliceAuth";
 import { clearOrganization, fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
+import WhatsNewModal from "./components/WhatsNewModal";
 
 // Función para convertir la clave VAPID de base64url a Uint8Array
 const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
@@ -313,6 +314,9 @@ function AppContent() {
         )}
 
         <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
+          {/* Modal automático de novedades (solo admin/org, no superadmin) */}
+          {isAuthenticated && !isSuperadmin && <WhatsNewModal />}
+
           {/* Banner de sesión de soporte (impersonación activa) */}
           {isImpersonating && isAuthenticated && (
             <div

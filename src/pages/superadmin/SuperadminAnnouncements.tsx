@@ -346,7 +346,11 @@ export default function SuperadminAnnouncements() {
               label="Publicado"
               description="Visible para todos los admins"
               checked={form.published}
-              onChange={(e) => setForm((f) => ({ ...f, published: e.currentTarget.checked }))}
+              onChange={(e) => {
+                // Capturar antes del updater diferido: React resetea currentTarget a null.
+                const checked = e.currentTarget.checked;
+                setForm((f) => ({ ...f, published: checked }));
+              }}
               mt="lg"
             />
           </Group>
