@@ -69,10 +69,24 @@ export default function MercadoPagoConnectCard({ organizationId }: Props) {
   const handleConnect = async () => {
     if (!organizationId) return;
     setBusy(true);
-    const url = await getMpConnectUrl(organizationId);
-    if (url) {
-      window.location.href = url; // redirige a Mercado Pago para autorizar
-    } else {
+    try {
+      const url = await getMpConnectUrl(organizationId);
+      if (url) {
+        window.location.href = url; // redirige a Mercado Pago para autorizar
+      } else {
+        setBusy(false);
+      }
+    } catch (error) {
+      // getMpConnectUrl (vía handleAxiosError) relanza con el mensaje del backend,
+      // p. ej. "Cobros con Mercado Pago aún no está disponible en México".
+      showNotification({
+        title: "No se pudo conectar",
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo iniciar la conexión con Mercado Pago.",
+        color: "red",
+      });
       setBusy(false);
     }
   };
