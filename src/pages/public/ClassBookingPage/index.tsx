@@ -16,7 +16,8 @@ import {
   getClassesByOrganization, getAvailableSessions, createPublicEnrollment,
 } from "../../../services/classService";
 import { checkClientClassPackagesByIdentifier } from "../../../services/packageService";
-import { createClassCheckout } from "../../../services/collectionService";
+import { createClassCheckout, createReceiptClassCheckout } from "../../../services/collectionService";
+import { useNavigate } from "react-router-dom";
 
 import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
@@ -32,6 +33,7 @@ const STEPS = [
 
 export default function ClassBookingWizard() {
   const isMobile = useMediaQuery("(max-width: 48rem)");
+  const navigate = useNavigate();
   const contentTopRef = useRef<HTMLDivElement | null>(null);
   const organization = useSelector((s: RootState) => s.organization.organization);
   const tz = organization?.timezone || "America/Bogota";
@@ -61,11 +63,13 @@ export default function ClassBookingWizard() {
   const [usePkg, setUsePkg] = useState(true);
 
   // ¿La inscripción exige pagar un depósito online (y no se cubre con paquete)?
+  // Se cobra si hay MP conectado o métodos de transferencia configurados.
   const classDepositNeeded =
     !(usePkg && pkgId) &&
     !!organization?.requireClassDeposit &&
     (organization?.classDepositPercentage ?? 0) > 0 &&
-    !!organization?.mpCollect?.connected;
+    (!!organization?.mpCollect?.connected ||
+      (organization?.paymentMethods?.length ?? 0) > 0);
 
   // Cargar clases al montar
   useEffect(() => {
@@ -196,25 +200,48 @@ export default function ClassBookingWizard() {
       // (y el cupo NO se cubre con un paquete), redirigir al checkout de Mercado
       // Pago en vez de crear la inscripción directamente.
       const usingPackage = usePkg && !!pkgId;
-      const needsDeposit =
+      const depositConfigured =
         !usingPackage &&
         !!organization.requireClassDeposit &&
-        (organization.classDepositPercentage ?? 0) > 0 &&
-        !!organization.mpCollect?.connected;
+        (organization.classDepositPercentage ?? 0) > 0;
+      const hasMp = !!organization.mpCollect?.connected;
+      const hasReceipt = (organization.paymentMethods?.length ?? 0) > 0;
+      const prefersReceipt = organization.depositPreferredMethod === "receipt";
+      const useReceipt = depositConfigured && hasReceipt && (prefersReceipt || !hasMp);
+      const useMp = depositConfigured && hasMp && !useReceipt;
 
-      if (needsDeposit) {
-        const checkout = await createClassCheckout({
-          organizationId: organization._id,
-          sessionId: selectedSession._id,
-          attendee: attendeePayload,
-          companion: companionPayload,
-          notes: attendee.notes || undefined,
-        });
+      const classCheckoutPayload = {
+        organizationId: organization._id,
+        sessionId: selectedSession._id,
+        attendee: attendeePayload,
+        companion: companionPayload,
+        notes: attendee.notes || undefined,
+      };
+
+      if (useMp) {
+        const checkout = await createClassCheckout(classCheckoutPayload);
         if (checkout?.checkoutUrl) {
           window.location.href = checkout.checkoutUrl;
           return; // navegamos fuera; el webhook confirma la inscripción
         }
         // Si no se pudo crear el checkout, no creamos la inscripción gratis.
+        return;
+      }
+
+      if (useReceipt) {
+        const checkout = await createReceiptClassCheckout(classCheckoutPayload);
+        if (checkout) {
+          navigate("/pago/comprobante", {
+            state: {
+              externalReference: checkout.externalReference,
+              amount: checkout.amount,
+              currency: checkout.currency,
+              paymentMethods: checkout.paymentMethods,
+              orderType: "class",
+            },
+          });
+          return;
+        }
         return;
       }
 

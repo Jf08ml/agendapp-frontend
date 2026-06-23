@@ -48,6 +48,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
   reservationDepositPercentage: response.reservationDepositPercentage ?? 50,
   requireClassDeposit: response.requireClassDeposit ?? false,
   classDepositPercentage: response.classDepositPercentage ?? 50,
+  depositPreferredMethod: response.depositPreferredMethod ?? "mercadopago",
   reminderSettings: {
     enabled: response.reminderSettings?.enabled ?? true,
     hoursBefore: response.reminderSettings?.hoursBefore ?? 24,

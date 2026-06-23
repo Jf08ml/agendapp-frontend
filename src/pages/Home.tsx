@@ -37,10 +37,12 @@ export default function Home() {
       title: "Comprar paquetes",
       icon: <IconPackage size={28} />,
       link: "/comprar-paquete",
-      // Solo si el plan incluye paquetes y MP está conectado (la compra es online).
+      // Si el plan incluye paquetes y hay un medio de cobro online: Mercado Pago
+      // conectado o métodos de transferencia (compra vía comprobante con IA).
       show:
         (organization as any)?.planLimits?.servicePackages !== false &&
-        !!organization?.mpCollect?.connected,
+        (!!organization?.mpCollect?.connected ||
+          ((organization?.paymentMethods?.length ?? 0) > 0)),
     },
     {
       title: "Plan de fidelidad",

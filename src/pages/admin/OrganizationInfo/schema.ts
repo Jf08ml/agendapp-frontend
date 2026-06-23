@@ -229,6 +229,7 @@ export const schema = z.object({
     z.null(),
     z.undefined()
   ]).optional(),
+  depositPreferredMethod: z.enum(["mercadopago", "receipt"]).optional(),
 
   clientFormConfig: z.object({
     identifierField: z.enum(['phone', 'email', 'documentId']).optional(),

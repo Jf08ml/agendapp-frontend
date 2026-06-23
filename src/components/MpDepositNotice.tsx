@@ -1,6 +1,7 @@
 // components/MpDepositNotice.tsx
-// Aviso pre-pago: informa al cliente que, para confirmar, se le cobrará un abono
-// (depósito) por un % vía Mercado Pago, ANTES de redirigirlo al checkout.
+// Aviso pre-pago: informa al cliente que, para confirmar, debe realizar un abono
+// (depósito) por un %. Copy genérico (no menciona el medio de pago concreto),
+// válido tanto para Mercado Pago como para transferencia + comprobante.
 import { Alert, Text } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { formatCurrency } from "../utils/formatCurrency";
@@ -26,15 +27,15 @@ export function MpDepositNotice({
         Se requiere un abono para confirmar
       </Text>
       <Text size="sm">
-        Para confirmar {objectLabel} se te cobrará un abono del{" "}
+        Para confirmar {objectLabel} debes realizar un abono del{" "}
         <strong>{percentage}%</strong>
         {amount && amount > 0 ? (
           <>
             {" "}
             (<strong>{formatCurrency(amount, currency)}</strong>)
           </>
-        ) : null}{" "}
-        a través de Mercado Pago. El valor restante se paga en el establecimiento.
+        ) : null}
+        . El valor restante se paga en el establecimiento.
       </Text>
     </Alert>
   );

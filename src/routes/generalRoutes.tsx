@@ -48,6 +48,8 @@ import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
 import TermsAndConditionsPage from "../pages/public/TermsAndConditionsPage";
 import PublicReservationPaymentPage from "../pages/public/PublicReservationPaymentPage";
+import PublicReceiptPaymentPage from "../pages/public/PublicReceiptPaymentPage";
+import ReceiptReviewPage from "../pages/admin/payments/ReceiptReviewPage";
 import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage";
 
 const generalRoutes = [
@@ -81,6 +83,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Pago de reserva",
       description: "Confirmación del pago del depósito de tu reserva.",
+    },
+  },
+  {
+    path: "/pago/comprobante",
+    component: PublicReceiptPaymentPage,
+    MediaMetadata: {
+      title: "Pago por transferencia",
+      description: "Sube el comprobante de tu transferencia para confirmar el pago.",
     },
   },
   {
@@ -182,6 +192,18 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Gestionar Reservas Online",
       description: "Gestiona las reservas de Galaxia Glamour.",
+    },
+  },
+  {
+    path: "/gestionar-pagos",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <ReceiptReviewPage {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Comprobantes de pago",
+      description: "Revisa los comprobantes de pago por transferencia.",
     },
   },
   {

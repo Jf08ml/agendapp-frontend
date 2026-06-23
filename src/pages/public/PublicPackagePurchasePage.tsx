@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -39,7 +40,9 @@ import {
 import {
   listPublicPackages,
   createPackageCheckout,
+  createReceiptPackageCheckout,
   type PublicPackageItem,
+  type ReceiptPaymentMethod,
 } from "../../services/collectionService";
 
 interface CustomerForm {
@@ -75,12 +78,14 @@ const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.tr
 // Página pública para que un cliente compre un paquete y lo pague online (MP).
 // El ClientPackage se crea cuando el webhook confirma el pago.
 export default function PublicPackagePurchasePage() {
+  const navigate = useNavigate();
   const organization = useSelector((s: RootState) => s.organization.organization);
   const orgCountry = (organization?.default_country || "CO") as CountryCode;
 
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("COP");
   const [mpConnected, setMpConnected] = useState(false);
+  const [receiptMethods, setReceiptMethods] = useState<ReceiptPaymentMethod[]>([]);
   const [packages, setPackages] = useState<PublicPackageItem[]>([]);
 
   // ── Config del formulario de cliente (igual que reservas/clases) ───────────
@@ -119,6 +124,7 @@ export default function PublicPackagePurchasePage() {
       if (res) {
         setCurrency(res.currency);
         setMpConnected(res.mpConnected);
+        setReceiptMethods(res.paymentMethods || []);
         setPackages(res.packages || []);
       }
       setLoading(false);
@@ -213,7 +219,7 @@ export default function PublicPackagePurchasePage() {
     setSubmitting(true);
     setFormError(null);
     try {
-      const checkout = await createPackageCheckout({
+      const checkoutPayload = {
         organizationId: organization._id,
         servicePackageId: selected._id,
         customerDetails: {
@@ -224,10 +230,34 @@ export default function PublicPackagePurchasePage() {
           birthDate: form.birthDate || undefined,
           notes: form.notes.trim() || undefined,
         },
-      });
-      if (checkout?.checkoutUrl) {
-        window.location.href = checkout.checkoutUrl;
-        return; // navegamos fuera; el webhook activa el paquete al pagar
+      };
+
+      // MP (automático) si está conectado y no se prefiere transferencia; si no,
+      // transferencia + comprobante.
+      const prefersReceipt = organization.depositPreferredMethod === "receipt";
+      const goMp = mpConnected && !(prefersReceipt && receiptMethods.length > 0);
+      if (goMp) {
+        const checkout = await createPackageCheckout(checkoutPayload);
+        if (checkout?.checkoutUrl) {
+          window.location.href = checkout.checkoutUrl;
+          return; // navegamos fuera; el webhook activa el paquete al pagar
+        }
+        setFormError("No se pudo iniciar el pago. Intenta de nuevo.");
+        return;
+      }
+
+      const checkout = await createReceiptPackageCheckout(checkoutPayload);
+      if (checkout) {
+        navigate("/pago/comprobante", {
+          state: {
+            externalReference: checkout.externalReference,
+            amount: checkout.amount,
+            currency: checkout.currency,
+            paymentMethods: checkout.paymentMethods,
+            orderType: "package",
+          },
+        });
+        return;
       }
       setFormError("No se pudo iniciar el pago. Intenta de nuevo.");
     } finally {
@@ -262,6 +292,11 @@ export default function PublicPackagePurchasePage() {
     );
   }
 
+  const canPay = mpConnected || receiptMethods.length > 0;
+  const willUseMp =
+    mpConnected &&
+    !(organization?.depositPreferredMethod === "receipt" && receiptMethods.length > 0);
+
   return (
     <Container size="lg" py="xl">
       <Stack gap="xs" mb="lg" align="center">
@@ -277,7 +312,7 @@ export default function PublicPackagePurchasePage() {
         </Text>
       </Stack>
 
-      {!mpConnected && (
+      {!canPay && (
         <Alert
           icon={<IconAlertCircle size={18} />}
           color="yellow"
@@ -349,7 +384,7 @@ export default function PublicPackagePurchasePage() {
                   mt="auto"
                   fullWidth
                   leftSection={<IconShoppingCart size={16} />}
-                  disabled={!mpConnected}
+                  disabled={!canPay}
                   onClick={() => openBuy(pkg)}
                 >
                   Comprar
@@ -505,8 +540,9 @@ export default function PublicPackagePurchasePage() {
               Pagar {formatCurrency(selected.price, currency)}
             </Button>
             <Text size="xs" c="dimmed" ta="center">
-              Serás redirigido a Mercado Pago para completar el pago de forma
-              segura.
+              {willUseMp
+                ? "Serás redirigido a Mercado Pago para completar el pago de forma segura."
+                : "A continuación verás los datos para realizar tu pago y subir el comprobante."}
             </Text>
           </Stack>
         )}

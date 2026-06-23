@@ -43,6 +43,8 @@ import {
   BookingPayload,
 } from "../../services/bookingChatService";
 import { createMultipleReservations, createReservationCheckout } from "../../services/reservationService";
+import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
+import { useNavigate } from "react-router-dom";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
 
 interface BookingChatPanelProps {
@@ -82,6 +84,7 @@ const RATINGS: { value: 1|3|5; emoji: string; label: string }[] = [
 ];
 
 export default function BookingChatPanel({ onBack, preselectedService }: BookingChatPanelProps) {
+  const navigate = useNavigate();
   const org = useSelector((s: RootState) => s.organization.organization);
   const color = org?.branding?.primaryColor || "#1C3461";
   const agentName = org?.aiAssistantName || "Roxi";
@@ -154,14 +157,18 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     setConfirming(true);
     setReservationError(null);
     try {
-      // 💳 Pay-to-confirm: si la org exige depósito y tiene MP conectado, generamos
-      // el cobro y redirigimos a Mercado Pago en vez de crear la reserva directo.
-      const depositRequired =
+      // 💳 Pay-to-confirm: si la org exige depósito, cobramos antes de crear la
+      // reserva. MP (automático) si está conectado; si no, transferencia + comprobante.
+      const depositConfigured =
         !!org?.requireReservationDeposit &&
-        (org?.reservationDepositPercentage ?? 0) > 0 &&
-        !!org?.mpCollect?.connected;
+        (org?.reservationDepositPercentage ?? 0) > 0;
+      const hasMp = !!org?.mpCollect?.connected;
+      const hasReceipt = (org?.paymentMethods?.length ?? 0) > 0;
+      const prefersReceipt = org?.depositPreferredMethod === "receipt";
+      const useReceipt = depositConfigured && hasReceipt && (prefersReceipt || !hasMp);
+      const useMp = depositConfigured && hasMp && !useReceipt;
 
-      if (depositRequired) {
+      if (useMp) {
         const checkout = await createReservationCheckout({
           ...(pendingPayload as any),
           source: "ai_chatbot",
@@ -169,6 +176,26 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         });
         if (checkout?.checkoutUrl) {
           window.location.href = checkout.checkoutUrl;
+          return;
+        }
+        throw new Error("No se pudo iniciar el pago del depósito.");
+      }
+
+      if (useReceipt) {
+        const checkout = await createReceiptReservationCheckout({
+          ...(pendingPayload as any),
+          source: "ai_chatbot",
+        } as unknown as ReservationReceiptPayload);
+        if (checkout) {
+          navigate("/pago/comprobante", {
+            state: {
+              externalReference: checkout.externalReference,
+              amount: checkout.amount,
+              currency: checkout.currency,
+              paymentMethods: checkout.paymentMethods,
+              orderType: "reservation",
+            },
+          });
           return;
         }
         throw new Error("No se pudo iniciar el pago del depósito.");
@@ -506,7 +533,8 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
 
                   {!!org?.requireReservationDeposit &&
                     (org?.reservationDepositPercentage ?? 0) > 0 &&
-                    !!org?.mpCollect?.connected && (
+                    (!!org?.mpCollect?.connected ||
+                      (org?.paymentMethods?.length ?? 0) > 0) && (
                       <MpDepositNotice
                         percentage={org!.reservationDepositPercentage ?? 0}
                         currency={org?.currency ?? "COP"}

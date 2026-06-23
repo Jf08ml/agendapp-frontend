@@ -153,6 +153,8 @@ export interface Organization {
   // Depósito para inscripción a clases (config propia, independiente de reservas).
   requireClassDeposit?: boolean;
   classDepositPercentage?: number;
+  // Medio preferido para el abono cuando hay AMBOS disponibles (MP + transferencia).
+  depositPreferredMethod?: "mercadopago" | "receipt";
   // Cobro de depósito vía Mercado Pago. El endpoint público solo expone `connected`.
   mpCollect?: { connected?: boolean };
   welcomeTitle?: string;

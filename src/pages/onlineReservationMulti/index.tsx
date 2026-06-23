@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import BookingChoiceScreen from "./BookingChoiceScreen";
 import BookingChatPanel from "./BookingChatPanel";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
@@ -44,6 +44,10 @@ import {
   type CreateMultipleReservationsPayload,
   type Reservation,
 } from "../../services/reservationService";
+import {
+  createReceiptReservationCheckout,
+  type ReservationReceiptPayload,
+} from "../../services/collectionService";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
 import dayjs from "dayjs";
 import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils";
@@ -109,6 +113,7 @@ export default function MultiBookingWizard() {
 
   // Pre-selección de servicio vía query param ?serviceId=
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const preselectedServiceId = searchParams.get("serviceId");
   const preselectionApplied = useRef(false);
 
@@ -247,19 +252,47 @@ export default function MultiBookingWizard() {
 
       const payload = buildMultiplePayload();
 
-      // 💳 Pay-to-confirm: si la org exige depósito y tiene MP conectado, en vez de
-      // crear la reserva directo, generamos el cobro y redirigimos a Mercado Pago.
+      // 💳 Pay-to-confirm: si la org exige depósito, cobramos antes de crear la
+      // reserva. Preferimos Mercado Pago (automático); si no está conectado pero
+      // hay métodos de transferencia, usamos el flujo de comprobante con IA.
       // (El depósito no aplica a series recurrentes en esta versión.)
-      const depositRequired =
+      const depositConfigured =
         !!organization?.requireReservationDeposit &&
         (organization?.reservationDepositPercentage ?? 0) > 0 &&
-        !!organization?.mpCollect?.connected &&
         recurrencePattern.type !== "weekly";
+      const hasMp = !!organization?.mpCollect?.connected;
+      const hasReceipt = (organization?.paymentMethods?.length ?? 0) > 0;
+      const prefersReceipt = organization?.depositPreferredMethod === "receipt";
+      // Si prefiere transferencia y la tiene, va por comprobante (aunque MP esté
+      // conectado). Si no, MP cuando esté disponible; si no, comprobante.
+      const useReceipt = depositConfigured && hasReceipt && (prefersReceipt || !hasMp);
+      const useMp = depositConfigured && hasMp && !useReceipt;
 
-      if (depositRequired) {
+      if (useMp) {
         const checkout = await createReservationCheckout({ ...payload, source: "manual_booking" });
         if (checkout?.checkoutUrl) {
           window.location.href = checkout.checkoutUrl; // redirección al checkout de MP
+          return;
+        }
+        // Si falló el checkout, no continuar creando la reserva sin pago.
+        return;
+      }
+
+      if (useReceipt) {
+        const checkout = await createReceiptReservationCheckout({
+          ...payload,
+          source: "manual_booking",
+        } as unknown as ReservationReceiptPayload);
+        if (checkout) {
+          navigate("/pago/comprobante", {
+            state: {
+              externalReference: checkout.externalReference,
+              amount: checkout.amount,
+              currency: checkout.currency,
+              paymentMethods: checkout.paymentMethods,
+              orderType: "reservation",
+            },
+          });
           return;
         }
         // Si falló el checkout, no continuar creando la reserva sin pago.
@@ -442,7 +475,8 @@ export default function MultiBookingWizard() {
         const depositActive =
           !!organization?.requireReservationDeposit &&
           depositPct > 0 &&
-          !!organization?.mpCollect?.connected &&
+          (!!organization?.mpCollect?.connected ||
+            (organization?.paymentMethods?.length ?? 0) > 0) &&
           recurrencePattern.type !== "weekly";
         const depositSubtotal = dates.reduce((total, date) => {
           const service = services.find((s) => s._id === date.serviceId);

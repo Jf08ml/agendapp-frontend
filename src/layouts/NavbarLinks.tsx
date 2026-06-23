@@ -18,7 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage, IconShieldCheck, IconSchool, IconSettings, IconBell } from "@tabler/icons-react";
+import { IconPackage, IconShieldCheck, IconSchool, IconSettings, IconBell, IconReceipt } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -125,9 +125,13 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
         {
           label: "Comprar paquetes",
           to: "/comprar-paquete",
-          // Solo si el plan incluye paquetes y MP está conectado (la compra es online).
+          // Si el plan incluye paquetes y hay un medio de cobro online: Mercado Pago
+          // conectado o métodos de transferencia (compra vía comprobante con IA).
           icon: <IconPackage size={18} />,
-          canShow: limits?.servicePackages !== false && !!organization?.mpCollect?.connected,
+          canShow:
+            limits?.servicePackages !== false &&
+            (!!organization?.mpCollect?.connected ||
+              (organization?.paymentMethods?.length ?? 0) > 0),
         },
       ],
     },
@@ -151,6 +155,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/gestion-caja",
           icon: <FaCashRegister size={18} />,
           canShow: can.cashRead,
+        },
+        {
+          label: "Comprobantes de pago",
+          to: "/gestionar-pagos",
+          icon: <IconReceipt size={18} />,
+          canShow: can.onlineRes,
         },
       ],
     },

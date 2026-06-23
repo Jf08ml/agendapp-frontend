@@ -204,7 +204,7 @@ export default function PaymentMethodsTab({
 
           <Switch
             label="Requerir abono para confirmar inscripción a clases"
-            description="Los clientes deberán pagar un abono (Mercado Pago) antes de confirmar su cupo en la clase"
+            description="Los clientes deberán pagar un abono antes de confirmar su cupo en la clase"
             checked={requireClassDeposit}
             onChange={(e) => form.setFieldValue("requireClassDeposit", e.currentTarget.checked)}
             disabled={!isEditing}
@@ -225,6 +225,29 @@ export default function PaymentMethodsTab({
           )}
         </Stack>
       </Card>
+
+      {/* Método preferido cuando hay AMBOS: Mercado Pago + transferencia */}
+      {methods.length > 0 && (
+        <Card withBorder padding="md">
+          <Stack gap="md">
+            <Text size="md" fw={600}>
+              Método de cobro del abono
+            </Text>
+            <Select
+              label="Cuando tengas Mercado Pago conectado y métodos de transferencia"
+              description="Define cómo cobrar el abono. 'Transferencia + comprobante' evita comisiones de Mercado Pago; el comprobante se valida con IA."
+              data={[
+                { value: "mercadopago", label: "Mercado Pago (pago automático)" },
+                { value: "receipt", label: "Transferencia + comprobante (validado con IA)" },
+              ]}
+              value={form.values.depositPreferredMethod ?? "mercadopago"}
+              onChange={(val) => form.setFieldValue("depositPreferredMethod", (val as "mercadopago" | "receipt") || "mercadopago")}
+              disabled={!isEditing}
+              allowDeselect={false}
+            />
+          </Stack>
+        </Card>
+      )}
 
       <Divider />
 
