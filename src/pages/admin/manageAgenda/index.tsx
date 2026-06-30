@@ -64,6 +64,7 @@ import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
 import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
 import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
+import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
 import { IconShieldCog } from "@tabler/icons-react";
 
@@ -1207,6 +1208,9 @@ const ScheduleView: React.FC = () => {
             onConnect={() => navigate("/gestionar-whatsapp")}
           />
         )}
+
+      {/* Reporte de impacto + encuesta (modal una sola vez, auto-gateado en backend) */}
+      <ImpactSurveyModal organizationId={organization?._id} />
 
       {/* Calendario principal — ocupa todo el alto restante */}
       <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>

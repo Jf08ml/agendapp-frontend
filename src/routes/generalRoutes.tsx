@@ -41,6 +41,7 @@ import SuperadminAnnouncements from "../pages/superadmin/SuperadminAnnouncements
 import SuperadminAnalytics from "../pages/superadmin/SuperadminAnalytics";
 import SuperadminChatbots from "../pages/superadmin/SuperadminChatbots";
 import SuperadminOnboarding from "../pages/superadmin/SuperadminOnboarding";
+import SuperadminImpactReports from "../pages/superadmin/SuperadminImpactReports";
 import AuditLogPage from "../pages/admin/auditLog";
 import SystemUpdates from "../pages/admin/SystemUpdates";
 import ManageClasses from "../pages/admin/classes";
@@ -523,6 +524,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Funnel de activación",
       description: "Funnel de onboarding y conversión a pago por hito",
+    },
+  },
+  {
+    path: "/superadmin/impacto",
+    component: SuperadminImpactReports,
+    MediaMetadata: {
+      title: "Reportes de impacto",
+      description: "Valor que AgenditApp aportó a cada negocio desde su registro",
     },
   },
   {
