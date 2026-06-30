@@ -203,6 +203,16 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "🔔 ¡Hola, {{nombre_cliente}}!\n\nTe recordamos tu próxima clase:\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n\n¡Te esperamos! Si no puedes asistir, responde a este mensaje.",
     footerText: "",
   },
+  // 🎂 Cumpleaños
+  birthdayGreeting: {
+    name: "cumpleanos_cliente",
+    category: "MARKETING",
+    language: "es",
+    headerText: "¡Feliz cumpleaños!",
+    bodyText:
+      "🎂 ¡Feliz cumpleaños, {{nombre_cliente}}! 🎉\n\nDe parte de todo el equipo de *{{nombre_negocio}}*, te deseamos un día lleno de alegría.\n\n🎁 Como regalo de cumpleaños: {{beneficio}}\n\n¡Gracias por ser parte de nuestra familia! Te esperamos pronto para celebrarlo. 💖",
+    footerText: "",
+  },
 };
 
 // ─── Ejemplos de variables para revisión de Meta ─────────────────────────────
@@ -230,6 +240,8 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   hora_inicio: "07:00 AM",
   hora_fin: "08:00 AM",
   precio: "$25.000",
+  // 🎂 Cumpleaños
+  beneficio: "20% de descuento en tu próximo servicio",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

@@ -216,6 +216,16 @@ const templateInfo = {
       { name: "{{organization}}", desc: "Nombre del negocio" },
     ],
   },
+  birthdayGreeting: {
+    title: "Saludo de Cumpleaños",
+    shortTitle: "Cumpleaños",
+    description: "Mensaje enviado automáticamente el día del cumpleaños del cliente",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{beneficio}}", desc: "Beneficio de cumpleaños (configurable abajo)" },
+    ],
+  },
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -227,6 +237,7 @@ const SIDEBAR_GROUPS = [
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
   { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
+  { label: "Cumpleaños", keys: ["birthdayGreeting"] },
 ] as const;
 
 // Nombre Meta por defecto para mostrar estado en sidebar
@@ -243,6 +254,7 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   clientNoShowAck: "aviso_no_asistencia",
   loyaltyServiceReward: "premio_fidelidad",
   loyaltyReferralReward: "premio_referidos",
+  birthdayGreeting: "cumpleanos_cliente",
 };
 
 const META_STATUS_DOT: Record<string, string> = {
@@ -288,7 +300,11 @@ export default function WhatsappTemplateEditor() {
     clientNoShowAck: true,
     loyaltyServiceReward: true,
     loyaltyReferralReward: true,
+    birthdayGreeting: false,
   });
+
+  // 🎂 Beneficio de cumpleaños (texto inyectado en {{beneficio}})
+  const [birthdayBenefit, setBirthdayBenefit] = useState<string>("");
 
   const loadTemplates = useCallback(async () => {
     if (!organization?._id) return;
@@ -297,6 +313,7 @@ export default function WhatsappTemplateEditor() {
       const data = await whatsappTemplateService.getTemplates(organization._id);
       setTemplates(data.templates);
       setDefaultTemplates(data.defaultTemplates);
+      setBirthdayBenefit(data.birthdayBenefit || "");
       const settings = await whatsappTemplateService.getTemplateSettings(organization._id);
       setTemplateSettings(settings);
       const edited: Record<string, string> = {};
@@ -380,8 +397,13 @@ export default function WhatsappTemplateEditor() {
         statusReservationRejected: templateSettings.statusReservationRejected,
         clientConfirmationAck: templateSettings.clientConfirmationAck,
         clientCancellationAck: templateSettings.clientCancellationAck,
+        clientNoShowAck: templateSettings.clientNoShowAck,
+        loyaltyServiceReward: templateSettings.loyaltyServiceReward,
+        loyaltyReferralReward: templateSettings.loyaltyReferralReward,
+        birthdayGreeting: templateSettings.birthdayGreeting,
       };
       await whatsappTemplateService.updateTemplateSettings(organization._id, validSettings);
+      await whatsappTemplateService.updateBirthdayBenefit(organization._id, birthdayBenefit);
       setMessage({ type: "success", text: "Configuración de envíos actualizada correctamente" });
     } catch (error) {
       try { handleAxiosError(error, "Error al guardar configuración"); }
@@ -755,6 +777,37 @@ export default function WhatsappTemplateEditor() {
                                 </Group>
                               </Paper>
                             ))}
+
+                            <Divider label="Cumpleaños" labelPosition="center" />
+
+                            <Paper withBorder p="sm" radius="md">
+                              <Group justify="space-between">
+                                <Box>
+                                  <Text size="sm" fw={500}>Saludo de cumpleaños</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Se envía automáticamente el día del cumpleaños del cliente (requiere fecha de nacimiento registrada)
+                                  </Text>
+                                </Box>
+                                <Switch
+                                  checked={templateSettings.birthdayGreeting ?? false}
+                                  onChange={(e) =>
+                                    setTemplateSettings((prev) => ({ ...prev, birthdayGreeting: e.currentTarget.checked }))
+                                  }
+                                />
+                              </Group>
+                            </Paper>
+
+                            {templateSettings.birthdayGreeting && (
+                              <Textarea
+                                label="Beneficio de cumpleaños"
+                                description="Texto que reemplaza {{beneficio}} en el mensaje (ej: 20% de descuento en tu próximo servicio)"
+                                placeholder="Ej: 20% de descuento en tu próximo servicio"
+                                autosize
+                                minRows={2}
+                                value={birthdayBenefit}
+                                onChange={(e) => setBirthdayBenefit(e.currentTarget.value)}
+                              />
+                            )}
                           </Stack>
 
                           <Group justify="flex-end">

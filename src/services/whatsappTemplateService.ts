@@ -25,10 +25,14 @@ export interface WhatsappTemplates {
   classEnrollmentPending?: WhatsappTemplate;
   classEnrollmentCancelled?: WhatsappTemplate;
   classReminder?: WhatsappTemplate;
+  // 🎂 Cumpleaños (siempre presente en la respuesta del backend)
+  birthdayGreeting: WhatsappTemplate;
 }
 
 export interface TemplatesResponse {
   templates: WhatsappTemplates;
+  // 🎂 Beneficio de cumpleaños configurado por la org (texto para {{beneficio}})
+  birthdayBenefit?: string;
   defaultTemplates: {
     scheduleAppointment: string;
     scheduleAppointmentBatch: string;
@@ -47,6 +51,7 @@ export interface TemplatesResponse {
     classEnrollmentPending?: string;
     classEnrollmentCancelled?: string;
     classReminder?: string;
+    birthdayGreeting?: string;
   };
 }
 
@@ -69,6 +74,8 @@ export interface WhatsappTemplateSettings {
   classEnrollmentPending?: boolean;
   classEnrollmentCancelled?: boolean;
   classReminder?: boolean;
+  // 🎂 Cumpleaños
+  birthdayGreeting?: boolean;
 }
 
 const whatsappTemplateService = {
@@ -168,6 +175,20 @@ const whatsappTemplateService = {
     const response = await apiGeneral.put(
       `/whatsapp-templates/${organizationId}/settings`,
       { enabledTypes: settings }
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 🎂 Actualiza el beneficio de cumpleaños (texto inyectado en {{beneficio}})
+   */
+  updateBirthdayBenefit: async (
+    organizationId: string,
+    birthdayBenefit: string
+  ): Promise<{ birthdayBenefit: string }> => {
+    const response = await apiGeneral.put(
+      `/whatsapp-templates/${organizationId}/birthday-benefit`,
+      { birthdayBenefit }
     );
     return response.data.data;
   },
