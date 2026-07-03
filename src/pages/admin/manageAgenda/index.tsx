@@ -41,7 +41,7 @@ import {
   updateEmployee,
 } from "../../../services/employeeService";
 import { Client } from "../../../services/clientService";
-import { Service } from "../../../services/serviceService";
+import { Service, getServicesByOrganizationId } from "../../../services/serviceService";
 import { showNotification } from "@mantine/notifications";
 import { openConfirmModal, modals } from "@mantine/modals";
 import { useSelector } from "react-redux";
@@ -66,7 +66,7 @@ import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
 import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
-import { IconShieldCog } from "@tabler/icons-react";
+import { IconShieldCog, IconCalendarOff } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
 
@@ -78,6 +78,7 @@ const SearchAppointmentsModal = lazy(
 const ReorderEmployeesModal = lazy(
   () => import("./components/ReorderEmployeesModal"),
 );
+const AgendaBlockModal = lazy(() => import("./components/AgendaBlockModal"));
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -109,6 +110,7 @@ const ScheduleView: React.FC = () => {
 
   const [modalOpenedAppointment, setModalOpenedAppointment] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
@@ -117,6 +119,9 @@ const ScheduleView: React.FC = () => {
   const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [reorderModalOpened, setReorderModalOpened] = useState(false);
+  const [blockModalOpened, setBlockModalOpened] = useState(false);
+  // Se incrementa al crear un bloqueo → fuerza recálculo de disponibilidad mensual
+  const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sendingReminders, setSendingReminders] = useState(false);
@@ -179,6 +184,14 @@ const ScheduleView: React.FC = () => {
       fetchAppointmentsForMonth(currentDate),
     ]).finally(() => setLoadingAgenda(false));
   }, [readyForScopedFetch]);
+
+  // ---------- DATA: Servicios (para el filtro de disponibilidad mensual) ----------
+  useEffect(() => {
+    if (!organizationId) return;
+    getServicesByOrganizationId(organizationId as string)
+      .then((svcs) => setAllServices(svcs.filter((s) => s.isActive !== false)))
+      .catch(() => setAllServices([]));
+  }, [organizationId]);
 
   // ---------- Ajuste de servicios según profesional ----------
   useEffect(() => {
@@ -1132,6 +1145,33 @@ const ScheduleView: React.FC = () => {
             </Button>
           )}
 
+          {hasPermission("appointments:create") && employees.length > 0 && (
+            isMobile ? (
+              <Tooltip label="Bloquear horario" withArrow>
+                <ActionIcon
+                  variant="light"
+                  color="gray"
+                  size="md"
+                  onClick={() => setBlockModalOpened(true)}
+                  aria-label="Bloquear horario"
+                >
+                  <IconCalendarOff size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <Button
+                size="xs"
+                variant="light"
+                color="gray"
+                leftSection={<IconCalendarOff size={16} />}
+                onClick={() => setBlockModalOpened(true)}
+                style={{ borderRadius: 8 }}
+              >
+                Bloquear
+              </Button>
+            )
+          )}
+
           {role === "admin" && employees.length > 0 && (
             <Menu position="bottom-end" withArrow shadow="md">
               <Menu.Target>
@@ -1216,6 +1256,8 @@ const ScheduleView: React.FC = () => {
       <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>
         <CustomCalendar
           employees={employees}
+          services={allServices}
+          availabilityRefreshKey={availabilityRefreshKey}
           appointments={appointments}
           currentDate={currentDate}
           setCurrentDate={setCurrentDate}
@@ -1230,6 +1272,14 @@ const ScheduleView: React.FC = () => {
           loadingMonth={loadingMonth}
           fetchAppointmentsForDay={fetchAppointmentsForDay}
           timezone={organizationTimezone}
+          onExceptionDeleted={(employeeId, updatedExceptions) => {
+            setEmployees((prev) =>
+              prev.map((e) =>
+                e._id === employeeId ? { ...e, scheduleExceptions: updatedExceptions } : e
+              )
+            );
+            setAvailabilityRefreshKey((k) => k + 1);
+          }}
         />
       </Box>
 
@@ -1272,6 +1322,23 @@ const ScheduleView: React.FC = () => {
             employees={employees}
             onSave={handleSaveReorderedEmployees}
             onFetchEmployees={fetchEmployees}
+          />
+        )}
+        {blockModalOpened && (
+          <AgendaBlockModal
+            opened={blockModalOpened}
+            onClose={() => setBlockModalOpened(false)}
+            employees={employees}
+            onSaved={(updatesByEmployee) => {
+              setEmployees((prev) =>
+                prev.map((e) =>
+                  updatesByEmployee[e._id]
+                    ? { ...e, scheduleExceptions: updatesByEmployee[e._id] }
+                    : e
+                )
+              );
+              setAvailabilityRefreshKey((k) => k + 1);
+            }}
           />
         )}
       </Suspense>

@@ -7,6 +7,17 @@ interface Role {
   permissions: string[];
 }
 
+// Bloqueo temporal de horario (excepción) de un profesional
+export interface EmployeeScheduleException {
+  _id?: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;   // "YYYY-MM-DD"
+  allDay: boolean;
+  startTime?: string; // "HH:mm" (solo si !allDay)
+  endTime?: string;   // "HH:mm" (solo si !allDay)
+  reason?: string;
+}
+
 // Definir la estructura de un profesional
 export interface Employee {
   _id: string;
@@ -25,6 +36,7 @@ export interface Employee {
   order?: number;
   commissionType?: "percentage" | "fixed";
   commissionValue?: number;
+  scheduleExceptions?: EmployeeScheduleException[];
 }
 
 interface CreateEmployeePayload {

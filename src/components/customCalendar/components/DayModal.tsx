@@ -12,7 +12,7 @@ dayjs.extend(timezone);
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment } from "../../../services/appointmentService";
-import { Employee } from "../../../services/employeeService";
+import { Employee, EmployeeScheduleException } from "../../../services/employeeService";
 import {
   generateTimeIntervals,
   organizeAppointmentsByEmployee,
@@ -51,6 +51,7 @@ interface DayModalProps {
   employees: Employee[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   timezone?: string; // 🌍 Timezone de la organización
+  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const DayModal: FC<DayModalProps> = ({
@@ -69,6 +70,7 @@ const DayModal: FC<DayModalProps> = ({
   employees,
   setAppointments,
   timezone = 'America/Bogota', // 🌍 Default timezone
+  onExceptionDeleted,
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
@@ -493,6 +495,7 @@ const DayModal: FC<DayModalProps> = ({
                       onOpenModal={onOpenModal}
                       timezone={timezone}
                       timeFormat={timeFormat}
+                      onExceptionDeleted={onExceptionDeleted}
                     />
                   ))}
                 </Box>

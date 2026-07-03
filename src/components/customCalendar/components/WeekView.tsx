@@ -7,7 +7,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment } from "../../../services/appointmentService";
-import { Employee } from "../../../services/employeeService";
+import { Employee, EmployeeScheduleException } from "../../../services/employeeService";
 import {
   generateTimeIntervals,
   organizeAppointmentsByEmployee,
@@ -49,6 +49,7 @@ interface WeekViewProps {
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   loadingMonth?: boolean;
   timezone?: string;
+  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const WeekView: FC<WeekViewProps> = ({
@@ -63,6 +64,7 @@ const WeekView: FC<WeekViewProps> = ({
   setAppointments,
   loadingMonth = false,
   timezone: tz = "America/Bogota",
+  onExceptionDeleted,
 }) => {
   const { handleToggleExpand, isExpanded } = useExpandAppointment();
   const { hasPermission } = usePermissions();
@@ -533,6 +535,7 @@ const WeekView: FC<WeekViewProps> = ({
                     onOpenModal={onOpenModal}
                     timezone={tz}
                     timeFormat={timeFormat}
+                    onExceptionDeleted={onExceptionDeleted}
                   />
                 ))}
               </Box>

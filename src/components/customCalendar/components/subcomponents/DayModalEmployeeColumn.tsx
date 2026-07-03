@@ -1,12 +1,62 @@
 import { FC, useRef, useMemo, useCallback } from "react";
-import { Box } from "@mantine/core";
+import { Box, Text } from "@mantine/core";
+import { format } from "date-fns";
+import { modals } from "@mantine/modals";
+import { showNotification } from "@mantine/notifications";
 import { useDrop, DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "./ItemTypes";
 import { Appointment } from "../../../../services/appointmentService";
-import { Employee } from "../../../../services/employeeService";
+import { Employee, EmployeeScheduleException } from "../../../../services/employeeService";
+import { removeEmployeeException } from "../../../../services/scheduleService";
 import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../../utils/scheduleUtils";
 import DraggableAppointmentCard from "../DraggableAppointmentCard";
 import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
+
+interface DayBlock {
+  id?: string;
+  top: number;
+  height: number;
+  label: string;
+  allDay: boolean;
+}
+
+// Calcula los bloqueos (excepciones) del profesional que aplican al día visible,
+// convertidos a coordenadas (top/height) del grid de tiempo.
+function computeDayBlocks(
+  employee: Employee,
+  selectedDay: Date,
+  startHour: number,
+  endHour: number
+): DayBlock[] {
+  const exceptions = employee.scheduleExceptions;
+  if (!exceptions?.length) return [];
+
+  const dayStr = format(selectedDay, "yyyy-MM-dd");
+  const totalHeight = (endHour - startHour + 1) * HOUR_HEIGHT;
+  const toMin = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  const blocks: DayBlock[] = [];
+  for (const ex of exceptions) {
+    // ¿La excepción cubre este día? (comparación de strings ISO YYYY-MM-DD)
+    if (!(ex.startDate <= dayStr && dayStr <= ex.endDate)) continue;
+
+    if (ex.allDay || !ex.startTime || !ex.endTime) {
+      blocks.push({ id: ex._id, top: 0, height: totalHeight, label: ex.reason || "Bloqueado", allDay: true });
+      continue;
+    }
+
+    const startMin = toMin(ex.startTime) - startHour * 60;
+    const endMin = toMin(ex.endTime) - startHour * 60;
+    const top = Math.max(0, startMin * MINUTE_HEIGHT);
+    const bottom = Math.min(totalHeight, endMin * MINUTE_HEIGHT);
+    if (bottom <= top) continue;
+    blocks.push({ id: ex._id, top, height: bottom - top, label: ex.reason || "Bloqueado", allDay: false });
+  }
+  return blocks;
+}
 
 interface EmployeeColumnProps {
   employee: Employee;
@@ -27,6 +77,8 @@ interface EmployeeColumnProps {
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   timezone?: string; // 🌍 Timezone de la organización
   timeFormat?: string;
+  /** Se llama tras eliminar un bloqueo, con la lista de excepciones ya actualizada */
+  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 interface DraggedItem {
@@ -59,12 +111,19 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   onOpenModal,
   timezone = 'America/Bogota', // 🌍 Default timezone
   timeFormat,
+  onExceptionDeleted,
 }) => {
   const columnRef = useRef<HTMLDivElement | null>(null);
 
   const allAppointments = useMemo(
     () => Object.values(appointmentsByEmployee).flat(),
     [appointmentsByEmployee]
+  );
+
+  // 🚫 Bloqueos (excepciones de horario) del profesional para el día visible
+  const dayBlocks = useMemo(
+    () => computeDayBlocks(employee, selectedDay, startHour, endHour),
+    [employee, selectedDay, startHour, endHour]
   );
 
   const handleDrop = useCallback(
@@ -136,6 +195,37 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       onOpenModal(selectedDay, clickedInterval, employee._id);
     }
   };
+
+  const handleDeleteBlock = useCallback(
+    (exceptionId: string) => {
+      modals.openConfirmModal({
+        title: "Eliminar bloqueo",
+        children: (
+          <Text size="sm">
+            ¿Eliminar este bloqueo de horario de {employee.names.trim()}? Esta acción no se puede
+            deshacer.
+          </Text>
+        ),
+        labels: { confirm: "Eliminar", cancel: "Cancelar" },
+        confirmProps: { color: "red" },
+        zIndex: 2000,
+        onConfirm: async () => {
+          try {
+            const updated = await removeEmployeeException(employee._id, exceptionId);
+            showNotification({ title: "Éxito", message: "Bloqueo eliminado", color: "green" });
+            onExceptionDeleted?.(employee._id, updated ?? []);
+          } catch {
+            showNotification({
+              title: "Error",
+              message: "No se pudo eliminar el bloqueo",
+              color: "red",
+            });
+          }
+        },
+      });
+    },
+    [employee._id, employee.names, onExceptionDeleted]
+  );
 
   const renderAppointments = () => {
     const activeAppointments = appointmentsByEmployee[employee._id]
@@ -277,6 +367,46 @@ const renderGuides = () => {
         {renderGuides()}
       </Box>
 
+      {/* 🚫 Bloqueos de horario (encima de las guías, debajo de las citas) */}
+      {dayBlocks.map((block, i) => (
+        <Box
+          key={`block-${i}`}
+          title={block.label}
+          style={{
+            position: "absolute",
+            top: `${block.top}px`,
+            left: 0,
+            right: 0,
+            height: `${block.height}px`,
+            zIndex: 0,
+            pointerEvents: "none",
+            background:
+              "repeating-linear-gradient(45deg, rgba(180,80,80,0.10), rgba(180,80,80,0.10) 6px, rgba(180,80,80,0.18) 6px, rgba(180,80,80,0.18) 12px)",
+            borderTop: "1px solid rgba(180,80,80,0.35)",
+            borderBottom: block.allDay ? "none" : "1px solid rgba(180,80,80,0.35)",
+            overflow: "hidden",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: "rgba(150,50,50,0.9)",
+              textTransform: "uppercase",
+              letterSpacing: 0.4,
+              padding: "2px 4px",
+              paddingRight: 18,
+              lineHeight: 1.1,
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              overflow: "hidden",
+            }}
+          >
+            {block.label}
+          </Text>
+        </Box>
+      ))}
+
       {/* Contenedor de citas */}
       <Box
         style={{
@@ -287,6 +417,56 @@ const renderGuides = () => {
       >
         {renderAppointments()}
       </Box>
+
+      {/* 🗑️ Botones para eliminar bloqueos (capa por encima de las citas) */}
+      {canCreate && dayBlocks.some((b) => b.id) && (
+        <Box
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 2,
+            pointerEvents: "none",
+          }}
+        >
+          {dayBlocks.map((block, i) =>
+            block.id ? (
+              <Box
+                key={`block-x-${i}`}
+                role="button"
+                title="Eliminar bloqueo"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteBlock(block.id!);
+                }}
+                style={{
+                  position: "absolute",
+                  top: `${block.top + 2}px`,
+                  right: 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "rgba(150,50,50,0.92)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  pointerEvents: "auto",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                }}
+              >
+                ×
+              </Box>
+            ) : null
+          )}
+        </Box>
+      )}
     </div>
   );
 };

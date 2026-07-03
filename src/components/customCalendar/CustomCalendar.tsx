@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Appointment } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
 import DayModal from "./components/DayModal";
@@ -13,13 +13,17 @@ import {
   isSameDay,
   startOfWeek,
   endOfWeek,
+  startOfMonth,
+  endOfMonth,
   format,
 } from "date-fns";
+import { Service } from "../../services/serviceService";
+import { checkDaysAvailability } from "../../services/scheduleService";
 import { es } from "date-fns/locale";
 import { useMediaQuery } from "@mantine/hooks";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
-import { Employee } from "../../services/employeeService";
+import { Employee, EmployeeScheduleException } from "../../services/employeeService";
 import {
   SegmentedControl,
   Group,
@@ -27,6 +31,7 @@ import {
   Text,
   Box,
   Tooltip,
+  Select,
 } from "@mantine/core";
 import {
   BiCalendar,
@@ -48,6 +53,9 @@ const BRAND = {
 
 interface CustomCalendarProps {
   employees: Employee[];
+  services?: Service[];
+  /** Cambiar este número fuerza un recálculo de disponibilidad (p.ej. tras crear un bloqueo) */
+  availabilityRefreshKey?: number;
   appointments: Appointment[];
   currentDate: Date;
   setCurrentDate: React.Dispatch<React.SetStateAction<Date>>;
@@ -62,10 +70,14 @@ interface CustomCalendarProps {
   loadingMonth: boolean;
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
   timezone?: string;
+  /** Se llama tras eliminar un bloqueo desde el calendario */
+  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
   employees,
+  services = [],
+  availabilityRefreshKey = 0,
   appointments,
   currentDate,
   setCurrentDate,
@@ -80,6 +92,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   loadingMonth,
   fetchAppointmentsForDay,
   timezone = "America/Bogota",
+  onExceptionDeleted,
 }) => {
   const savedDefault = (localStorage.getItem(STORAGE_KEY) ?? "month") as "month" | "week";
   const [viewMode, setViewMode] = useState<"month" | "week">(savedDefault);
@@ -98,6 +111,66 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   const isTablet = useMediaQuery("(max-width: 1100px)") ?? false;
   const organization = useSelector((s: RootState) => s.organization.organization);
   const holidayCountry = organization?.default_country || "CO";
+
+  // ── Disponibilidad mensual (Fase 1) ────────────────────────────────────────
+  const [availServiceId, setAvailServiceId] = useState<string | null>(null);
+  const [availEmployeeId, setAvailEmployeeId] = useState<string | null>(null); // null = Todos
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, boolean> | null>(null);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
+
+  const selectedAvailService = useMemo(
+    () => services.find((s) => s._id === availServiceId) || null,
+    [services, availServiceId]
+  );
+
+  // Profesionales elegibles para el servicio seleccionado
+  const eligibleEmployees = useMemo(() => {
+    if (!availServiceId) return employees;
+    const filtered = employees.filter((e) =>
+      (e.services || []).some((s) => s._id === availServiceId)
+    );
+    return filtered.length > 0 ? filtered : employees;
+  }, [employees, availServiceId]);
+
+  // Si el profesional seleccionado deja de ser elegible, resetear a Todos
+  useEffect(() => {
+    if (availEmployeeId && !eligibleEmployees.some((e) => e._id === availEmployeeId)) {
+      setAvailEmployeeId(null);
+    }
+  }, [eligibleEmployees, availEmployeeId]);
+
+  const monthKey = format(currentDate, "yyyy-MM");
+
+  useEffect(() => {
+    // Solo en vista mensual y con un servicio elegido
+    if (viewMode !== "month" || !availServiceId || !organization?._id || !selectedAvailService) {
+      setAvailabilityMap(null);
+      return;
+    }
+    let cancelled = false;
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+
+    setLoadingAvailability(true);
+    checkDaysAvailability(
+      organization._id,
+      [{ serviceId: availServiceId, employeeId: availEmployeeId, duration: selectedAvailService.duration }],
+      format(gridStart, "yyyy-MM-dd"),
+      format(gridEnd, "yyyy-MM-dd")
+    )
+      .then((res) => {
+        if (!cancelled) setAvailabilityMap(res?.availability ?? null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAvailability(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, availServiceId, availEmployeeId, monthKey, organization?._id, appointments, availabilityRefreshKey]);
 
   const handleMonthNavigation = useCallback(
     (direction: "prev" | "next") => {
@@ -331,6 +404,64 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         )}
       </Group>
 
+      {/* Barra de disponibilidad (solo vista mensual) */}
+      {viewMode === "month" && services.length > 0 && employees.length > 0 && (
+        <Group
+          gap="xs"
+          align="center"
+          mb="xs"
+          wrap="wrap"
+          style={{ flexShrink: 0 }}
+        >
+          <Select
+            size="xs"
+            placeholder="Ver disponibilidad por servicio"
+            data={services.map((s) => ({ value: s._id, label: s.name }))}
+            value={availServiceId}
+            onChange={setAvailServiceId}
+            clearable
+            searchable
+            leftSection={<BiCalendar size={14} />}
+            style={{ flex: isMobile ? "1 1 100%" : "0 0 240px", minWidth: 0 }}
+            comboboxProps={{ zIndex: 350 }}
+          />
+
+          {availServiceId && (
+            <Select
+              size="xs"
+              placeholder="Profesional"
+              data={[
+                { value: "all", label: "Todos los profesionales" },
+                ...eligibleEmployees.map((e) => ({ value: e._id, label: e.names.trim() })),
+              ]}
+              value={availEmployeeId ?? "all"}
+              onChange={(v) => setAvailEmployeeId(v === "all" ? null : v)}
+              style={{ flex: isMobile ? "1 1 150px" : "0 0 210px", minWidth: 0 }}
+              comboboxProps={{ zIndex: 350 }}
+            />
+          )}
+
+          {availServiceId && (
+            <Group gap={isMobile ? 8 : 12} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
+              {loadingAvailability ? (
+                <Text size="xs" c="dimmed">Calculando…</Text>
+              ) : (
+                <>
+                  <Group gap={4} align="center" wrap="nowrap">
+                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "#2F9E44" }} />
+                    <Text size="xs" c="dimmed">{isMobile ? "Libre" : "Con espacio"}</Text>
+                  </Group>
+                  <Group gap={4} align="center" wrap="nowrap">
+                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "#CED4DA" }} />
+                    <Text size="xs" c="dimmed">{isMobile ? "Ocupado" : "Sin espacio"}</Text>
+                  </Group>
+                </>
+              )}
+            </Group>
+          )}
+        </Group>
+      )}
+
       {/* Views */}
       <div
         style={
@@ -378,6 +509,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
                 loadingMonth={loadingMonth}
                 holidayConfig={{ country: holidayCountry, language: "es" }}
                 selectedDay={panelDay}
+                availabilityMap={availabilityMap}
+                availabilityActive={!!availServiceId}
               />
             </Box>
 
@@ -410,6 +543,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
               setAppointments={setAppointments}
               loadingMonth={loadingMonth}
               timezone={timezone}
+              onExceptionDeleted={onExceptionDeleted}
             />
           </div>
         ) : (
@@ -449,6 +583,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           fetchAppointmentsForDay={fetchAppointmentsForDay}
           loadedMonthDate={currentDate}
           timezone={timezone}
+          onExceptionDeleted={onExceptionDeleted}
         />
       )}
     </div>

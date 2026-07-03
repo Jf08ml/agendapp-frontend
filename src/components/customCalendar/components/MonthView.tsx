@@ -9,6 +9,7 @@ import {
   isToday,
   startOfWeek as startOfCalendarWeek,
   endOfWeek as endOfCalendarWeek,
+  format as formatDate,
 } from "date-fns";
 import { Appointment } from "../../../services/appointmentService";
 import CustomLoader from "../../customLoader/CustomLoader";
@@ -44,6 +45,10 @@ interface MonthViewProps {
   loadingMonth: boolean;
   holidayConfig?: HolidayConfig;
   selectedDay?: Date | null;
+  /** Mapa { "YYYY-MM-DD": hayEspacio } — Fase 1 disponibilidad mensual */
+  availabilityMap?: Record<string, boolean> | null;
+  /** Si el filtro de disponibilidad está activo (hay servicio seleccionado) */
+  availabilityActive?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -61,6 +66,8 @@ const MonthView: React.FC<MonthViewProps> = ({
   loadingMonth,
   holidayConfig = { country: "CO", language: "es" },
   selectedDay,
+  availabilityMap = null,
+  availabilityActive = false,
 }) => {
   const startMonth = startOfMonth(currentDate);
   const endMonth = endOfMonth(currentDate);
@@ -157,6 +164,13 @@ const MonthView: React.FC<MonthViewProps> = ({
           const data = dayDataMap.get(key) ?? { count: 0, avatars: [] };
           const outside = !isSameMonth(day, currentDate);
           const holiday = !outside && isHoliday(day);
+
+          // Disponibilidad (Fase 1): key en formato local, igual que se pide al backend
+          const availKey = formatDate(day, "yyyy-MM-dd");
+          const hasSpace =
+            !outside && availabilityActive && availabilityMap
+              ? availabilityMap[availKey]
+              : undefined;
           const weekend = idx % 7 === 0 || idx % 7 === 6;
           const today = isToday(day);
           const selected = selectedDay ? isSameDay(day, selectedDay) : false;
@@ -247,19 +261,34 @@ const MonthView: React.FC<MonthViewProps> = ({
                     </Text>
                   )}
                 </Box>
-                {holiday && (
-                  <Text
-                    style={{
-                      fontSize: 7.5,
-                      fontWeight: 800,
-                      letterSpacing: 0.8,
-                      color: selected ? "#FFB48A" : BRAND.accent,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {isMobile ? "F" : "Fest."}
-                  </Text>
-                )}
+                <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {holiday && (
+                    <Text
+                      style={{
+                        fontSize: 7.5,
+                        fontWeight: 800,
+                        letterSpacing: 0.8,
+                        color: selected ? "#FFB48A" : BRAND.accent,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {isMobile ? "F" : "Fest."}
+                    </Text>
+                  )}
+                  {hasSpace !== undefined && (
+                    <Box
+                      title={hasSpace ? "Con espacio disponible" : "Sin espacio"}
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: "50%",
+                        background: hasSpace ? "#2F9E44" : "#CED4DA",
+                        border: selected ? "1px solid rgba(255,255,255,0.7)" : "none",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </Box>
               </Box>
 
               {/* Employee avatars + count — desktop only */}
