@@ -44,10 +44,18 @@ interface ReceiptPaymentState {
   amount: number;
   currency: string;
   paymentMethods: ReceiptPaymentMethod[];
-  orderType?: "reservation" | "class" | "package";
+  orderType?: "reservation" | "class" | "package" | "store";
 }
 
 type View = "upload" | "submitting" | "paid" | "review" | "rejected";
+
+// Texto de confirmación por tipo de objeto pagado (default: reserva).
+const PAID_TEXT: Record<string, string> = {
+  store:
+    "Validamos tu comprobante y tu pedido quedó confirmado. El negocio te contactará para coordinar la entrega.",
+};
+const DEFAULT_PAID_TEXT =
+  "Validamos tu comprobante y tu reserva quedó confirmada. Te enviaremos los detalles por WhatsApp.";
 
 const METHOD_LABEL: Record<string, string> = {
   nequi: "Nequi",
@@ -175,8 +183,7 @@ export default function PublicReceiptPaymentPage() {
           ¡Pago confirmado!
         </Title>
         <Text c="dimmed" ta="center">
-          Validamos tu comprobante y tu reserva quedó confirmada. Te enviaremos los
-          detalles por WhatsApp.
+          {PAID_TEXT[state.orderType ?? ""] ?? DEFAULT_PAID_TEXT}
         </Text>
         <Button size="md" onClick={() => navigate("/")}>
           Volver al inicio

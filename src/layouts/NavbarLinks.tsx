@@ -18,7 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage, IconShieldCheck, IconSchool, IconSettings, IconBell, IconReceipt } from "@tabler/icons-react";
+import { IconPackage, IconPackages, IconShieldCheck, IconSchool, IconSettings, IconBell, IconReceipt, IconTruckDelivery, IconBuildingStore } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -70,6 +70,7 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
     apptsOwn: hasPermission("appointments:view_own"),
     onlineRes: hasPermission("reservationOnline:read"),
     cashRead: hasPermission("cashManagement:read"),
+    inventoryRead: hasPermission("inventory:read"),
     whatsappRead: hasPermission("whatsapp:read") && limits?.whatsappIntegration !== false,
     analyticsRead: hasPermission("analytics:read") && limits?.analyticsAdvanced !== false,
     packagesRead: hasPermission("packages:view") && limits?.servicePackages !== false,
@@ -133,6 +134,13 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
             (!!organization?.mpCollect?.connected ||
               (organization?.paymentMethods?.length ?? 0) > 0),
         },
+        {
+          label: "Tienda",
+          to: "/tienda",
+          icon: <IconBuildingStore size={18} />,
+          // Opt-in: la org debe activar la tienda pública en /inventario.
+          canShow: organization?.storeEnabled === true,
+        },
       ],
     },
     {
@@ -155,6 +163,18 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/gestion-caja",
           icon: <FaCashRegister size={18} />,
           canShow: can.cashRead,
+        },
+        {
+          label: "Inventario",
+          to: "/inventario",
+          icon: <IconPackages size={18} />,
+          canShow: can.inventoryRead,
+        },
+        {
+          label: "Pedidos",
+          to: "/pedidos",
+          icon: <IconTruckDelivery size={18} />,
+          canShow: can.inventoryRead,
         },
         {
           label: "Comprobantes de pago",

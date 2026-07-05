@@ -24,6 +24,8 @@ import {
   TextInput,
   NumberInput,
   Paper,
+  Menu,
+  Tabs,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
@@ -62,6 +64,11 @@ import {
   IconUserX,
   IconBan,
   IconPackage,
+  IconShoppingCart,
+  IconCash,
+  IconCreditCard,
+  IconBuildingBank,
+  IconCoin,
 } from "@tabler/icons-react";
 
 import {
@@ -84,6 +91,12 @@ import {
   addClientPackagePayment,
   removeClientPackagePayment,
 } from "../../services/packageService";
+import {
+  ProductSale,
+  getSales as getProductSales,
+  deleteSale as deleteProductSaleApi,
+} from "../../services/productService";
+import SaleModal from "../admin/inventory/components/SaleModal";
 
 const IconArrowRight = IconChevronRight;
 
@@ -261,16 +274,27 @@ const DailyCashbox: React.FC = () => {
 
   // Gastos generales
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [newExpense, setNewExpense] = useState({ concept: "", category: "", amount: 0 });
+  const [newExpense, setNewExpense] = useState({ concept: "", category: "", amount: 0, method: "cash" });
   const [addingExpense, setAddingExpense] = useState(false);
 
   // Ingresos generales
   const [incomes, setIncomes] = useState<Expense[]>([]);
-  const [newIncome, setNewIncome] = useState({ concept: "", category: "", amount: 0 });
+  const [newIncome, setNewIncome] = useState({ concept: "", category: "", amount: 0, method: "cash" });
   const [addingIncome, setAddingIncome] = useState(false);
 
   // Tipo de movimiento activo en el formulario unificado
   const [movementType, setMovementType] = useState<"expense" | "income">("expense");
+
+  // Tab activo del contenido — persiste la preferencia en localStorage
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const saved = localStorage.getItem("cashbox_tab");
+    const valid = ["citas", "paquetes", "productos", "movimientos"];
+    return saved && valid.includes(saved) ? saved : "citas";
+  });
+  const openTab = (tab: string) => {
+    setActiveTab(tab);
+    localStorage.setItem("cashbox_tab", tab);
+  };
 
   // Base de caja (monto inicial en efectivo al abrir el día)
   const [cashBase, setCashBase] = useState<number>(0);
@@ -296,6 +320,10 @@ const DailyCashbox: React.FC = () => {
   const [newPackagePayment, setNewPackagePayment] = useState({ amount: 0, method: "cash", note: "" });
   const [savingPackagePayment, setSavingPackagePayment] = useState(false);
 
+  // Ventas de productos
+  const [productSales, setProductSales] = useState<ProductSale[]>([]);
+  const [saleModalOpened, setSaleModalOpened] = useState(false);
+
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
@@ -303,6 +331,8 @@ const DailyCashbox: React.FC = () => {
   const { hasPermission } = usePermissions();
   const canManagePackagePayments =
     hasPermission("packages:view") && org?.planLimits?.servicePackages !== false;
+  const canSellProducts =
+    hasPermission("inventory:sell") || hasPermission("inventory:manage");
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const currency = org?.currency || "COP";
@@ -391,6 +421,7 @@ const DailyCashbox: React.FC = () => {
     if (organizationId && startDate && endDate) {
       fetchAppointments();
       fetchExpenses();
+      fetchProductSales();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, startDate, endDate]);
@@ -454,6 +485,18 @@ const DailyCashbox: React.FC = () => {
     }
   };
 
+  const fetchProductSales = async () => {
+    if (!startDate || !endDate) return;
+    try {
+      const data = await getProductSales(startDate.toISOString(), endDate.toISOString());
+      setProductSales(Array.isArray(data) ? data : []);
+    } catch (error) {
+      // Sin permiso inventory:read o backend aún sin desplegar: sección vacía, sin tumbar la página
+      console.error("Error al obtener ventas de productos:", error);
+      setProductSales([]);
+    }
+  };
+
   const fetchClientPackages = async () => {
     if (!organizationId) return;
     setLoadingPackages(true);
@@ -478,10 +521,11 @@ const DailyCashbox: React.FC = () => {
         amount: newExpense.amount,
         date: date.toISOString(),
         type: "expense",
+        method: newExpense.method,
       });
       if (created) {
         setExpenses((prev) => [created, ...prev]);
-        setNewExpense({ concept: "", category: "", amount: 0 });
+        setNewExpense({ concept: "", category: "", amount: 0, method: "cash" });
         showNotification({ title: "Gasto registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
       }
     } catch (error) {
@@ -521,10 +565,11 @@ const DailyCashbox: React.FC = () => {
         amount: newIncome.amount,
         date: date.toISOString(),
         type: "income",
+        method: newIncome.method,
       });
       if (created) {
         setIncomes((prev) => [created, ...prev]);
-        setNewIncome({ concept: "", category: "", amount: 0 });
+        setNewIncome({ concept: "", category: "", amount: 0, method: "cash" });
         showNotification({ title: "Ingreso registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
       }
     } catch (error) {
@@ -548,6 +593,26 @@ const DailyCashbox: React.FC = () => {
           showNotification({ title: "Ingreso eliminado", message: "", color: "green", autoClose: 2000, position: "top-right" });
         } catch (error) {
           console.error(error);
+        }
+      },
+    });
+  };
+
+  const handleDeleteProductSale = (id: string) => {
+    openConfirmModal({
+      title: "Anular venta",
+      children: <p>¿Anular esta venta? Se repondrá el stock de los productos vendidos.</p>,
+      centered: true,
+      labels: { confirm: "Anular venta", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        try {
+          await deleteProductSaleApi(id);
+          setProductSales((prev) => prev.filter((s) => s._id !== id));
+          showNotification({ title: "Venta anulada", message: "Stock repuesto", color: "orange", autoClose: 2500, position: "top-right" });
+        } catch (error) {
+          console.error(error);
+          showNotification({ title: "Error", message: "No se pudo anular la venta", color: "red", autoClose: 3000, position: "top-right" });
         }
       },
     });
@@ -932,8 +997,14 @@ const DailyCashbox: React.FC = () => {
     [incomes]
   );
 
+  // Ventas de productos: total del período y total en efectivo
+  const totalProductSales = useMemo(
+    () => productSales.reduce((s, sale) => s + (sale.total || 0), 0),
+    [productSales]
+  );
+
   // Totales + resumen por servicio calculados sobre filteredAppointments
-  const { totalIncome, totalCount, servicesSummary, totalCollected, totalPending, totalCosts, netMargin, totalCashCollected } =
+  const { totalCount, servicesSummary, totalCollected, totalPending, totalCosts, netMargin } =
     useMemo(() => {
       const summary: Record<string, { count: number; total: number; costs: number }> = {};
       let total = 0;
@@ -995,10 +1066,10 @@ const DailyCashbox: React.FC = () => {
         totalCollected: collected,
         totalPending: Math.max(0, total - collected),
         totalCosts: costsTotal,
-        netMargin: completedIncome + totalGeneralIncomes - costsTotal - totalGeneralExpenses,
+        netMargin: completedIncome + totalGeneralIncomes + totalProductSales - costsTotal - totalGeneralExpenses,
         totalCashCollected: cashCollected,
       };
-    }, [filteredAppointments, totalGeneralExpenses, totalGeneralIncomes]);
+    }, [filteredAppointments, totalGeneralExpenses, totalGeneralIncomes, totalProductSales]);
 
   // ---- Pagos de paquetes/planes ----
   const getPackageName = (pkg: ClientPackage): string => {
@@ -1044,7 +1115,55 @@ const DailyCashbox: React.FC = () => {
     [packagePaymentsInRange]
   );
 
-  const totalReceivedCombined = totalCollected + totalGeneralIncomes + totalPackagePayments;
+  const totalReceivedCombined =
+    totalCollected + totalGeneralIncomes + totalPackagePayments + totalProductSales;
+
+  // Desglose de lo recibido por método de pago, agregando las 4 fuentes del período.
+  // NOTA advancePayment: el abono inicial de una cita no tiene método asociado y hoy
+  // tampoco entra al efectivo (totalCashCollected solo suma appt.payments con method
+  // "cash"), así que se mantiene ese mismo criterio: NO entra al desglose por método,
+  // aunque sí cuenta en "Recibido" (totalCollected). Igual pasa con los ingresos extra
+  // sin método (históricos, method null): meterlos en "Otro" mentiría sobre cómo se
+  // recibió el dinero, así que se excluyen del desglose pero NO del total recibido.
+  const receivedByMethod = useMemo(() => {
+    const acc: Record<"cash" | "card" | "transfer" | "other", number> = {
+      cash: 0,
+      card: 0,
+      transfer: 0,
+      other: 0,
+    };
+    const add = (method: string | null | undefined, amount: number) => {
+      if (!amount) return;
+      if (method === "cash" || method === "card" || method === "transfer" || method === "other") {
+        acc[method] += amount;
+      }
+      // method null/desconocido: excluido del desglose (ver nota arriba)
+    };
+    // 1) Pagos de citas del período (mismo universo que totalCollected, sin advancePayment)
+    for (const appt of filteredAppointments) {
+      for (const p of appt.payments || []) add(p.method, p.amount || 0);
+    }
+    // 2) Pagos de paquetes registrados dentro del rango
+    for (const { payment } of packagePaymentsInRange) add(payment.method, payment.amount || 0);
+    // 3) Ventas de productos
+    for (const sale of productSales) add(sale.method, sale.total || 0);
+    // 4) Ingresos extra (method puede ser null en históricos)
+    for (const inc of incomes) add(inc.method, inc.amount || 0);
+    return acc;
+  }, [filteredAppointments, packagePaymentsInRange, productSales, incomes]);
+
+  // Gastos pagados en efectivo (para el arqueo). Los gastos históricos sin método
+  // (method null) NO cuentan como efectivo a propósito.
+  const totalCashExpenses = useMemo(
+    () =>
+      expenses
+        .filter((e) => e.method === "cash")
+        .reduce((s, e) => s + (e.amount || 0), 0),
+    [expenses]
+  );
+
+  // Arqueo: base + todas las entradas en efectivo − gastos en efectivo
+  const cashInDrawer = cashBase + receivedByMethod.cash - totalCashExpenses;
 
   const packagesWithBalance = useMemo(() => {
     const search = packageSearch.trim().toLowerCase();
@@ -1057,6 +1176,10 @@ const DailyCashbox: React.FC = () => {
       });
   }, [clientPackages, packageSearch]);
 
+  // Tab efectivo: si el tab guardado es "paquetes" pero el usuario no puede gestionarlos, cae a "citas"
+  const effectiveTab =
+    activeTab === "paquetes" && !canManagePackagePayments ? "citas" : activeTab;
+
   const formattedRangeLabel =
     startDate && endDate
       ? interval === "daily"
@@ -1065,6 +1188,57 @@ const DailyCashbox: React.FC = () => {
             "DD/MM/YYYY"
           )}`
       : "";
+
+  // ---- UI: menú "+ Registrar" (acciones rápidas) ----
+  const RegisterMenu = (
+    <Menu shadow="md" width={220} position="bottom-end">
+      <Menu.Target>
+        <Button
+          size="xs"
+          leftSection={<IconPlus size={14} />}
+          style={isMobile ? { flex: 1 } : undefined}
+        >
+          Registrar
+        </Button>
+      </Menu.Target>
+      <Menu.Dropdown>
+        {canSellProducts && (
+          <Menu.Item
+            leftSection={<IconShoppingCart size={16} />}
+            onClick={() => setSaleModalOpened(true)}
+          >
+            Venta de producto
+          </Menu.Item>
+        )}
+        {canManagePackagePayments && (
+          <Menu.Item
+            leftSection={<IconPackage size={16} />}
+            onClick={() => openTab("paquetes")}
+          >
+            Abono a paquete
+          </Menu.Item>
+        )}
+        <Menu.Item
+          leftSection={<IconReceipt size={16} />}
+          onClick={() => {
+            setMovementType("expense");
+            openTab("movimientos");
+          }}
+        >
+          Gasto
+        </Menu.Item>
+        <Menu.Item
+          leftSection={<IconCoin size={16} />}
+          onClick={() => {
+            setMovementType("income");
+            openTab("movimientos");
+          }}
+        >
+          Ingreso
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
 
   // ---- UI: filtros drawer mobile ----
   const FiltersContent = (
@@ -1512,6 +1686,13 @@ const DailyCashbox: React.FC = () => {
         })()}
       </Drawer>
 
+      {/* ---- Modal de venta de productos ---- */}
+      <SaleModal
+        isOpen={saleModalOpened}
+        onClose={() => setSaleModalOpened(false)}
+        onSaleCreated={() => fetchProductSales()}
+      />
+
       <Stack gap="md" mt="xs">
         {/* ── Barra de control ── */}
         <Card shadow="sm" radius="md" withBorder p="md">
@@ -1529,13 +1710,7 @@ const DailyCashbox: React.FC = () => {
               {/* En desktop los botones van aquí; en mobile van en fila separada */}
               {!isMobile && (
                 <Group gap="xs" wrap="nowrap">
-                  <Button
-                    variant="light" color="teal" size="xs"
-                    leftSection={<IconReceipt size={14} />}
-                    onClick={() => document.getElementById("cashbox-movements")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  >
-                    Gastos e ingresos
-                  </Button>
+                  {RegisterMenu}
                 </Group>
               )}
             </Group>
@@ -1543,14 +1718,7 @@ const DailyCashbox: React.FC = () => {
             {/* Fila de acciones mobile (debajo del título para que el badge se vea completo) */}
             {isMobile && (
               <Group gap="xs" wrap="wrap">
-                <Button
-                  variant="light" color="teal" size="xs"
-                  leftSection={<IconReceipt size={14} />}
-                  onClick={() => document.getElementById("cashbox-movements")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  style={{ flex: 1 }}
-                >
-                  Gastos e ingresos
-                </Button>
+                {RegisterMenu}
                 <ActionIcon variant="light" size="lg" onClick={() => setFiltersOpened(true)} aria-label="Filtros">
                   <IconFilter size={18} />
                 </ActionIcon>
@@ -1657,32 +1825,13 @@ const DailyCashbox: React.FC = () => {
           </Drawer>
         </Card>
 
-        {/* ── Tarjetas de métricas ── */}
-        <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: interval === "daily" ? 5 : 4 }} spacing="sm">
-          <Paper withBorder p="md" radius="md">
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Ingresos</Text>
-            <Text fw={900} size="xl">{formatCurrency(totalIncome, currency)}</Text>
-            <Text size="xs" c="dimmed" mt={2}>{totalCount} cita{totalCount !== 1 ? "s" : ""}</Text>
+        {/* ── KPIs fijos (siempre visibles) ── */}
+        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm">
+          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-violet-6)" }}>
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Recibido</Text>
+            <Text fw={900} size="xl" c="violet">{formatCurrency(totalReceivedCombined, currency)}</Text>
+            <Text size="xs" c="dimmed" mt={2}>{totalCount} cita{totalCount !== 1 ? "s" : ""} en el período</Text>
           </Paper>
-
-          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-green-6)" }}>
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Cobrado</Text>
-            <Text fw={900} size="xl" c="green">{formatCurrency(totalCollected, currency)}</Text>
-          </Paper>
-
-          {canManagePackagePayments && totalPackagePayments > 0 && (
-            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-grape-6)" }}>
-              <Text size="xs" c="dimmed" fw={500} mb={4}>Pagos de paquetes</Text>
-              <Text fw={900} size="xl" c="grape">{formatCurrency(totalPackagePayments, currency)}</Text>
-            </Paper>
-          )}
-
-          {canManagePackagePayments && (
-            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-violet-6)" }}>
-              <Text size="xs" c="dimmed" fw={500} mb={4}>Total recibido</Text>
-              <Text fw={900} size="xl" c="violet">{formatCurrency(totalReceivedCombined, currency)}</Text>
-            </Paper>
-          )}
 
           <Paper withBorder p="md" radius="md"
             style={totalPending > 0 ? { borderLeft: "3px solid var(--mantine-color-orange-6)" } : undefined}>
@@ -1690,37 +1839,139 @@ const DailyCashbox: React.FC = () => {
             <Text fw={900} size="xl" c={totalPending > 0 ? "orange" : "dimmed"}>{formatCurrency(totalPending, currency)}</Text>
           </Paper>
 
-          {interval === "daily" && (
-            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-blue-6)" }}>
-              <Text size="xs" c="dimmed" fw={500} mb={4}>Cierre efectivo</Text>
-              <Text fw={900} size="xl" c="blue">{formatCurrency(cashBase + totalCashCollected, currency)}</Text>
-              {cashBase > 0 && <Text size="xs" c="dimmed" mt={2}>Base: {formatCurrency(cashBase, currency)}</Text>}
-            </Paper>
-          )}
+          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-red-6)" }}>
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Gastos</Text>
+            <Text fw={900} size="xl" c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
+          </Paper>
 
-          {totalGeneralIncomes > 0 && (
-            <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-teal-6)" }}>
-              <Text size="xs" c="dimmed" fw={500} mb={4}>Ingresos extra</Text>
-              <Text fw={900} size="xl" c="teal">{formatCurrency(totalGeneralIncomes, currency)}</Text>
-            </Paper>
-          )}
-
-          {(totalCosts > 0 || totalGeneralExpenses > 0) && (
-            <>
-              <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-red-6)" }}>
-                <Text size="xs" c="dimmed" fw={500} mb={4}>Gastos</Text>
-                <Text fw={900} size="xl" c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
-              </Paper>
-              <Paper withBorder p="md" radius="md"
-                style={{ borderLeft: `3px solid var(--mantine-color-${netMargin >= 0 ? "teal" : "red"}-6)` }}>
-                <Text size="xs" c="dimmed" fw={500} mb={4}>Margen neto</Text>
-                <Text fw={900} size="xl" c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
-              </Paper>
-            </>
-          )}
+          <Paper withBorder p="md" radius="md"
+            style={{ borderLeft: `3px solid var(--mantine-color-${netMargin >= 0 ? "teal" : "red"}-6)` }}>
+            <Text size="xs" c="dimmed" fw={500} mb={4}>Margen</Text>
+            <Text fw={900} size="xl" c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
+          </Paper>
         </SimpleGrid>
 
-        {/* ── Citas ── */}
+        {/* ── Desglose de lo recibido: por origen y por método ── */}
+        {(totalReceivedCombined > 0 ||
+          receivedByMethod.cash + receivedByMethod.card + receivedByMethod.transfer + receivedByMethod.other > 0) && (
+          <Paper withBorder p="sm" radius="md">
+            <Stack gap={6}>
+              {(totalCollected > 0 || totalPackagePayments > 0 || totalProductSales > 0 || totalGeneralIncomes > 0) && (
+                <Group gap="xs" wrap="wrap">
+                  <Text size="xs" c="dimmed" fw={600}>Por origen:</Text>
+                  {totalCollected > 0 && (
+                    <Badge variant="light" color="green" size="sm">Citas {formatCurrency(totalCollected, currency)}</Badge>
+                  )}
+                  {totalPackagePayments > 0 && (
+                    <Badge variant="light" color="grape" size="sm">Paquetes {formatCurrency(totalPackagePayments, currency)}</Badge>
+                  )}
+                  {totalProductSales > 0 && (
+                    <Badge variant="light" color="cyan" size="sm">Productos {formatCurrency(totalProductSales, currency)}</Badge>
+                  )}
+                  {totalGeneralIncomes > 0 && (
+                    <Badge variant="light" color="teal" size="sm">Extra {formatCurrency(totalGeneralIncomes, currency)}</Badge>
+                  )}
+                </Group>
+              )}
+              {receivedByMethod.cash + receivedByMethod.card + receivedByMethod.transfer + receivedByMethod.other > 0 && (
+                <Group gap="md" wrap="wrap">
+                  <Text size="xs" c="dimmed" fw={600}>Por método:</Text>
+                  {receivedByMethod.cash > 0 && (
+                    <Group gap={4} wrap="nowrap">
+                      <IconCash size={14} />
+                      <Text size="xs">Efectivo {formatCurrency(receivedByMethod.cash, currency)}</Text>
+                    </Group>
+                  )}
+                  {receivedByMethod.card > 0 && (
+                    <Group gap={4} wrap="nowrap">
+                      <IconCreditCard size={14} />
+                      <Text size="xs">Tarjeta {formatCurrency(receivedByMethod.card, currency)}</Text>
+                    </Group>
+                  )}
+                  {receivedByMethod.transfer > 0 && (
+                    <Group gap={4} wrap="nowrap">
+                      <IconBuildingBank size={14} />
+                      <Text size="xs">Transferencia {formatCurrency(receivedByMethod.transfer, currency)}</Text>
+                    </Group>
+                  )}
+                  {receivedByMethod.other > 0 && (
+                    <Group gap={4} wrap="nowrap">
+                      <IconCoin size={14} />
+                      <Text size="xs">Otro {formatCurrency(receivedByMethod.other, currency)}</Text>
+                    </Group>
+                  )}
+                </Group>
+              )}
+            </Stack>
+          </Paper>
+        )}
+
+        {/* ── Arqueo de efectivo (solo vista diaria) ── */}
+        {interval === "daily" && (
+          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-blue-6)" }}>
+            <Group gap="xs" mb={6}>
+              <IconCash size={16} />
+              <Text size="sm" fw={700}>Arqueo de efectivo</Text>
+            </Group>
+            <Stack gap={2}>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">Base de caja</Text>
+                <Text size="sm">{formatCurrency(cashBase, currency)}</Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">+ Entradas en efectivo</Text>
+                <Text size="sm" c="green">{formatCurrency(receivedByMethod.cash, currency)}</Text>
+              </Group>
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">− Gastos en efectivo</Text>
+                <Text size="sm" c="red">{formatCurrency(totalCashExpenses, currency)}</Text>
+              </Group>
+              <Group justify="space-between" pt={4} style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}>
+                <Text size="sm" fw={700}>Total en caja</Text>
+                <Text size="sm" fw={900} c="blue">{formatCurrency(cashInDrawer, currency)}</Text>
+              </Group>
+            </Stack>
+          </Paper>
+        )}
+
+        {/* ── Contenido en tabs ── */}
+        <Tabs value={effectiveTab} onChange={(v) => openTab(v || "citas")} radius="md">
+          {/* Lista scrolleable horizontal en mobile */}
+          <Tabs.List style={{ flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden" }}>
+            <Tabs.Tab
+              value="citas"
+              leftSection={<IconCalendar size={15} />}
+              rightSection={<Badge variant="light" color="gray" size="sm">{filteredAppointments.length}</Badge>}
+            >
+              Citas
+            </Tabs.Tab>
+            {canManagePackagePayments && (
+              <Tabs.Tab
+                value="paquetes"
+                leftSection={<IconPackage size={15} />}
+                rightSection={<Badge variant="light" color="gray" size="sm">{packagesWithBalance.length}</Badge>}
+              >
+                Paquetes
+              </Tabs.Tab>
+            )}
+            <Tabs.Tab
+              value="productos"
+              leftSection={<IconShoppingCart size={15} />}
+              rightSection={<Badge variant="light" color="gray" size="sm">{productSales.length}</Badge>}
+            >
+              Productos
+            </Tabs.Tab>
+            <Tabs.Tab
+              value="movimientos"
+              leftSection={<IconReceipt size={15} />}
+              rightSection={<Badge variant="light" color="gray" size="sm">{expenses.length + incomes.length}</Badge>}
+            >
+              Movimientos
+            </Tabs.Tab>
+          </Tabs.List>
+
+          {/* ── Tab: Citas ── */}
+          <Tabs.Panel value="citas" pt="md">
         <Card shadow="sm" radius="md" withBorder>
           <Group justify="space-between" mb="sm" wrap="wrap">
             <Group gap="xs">
@@ -1766,9 +2017,11 @@ const DailyCashbox: React.FC = () => {
             </>
           )}
         </Card>
+          </Tabs.Panel>
 
-        {/* ── Pagos de paquetes/planes ── */}
-        {canManagePackagePayments && (
+          {/* ── Tab: Pagos de paquetes/planes ── */}
+          {canManagePackagePayments && (
+          <Tabs.Panel value="paquetes" pt="md">
         <Card shadow="sm" radius="md" withBorder>
           <Group gap="xs" mb="sm">
             <IconPackage size={18} />
@@ -1893,10 +2146,96 @@ const DailyCashbox: React.FC = () => {
             </Stack>
           )}
         </Card>
-        )}
+          </Tabs.Panel>
+          )}
 
-        {/* ── Movimientos ── */}
-        <Card id="cashbox-movements" shadow="sm" radius="md" withBorder>
+          {/* ── Tab: Ventas de productos ── */}
+          <Tabs.Panel value="productos" pt="md">
+        <Card shadow="sm" radius="md" withBorder>
+          <Group justify="space-between" mb="sm" wrap="wrap">
+            <Group gap="xs">
+              <IconShoppingCart size={18} />
+              <Title order={4}>Ventas de productos</Title>
+              <Badge variant="light" color="gray">{productSales.length}</Badge>
+              {totalProductSales > 0 && (
+                <Badge color="cyan" variant="light">+{formatCurrency(totalProductSales, currency)}</Badge>
+              )}
+            </Group>
+            {canSellProducts && (
+              <Button size="xs" variant="light" color="cyan"
+                leftSection={<IconShoppingCart size={14} />}
+                onClick={() => setSaleModalOpened(true)}>
+                Registrar venta
+              </Button>
+            )}
+          </Group>
+
+          {productSales.length === 0 ? (
+            <Text c="dimmed" ta="center" size="sm" py="sm">No hay ventas de productos en este período.</Text>
+          ) : (
+            <ScrollArea scrollbarSize={10}>
+              <Table striped highlightOnHover withTableBorder={false}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Fecha / Hora</Table.Th>
+                    <Table.Th>Items</Table.Th>
+                    <Table.Th>Vendedor</Table.Th>
+                    <Table.Th>Método</Table.Th>
+                    <Table.Th>Total</Table.Th>
+                    {canSellProducts && <Table.Th style={{ width: 40 }} />}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {productSales.map((sale) => {
+                    const soldByName =
+                      typeof sale.soldBy === "object" && sale.soldBy !== null
+                        ? sale.soldBy.names
+                        : null;
+                    return (
+                      <Table.Tr key={sale._id}>
+                        <Table.Td>
+                          <Text size="sm">{formatInTimezone(sale.date, timezone, "DD/MM/YY")}</Text>
+                          <Text size="xs" c="dimmed">{formatInTimezone(sale.date, timezone, timeFmt)}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">
+                            {sale.items.map((i) => `${i.name} × ${i.quantity}`).join(", ")}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{soldByName || "—"}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="outline" color="gray" size="xs">
+                            {METHOD_LABELS[sale.method] || sale.method}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>{formatCurrency(sale.total, currency)}</Text>
+                        </Table.Td>
+                        {canSellProducts && (
+                          <Table.Td>
+                            <Tooltip label="Anular venta" withArrow>
+                              <ActionIcon color="red" variant="subtle" size="sm"
+                                onClick={() => handleDeleteProductSale(sale._id)}>
+                                <IconTrash size={14} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          )}
+        </Card>
+          </Tabs.Panel>
+
+          {/* ── Tab: Movimientos ── */}
+          <Tabs.Panel value="movimientos" pt="md">
+        <Card shadow="sm" radius="md" withBorder>
           <Group justify="space-between" align="center" mb="md">
             <Group gap="xs">
               <IconReceipt size={18} />
@@ -1937,6 +2276,15 @@ const DailyCashbox: React.FC = () => {
                   : setNewIncome((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))}
                 min={0} w={120}
               />
+              <Select
+                placeholder="Método"
+                value={movementType === "expense" ? newExpense.method : newIncome.method}
+                onChange={(v) => movementType === "expense"
+                  ? setNewExpense((p) => ({ ...p, method: v || "cash" }))
+                  : setNewIncome((p) => ({ ...p, method: v || "cash" }))}
+                data={Object.entries(METHOD_LABELS).map(([value, label]) => ({ value, label }))}
+                clearable={false} searchable={false} w={140}
+              />
               <Button
                 color={movementType === "income" ? "teal" : undefined}
                 leftSection={<IconPlus size={16} />}
@@ -1970,6 +2318,9 @@ const DailyCashbox: React.FC = () => {
                         </Badge>
                         <Text size="sm" fw={600} lineClamp={1}>{item.concept}</Text>
                         {item.category && <Badge size="xs" variant="dot" color="gray">{item.category}</Badge>}
+                        {item.method && (
+                          <Badge size="xs" variant="outline" color="gray">{METHOD_LABELS[item.method] || item.method}</Badge>
+                        )}
                       </Group>
                       <Text size="xs" c="dimmed">{formatInTimezone(item.date, timezone, "DD/MM/YYYY")}</Text>
                     </div>
@@ -1989,6 +2340,8 @@ const DailyCashbox: React.FC = () => {
             </Stack>
           )}
         </Card>
+          </Tabs.Panel>
+        </Tabs>
       </Stack>
     </Container>
   );

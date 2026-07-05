@@ -5,7 +5,7 @@ import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
-import { IconSchool, IconPackage } from "@tabler/icons-react";
+import { IconSchool, IconPackage, IconBuildingStore } from "@tabler/icons-react";
 import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout } from "./HomeLayouts";
 
 export default function Home() {
@@ -43,6 +43,13 @@ export default function Home() {
         (organization as any)?.planLimits?.servicePackages !== false &&
         (!!organization?.mpCollect?.connected ||
           ((organization?.paymentMethods?.length ?? 0) > 0)),
+    },
+    {
+      title: "Tienda",
+      icon: <IconBuildingStore size={28} />,
+      link: "/tienda",
+      // Opt-in: la org debe activar la tienda pública en /inventario.
+      show: organization?.storeEnabled === true,
     },
     {
       title: "Plan de fidelidad",

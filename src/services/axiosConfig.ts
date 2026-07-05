@@ -302,6 +302,9 @@ const apiEmployeePublic: AxiosInstance = createPublicAxiosInstance(
 const apiAdvance: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/advances`
 );
+const apiProduct: AxiosInstance = createAxiosInstance(
+  `${API_BASE_URL}/products`
+);
 const apiAuth: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/login`);
 const apiOrganization: AxiosInstance = createAxiosInstance(
   `${API_BASE_URL}/organizations`
@@ -325,6 +328,10 @@ const apiPackagePublic: AxiosInstance = createPublicAxiosInstance(
 const apiPlansPublic: AxiosInstance = createPublicAxiosInstance(
   `${API_BASE_URL}/plans`
 );
+// Tienda pública de productos (catálogo + checkout, sin auth)
+const apiStorePublic: AxiosInstance = createPublicAxiosInstance(
+  `${API_BASE_URL}/store`
+);
 
 // Módulo de Clases
 const apiClass: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/classes`);
@@ -343,6 +350,7 @@ export {
   apiEmployee,
   apiEmployeePublic,
   apiAdvance,
+  apiProduct,
   apiAuth,
   apiOrganization,
   apiSubscribe,
@@ -352,6 +360,7 @@ export {
   apiPackage,
   apiPackagePublic,
   apiPlansPublic,
+  apiStorePublic,
   apiClass,
   apiClassPublic,
   apiEnrollment,

@@ -9,6 +9,8 @@ export interface Expense {
   amount: number;
   category?: string;
   type?: "expense" | "income";
+  // Método de pago; null en movimientos históricos (no cuentan como efectivo)
+  method?: string | null;
   registeredBy?: string;
   createdAt: string;
 }

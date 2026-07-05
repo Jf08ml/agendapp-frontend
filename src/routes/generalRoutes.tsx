@@ -45,6 +45,7 @@ import SuperadminImpactReports from "../pages/superadmin/SuperadminImpactReports
 import AuditLogPage from "../pages/admin/auditLog";
 import SystemUpdates from "../pages/admin/SystemUpdates";
 import ManageClasses from "../pages/admin/classes";
+import InventoryPage from "../pages/admin/inventory";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
 import SetupWizard from "../pages/onboarding/SetupWizard";
 import TermsAndConditionsPage from "../pages/public/TermsAndConditionsPage";
@@ -52,6 +53,8 @@ import PublicReservationPaymentPage from "../pages/public/PublicReservationPayme
 import PublicReceiptPaymentPage from "../pages/public/PublicReceiptPaymentPage";
 import ReceiptReviewPage from "../pages/admin/payments/ReceiptReviewPage";
 import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage";
+import PublicStorePage from "../pages/public/PublicStorePage";
+import StoreOrdersPage from "../pages/admin/storeOrders";
 
 const generalRoutes = [
   {
@@ -208,6 +211,18 @@ const generalRoutes = [
     },
   },
   {
+    path: "/pedidos",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <StoreOrdersPage {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Pedidos de la tienda",
+      description: "Gestiona los pedidos de la tienda pública.",
+    },
+  },
+  {
     path: "/gestionar-servicios",
     component: (props: JSX.IntrinsicAttributes) => (
       <ProtectedRoute>
@@ -266,6 +281,18 @@ const generalRoutes = [
         <DailyCashbox {...props} />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/inventario",
+    component: (props: JSX.IntrinsicAttributes) => (
+      <ProtectedRoute>
+        <InventoryPage {...props} />
+      </ProtectedRoute>
+    ),
+    MediaMetadata: {
+      title: "Inventario",
+      description: "Gestiona el inventario de productos y sus ventas.",
+    },
   },
   {
     path: "/gestionar-whatsapp",
@@ -403,6 +430,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Comprar Paquete",
       description: "Compra un paquete de sesiones y págalo en línea.",
+    },
+  },
+
+  {
+    path: "/tienda",
+    component: PublicStorePage,
+    MediaMetadata: {
+      title: "Tienda",
+      description: "Compra los productos del negocio y págalos en línea.",
     },
   },
 

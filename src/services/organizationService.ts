@@ -150,6 +150,9 @@ export interface Organization {
   paymentMethods?: PaymentMethod[];
   requireReservationDeposit?: boolean;
   reservationDepositPercentage?: number;
+  // Tienda pública de productos (flags públicos expuestos en organization-config)
+  storeEnabled?: boolean;
+  storeCodEnabled?: boolean;
   // Depósito para inscripción a clases (config propia, independiente de reservas).
   requireClassDeposit?: boolean;
   classDepositPercentage?: number;

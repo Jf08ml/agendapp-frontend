@@ -27,7 +27,7 @@ const POLL_INTERVAL_MS = 4000; // cada 4 segundos
 const MAX_ATTEMPTS = 15; // ~60 segundos
 
 type PageStatus = "waiting" | "paid" | "failed" | "timeout";
-type OrderType = "reservation" | "class" | "package";
+type OrderType = "reservation" | "class" | "package" | "store";
 
 // Copys por tipo de objeto pagado.
 const COPY: Record<OrderType, { paidTitle: string; paidText: string; retryPath: string; retryLabel: string }> = {
@@ -48,6 +48,13 @@ const COPY: Record<OrderType, { paidTitle: string; paidText: string; retryPath: 
     paidText: "Recibimos tu pago y tu paquete quedó activo. Ya puedes usar tus sesiones.",
     retryPath: "/",
     retryLabel: "Volver al inicio",
+  },
+  store: {
+    paidTitle: "¡Pedido confirmado!",
+    paidText:
+      "Recibimos tu pago y tu pedido quedó confirmado. El negocio te contactará para coordinar la entrega.",
+    retryPath: "/tienda",
+    retryLabel: "Volver a la tienda",
   },
 };
 
@@ -85,7 +92,11 @@ export default function PublicReservationPaymentPage() {
     }
     const order = await getOrderStatus(ref);
     if (order) {
-      if (order.type === "class" || order.type === "package") {
+      if (
+        order.type === "class" ||
+        order.type === "package" ||
+        order.type === "store"
+      ) {
         setOrderType(order.type);
       }
       const mapped = mapOrderStatus(order.status);
