@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -22,13 +22,26 @@ import {
   Radio,
   Image,
   AspectRatio,
+  Drawer,
+  Affix,
+  Chip,
+  Skeleton,
+  Paper,
+  Box,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconAlertCircle,
   IconBuildingStore,
+  IconCash,
   IconCircleCheck,
+  IconCreditCard,
   IconMinus,
   IconPlus,
+  IconReceipt2,
+  IconSearch,
+  IconSearchOff,
   IconShoppingCart,
   IconTrash,
   IconTruckDelivery,
@@ -99,6 +112,43 @@ const storeImageSrc = (url: string) =>
     ? `${url}?tr=w-600,h-600,c-at_max`
     : url;
 
+// Búsqueda tolerante a tildes y mayúsculas.
+const normalizeText = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+// Valor centinela del chip "Todas" (evita colisión con una categoría real).
+const ALL_CATEGORIES = "__all__";
+
+// Estilos de presentación: hover de tarjetas de producto y estado activo de las
+// tarjetas de opción del checkout. Solo CSS, sin listeners de JS.
+const STORE_STYLES = `
+  .store-product-card {
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+  .store-product-img {
+    transition: transform 300ms ease;
+  }
+  @media (hover: hover) {
+    .store-product-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--mantine-shadow-md);
+    }
+    .store-product-card:hover .store-product-img {
+      transform: scale(1.04);
+    }
+  }
+  .store-option-card {
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .store-option-card[data-checked] {
+    border-color: var(--mantine-primary-color-filled);
+    background-color: var(--mantine-primary-color-light);
+  }
+`;
+
 // Tienda pública de productos: catálogo + carrito local + checkout con
 // Mercado Pago, transferencia (comprobante) o pago contra entrega.
 export default function PublicStorePage() {
@@ -106,6 +156,7 @@ export default function PublicStorePage() {
   const organization = useSelector((s: RootState) => s.organization.organization);
   const orgCountry = (organization?.default_country || "CO") as CountryCode;
   const storeEnabled = !!organization?.storeEnabled;
+  const isMobile = useMediaQuery("(max-width: 48em)");
 
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("COP");
@@ -114,8 +165,13 @@ export default function PublicStorePage() {
   const [codEnabled, setCodEnabled] = useState(false);
   const [products, setProducts] = useState<StoreProduct[]>([]);
 
+  // ── Búsqueda y filtro por categoría (client-side) ──────────────────────────
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES);
+
   // ── Carrito (estado local) ─────────────────────────────────────────────────
   const [cart, setCart] = useState<StoreCartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   // ── Config del formulario de cliente (igual que reservas/paquetes) ─────────
   const rawConfig = organization?.clientFormConfig;
@@ -169,11 +225,46 @@ export default function PublicStorePage() {
     })();
   }, [organization?._id, storeEnabled]);
 
+  // ── Categorías únicas + productos filtrados ────────────────────────────────
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      const c = p.category?.trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    const q = normalizeText(search.trim());
+    return products.filter((p) => {
+      if (
+        categoryFilter !== ALL_CATEGORIES &&
+        (p.category?.trim() ?? "") !== categoryFilter
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      return normalizeText(
+        `${p.name} ${p.brand ?? ""} ${p.description ?? ""}`
+      ).includes(q);
+    });
+  }, [products, search, categoryFilter]);
+
   // ── Carrito: helpers ───────────────────────────────────────────────────────
   const cartQty = (productId: string) =>
     cart.find((i) => i.product._id === productId)?.quantity ?? 0;
 
   const addToCart = (product: StoreProduct) => {
+    // Feedback al agregar el primer ítem: guía hacia el botón flotante.
+    if (cart.length === 0) {
+      notifications.show({
+        message: "Producto agregado. Revisa tu pedido en el botón del carrito.",
+        icon: <IconShoppingCart size={16} />,
+        autoClose: 2500,
+        withBorder: true,
+      });
+    }
     setCart((prev) => {
       const existing = prev.find((i) => i.product._id === product._id);
       if (existing) {
@@ -199,6 +290,7 @@ export default function PublicStorePage() {
     setCart((prev) => prev.filter((i) => i.product._id !== productId));
 
   const total = cart.reduce((sum, i) => sum + i.product.salePrice * i.quantity, 0);
+  const itemCount = cart.reduce((n, i) => n + i.quantity, 0);
 
   // ── Vías de pago disponibles ───────────────────────────────────────────────
   const hasMp = mpConnected;
@@ -363,6 +455,7 @@ export default function PublicStorePage() {
           address: deliveryMode === "delivery" ? address.trim() : undefined,
         });
         setCheckoutOpen(false);
+        setCartOpen(false);
         setCart([]);
         return;
       }
@@ -391,6 +484,32 @@ export default function PublicStorePage() {
       </Group>
     ) : null;
 
+  // Vías de pago disponibles (nota informativa del carrito).
+  const payHints: { Icon: typeof IconCreditCard; label: string }[] = [];
+  if (hasMp) payHints.push({ Icon: IconCreditCard, label: "Mercado Pago" });
+  if (hasReceipt) payHints.push({ Icon: IconReceipt2, label: "Transferencia" });
+  if (hasCod) payHints.push({ Icon: IconCash, label: "Contraentrega" });
+
+  // Encabezado de la tienda (se reutiliza en el estado de carga).
+  const headerBlock = (
+    <Stack gap={6} align="center">
+      <ThemeIcon size={56} radius="xl" variant="light">
+        <IconBuildingStore size={32} />
+      </ThemeIcon>
+      {organization?.name && (
+        <Text size="sm" fw={600} c="dimmed" tt="uppercase" lts={1} ta="center">
+          {organization.name}
+        </Text>
+      )}
+      <Title order={1} size="h2" ta="center">
+        Tienda
+      </Title>
+      <Text c="dimmed" ta="center" maw={520}>
+        Elige tus productos, arma tu pedido y págalo en línea o al recibirlo.
+      </Text>
+    </Stack>
+  );
+
   // ── Tienda deshabilitada ─────────────────────────────────────────────────
   if (organization && !storeEnabled) {
     return (
@@ -413,11 +532,31 @@ export default function PublicStorePage() {
     );
   }
 
+  // ── Cargando: skeletons de tarjetas ──────────────────────────────────────
   if (loading) {
     return (
-      <Center mih="60vh">
-        <Loader />
-      </Center>
+      <Container size="xl" py="xl">
+        <Stack gap="xl">
+          {headerBlock}
+          <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing={{ base: "sm", sm: "lg" }}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} withBorder radius="lg" padding={isMobile ? "sm" : "lg"}>
+                <Card.Section>
+                  <AspectRatio ratio={1}>
+                    <Skeleton radius={0} />
+                  </AspectRatio>
+                </Card.Section>
+                <Stack gap="xs" mt="md">
+                  <Skeleton height={14} width="75%" radius="sm" />
+                  <Skeleton height={10} width="95%" radius="sm" />
+                  <Skeleton height={22} width="55%" radius="sm" />
+                  <Skeleton height={34} radius="md" />
+                </Stack>
+              </Card>
+            ))}
+          </SimpleGrid>
+        </Stack>
+      </Container>
     );
   }
 
@@ -426,27 +565,27 @@ export default function PublicStorePage() {
     return (
       <Container size="sm" py="xl">
         <Stack align="center" gap="lg" mt={40}>
-          <ThemeIcon size={80} radius="xl" color="teal" variant="light">
-            <IconCircleCheck size={52} />
+          <ThemeIcon size={96} radius="xl" color="teal" variant="light">
+            <IconCircleCheck size={60} />
           </ThemeIcon>
           <Stack align="center" gap="xs">
             <Title order={2} ta="center">
               ¡Pedido recibido!
             </Title>
-            <Text c="dimmed" ta="center">
+            <Text c="dimmed" ta="center" maw={440}>
               El negocio te contactará para coordinar la entrega. Pagas al
               recibir tu pedido.
             </Text>
           </Stack>
 
-          <Card withBorder radius="md" p="md" w="100%">
-            <Text fw={600} mb="sm">
+          <Paper withBorder radius="lg" p="lg" w="100%">
+            <Text fw={700} mb="sm">
               Resumen del pedido
             </Text>
             <Stack gap={6}>
               {codConfirmation.items.map((i) => (
                 <Group key={i.product._id} justify="space-between" wrap="nowrap">
-                  <Text size="sm">
+                  <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
                     {i.quantity}× {i.product.name}
                   </Text>
                   <Text size="sm" fw={500}>
@@ -457,12 +596,20 @@ export default function PublicStorePage() {
               <Divider my={4} />
               <Group justify="space-between">
                 <Text fw={700}>Total</Text>
-                <Text fw={700}>{formatCurrency(codConfirmation.total, currency)}</Text>
+                <Text fw={800} size="lg">
+                  {formatCurrency(codConfirmation.total, currency)}
+                </Text>
               </Group>
               <Group gap="xs" mt={4}>
                 <Badge
                   variant="light"
-                  leftSection={<IconTruckDelivery size={12} />}
+                  leftSection={
+                    codConfirmation.deliveryMode === "delivery" ? (
+                      <IconTruckDelivery size={12} />
+                    ) : (
+                      <IconBuildingStore size={12} />
+                    )
+                  }
                 >
                   {codConfirmation.deliveryMode === "delivery"
                     ? "Envío a domicilio"
@@ -478,10 +625,15 @@ export default function PublicStorePage() {
                 </Text>
               )}
             </Stack>
-          </Card>
+          </Paper>
 
-          <Button variant="light" onClick={() => setCodConfirmation(null)}>
-            Volver a la tienda
+          <Button
+            variant="light"
+            size="md"
+            leftSection={<IconBuildingStore size={18} />}
+            onClick={() => setCodConfirmation(null)}
+          >
+            Seguir comprando
           </Button>
         </Stack>
       </Container>
@@ -489,196 +641,406 @@ export default function PublicStorePage() {
   }
 
   return (
-    <Container size="lg" py="xl">
-      <Stack gap="xs" mb="lg" align="center">
-        <ThemeIcon size={56} radius="xl" variant="light" color="teal">
-          <IconBuildingStore size={32} />
-        </ThemeIcon>
-        <Title order={2} ta="center">
-          Tienda
-        </Title>
-        <Text c="dimmed" ta="center" maw={520}>
-          Elige tus productos, arma tu pedido y págalo en línea o al recibirlo.
-        </Text>
-      </Stack>
+    <Container size="xl" py="xl">
+      <style>{STORE_STYLES}</style>
 
-      {!canPay && products.length > 0 && (
-        <Alert
-          icon={<IconAlertCircle size={18} />}
-          color="yellow"
-          variant="light"
-          mb="md"
-        >
-          Los pedidos en línea no están disponibles en este momento. Comunícate
-          con el negocio para comprar.
-        </Alert>
-      )}
+      <Stack gap="xl">
+        {/* ── Encabezado + búsqueda + categorías ── */}
+        <Stack gap="md">
+          {headerBlock}
 
-      {products.length === 0 ? (
-        <Center mih="30vh">
-          <Text c="dimmed">No hay productos disponibles por ahora.</Text>
-        </Center>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-          {products.map((product) => {
-            const qty = cartQty(product._id);
-            return (
-              <Card key={product._id} withBorder radius="md" padding="lg">
-                {/* Imagen (o placeholder) siempre presente: mantiene las
-                    tarjetas alineadas aunque solo algunos productos la tengan.
-                    Área 1:1 (estándar de producto) para minimizar recortes. */}
-                <Card.Section>
-                  <AspectRatio ratio={1}>
-                    {product.imageUrl ? (
-                      <Image
-                        src={storeImageSrc(product.imageUrl)}
-                        alt={product.name}
-                        fit="cover"
-                      />
-                    ) : (
-                      <Center bg="var(--mantine-color-gray-1)">
-                        <IconBuildingStore
-                          size={44}
-                          color="var(--mantine-color-gray-5)"
+          {products.length > 0 && (
+            <Stack gap="sm">
+              <TextInput
+                placeholder="Buscar productos..."
+                aria-label="Buscar productos"
+                leftSection={<IconSearch size={16} />}
+                value={search}
+                onChange={(e) => setSearch(e.currentTarget.value)}
+                radius="md"
+                size="md"
+                maw={480}
+                w="100%"
+                mx="auto"
+              />
+              {categories.length >= 2 && (
+                <Chip.Group
+                  multiple={false}
+                  value={categoryFilter}
+                  onChange={(v) => setCategoryFilter(v || ALL_CATEGORIES)}
+                >
+                  <Group gap="xs" justify="center">
+                    <Chip value={ALL_CATEGORIES} size="sm" radius="xl">
+                      Todas
+                    </Chip>
+                    {categories.map((c) => (
+                      <Chip key={c} value={c} size="sm" radius="xl">
+                        {c}
+                      </Chip>
+                    ))}
+                  </Group>
+                </Chip.Group>
+              )}
+            </Stack>
+          )}
+        </Stack>
+
+        {!canPay && products.length > 0 && (
+          <Alert icon={<IconAlertCircle size={18} />} color="yellow" variant="light">
+            Los pedidos en línea no están disponibles en este momento. Comunícate
+            con el negocio para comprar.
+          </Alert>
+        )}
+
+        {/* ── Catálogo ── */}
+        {products.length === 0 ? (
+          <Center mih="30vh">
+            <Stack align="center" gap="sm">
+              <ThemeIcon size={64} radius="xl" variant="light" color="gray">
+                <IconBuildingStore size={36} />
+              </ThemeIcon>
+              <Text fw={600}>Aún no hay productos disponibles</Text>
+              <Text size="sm" c="dimmed" ta="center">
+                Vuelve pronto: el negocio está preparando su catálogo.
+              </Text>
+            </Stack>
+          </Center>
+        ) : filteredProducts.length === 0 ? (
+          <Center mih="30vh">
+            <Stack align="center" gap="sm">
+              <ThemeIcon size={64} radius="xl" variant="light" color="gray">
+                <IconSearchOff size={36} />
+              </ThemeIcon>
+              <Text fw={600}>No encontramos productos</Text>
+              <Text size="sm" c="dimmed" ta="center">
+                Prueba con otra búsqueda o cambia de categoría.
+              </Text>
+              <Button
+                variant="light"
+                size="xs"
+                onClick={() => {
+                  setSearch("");
+                  setCategoryFilter(ALL_CATEGORIES);
+                }}
+              >
+                Limpiar filtros
+              </Button>
+            </Stack>
+          </Center>
+        ) : (
+          <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing={{ base: "sm", sm: "lg" }}>
+            {filteredProducts.map((product) => {
+              const qty = cartQty(product._id);
+              return (
+                <Card
+                  key={product._id}
+                  withBorder
+                  radius="lg"
+                  padding={isMobile ? "sm" : "lg"}
+                  className="store-product-card"
+                >
+                  {/* Imagen (o placeholder) siempre presente: mantiene las
+                      tarjetas alineadas aunque solo algunos productos la tengan.
+                      Área 1:1 (estándar de producto) para minimizar recortes. */}
+                  <Card.Section style={{ position: "relative", overflow: "hidden" }}>
+                    <AspectRatio ratio={1}>
+                      {product.imageUrl ? (
+                        <Image
+                          className="store-product-img"
+                          src={storeImageSrc(product.imageUrl)}
+                          alt={product.name}
+                          fit="cover"
+                          style={
+                            product.outOfStock
+                              ? { filter: "grayscale(1) opacity(0.6)" }
+                              : undefined
+                          }
                         />
-                      </Center>
+                      ) : (
+                        <Center
+                          className="store-product-img"
+                          bg="var(--mantine-color-gray-1)"
+                          style={
+                            product.outOfStock
+                              ? { filter: "grayscale(1) opacity(0.6)" }
+                              : undefined
+                          }
+                        >
+                          <IconBuildingStore
+                            size={44}
+                            color="var(--mantine-color-gray-5)"
+                          />
+                        </Center>
+                      )}
+                    </AspectRatio>
+                    {product.category && (
+                      <Badge
+                        size="sm"
+                        variant="white"
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          boxShadow: "var(--mantine-shadow-xs)",
+                        }}
+                      >
+                        {product.category}
+                      </Badge>
                     )}
-                  </AspectRatio>
-                </Card.Section>
-                <Stack gap="sm" h="100%" mt="md">
-                  <Stack gap={4}>
-                    <Group justify="space-between" wrap="nowrap" align="flex-start">
-                      <Text fw={600} size="lg">
-                        {product.name}
-                      </Text>
-                      {product.outOfStock && (
-                        <Badge color="red" variant="light">
+                    {product.outOfStock && (
+                      <Center style={{ position: "absolute", inset: 0 }}>
+                        <Badge size="lg" color="dark" variant="filled">
                           Agotado
                         </Badge>
-                      )}
-                    </Group>
-                    <Group gap={6}>
-                      {product.brand && (
-                        <Badge variant="light" color="gray">
-                          {product.brand}
-                        </Badge>
-                      )}
-                      {product.category && (
-                        <Badge variant="light" color="blue">
-                          {product.category}
-                        </Badge>
-                      )}
-                    </Group>
+                      </Center>
+                    )}
+                  </Card.Section>
+
+                  <Stack gap={6} mt="md" style={{ flexGrow: 1 }}>
+                    {product.brand && (
+                      <Text
+                        size="xs"
+                        c="dimmed"
+                        tt="uppercase"
+                        fw={600}
+                        lts={0.5}
+                        lineClamp={1}
+                      >
+                        {product.brand}
+                      </Text>
+                    )}
+                    <Text fw={600} lineClamp={1}>
+                      {product.name}
+                    </Text>
                     {product.description && (
-                      <Text size="sm" c="dimmed" lineClamp={3}>
+                      <Text size="sm" c="dimmed" lineClamp={2}>
                         {product.description}
                       </Text>
                     )}
+
+                    <Text size="xl" fw={800} mt="auto" pt={6}>
+                      {formatCurrency(product.salePrice, currency)}
+                    </Text>
+
+                    {qty === 0 ? (
+                      <Button
+                        fullWidth
+                        variant="light"
+                        radius="md"
+                        leftSection={<IconShoppingCart size={16} />}
+                        disabled={!!product.outOfStock || !canPay}
+                        onClick={() => addToCart(product)}
+                      >
+                        Agregar
+                      </Button>
+                    ) : (
+                      <Group gap="xs" wrap="nowrap">
+                        <ActionIcon
+                          variant="light"
+                          size="lg"
+                          radius="md"
+                          aria-label="Quitar uno"
+                          onClick={() => changeQty(product._id, -1)}
+                        >
+                          <IconMinus size={16} />
+                        </ActionIcon>
+                        <Text fw={700} ta="center" style={{ flex: 1 }}>
+                          {qty}
+                        </Text>
+                        <ActionIcon
+                          variant="light"
+                          size="lg"
+                          radius="md"
+                          aria-label="Agregar uno"
+                          onClick={() => changeQty(product._id, 1)}
+                        >
+                          <IconPlus size={16} />
+                        </ActionIcon>
+                      </Group>
+                    )}
                   </Stack>
+                </Card>
+              );
+            })}
+          </SimpleGrid>
+        )}
+      </Stack>
 
-                  <Text fw={700} size="xl">
-                    {formatCurrency(product.salePrice, currency)}
-                  </Text>
+      {/* ── Botón flotante del carrito ── */}
+      {cart.length > 0 && (
+        <Affix position={{ bottom: 20, right: 20 }} zIndex={150}>
+          <Button
+            size="md"
+            radius="xl"
+            leftSection={<IconShoppingCart size={18} />}
+            rightSection={
+              <Badge size="sm" variant="white" circle>
+                {itemCount}
+              </Badge>
+            }
+            style={{ boxShadow: "var(--mantine-shadow-lg)" }}
+            onClick={() => setCartOpen(true)}
+          >
+            {formatCurrency(total, currency)}
+          </Button>
+        </Affix>
+      )}
 
-                  {qty === 0 ? (
-                    <Button
-                      mt="auto"
-                      fullWidth
-                      leftSection={<IconShoppingCart size={16} />}
-                      disabled={!!product.outOfStock || !canPay}
-                      onClick={() => addToCart(product)}
-                    >
-                      Agregar
-                    </Button>
+      {/* ── Carrito (Drawer) ── */}
+      <Drawer
+        opened={cartOpen}
+        onClose={() => setCartOpen(false)}
+        position="right"
+        size={isMobile ? "100%" : 420}
+        title={
+          <Group gap="xs">
+            <IconShoppingCart size={20} />
+            <Text fw={700}>Tu pedido</Text>
+          </Group>
+        }
+      >
+        {cart.length === 0 ? (
+          <Stack align="center" gap="sm" py="xl">
+            <ThemeIcon size={64} radius="xl" variant="light" color="gray">
+              <IconShoppingCart size={36} />
+            </ThemeIcon>
+            <Text fw={600}>Tu carrito está vacío</Text>
+            <Text size="sm" c="dimmed" ta="center">
+              Agrega productos del catálogo para armar tu pedido.
+            </Text>
+            <Button variant="light" size="xs" onClick={() => setCartOpen(false)}>
+              Ver productos
+            </Button>
+          </Stack>
+        ) : (
+          <Stack gap="md">
+            <Stack gap="sm">
+              {cart.map((i) => (
+                <Group key={i.product._id} wrap="nowrap" align="flex-start" gap="sm">
+                  {i.product.imageUrl ? (
+                    <Image
+                      src={storeImageSrc(i.product.imageUrl)}
+                      alt={i.product.name}
+                      w={48}
+                      h={48}
+                      radius="md"
+                      fit="cover"
+                      style={{ flexShrink: 0 }}
+                    />
                   ) : (
-                    <Group mt="auto" justify="center" gap="sm">
+                    <Center
+                      w={48}
+                      h={48}
+                      bg="var(--mantine-color-gray-1)"
+                      style={{
+                        borderRadius: "var(--mantine-radius-md)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconBuildingStore
+                        size={22}
+                        color="var(--mantine-color-gray-5)"
+                      />
+                    </Center>
+                  )}
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text size="sm" fw={600} lineClamp={1}>
+                      {i.product.name}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {formatCurrency(i.product.salePrice, currency)} c/u
+                    </Text>
+                    <Group gap={6} mt={6} wrap="nowrap">
                       <ActionIcon
                         variant="light"
-                        size="lg"
+                        size="sm"
+                        radius="md"
                         aria-label="Quitar uno"
-                        onClick={() => changeQty(product._id, -1)}
+                        onClick={() => changeQty(i.product._id, -1)}
                       >
-                        <IconMinus size={16} />
+                        <IconMinus size={12} />
                       </ActionIcon>
-                      <Text fw={600} w={32} ta="center">
-                        {qty}
+                      <Text size="sm" fw={600} w={24} ta="center">
+                        {i.quantity}
                       </Text>
                       <ActionIcon
                         variant="light"
-                        size="lg"
+                        size="sm"
+                        radius="md"
                         aria-label="Agregar uno"
-                        onClick={() => changeQty(product._id, 1)}
+                        onClick={() => changeQty(i.product._id, 1)}
                       >
-                        <IconPlus size={16} />
+                        <IconPlus size={12} />
                       </ActionIcon>
                     </Group>
-                  )}
-                </Stack>
-              </Card>
-            );
-          })}
-        </SimpleGrid>
-      )}
-
-      {/* ── Resumen del carrito ── */}
-      {cart.length > 0 && (
-        <Card withBorder radius="md" p="md" mt="xl">
-          <Group gap="xs" mb="sm">
-            <IconShoppingCart size={18} />
-            <Text fw={600}>Tu pedido</Text>
-          </Group>
-          <Stack gap={8}>
-            {cart.map((i) => (
-              <Group key={i.product._id} justify="space-between" wrap="nowrap">
-                <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
-                  {i.quantity}× {i.product.name}
-                </Text>
-                <Group gap="xs" wrap="nowrap">
-                  <Text size="sm" fw={500}>
-                    {formatCurrency(i.product.salePrice * i.quantity, currency)}
-                  </Text>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    size="sm"
-                    aria-label="Quitar del carrito"
-                    onClick={() => removeFromCart(i.product._id)}
-                  >
-                    <IconTrash size={14} />
-                  </ActionIcon>
+                  </Box>
+                  <Stack gap={4} align="flex-end">
+                    <Text size="sm" fw={700}>
+                      {formatCurrency(i.product.salePrice * i.quantity, currency)}
+                    </Text>
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="sm"
+                      aria-label="Quitar del carrito"
+                      onClick={() => removeFromCart(i.product._id)}
+                    >
+                      <IconTrash size={14} />
+                    </ActionIcon>
+                  </Stack>
                 </Group>
-              </Group>
-            ))}
+              ))}
+            </Stack>
+
             <Divider />
-            <Group justify="space-between">
-              <Text fw={700}>Total</Text>
-              <Text fw={700} size="lg">
+
+            <Group justify="space-between" align="center">
+              <Text fw={600}>Total</Text>
+              <Text fw={800} size="xl">
                 {formatCurrency(total, currency)}
               </Text>
             </Group>
+
             <Button
               fullWidth
               size="md"
               leftSection={<IconShoppingCart size={18} />}
               disabled={!canPay}
-              onClick={openCheckout}
+              onClick={() => {
+                setCartOpen(false);
+                openCheckout();
+              }}
             >
               Hacer pedido
             </Button>
+
+            {payHints.length > 0 && (
+              <Group gap="md" justify="center">
+                {payHints.map(({ Icon, label }) => (
+                  <Group key={label} gap={4} wrap="nowrap">
+                    <Icon size={14} color="var(--mantine-color-dimmed)" />
+                    <Text size="xs" c="dimmed">
+                      {label}
+                    </Text>
+                  </Group>
+                ))}
+              </Group>
+            )}
           </Stack>
-        </Card>
-      )}
+        )}
+      </Drawer>
 
       {/* ── Modal de checkout ── */}
-      <Modal opened={checkoutOpen} onClose={closeCheckout} title="Completar pedido" centered>
+      <Modal
+        opened={checkoutOpen}
+        onClose={closeCheckout}
+        title={<Text fw={700}>Completar pedido</Text>}
+        centered
+        size="lg"
+        radius="lg"
+      >
         <Stack gap="md">
-          <Group justify="space-between">
-            <Text fw={600}>
-              {cart.reduce((n, i) => n + i.quantity, 0)} producto(s)
-            </Text>
-            <Text fw={700}>{formatCurrency(total, currency)}</Text>
-          </Group>
-          <Divider />
+          <Divider label="Tus datos" labelPosition="left" />
 
           {/* Identificador configurado por la organización (siempre primero) */}
           {identifierField === "phone" && (
@@ -772,16 +1134,56 @@ export default function PublicStorePage() {
             />
           )}
 
+          <Divider label="Entrega" labelPosition="left" />
+
           {/* Modalidad de entrega */}
           <Radio.Group
-            label="Entrega"
             value={deliveryMode}
             onChange={(v) => setDeliveryMode(v as DeliveryMode)}
+            aria-label="Modalidad de entrega"
           >
-            <Stack gap={6} mt={6}>
-              <Radio value="pickup" label="Recoger en el local" />
-              <Radio value="delivery" label="Envío a domicilio" />
-            </Stack>
+            <Group grow gap="sm" align="stretch">
+              <Radio.Card
+                value="pickup"
+                radius="md"
+                p="sm"
+                className="store-option-card"
+              >
+                <Stack gap={6} align="center" ta="center">
+                  <ThemeIcon variant="light" size="lg" radius="md">
+                    <IconBuildingStore size={20} />
+                  </ThemeIcon>
+                  <div>
+                    <Text size="sm" fw={600}>
+                      Retiro en local
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Recoges tu pedido en el negocio
+                    </Text>
+                  </div>
+                </Stack>
+              </Radio.Card>
+              <Radio.Card
+                value="delivery"
+                radius="md"
+                p="sm"
+                className="store-option-card"
+              >
+                <Stack gap={6} align="center" ta="center">
+                  <ThemeIcon variant="light" size="lg" radius="md">
+                    <IconTruckDelivery size={20} />
+                  </ThemeIcon>
+                  <div>
+                    <Text size="sm" fw={600}>
+                      Domicilio
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Te lo llevamos a tu dirección
+                    </Text>
+                  </div>
+                </Stack>
+              </Radio.Card>
+            </Group>
           </Radio.Group>
           {deliveryMode === "delivery" && (
             <Textarea
@@ -803,25 +1205,109 @@ export default function PublicStorePage() {
             autosize
           />
 
+          <Divider label="Pago" labelPosition="left" />
+
           {/* Vía de pago (solo las disponibles) */}
           <Radio.Group
-            label="¿Cómo quieres pagar?"
             value={payMethod ?? ""}
             onChange={(v) => setPayMethod(v as PayMethod)}
+            aria-label="Vía de pago"
           >
-            <Stack gap={6} mt={6}>
+            <Stack gap="xs">
               {hasMp && (
-                <Radio value="mp" label="Pagar en línea con Mercado Pago" />
+                <Radio.Card
+                  value="mp"
+                  radius="md"
+                  p="sm"
+                  className="store-option-card"
+                >
+                  <Group wrap="nowrap" gap="sm">
+                    <ThemeIcon variant="light" size="lg" radius="md">
+                      <IconCreditCard size={20} />
+                    </ThemeIcon>
+                    <div style={{ flex: 1 }}>
+                      <Text size="sm" fw={600}>
+                        Mercado Pago
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Paga online con tarjeta o saldo
+                      </Text>
+                    </div>
+                    <Radio.Indicator />
+                  </Group>
+                </Radio.Card>
               )}
               {hasReceipt && (
-                <Radio
+                <Radio.Card
                   value="receipt"
-                  label="Transferencia (subes el comprobante)"
-                />
+                  radius="md"
+                  p="sm"
+                  className="store-option-card"
+                >
+                  <Group wrap="nowrap" gap="sm">
+                    <ThemeIcon variant="light" size="lg" radius="md">
+                      <IconReceipt2 size={20} />
+                    </ThemeIcon>
+                    <div style={{ flex: 1 }}>
+                      <Text size="sm" fw={600}>
+                        Transferencia
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Sube tu comprobante
+                      </Text>
+                    </div>
+                    <Radio.Indicator />
+                  </Group>
+                </Radio.Card>
               )}
-              {hasCod && <Radio value="cod" label="Pago contra entrega" />}
+              {hasCod && (
+                <Radio.Card
+                  value="cod"
+                  radius="md"
+                  p="sm"
+                  className="store-option-card"
+                >
+                  <Group wrap="nowrap" gap="sm">
+                    <ThemeIcon variant="light" size="lg" radius="md">
+                      <IconCash size={20} />
+                    </ThemeIcon>
+                    <div style={{ flex: 1 }}>
+                      <Text size="sm" fw={600}>
+                        Contraentrega
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Paga al recibir o recoger
+                      </Text>
+                    </div>
+                    <Radio.Indicator />
+                  </Group>
+                </Radio.Card>
+              )}
             </Stack>
           </Radio.Group>
+
+          <Divider label="Resumen" labelPosition="left" />
+
+          {/* Resumen compacto del pedido */}
+          <Paper withBorder radius="md" p="sm">
+            <Stack gap={4}>
+              {cart.map((i) => (
+                <Group key={i.product._id} justify="space-between" wrap="nowrap">
+                  <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
+                    {i.quantity}× {i.product.name}
+                  </Text>
+                  <Text size="sm" fw={500}>
+                    {formatCurrency(i.product.salePrice * i.quantity, currency)}
+                  </Text>
+                </Group>
+              ))}
+              <Divider my={4} />
+              <Group justify="space-between">
+                <Text fw={700}>Total</Text>
+                <Text fw={800}>{formatCurrency(total, currency)}</Text>
+              </Group>
+            </Stack>
+          </Paper>
 
           {formError && (
             <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
@@ -831,6 +1317,7 @@ export default function PublicStorePage() {
 
           <Button
             fullWidth
+            size="md"
             loading={submitting}
             leftSection={<IconShoppingCart size={16} />}
             onClick={handleOrder}

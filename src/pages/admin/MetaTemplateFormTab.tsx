@@ -213,6 +213,35 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "🎂 ¡Feliz cumpleaños, {{nombre_cliente}}! 🎉\n\nDe parte de todo el equipo de *{{nombre_negocio}}*, te deseamos un día lleno de alegría.\n\n🎁 Como regalo de cumpleaños: {{beneficio}}\n\n¡Gracias por ser parte de nuestra familia! Te esperamos pronto para celebrarlo. 💖",
     footerText: "",
   },
+  // 🛍️ Tienda pública
+  paymentReceived: {
+    name: "pago_recibido",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Pago recibido",
+    bodyText:
+      "✅ ¡Hola, {{nombre_cliente}}!\n\nHemos recibido tu pago en *{{nombre_negocio}}*. 🎉\n\n💰 Monto pagado: {{monto}}\n🛍️ Tu pedido: {{detalle_pedido}}\n\n¡Gracias por tu compra! Si tienes alguna pregunta, responde a este mensaje.",
+    footerText: "",
+  },
+  // 🔔 Mensajes del sistema (avisos al admin de la org)
+  adminPaymentAlert: {
+    name: "aviso_pago_admin",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Aviso de pago recibido",
+    bodyText:
+      "💰 *Aviso de pago recibido*\n\n🧾 Tipo: {{tipo}}\n💵 Monto: {{monto}}\n📄 Detalle: {{detalle}}\n📌 Estado: {{estado}}\n\nRevisa los detalles en tu panel de AgenditApp.",
+    footerText: "",
+  },
+  adminNewOrderAlert: {
+    name: "aviso_pedido_admin",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Nuevo pedido en tu tienda",
+    bodyText:
+      "🛍️ *Nuevo pedido en tu tienda*\n\n👤 Cliente: {{cliente}}\n📦 Pedido: {{pedido}}\n🚚 Entrega: {{entrega}}\n💳 Pago: {{pago}}\n\nGestiona el pedido desde tu panel de AgenditApp, en la sección Pedidos.",
+    footerText: "",
+  },
 };
 
 // ─── Ejemplos de variables para revisión de Meta ─────────────────────────────
@@ -242,6 +271,17 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   precio: "$25.000",
   // 🎂 Cumpleaños
   beneficio: "20% de descuento en tu próximo servicio",
+  // 🛍️ Tienda pública
+  monto: "$45.000",
+  detalle_pedido: "2× Shampoo, 1× Cera",
+  // 🔔 Mensajes del sistema (avisos al admin)
+  tipo: "reserva",
+  detalle: "De: Juan Perez · Ref: 123456",
+  estado: "Validado automáticamente con IA",
+  cliente: "Maria Garcia",
+  pedido: "3 productos · $45.000",
+  entrega: "Domicilio: Calle 19 #27-38",
+  pago: "Pagado",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

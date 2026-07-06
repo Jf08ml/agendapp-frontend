@@ -27,6 +27,11 @@ export interface WhatsappTemplates {
   classReminder?: WhatsappTemplate;
   // 🎂 Cumpleaños (siempre presente en la respuesta del backend)
   birthdayGreeting: WhatsappTemplate;
+  // 🛍️ Pago recibido (tienda pública)
+  paymentReceived: WhatsappTemplate;
+  // 🔔 Mensajes del sistema (avisos al admin)
+  adminPaymentAlert: WhatsappTemplate;
+  adminNewOrderAlert: WhatsappTemplate;
 }
 
 export interface TemplatesResponse {
@@ -52,6 +57,9 @@ export interface TemplatesResponse {
     classEnrollmentCancelled?: string;
     classReminder?: string;
     birthdayGreeting?: string;
+    paymentReceived?: string;
+    adminPaymentAlert?: string;
+    adminNewOrderAlert?: string;
   };
 }
 
@@ -76,6 +84,11 @@ export interface WhatsappTemplateSettings {
   classReminder?: boolean;
   // 🎂 Cumpleaños
   birthdayGreeting?: boolean;
+  // 🛍️ Pago recibido (tienda pública)
+  paymentReceived?: boolean;
+  // 🔔 Mensajes del sistema (avisos al admin)
+  adminPaymentAlert?: boolean;
+  adminNewOrderAlert?: boolean;
 }
 
 const whatsappTemplateService = {

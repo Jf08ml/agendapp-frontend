@@ -226,6 +226,40 @@ const templateInfo = {
       { name: "{{beneficio}}", desc: "Beneficio de cumpleaños (configurable abajo)" },
     ],
   },
+  paymentReceived: {
+    title: "Pago Recibido (Tienda)",
+    shortTitle: "Pago recibido",
+    description: "Mensaje enviado al comprador cuando se confirma el pago de su pedido de la tienda",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del comprador" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{monto}}", desc: "Monto pagado (con la moneda del negocio)" },
+      { name: "{{detalle}}", desc: "Detalle del pedido (ej: 2× Shampoo, 1× Cera)" },
+    ],
+  },
+  // 🔔 Mensajes del sistema (avisos al admin de la org)
+  adminPaymentAlert: {
+    title: "Aviso de Pago Recibido",
+    shortTitle: "Aviso de pago",
+    description: "Aviso enviado a tu WhatsApp cuando llega o se valida un comprobante de pago",
+    variables: [
+      { name: "{{tipo}}", desc: "Tipo de pago (reserva, paquete, clase o pedido de tienda)" },
+      { name: "{{monto}}", desc: "Monto del pago" },
+      { name: "{{detalle}}", desc: "Remitente y referencia del comprobante (o —)" },
+      { name: "{{estado}}", desc: "Estado (validado con IA o requiere revisión)" },
+    ],
+  },
+  adminNewOrderAlert: {
+    title: "Nuevo Pedido en la Tienda",
+    shortTitle: "Nuevo pedido",
+    description: "Aviso enviado a tu WhatsApp cuando un cliente hace un pedido en tu tienda",
+    variables: [
+      { name: "{{cliente}}", desc: "Nombre del cliente" },
+      { name: "{{pedido}}", desc: "Resumen del pedido (ej: 3 productos · $45.000)" },
+      { name: "{{entrega}}", desc: "Modo de entrega (domicilio o retiro en el local)" },
+      { name: "{{pago}}", desc: "Estado del pago (pagado o contraentrega)" },
+    ],
+  },
 };
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -236,8 +270,10 @@ const SIDEBAR_GROUPS = [
   { label: "Reservas", keys: ["statusReservationPending"] },
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
   { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
+  { label: "Tienda", keys: ["paymentReceived"] },
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
+  { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
 ] as const;
 
 // Nombre Meta por defecto para mostrar estado en sidebar
@@ -255,6 +291,9 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   loyaltyServiceReward: "premio_fidelidad",
   loyaltyReferralReward: "premio_referidos",
   birthdayGreeting: "cumpleanos_cliente",
+  paymentReceived: "pago_recibido",
+  adminPaymentAlert: "aviso_pago_admin",
+  adminNewOrderAlert: "aviso_pedido_admin",
 };
 
 const META_STATUS_DOT: Record<string, string> = {
@@ -301,6 +340,9 @@ export default function WhatsappTemplateEditor() {
     loyaltyServiceReward: true,
     loyaltyReferralReward: true,
     birthdayGreeting: false,
+    paymentReceived: true,
+    adminPaymentAlert: true,
+    adminNewOrderAlert: true,
   });
 
   // 🎂 Beneficio de cumpleaños (texto inyectado en {{beneficio}})
@@ -401,6 +443,12 @@ export default function WhatsappTemplateEditor() {
         loyaltyServiceReward: templateSettings.loyaltyServiceReward,
         loyaltyReferralReward: templateSettings.loyaltyReferralReward,
         birthdayGreeting: templateSettings.birthdayGreeting,
+        // 🛍️ Pago recibido (tienda) — el backend REEMPLAZA todo enabledTypes,
+        // así que este toggle DEBE ir siempre en el payload.
+        paymentReceived: templateSettings.paymentReceived ?? true,
+        // 🔔 Mensajes del sistema (avisos al admin) — mismo motivo: siempre en el payload
+        adminPaymentAlert: templateSettings.adminPaymentAlert ?? true,
+        adminNewOrderAlert: templateSettings.adminNewOrderAlert ?? true,
       };
       await whatsappTemplateService.updateTemplateSettings(organization._id, validSettings);
       await whatsappTemplateService.updateBirthdayBenefit(organization._id, birthdayBenefit);
@@ -707,6 +755,15 @@ export default function WhatsappTemplateEditor() {
                   {/* Cuerpo del editor */}
                   <ScrollArea style={{ flex: 1 }}>
                     <Box p="lg">
+                      {/* 🔔 Nota para los mensajes del sistema (avisos al admin) */}
+                      {(selectedKey === "adminPaymentAlert" || selectedKey === "adminNewOrderAlert") && (
+                        <Alert icon={<IconInfoCircle size={18} />} color="teal" variant="light" radius="md" mb="md">
+                          <Text size="sm">
+                            Este mensaje se envía a tu WhatsApp (el del negocio) desde tu propio número.
+                            Si no tienes WhatsApp conectado, se envía desde el número de AgenditApp con un formato estándar.
+                          </Text>
+                        </Alert>
+                      )}
                       {selectedKey === "campaign_templates" && organization?._id ? (
                         // ── Panel plantillas de campaña (Meta) ────
                         <MetaTemplatesPanel organizationId={organization._id} />
@@ -729,6 +786,7 @@ export default function WhatsappTemplateEditor() {
                               { key: "clientConfirmationAck", label: "Agradecimiento por confirmación", desc: "Cuando el cliente confirma asistencia" },
                               { key: "clientCancellationAck", label: "Aviso de cancelación al cliente", desc: "Cuando el cliente cancela" },
                               { key: "clientNoShowAck", label: "Aviso de no asistencia", desc: "Cuando se marca como no asistió" },
+                              { key: "paymentReceived", label: "Pago recibido (tienda)", desc: "Cuando se confirma el pago de un pedido de la tienda" },
                             ].map(({ key, label, desc }) => (
                               <Paper key={key} withBorder p="sm" radius="md">
                                 <Group justify="space-between">
@@ -808,6 +866,28 @@ export default function WhatsappTemplateEditor() {
                                 onChange={(e) => setBirthdayBenefit(e.currentTarget.value)}
                               />
                             )}
+
+                            <Divider label="Mensajes del sistema (a tu WhatsApp)" labelPosition="center" />
+
+                            {[
+                              { key: "adminPaymentAlert", label: "Aviso de pago recibido", desc: "Cuando llega o se valida un comprobante de pago" },
+                              { key: "adminNewOrderAlert", label: "Nuevo pedido en la tienda", desc: "Cuando un cliente hace un pedido en tu tienda" },
+                            ].map(({ key, label, desc }) => (
+                              <Paper key={key} withBorder p="sm" radius="md">
+                                <Group justify="space-between">
+                                  <Box>
+                                    <Text size="sm" fw={500}>{label}</Text>
+                                    <Text size="xs" c="dimmed">{desc}</Text>
+                                  </Box>
+                                  <Switch
+                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
+                                    onChange={(e) =>
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
+                                    }
+                                  />
+                                </Group>
+                              </Paper>
+                            ))}
                           </Stack>
 
                           <Group justify="flex-end">

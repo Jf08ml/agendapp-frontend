@@ -96,3 +96,13 @@ export const cancelStoreOrder = async (orderId: string): Promise<void> => {
     handleAxiosError(error, "No se pudo cancelar el pedido");
   }
 };
+
+// DELETE /store-orders/:id — elimina el pedido definitivamente (no reversible).
+// El backend lo bloquea si está pagado sin entregar o con comprobante en revisión.
+export const deleteStoreOrderPermanently = async (orderId: string): Promise<void> => {
+  try {
+    await apiGeneral.delete(`/store-orders/${orderId}`);
+  } catch (error) {
+    handleAxiosError(error, "No se pudo eliminar el pedido");
+  }
+};

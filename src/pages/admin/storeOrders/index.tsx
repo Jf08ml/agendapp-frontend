@@ -29,6 +29,7 @@ import {
   IconBuildingStore,
   IconMapPin,
   IconBrandWhatsapp,
+  IconTrash,
 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { modals } from "@mantine/modals";
@@ -39,6 +40,7 @@ import {
   deliverStoreOrder,
   collectStoreOrder,
   cancelStoreOrder,
+  deleteStoreOrderPermanently,
   type StoreOrder,
   type CodCollectMethod,
 } from "../../../services/storeOrderService";
@@ -189,6 +191,40 @@ export default function StoreOrdersPage() {
     });
   };
 
+  const doDelete = async (order: StoreOrder) => {
+    setProcessing(order._id);
+    try {
+      await deleteStoreOrderPermanently(order._id);
+      notifications.show({ color: "red", message: "Pedido eliminado definitivamente." });
+      await load();
+    } catch (e) {
+      notifications.show({
+        color: "red",
+        message: e instanceof Error ? e.message : "No se pudo eliminar el pedido.",
+      });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const confirmDelete = (order: StoreOrder) => {
+    modals.openConfirmModal({
+      title: "Eliminar pedido definitivamente",
+      centered: true,
+      children: (
+        <Text size="sm">
+          ¿Eliminar definitivamente el pedido de {order.store?.customer?.name || "este cliente"}{" "}
+          por {formatCurrency(order.amount, order.currency)}? Desaparecerá de la bandeja y{" "}
+          <strong>no se puede deshacer</strong>. No afecta el stock ni las ventas ya registradas
+          en caja.
+        </Text>
+      ),
+      labels: { confirm: "Eliminar definitivamente", cancel: "Volver" },
+      confirmProps: { color: "red" },
+      onConfirm: () => doDelete(order),
+    });
+  };
+
   if (!canRead) {
     return (
       <Container size="lg" py="lg">
@@ -262,6 +298,12 @@ export default function StoreOrdersPage() {
             const canCollect =
               canManage && order.provider === "cod" && order.status === "pending" && isPending;
             const canCancel = canManage && order.status !== "paid" && isPending;
+            // Eliminar definitivo: solo estados terminales o sin pago (el backend
+            // bloquea pagado-sin-entregar y comprobante en revisión).
+            const canDelete =
+              canManage &&
+              order.status !== "in_review" &&
+              !(order.status === "paid" && isPending);
 
             return (
               <Card key={order._id} withBorder radius="md" p="md">
@@ -351,7 +393,7 @@ export default function StoreOrdersPage() {
                   )}
                 </Stack>
 
-                {(canDeliver || canCollect || canCancel) && (
+                {(canDeliver || canCollect || canCancel || canDelete) && (
                   <>
                     <Divider mb="sm" />
                     <Group grow>
@@ -387,6 +429,17 @@ export default function StoreOrdersPage() {
                           onClick={() => handleDeliver(order)}
                         >
                           Marcar entregado
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          color="red"
+                          variant="subtle"
+                          leftSection={<IconTrash size={16} />}
+                          loading={processing === order._id}
+                          onClick={() => confirmDelete(order)}
+                        >
+                          Eliminar
                         </Button>
                       )}
                     </Group>
