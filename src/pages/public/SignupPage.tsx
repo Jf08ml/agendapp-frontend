@@ -48,6 +48,7 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
+import { loadMetaPixel, trackRegistroIniciado, trackRegistroCompletado } from "../../utils/metaPixel";
 
 const signupSchema = z.object({
   slug: z
@@ -259,6 +260,12 @@ export default function SignupPage() {
 
   useEffect(() => () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); }, []);
 
+  // Meta Pixel: Evento 2 "Registro Iniciado" al entrar a la página (solo Pixel, sin CAPI)
+  useEffect(() => {
+    loadMetaPixel();
+    trackRegistroIniciado();
+  }, []);
+
   // Auto-fill referral code from ?ref= URL param or sessionStorage + fetch agent name.
   // Se usa sessionStorage (no localStorage) para que la atribución dure solo la
   // sesión/visita actual y no quede un código viejo colgado indefinidamente.
@@ -323,6 +330,8 @@ export default function SignupPage() {
         businessVertical: values.businessVertical || undefined,
       });
       sessionStorage.removeItem("signup_referral_code");
+      // Evento 3 "Registro Completado" — solo tras la confirmación del backend
+      trackRegistroCompletado({ email: values.email, phone: values.phone });
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
       const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
       setSuccessInfo({ displayUrl, redirectUrl });
