@@ -1,4 +1,4 @@
-import { sendCompleteRegistrationCapi } from "../services/metaConversionsService";
+import { sendCompleteRegistrationCapi, sendContactCapi } from "../services/metaConversionsService";
 
 declare global {
   interface Window {
@@ -99,4 +99,29 @@ export async function trackRegistroCompletado(data: { email?: string; phone?: st
   } catch {
     // Best-effort: el tracking nunca debe bloquear ni afectar el flujo de registro.
   }
+}
+
+/**
+ * Evento "Contact" (Pixel + CAPI) — botones flotantes de WhatsApp de la app
+ * de registro. Los dos botones (desktop y mobile) disparan este mismo helper
+ * con el mismo content_name "flotante_app". No bloquea la navegación a
+ * WhatsApp: el click conserva su href y no llama preventDefault.
+ */
+export function trackContactApp(): void {
+  if (!PIXEL_ID) return;
+
+  const eventId = crypto.randomUUID();
+
+  window.fbq?.("track", "Contact", { content_name: "flotante_app" }, { eventID: eventId });
+
+  const { fbp, fbc } = getFbpFbc();
+
+  sendContactCapi({
+    event_id: eventId,
+    event_source_url: window.location.href,
+    fbp,
+    fbc,
+  }).catch(() => {
+    // Best-effort: el tracking nunca debe bloquear la navegación a WhatsApp.
+  });
 }

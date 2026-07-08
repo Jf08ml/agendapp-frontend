@@ -27,3 +27,28 @@ export async function sendCompleteRegistrationCapi(
     body: JSON.stringify(payload),
   });
 }
+
+export interface ContactCapiPayload {
+  event_id: string;
+  event_source_url: string;
+  fbp?: string;
+  fbc?: string;
+}
+
+/**
+ * Envía el evento estándar Contact (content_name "flotante_app") al mismo
+ * endpoint interno de Conversions API, parametrizando event_name — el click
+ * navega a WhatsApp, por eso también usa keepalive: true.
+ */
+export async function sendContactCapi(payload: ContactCapiPayload): Promise<void> {
+  await fetch(`${API_BASE_URL}/meta-capi/complete-registration`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    keepalive: true,
+    body: JSON.stringify({
+      ...payload,
+      event_name: "Contact",
+      content_name: "flotante_app",
+    }),
+  });
+}

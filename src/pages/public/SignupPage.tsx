@@ -48,7 +48,7 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
-import { loadMetaPixel, trackRegistroIniciado, trackRegistroCompletado } from "../../utils/metaPixel";
+import { loadMetaPixel, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
 
 const signupSchema = z.object({
   slug: z
@@ -459,7 +459,7 @@ export default function SignupPage() {
               </Text>
               <Text size="sm" c="#64748B" mb={16}>Si necesitas ayuda, contáctanos.</Text>
 
-              <Anchor href={supportWaUrl} target="_blank" style={{ textDecoration: "none" }}>
+              <Anchor href={supportWaUrl} target="_blank" onClick={() => trackContactApp()} style={{ textDecoration: "none" }}>
                 <Group
                   gap={10}
                   style={{
@@ -838,6 +838,7 @@ export default function SignupPage() {
                 <ActionIcon
                   radius="xl" size={44} variant="filled" color="green"
                   component="a" href={supportWaUrl} target="_blank"
+                  onClick={() => trackContactApp()}
                   aria-label="Soporte WhatsApp"
                 >
                   <IconBrandWhatsapp size={22} />
