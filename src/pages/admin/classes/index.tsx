@@ -218,15 +218,23 @@ export default function ManageClasses() {
   };
 
   const handleBulkSubmit = async (data: BulkSessionPayload) => {
-    const result = await bulkCreateSessions(data);
-    if (result) {
+    try {
+      const result = await bulkCreateSessions(data);
+      if (result) {
+        showNotification({
+          message: `${result.created.length} sesión(es) programada(s)${result.skipped.length ? `, ${result.skipped.length} omitida(s) por conflicto` : ""}`,
+          color: result.skipped.length ? "orange" : "green",
+        });
+        loadAll();
+      }
+      return result;
+    } catch (err) {
       showNotification({
-        message: `${result.created.length} sesión(es) programada(s)${result.skipped.length ? `, ${result.skipped.length} omitida(s) por conflicto` : ""}`,
-        color: result.skipped.length ? "orange" : "green",
+        message: err instanceof Error ? err.message : "Error al programar las sesiones",
+        color: "red",
       });
-      loadAll();
+      throw err; // re-throw para que BulkSessionModal muestre el error inline
     }
-    return result;
   };
 
   const handleCancelSession = (session: ClassSession) => {

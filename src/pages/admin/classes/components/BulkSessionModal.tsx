@@ -49,6 +49,7 @@ export default function BulkSessionModal({
 }: Props) {
   const [result, setResult] = useState<BulkResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm({
     initialValues: {
@@ -81,6 +82,7 @@ export default function BulkSessionModal({
     if (!opened) {
       form.reset();
       setResult(null);
+      setError(null);
     }
   }, [opened]);
 
@@ -112,6 +114,7 @@ export default function BulkSessionModal({
 
   const handleSubmit = async (values: typeof form.values) => {
     setSubmitting(true);
+    setError(null);
     try {
       const payload: BulkSessionPayload = {
         classId: values.classId,
@@ -126,6 +129,8 @@ export default function BulkSessionModal({
       };
       const res = await onSubmit(payload);
       if (res) setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al programar las sesiones");
     } finally {
       setSubmitting(false);
     }
@@ -300,6 +305,12 @@ export default function BulkSessionModal({
             minRows={2}
             {...form.getInputProps("notes")}
           />
+
+          {error && (
+            <Alert icon={<IconAlertCircle size={16} />} color="red" title="No se pudo programar" withCloseButton onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
 
           {/* Preview */}
           {previewDates.length > 0 && (
