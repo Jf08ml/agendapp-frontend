@@ -61,6 +61,40 @@ function useFavicon(faviconUrl?: string) {
   }, [faviconUrl]);
 }
 
+// iOS Safari no lee el Web App Manifest para "Añadir a inicio" — solo usa
+// apple-touch-icon (para el ícono) y apple-mobile-web-app-title (para el nombre
+// bajo el ícono). index.html trae un fallback genérico estático; esto lo
+// reemplaza por el branding real de la organización, igual que useFavicon.
+function useAppleTouchIcon(iconUrl?: string) {
+  useEffect(() => {
+    if (!iconUrl) return;
+    let link = document.querySelector(
+      "link[rel='apple-touch-icon']"
+    ) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "apple-touch-icon";
+      document.head.appendChild(link);
+    }
+    link.href = iconUrl;
+  }, [iconUrl]);
+}
+
+function useAppleWebAppTitle(title?: string) {
+  useEffect(() => {
+    if (!title) return;
+    let meta = document.querySelector(
+      "meta[name='apple-mobile-web-app-title']"
+    ) as HTMLMetaElement | null;
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "apple-mobile-web-app-title");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", title);
+  }, [title]);
+}
+
 export default function AppWithBranding() {
   const dispatch = useDispatch<AppDispatch>();
   const organization = useSelector(
@@ -118,6 +152,10 @@ export default function AppWithBranding() {
 
   // Cambia el favicon
   useFavicon(organization?.branding?.faviconUrl);
+
+  // iOS: ícono y nombre para "Añadir a inicio" (el manifest no aplica en Safari)
+  useAppleTouchIcon(organization?.branding?.pwaIcon || organization?.branding?.logoUrl);
+  useAppleWebAppTitle(organization?.branding?.pwaShortName || organization?.name);
 
   // Lógica para color principal personalizado
   const colorValue = organization?.branding?.primaryColor || "#1C3461";

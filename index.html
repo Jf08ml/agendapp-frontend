@@ -11,6 +11,13 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="google" content="notranslate" />
 
+  <!-- iOS Safari ignora el manifest para "Añadir a inicio": necesita estas tags en el HTML.
+       apple-touch-icon con logo por defecto aquí; AppWithBranding.tsx lo sobreescribe por
+       organización en cuanto carga el branding (mismo patrón que el favicon dinámico). -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="apple-touch-icon" href="/logo_default.png" />
+
   <!-- Preconnect para acelerar la descarga de fuentes -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

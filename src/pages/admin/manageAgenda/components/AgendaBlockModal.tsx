@@ -27,6 +27,13 @@ interface AgendaBlockModalProps {
   employees: Employee[];
   /** Se llama tras guardar, con las excepciones ya actualizadas por empleado */
   onSaved?: (updatesByEmployee: Record<string, EmployeeScheduleException[]>) => void;
+  /**
+   * Si se indica, el modal queda restringido a bloquear ÚNICAMENTE la agenda de
+   * este profesional — oculta el selector de "aplicar a todos"/otros profesionales.
+   * Pensado para cuando quien abre el modal es el propio profesional (permiso
+   * appointments:manage_own_blocks), no un admin.
+   */
+  restrictedToEmployeeId?: string;
 }
 
 interface BlockForm {
@@ -60,11 +67,16 @@ export default function AgendaBlockModal({
   onClose,
   employees,
   onSaved,
+  restrictedToEmployeeId,
 }: AgendaBlockModalProps) {
   const [form, setForm] = useState<BlockForm>(DEFAULT_FORM);
   const [applyToAll, setApplyToAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const ownName = restrictedToEmployeeId
+    ? employees.find((e) => e._id === restrictedToEmployeeId)?.names?.trim()
+    : undefined;
 
   const reset = () => {
     setForm(DEFAULT_FORM);
@@ -78,7 +90,11 @@ export default function AgendaBlockModal({
   };
 
   const handleSave = async () => {
-    const targetIds = applyToAll ? employees.map((e) => e._id) : selectedIds;
+    const targetIds = restrictedToEmployeeId
+      ? [restrictedToEmployeeId]
+      : applyToAll
+      ? employees.map((e) => e._id)
+      : selectedIds;
 
     if (targetIds.length === 0) {
       showNotification({
@@ -168,23 +184,31 @@ export default function AgendaBlockModal({
           </Text>
         </Alert>
 
-        <Checkbox
-          label="Aplicar a todos los profesionales"
-          checked={applyToAll}
-          onChange={(e) => setApplyToAll(e.currentTarget.checked)}
-        />
+        {restrictedToEmployeeId ? (
+          <Text size="sm">
+            Se bloqueará la agenda de <strong>{ownName || "tu perfil"}</strong>.
+          </Text>
+        ) : (
+          <>
+            <Checkbox
+              label="Aplicar a todos los profesionales"
+              checked={applyToAll}
+              onChange={(e) => setApplyToAll(e.currentTarget.checked)}
+            />
 
-        {!applyToAll && (
-          <MultiSelect
-            label="Profesionales"
-            placeholder="Selecciona uno o varios"
-            data={employees.map((e) => ({ value: e._id, label: e.names.trim() }))}
-            value={selectedIds}
-            onChange={setSelectedIds}
-            searchable
-            clearable
-            comboboxProps={{ zIndex: 1100 }}
-          />
+            {!applyToAll && (
+              <MultiSelect
+                label="Profesionales"
+                placeholder="Selecciona uno o varios"
+                data={employees.map((e) => ({ value: e._id, label: e.names.trim() }))}
+                value={selectedIds}
+                onChange={setSelectedIds}
+                searchable
+                clearable
+                comboboxProps={{ zIndex: 1100 }}
+              />
+            )}
+          </>
         )}
 
         <Group grow>

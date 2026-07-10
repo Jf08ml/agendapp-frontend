@@ -23,4 +23,10 @@ export const AGENDA_PERMISSIONS: AgendaPermission[] = [
     key: "appointments:reorderemployees",
     label: "Reordenar profesionales en la agenda",
   },
+  {
+    key: "appointments:manage_own_blocks",
+    label: "Bloquear su propia agenda",
+    description:
+      "Permite al profesional marcar temporalmente su propia disponibilidad como bloqueada (vacaciones, permisos, etc.). No puede bloquear la agenda de otros profesionales.",
+  },
 ];

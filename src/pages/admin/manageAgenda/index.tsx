@@ -1145,7 +1145,7 @@ const ScheduleView: React.FC = () => {
             </Button>
           )}
 
-          {hasPermission("appointments:create") && employees.length > 0 && (
+          {(hasPermission("appointments:create") || hasPermission("appointments:manage_own_blocks")) && employees.length > 0 && (
             isMobile ? (
               <Tooltip label="Bloquear horario" withArrow>
                 <ActionIcon
@@ -1329,6 +1329,11 @@ const ScheduleView: React.FC = () => {
             opened={blockModalOpened}
             onClose={() => setBlockModalOpened(false)}
             employees={employees}
+            restrictedToEmployeeId={
+              !hasPermission("appointments:create") && hasPermission("appointments:manage_own_blocks")
+                ? userId
+                : undefined
+            }
             onSaved={(updatesByEmployee) => {
               setEmployees((prev) =>
                 prev.map((e) =>
