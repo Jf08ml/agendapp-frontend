@@ -25,10 +25,6 @@
   ],
   "rewrites": [
     {
-      "source": "/manifest.webmanifest",
-      "destination": "https://api.agenditapp.com/api/manifest.webmanifest"
-    },
-{
       "source": "/(.*)",
       "destination": "/index.html"
     }
