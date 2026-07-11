@@ -10,6 +10,7 @@ import {
   PinInput,
   Radio,
   Stack,
+  Switch,
   Text,
   Title,
 } from "@mantine/core";
@@ -21,14 +22,15 @@ import {
   BiX,
 } from "react-icons/bi";
 import { FaFacebook } from "react-icons/fa";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../../../app/store";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "../../../app/store";
 import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
 import {
   activateMetaModo,
   embeddedConnectMeta,
   disconnectMetaOrg,
   getMetaStatus,
+  updateOrganization,
 } from "../../../services/organizationService";
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -161,11 +163,42 @@ const ModePicker: React.FC<ModePickerProps> = ({
 
 const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   const dispatch = useDispatch<AppDispatch>();
+  const organization = useSelector((s: RootState) => s.organization.organization);
   const sdkReady = useRef(false);
 
   const [status, setStatus] = useState<MetaStatus | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [connected, setConnected] = useState(false);
+
+  // Agente IA de reservas para clientes (responde mensajes entrantes en este número)
+  const [bookingAgentEnabled, setBookingAgentEnabled] = useState<boolean>(
+    organization?.waBookingAgentEnabled ?? false
+  );
+  const [savingBookingAgent, setSavingBookingAgent] = useState(false);
+
+  useEffect(() => {
+    setBookingAgentEnabled(organization?.waBookingAgentEnabled ?? false);
+  }, [organization?.waBookingAgentEnabled]);
+
+  async function handleToggleBookingAgent(checked: boolean) {
+    setBookingAgentEnabled(checked);
+    setSavingBookingAgent(true);
+    try {
+      await updateOrganization(organizationId, { waBookingAgentEnabled: checked });
+      await dispatch(fetchOrganizationConfig());
+      notifications.show({
+        color: checked ? "green" : "teal",
+        message: checked
+          ? "Asistente de reservas activado: responderá los mensajes de tus clientes en este número."
+          : "Asistente de reservas desactivado.",
+      });
+    } catch {
+      setBookingAgentEnabled(!checked); // revertir
+      notifications.show({ color: "red", message: "Error al guardar. Intenta de nuevo." });
+    } finally {
+      setSavingBookingAgent(false);
+    }
+  }
 
   // Estado compartido de modo
   const [mode, setMode]       = useState<Mode>("coexistence");
@@ -393,6 +426,15 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
               {status.coexistence ? "Modo coexistencia" : "Solo Cloud API"}
             </Badge>
           </Alert>
+
+          <Switch
+            label="Asistente IA de reservas para clientes"
+            description="Responde automáticamente los mensajes que tus clientes envíen a este número: muestra servicios, consulta disponibilidad y agenda la cita por ellos. Las reservas siguen tu política actual (aprobación manual o automática)."
+            checked={bookingAgentEnabled}
+            disabled={savingBookingAgent}
+            onChange={(e) => handleToggleBookingAgent(e.currentTarget.checked)}
+          />
+
           <Group justify="flex-end">
             <Button color="red" variant="subtle" size="sm" leftSection={<BiX size={16} />}
               onClick={handleDisconnect} loading={disconnecting}>

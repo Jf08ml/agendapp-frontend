@@ -181,6 +181,8 @@ export interface Organization {
   // Agente WhatsApp (Baileys)
   waPhone?: string | null;
   waAgentEnabled?: boolean;
+  // Agente IA de reservas para clientes (número Meta)
+  waBookingAgentEnabled?: boolean;
   // Conexión híbrida WA
   hideBaileysUI?: boolean;
   waConnectionType?: 'baileys' | 'meta' | null;
