@@ -20,6 +20,8 @@ export interface Service {
   maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un profesional (default: 1)
   recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
   costs?: ServiceCost[]; // 💸 Gastos por insumos/materiales
+  followUpServiceId?: string | null; // 🔁 Servicio de seguimiento a recomendar N días después
+  followUpDays?: number | null; // 🔁 Días de espera antes de recordar el servicio de seguimiento
 }
 
 interface CreateServicePayload {
@@ -32,6 +34,8 @@ interface CreateServicePayload {
   maxConcurrentAppointments?: number;
   recommendations?: string;
   costs?: ServiceCost[];
+  followUpServiceId?: string | null;
+  followUpDays?: number | null;
 }
 
 interface Response<T> {

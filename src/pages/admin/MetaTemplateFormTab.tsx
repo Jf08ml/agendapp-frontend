@@ -213,6 +213,16 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "🎂 ¡Feliz cumpleaños, {{nombre_cliente}}! 🎉\n\nDe parte de todo el equipo de *{{nombre_negocio}}*, te deseamos un día lleno de alegría.\n\n🎁 Como regalo de cumpleaños: {{beneficio}}\n\n¡Gracias por ser parte de nuestra familia! Te esperamos pronto para celebrarlo. 💖",
     footerText: "",
   },
+  // 🔁 Recordatorio de seguimiento entre servicios relacionados
+  followUpReminder: {
+    name: "recordatorio_seguimiento",
+    category: "MARKETING",
+    language: "es",
+    headerText: "Es hora de tu seguimiento",
+    bodyText:
+      "✨ ¡Hola, {{nombre_cliente}}!\n\nYa pasaron {{dias}} días desde tu {{servicio_original}} en *{{nombre_negocio}}*.\n\nEs un buen momento para agendar tu {{servicio_seguimiento}} y mantener tu resultado al día.\n\nSi tienes alguna pregunta o quieres agendar, responde a este mensaje. ¡Te esperamos! 💖",
+    footerText: "",
+  },
   // 🛍️ Tienda pública
   paymentReceived: {
     name: "pago_recibido",
@@ -271,6 +281,10 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   precio: "$25.000",
   // 🎂 Cumpleaños
   beneficio: "20% de descuento en tu próximo servicio",
+  // 🔁 Recordatorio de seguimiento entre servicios relacionados
+  servicio_seguimiento: "Retoque de pestañas",
+  servicio_original: "Montura de pestañas pelo a pelo",
+  dias: "20",
   // 🛍️ Tienda pública
   monto: "$45.000",
   detalle_pedido: "2× Shampoo, 1× Cera",

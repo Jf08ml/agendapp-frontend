@@ -24,6 +24,7 @@ import {
   Center,
   ThemeIcon,
   SegmentedControl,
+  Select,
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
@@ -36,6 +37,7 @@ interface ModalCreateEditProps {
   service: Service | null;
   onSave: (service: Service) => void;
   allTypes: string[];
+  allServices: Service[];
 }
 
 const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
@@ -44,6 +46,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   service,
   onSave,
   allTypes,
+  allServices,
 }) => {
   const [editingService, setEditingService] = useState<Service>({
     _id: "",
@@ -56,6 +59,8 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     hidePrice: false,
     maxConcurrentAppointments: 1,
     recommendations: "",
+    followUpServiceId: null,
+    followUpDays: null,
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [saving, setSaving] = useState(false);
@@ -91,6 +96,8 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         hidePrice: false,
         maxConcurrentAppointments: 1,
         recommendations: "",
+        followUpServiceId: null,
+        followUpDays: null,
       });
       setImageFiles([]);
       setIsFreeService(false);
@@ -531,6 +538,54 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
             </Stack>
           </Paper>
         </SimpleGrid>
+
+        <Paper withBorder p="md" radius="md" shadow="xs">
+          <Title order={5} mb="sm">🔁 Recordatorio de seguimiento (opcional)</Title>
+          <Divider mb="md" />
+          <Stack gap="md">
+            <Select
+              label="Servicio de seguimiento"
+              description="Si el cliente no vuelve a agendar este servicio, se le enviará un recordatorio por WhatsApp"
+              placeholder="Sin seguimiento configurado"
+              clearable
+              searchable
+              data={allServices.map((s) => ({ value: s._id, label: s.name }))}
+              value={editingService.followUpServiceId ?? null}
+              onChange={(value) =>
+                setEditingService({
+                  ...editingService,
+                  followUpServiceId: value,
+                  followUpDays: value ? (editingService.followUpDays ?? 20) : null,
+                })
+              }
+            />
+            {editingService.followUpServiceId && (
+              <Box>
+                <NumberInput
+                  label="Días de espera"
+                  description="Cuántos días después de esta cita se enviará el recordatorio"
+                  value={editingService.followUpDays ?? 20}
+                  onChange={(value) => setEditingService({ ...editingService, followUpDays: typeof value === "number" ? value : 20 })}
+                  min={1}
+                  max={365}
+                />
+                <Group gap="xs" mt={8} wrap="wrap">
+                  {[15, 20, 30, 45, 60].map((d) => (
+                    <Chip
+                      key={d}
+                      size="sm"
+                      checked={editingService.followUpDays === d}
+                      onChange={() => setEditingService({ ...editingService, followUpDays: d })}
+                      variant="filled"
+                    >
+                      {d} días
+                    </Chip>
+                  ))}
+                </Group>
+              </Box>
+            )}
+          </Stack>
+        </Paper>
 
         <Divider />
         <Group justify="space-between">

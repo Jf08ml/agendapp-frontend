@@ -339,6 +339,7 @@ const AdminServices: React.FC = () => {
         service={editingService}
         onSave={handleSaveService}
         allTypes={allTypes}
+        allServices={services}
       />
 
       {/* Cargando inicial -> skeletons bonitos */}
@@ -512,6 +513,7 @@ const AdminServices: React.FC = () => {
         onClose={() => { setIsModalOpen(false); setEditingService(null); }}
         onSave={handleSaveService}
         allTypes={allTypes}
+        allServices={services}
         service={editingService}
       />
 

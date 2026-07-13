@@ -226,6 +226,18 @@ const templateInfo = {
       { name: "{{beneficio}}", desc: "Beneficio de cumpleaños (configurable abajo)" },
     ],
   },
+  followUpReminder: {
+    title: "Recordatorio de Seguimiento",
+    shortTitle: "Seguimiento",
+    description: "Mensaje enviado cuando un cliente no ha vuelto por el servicio de seguimiento configurado (ej: retoque)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{service}}", desc: "Servicio de seguimiento a agendar (ej: Retoque)" },
+      { name: "{{originalService}}", desc: "Servicio original realizado (ej: Montura de pestañas)" },
+      { name: "{{days}}", desc: "Días transcurridos desde el servicio original" },
+    ],
+  },
   paymentReceived: {
     title: "Pago Recibido (Tienda)",
     shortTitle: "Pago recibido",
@@ -273,6 +285,7 @@ const SIDEBAR_GROUPS = [
   { label: "Tienda", keys: ["paymentReceived"] },
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
+  { label: "Seguimiento", keys: ["followUpReminder"] },
   { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
 ] as const;
 
@@ -291,6 +304,7 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   loyaltyServiceReward: "premio_fidelidad",
   loyaltyReferralReward: "premio_referidos",
   birthdayGreeting: "cumpleanos_cliente",
+  followUpReminder: "recordatorio_seguimiento",
   paymentReceived: "pago_recibido",
   adminPaymentAlert: "aviso_pago_admin",
   adminNewOrderAlert: "aviso_pedido_admin",
@@ -340,6 +354,7 @@ export default function WhatsappTemplateEditor() {
     loyaltyServiceReward: true,
     loyaltyReferralReward: true,
     birthdayGreeting: false,
+    followUpReminder: false,
     paymentReceived: true,
     adminPaymentAlert: true,
     adminNewOrderAlert: true,
@@ -443,6 +458,7 @@ export default function WhatsappTemplateEditor() {
         loyaltyServiceReward: templateSettings.loyaltyServiceReward,
         loyaltyReferralReward: templateSettings.loyaltyReferralReward,
         birthdayGreeting: templateSettings.birthdayGreeting,
+        followUpReminder: templateSettings.followUpReminder,
         // 🛍️ Pago recibido (tienda) — el backend REEMPLAZA todo enabledTypes,
         // así que este toggle DEBE ir siempre en el payload.
         paymentReceived: templateSettings.paymentReceived ?? true,
@@ -866,6 +882,25 @@ export default function WhatsappTemplateEditor() {
                                 onChange={(e) => setBirthdayBenefit(e.currentTarget.value)}
                               />
                             )}
+
+                            <Divider label="Seguimiento entre servicios" labelPosition="center" />
+
+                            <Paper withBorder p="sm" radius="md">
+                              <Group justify="space-between">
+                                <Box>
+                                  <Text size="sm" fw={500}>Recordatorio de seguimiento</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Se envía cuando un cliente no ha vuelto por el servicio de seguimiento configurado en cada servicio (ej: retoque)
+                                  </Text>
+                                </Box>
+                                <Switch
+                                  checked={templateSettings.followUpReminder ?? false}
+                                  onChange={(e) =>
+                                    setTemplateSettings((prev) => ({ ...prev, followUpReminder: e.currentTarget.checked }))
+                                  }
+                                />
+                              </Group>
+                            </Paper>
 
                             <Divider label="Mensajes del sistema (a tu WhatsApp)" labelPosition="center" />
 
