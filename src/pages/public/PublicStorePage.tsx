@@ -28,6 +28,7 @@ import {
   Skeleton,
   Paper,
   Box,
+  Collapse,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
@@ -45,15 +46,17 @@ import {
   IconShoppingCart,
   IconTrash,
   IconTruckDelivery,
+  IconMapPin,
 } from "@tabler/icons-react";
 import { CountryCode } from "libphonenumber-js";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
+import AddressMapPicker from "../../components/AddressMapPicker";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { getClientByIdentifier } from "../../services/clientService";
 import {
-  DEFAULT_CLIENT_FORM_CONFIG,
+  DEFAULT_STORE_FORM_CONFIG,
   type ClientFieldConfig,
 } from "../../services/organizationService";
 import { type ReceiptPaymentMethod } from "../../services/collectionService";
@@ -173,12 +176,12 @@ export default function PublicStorePage() {
   const [cart, setCart] = useState<StoreCartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
 
-  // ── Config del formulario de cliente (igual que reservas/paquetes) ─────────
-  const rawConfig = organization?.clientFormConfig;
+  // ── Config del formulario de tienda (independiente del de reservas/citas) ──
+  const rawConfig = organization?.storeFormConfig;
   const identifierField: "phone" | "email" | "documentId" =
-    rawConfig?.identifierField ?? DEFAULT_CLIENT_FORM_CONFIG.identifierField;
+    rawConfig?.identifierField ?? DEFAULT_STORE_FORM_CONFIG.identifierField;
   const configFields: ClientFieldConfig[] =
-    rawConfig?.fields?.length ? rawConfig.fields : DEFAULT_CLIENT_FORM_CONFIG.fields;
+    rawConfig?.fields?.length ? rawConfig.fields : DEFAULT_STORE_FORM_CONFIG.fields;
   const fieldCfg = (key: ClientFieldConfig["key"]) =>
     configFields.find((f) => f.key === key) ?? { key, enabled: false, required: false };
   const phoneCfg = fieldCfg("phone");
@@ -196,6 +199,9 @@ export default function PublicStorePage() {
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("pickup");
   const [address, setAddress] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [showMap, setShowMap] = useState(false);
+  const [deliveryLat, setDeliveryLat] = useState<number | undefined>(undefined);
+  const [deliveryLng, setDeliveryLng] = useState<number | undefined>(undefined);
   const [payMethod, setPayMethod] = useState<PayMethod | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -308,6 +314,9 @@ export default function PublicStorePage() {
     setDeliveryMode("pickup");
     setAddress("");
     setDeliveryNotes("");
+    setShowMap(false);
+    setDeliveryLat(undefined);
+    setDeliveryLng(undefined);
     setPayMethod(hasMp ? "mp" : hasReceipt ? "receipt" : hasCod ? "cod" : null);
     setCheckoutOpen(true);
   };
@@ -386,6 +395,14 @@ export default function PublicStorePage() {
       setFormError("Ingresa tu número de documento.");
       return;
     }
+    if (emailCfg.enabled && emailCfg.required && identifierField !== "email" && !form.email.trim()) {
+      setFormError("Ingresa un correo válido.");
+      return;
+    }
+    if (documentIdCfg.enabled && documentIdCfg.required && identifierField !== "documentId" && !form.documentId.trim()) {
+      setFormError("Ingresa tu número de documento.");
+      return;
+    }
     if (form.email.trim() && !isValidEmail(form.email)) {
       setFormError("Ingresa un correo válido.");
       return;
@@ -409,11 +426,15 @@ export default function PublicStorePage() {
           name: form.name.trim(),
           phone: form.phone_e164 || form.phone,
           email: form.email.trim() || undefined,
+          documentId: form.documentId.trim() || undefined,
         },
         delivery: {
           mode: deliveryMode,
           address: deliveryMode === "delivery" ? address.trim() : undefined,
           notes: deliveryNotes.trim() || undefined,
+          ...(deliveryMode === "delivery" && deliveryLat != null && deliveryLng != null
+            ? { lat: deliveryLat, lng: deliveryLng }
+            : {}),
         },
       };
 
@@ -1094,6 +1115,15 @@ export default function PublicStorePage() {
               <LookupFeedback />
             </Stack>
           )}
+          {documentIdCfg.enabled && identifierField !== "documentId" && (
+            <TextInput
+              label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+              placeholder="opcional"
+              value={form.documentId}
+              onChange={(e) => setField("documentId", e.currentTarget.value)}
+              required={documentIdCfg.required}
+            />
+          )}
 
           {/* Nombre (siempre) */}
           <TextInput
@@ -1186,15 +1216,38 @@ export default function PublicStorePage() {
             </Group>
           </Radio.Group>
           {deliveryMode === "delivery" && (
-            <Textarea
-              label="Dirección de entrega"
-              placeholder="Calle, número, barrio, referencias..."
-              required
-              value={address}
-              onChange={(e) => setAddress(e.currentTarget.value)}
-              minRows={2}
-              autosize
-            />
+            <Stack gap={6}>
+              <Textarea
+                label="Dirección de entrega"
+                placeholder="Calle, número, barrio, referencias..."
+                required
+                value={address}
+                onChange={(e) => setAddress(e.currentTarget.value)}
+                minRows={2}
+                autosize
+              />
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={<IconMapPin size={14} />}
+                onClick={() => setShowMap((v) => !v)}
+                style={{ alignSelf: "flex-start" }}
+              >
+                {showMap ? "Ocultar mapa" : "Ubicar en el mapa (opcional)"}
+              </Button>
+              <Collapse in={showMap}>
+                <AddressMapPicker
+                  lat={deliveryLat}
+                  lng={deliveryLng}
+                  defaultCenter={organization?.location}
+                  onChange={({ lat, lng, address: pickedAddress }) => {
+                    setDeliveryLat(lat);
+                    setDeliveryLng(lng);
+                    if (pickedAddress) setAddress(pickedAddress);
+                  }}
+                />
+              </Collapse>
+            </Stack>
           )}
           <Textarea
             label="Notas para el pedido"

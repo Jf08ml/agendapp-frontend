@@ -18,6 +18,7 @@ import {
   IconBan,
   IconBell,
   IconForms,
+  IconBuildingStore,
 } from "@tabler/icons-react";
 
 import { RootState } from "../../../app/store";
@@ -44,6 +45,7 @@ import MercadoPagoConnectCard from "./components/MercadoPagoConnectCard";
 import CancellationPolicyTab from "./components/tabs/CancellationPolicyTab";
 import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
 import ClientFormTab from "./components/tabs/ClientFormTab";
+import StoreFormTab from "./components/tabs/StoreFormTab";
 
 import { schema, FormValues } from "./schema";
 import { normalizeOrg } from "./utils";
@@ -282,6 +284,9 @@ export default function OrganizationInfo() {
             <Tabs.Tab value="clientForm" leftSection={<IconForms size={14} />}>
               Formulario cliente
             </Tabs.Tab>
+            <Tabs.Tab value="storeForm" leftSection={<IconBuildingStore size={14} />}>
+              Formulario tienda
+            </Tabs.Tab>
           </Tabs.List>
         </ScrollArea>
 
@@ -336,6 +341,10 @@ export default function OrganizationInfo() {
 
         <Tabs.Panel value="clientForm" pt="md">
           <ClientFormTab form={form} isEditing={true} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="storeForm" pt="md">
+          <StoreFormTab form={form} isEditing={true} />
         </Tabs.Panel>
       </Tabs>
 

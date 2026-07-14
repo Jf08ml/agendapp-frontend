@@ -102,6 +102,20 @@ export const DEFAULT_CLIENT_FORM_CONFIG: ClientFormConfig = {
   ],
 };
 
+// 🛍️ Formulario de comprador en la tienda pública — independiente de
+// DEFAULT_CLIENT_FORM_CONFIG (público general, no necesariamente los mismos
+// clientes/pacientes de las citas). Solo incluye los campos que el checkout
+// de la tienda realmente solicita (sin birthDate/notes).
+export const DEFAULT_STORE_FORM_CONFIG: ClientFormConfig = {
+  identifierField: 'phone',
+  fields: [
+    { key: 'name',       enabled: true,  required: true },
+    { key: 'phone',      enabled: true,  required: true },
+    { key: 'email',      enabled: true,  required: false },
+    { key: 'documentId', enabled: false, required: false },
+  ],
+};
+
 export interface Organization {
   _id?: string;
   slug?: string;
@@ -174,6 +188,7 @@ export interface Organization {
   timeFormat?: '12h' | '24h';
   aiAssistantName?: string;
   clientFormConfig?: ClientFormConfig;
+  storeFormConfig?: ClientFormConfig;
   // Sistema de membresías
   currentMembershipId?: string;
   membershipStatus?: "active" | "trial" | "past_due" | "suspended" | "cancelled" | "none";

@@ -384,7 +384,19 @@ export default function StoreOrdersPage() {
                     </Badge>
                   </Group>
                   {delivery?.mode === "delivery" && delivery?.address && (
-                    <Text size="sm">{delivery.address}</Text>
+                    <Group gap={6} wrap="nowrap" align="baseline">
+                      <Text size="sm">{delivery.address}</Text>
+                      {delivery.lat != null && delivery.lng != null && (
+                        <Anchor
+                          href={`https://www.google.com/maps?q=${delivery.lat},${delivery.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="xs"
+                        >
+                          Ver en mapa
+                        </Anchor>
+                      )}
+                    </Group>
                   )}
                   {delivery?.notes && (
                     <Text size="xs" c="dimmed">

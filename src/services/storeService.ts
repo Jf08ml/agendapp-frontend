@@ -57,12 +57,16 @@ export interface StoreCustomer {
   name: string;
   phone: string;
   email?: string;
+  documentId?: string;
 }
 
 export interface StoreDelivery {
   mode: "pickup" | "delivery";
   address?: string;
   notes?: string;
+  // 📍 Punto exacto (opcional) capturado con el mini-mapa en el checkout
+  lat?: number;
+  lng?: number;
 }
 
 export interface StoreOrderPayload {

@@ -42,8 +42,8 @@ export interface StoreOrder {
   paidAt?: string;
   store?: {
     items?: StoreOrderItem[];
-    customer?: { name?: string; phone?: string; email?: string };
-    delivery?: { mode?: "pickup" | "delivery"; address?: string; notes?: string };
+    customer?: { name?: string; phone?: string; email?: string; documentId?: string };
+    delivery?: { mode?: "pickup" | "delivery"; address?: string; notes?: string; lat?: number; lng?: number };
     fulfillmentStatus?: StoreFulfillmentStatus;
     fulfilledAt?: string;
     saleId?: string;
