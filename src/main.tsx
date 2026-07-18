@@ -9,6 +9,7 @@ import "@mantine/dates/styles.css";
 import { Provider } from "react-redux";
 import { store } from "./app/store.ts";
 import AppWithBranding from "./AppWithBranding.tsx";
+import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Cancelar el timeout de recuperación del SW - la app cargó correctamente
@@ -20,9 +21,11 @@ sessionStorage.removeItem('sw_recovery_attempted');
 
 createRoot(document.getElementById("root")!).render(
   // <StrictMode>
-  <Provider store={store}>
-    <SpeedInsights />
-    <AppWithBranding />
-  </Provider>
+  <ErrorBoundary>
+    <Provider store={store}>
+      <SpeedInsights />
+      <AppWithBranding />
+    </Provider>
+  </ErrorBoundary>
   // </StrictMode>
 );

@@ -428,9 +428,10 @@ export default function ClassWhatsappTemplates() {
                                 </Box>
                                 <Switch
                                   checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                  onChange={(e) =>
-                                    setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
-                                  }
+                                  onChange={(e) => {
+                                    const checked = e.currentTarget.checked;
+                                    setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
+                                  }}
                                 />
                               </Group>
                             </Paper>

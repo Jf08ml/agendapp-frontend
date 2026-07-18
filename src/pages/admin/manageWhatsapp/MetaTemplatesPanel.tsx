@@ -450,7 +450,10 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
               required={isNew}
               disabled={!isNew}
               value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.currentTarget.value }))}
+              onChange={(e) => {
+                const name = e.currentTarget.value;
+                setForm((f) => ({ ...f, name }));
+              }}
             />
 
             {/* Categoría + Idioma (solo nueva) */}
@@ -471,7 +474,10 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
               maxLength={60}
               disabled={!isNew}
               value={form.headerText}
-              onChange={(e) => setForm((f) => ({ ...f, headerText: e.currentTarget.value }))}
+              onChange={(e) => {
+                const headerText = e.currentTarget.value;
+                setForm((f) => ({ ...f, headerText }));
+              }}
             />
 
             {/* Cuerpo */}
@@ -484,7 +490,10 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
               autosize
               disabled={!isNew}
               value={form.bodyText}
-              onChange={(e) => setForm((f) => ({ ...f, bodyText: e.currentTarget.value }))}
+              onChange={(e) => {
+                const bodyText = e.currentTarget.value;
+                setForm((f) => ({ ...f, bodyText }));
+              }}
               styles={isNew ? { input: { fontFamily: "'Courier New', monospace", fontSize: 13 } } : undefined}
             />
 
@@ -496,7 +505,10 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
               maxLength={60}
               disabled={!isNew}
               value={form.footerText}
-              onChange={(e) => setForm((f) => ({ ...f, footerText: e.currentTarget.value }))}
+              onChange={(e) => {
+                const footerText = e.currentTarget.value;
+                setForm((f) => ({ ...f, footerText }));
+              }}
             />
 
             {/* Tabla de conversión de variables (solo al crear, cuando hay variables) */}
@@ -543,9 +555,10 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
                       placeholder={`ej: valor real que aparecería en lugar de {{${name}}}`}
                       required
                       value={form.customExamples[name] || ""}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, customExamples: { ...f.customExamples, [name]: e.currentTarget.value } }))
-                      }
+                      onChange={(e) => {
+                        const value = e.currentTarget.value;
+                        setForm((f) => ({ ...f, customExamples: { ...f.customExamples, [name]: value } }));
+                      }}
                     />
                   ))}
                 </Stack>

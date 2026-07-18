@@ -253,21 +253,30 @@ export default function OpeningHoursTab({
             <NativeSelect
               label="Día"
               value={newBreak.day}
-              onChange={(e) => setNewBreak((s) => ({ ...s, day: e.currentTarget.value }))}
+              onChange={(e) => {
+                const day = e.currentTarget.value;
+                setNewBreak((s) => ({ ...s, day }));
+              }}
               data={DAY_LABELS.map((l, i) => ({ value: String(i), label: l }))}
               disabled={!isEditing}
             />
             <TimeInput
               label="Desde"
               value={newBreak.start}
-              onChange={(e) => setNewBreak((s) => ({ ...s, start: e.currentTarget.value }))}
+              onChange={(e) => {
+                const start = e.currentTarget.value;
+                setNewBreak((s) => ({ ...s, start }));
+              }}
               onBlur={() => setNewBreak((s) => ({ ...s, start: toHHmmStrict(toHHmmLenient(s.start)) }))}
               disabled={!isEditing}
             />
             <TimeInput
               label="Hasta"
               value={newBreak.end}
-              onChange={(e) => setNewBreak((s) => ({ ...s, end: e.currentTarget.value }))}
+              onChange={(e) => {
+                const end = e.currentTarget.value;
+                setNewBreak((s) => ({ ...s, end }));
+              }}
               onBlur={() => setNewBreak((s) => ({ ...s, end: toHHmmStrict(toHHmmLenient(s.end)) }))}
               disabled={!isEditing}
             />
@@ -275,7 +284,10 @@ export default function OpeningHoursTab({
               label="Nota (opcional)"
               placeholder="Almuerzo, inventario, etc."
               value={newBreak.note || ""}
-              onChange={(e) => setNewBreak((s) => ({ ...s, note: e.currentTarget.value }))}
+              onChange={(e) => {
+                const note = e.currentTarget.value;
+                setNewBreak((s) => ({ ...s, note }));
+              }}
               disabled={!isEditing}
             />
           </SimpleGrid>

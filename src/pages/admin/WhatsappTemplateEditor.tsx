@@ -812,9 +812,10 @@ export default function WhatsappTemplateEditor() {
                                   </Box>
                                   <Switch
                                     checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) =>
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
-                                    }
+                                    onChange={(e) => {
+                                      const checked = e.currentTarget.checked;
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
+                                    }}
                                   />
                                 </Group>
                               </Paper>
@@ -844,9 +845,10 @@ export default function WhatsappTemplateEditor() {
                                   </Box>
                                   <Switch
                                     checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) =>
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
-                                    }
+                                    onChange={(e) => {
+                                      const checked = e.currentTarget.checked;
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
+                                    }}
                                   />
                                 </Group>
                               </Paper>
@@ -864,9 +866,10 @@ export default function WhatsappTemplateEditor() {
                                 </Box>
                                 <Switch
                                   checked={templateSettings.birthdayGreeting ?? false}
-                                  onChange={(e) =>
-                                    setTemplateSettings((prev) => ({ ...prev, birthdayGreeting: e.currentTarget.checked }))
-                                  }
+                                  onChange={(e) => {
+                                    const checked = e.currentTarget.checked;
+                                    setTemplateSettings((prev) => ({ ...prev, birthdayGreeting: checked }));
+                                  }}
                                 />
                               </Group>
                             </Paper>
@@ -895,9 +898,10 @@ export default function WhatsappTemplateEditor() {
                                 </Box>
                                 <Switch
                                   checked={templateSettings.followUpReminder ?? false}
-                                  onChange={(e) =>
-                                    setTemplateSettings((prev) => ({ ...prev, followUpReminder: e.currentTarget.checked }))
-                                  }
+                                  onChange={(e) => {
+                                    const checked = e.currentTarget.checked;
+                                    setTemplateSettings((prev) => ({ ...prev, followUpReminder: checked }));
+                                  }}
                                 />
                               </Group>
                             </Paper>
@@ -916,9 +920,10 @@ export default function WhatsappTemplateEditor() {
                                   </Box>
                                   <Switch
                                     checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) =>
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: e.currentTarget.checked }))
-                                    }
+                                    onChange={(e) => {
+                                      const checked = e.currentTarget.checked;
+                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
+                                    }}
                                   />
                                 </Group>
                               </Paper>

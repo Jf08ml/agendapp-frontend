@@ -562,7 +562,10 @@ const MetaTemplateFormTab: React.FC<Props> = ({
           description="Máx. 60 caracteres. Meta no permite emojis, asteriscos ni saltos de línea en el encabezado."
           maxLength={60}
           value={form.headerText}
-          onChange={(e) => setForm((f) => ({ ...f, headerText: e.currentTarget.value }))}
+          onChange={(e) => {
+            const headerText = e.currentTarget.value;
+            setForm((f) => ({ ...f, headerText }));
+          }}
           error={/[*_\n]|[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27FF}]/u.test(form.headerText) ? "Elimina emojis, asteriscos o saltos de línea" : undefined}
         />
 
@@ -574,7 +577,10 @@ const MetaTemplateFormTab: React.FC<Props> = ({
           autosize
           maxRows={14}
           value={form.bodyText}
-          onChange={(e) => setForm((f) => ({ ...f, bodyText: e.currentTarget.value }))}
+          onChange={(e) => {
+            const bodyText = e.currentTarget.value;
+            setForm((f) => ({ ...f, bodyText }));
+          }}
           styles={{ input: { fontFamily: "'Courier New', monospace", fontSize: 13 } }}
         />
 
@@ -583,7 +589,10 @@ const MetaTemplateFormTab: React.FC<Props> = ({
           description="Máx. 60 caracteres — no puede tener variables"
           maxLength={60}
           value={form.footerText}
-          onChange={(e) => setForm((f) => ({ ...f, footerText: e.currentTarget.value }))}
+          onChange={(e) => {
+            const footerText = e.currentTarget.value;
+            setForm((f) => ({ ...f, footerText }));
+          }}
         />
       </Stack>
 

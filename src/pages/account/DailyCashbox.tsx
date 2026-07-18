@@ -1529,7 +1529,10 @@ const DailyCashbox: React.FC = () => {
                     size="sm" label="Nombre"
                     placeholder="Ej: Kit de color"
                     value={drawerNewItem.name}
-                    onChange={(e) => setDrawerNewItem((p) => ({ ...p, name: e.currentTarget.value }))}
+                    onChange={(e) => {
+                      const name = e.currentTarget.value;
+                      setDrawerNewItem((p) => ({ ...p, name }));
+                    }}
                     style={{ flex: 2 }}
                   />
                   <NumberInput
@@ -2255,17 +2258,21 @@ const DailyCashbox: React.FC = () => {
               <TextInput
                 placeholder={movementType === "expense" ? "Concepto (ej: arriendo)" : "Concepto (ej: venta producto)"}
                 value={movementType === "expense" ? newExpense.concept : newIncome.concept}
-                onChange={(e) => movementType === "expense"
-                  ? setNewExpense((p) => ({ ...p, concept: e.currentTarget.value }))
-                  : setNewIncome((p) => ({ ...p, concept: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const concept = e.currentTarget.value;
+                  if (movementType === "expense") setNewExpense((p) => ({ ...p, concept }));
+                  else setNewIncome((p) => ({ ...p, concept }));
+                }}
                 style={{ flex: "1 1 180px", minWidth: 130 }}
               />
               <TextInput
                 placeholder="Categoría (opc.)"
                 value={movementType === "expense" ? newExpense.category : newIncome.category}
-                onChange={(e) => movementType === "expense"
-                  ? setNewExpense((p) => ({ ...p, category: e.currentTarget.value }))
-                  : setNewIncome((p) => ({ ...p, category: e.currentTarget.value }))}
+                onChange={(e) => {
+                  const category = e.currentTarget.value;
+                  if (movementType === "expense") setNewExpense((p) => ({ ...p, category }));
+                  else setNewIncome((p) => ({ ...p, category }));
+                }}
                 style={{ flex: "0 1 140px", minWidth: 100 }}
               />
               <NumberInput

@@ -482,9 +482,10 @@ export default function ManageClasses() {
                             size="xs"
                             checked={isSelected}
                             onChange={(e) => {
+                              const checked = e.currentTarget.checked;
                               setSelectedIds((prev) => {
                                 const next = new Set(prev);
-                                e.currentTarget.checked ? next.add(s._id) : next.delete(s._id);
+                                checked ? next.add(s._id) : next.delete(s._id);
                                 return next;
                               });
                             }}

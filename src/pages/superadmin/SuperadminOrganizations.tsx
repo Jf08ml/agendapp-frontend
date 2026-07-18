@@ -647,9 +647,10 @@ export default function SuperadminOrganizations() {
           <Checkbox
             label="Activo"
             checked={newOrg.isActive ?? true}
-            onChange={(e) =>
-              setNewOrg((p) => ({ ...p, isActive: e.currentTarget.checked }))
-            }
+            onChange={(e) => {
+              const checked = e.currentTarget.checked;
+              setNewOrg((p) => ({ ...p, isActive: checked }));
+            }}
           />
 
           <Text fw={600} mt="sm">

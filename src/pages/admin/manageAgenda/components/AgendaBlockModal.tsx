@@ -237,7 +237,12 @@ export default function AgendaBlockModal({
           label="Todo el día"
           description="Si está desactivado, solo se bloquea la franja horaria indicada"
           checked={form.allDay}
-          onChange={(e) => setForm((f) => ({ ...f, allDay: e.currentTarget.checked }))}
+          onChange={(e) => {
+            // Capturar antes del setState: e.currentTarget es null si React
+            // re-ejecuta el updater fuera del handler (crash de página en blanco)
+            const allDay = e.currentTarget.checked;
+            setForm((f) => ({ ...f, allDay }));
+          }}
         />
 
         <Collapse in={!form.allDay}>
@@ -245,12 +250,18 @@ export default function AgendaBlockModal({
             <TimeInput
               label="Hora inicio"
               value={form.startTime}
-              onChange={(e) => setForm((f) => ({ ...f, startTime: e.currentTarget.value }))}
+              onChange={(e) => {
+                const startTime = e.currentTarget.value;
+                setForm((f) => ({ ...f, startTime }));
+              }}
             />
             <TimeInput
               label="Hora fin"
               value={form.endTime}
-              onChange={(e) => setForm((f) => ({ ...f, endTime: e.currentTarget.value }))}
+              onChange={(e) => {
+                const endTime = e.currentTarget.value;
+                setForm((f) => ({ ...f, endTime }));
+              }}
             />
           </Group>
         </Collapse>
@@ -259,7 +270,10 @@ export default function AgendaBlockModal({
           label="Motivo (opcional)"
           placeholder="Vacaciones, permiso médico, capacitación..."
           value={form.reason}
-          onChange={(e) => setForm((f) => ({ ...f, reason: e.currentTarget.value }))}
+          onChange={(e) => {
+            const reason = e.currentTarget.value;
+            setForm((f) => ({ ...f, reason }));
+          }}
         />
 
         <Group justify="flex-end" mt="sm">
