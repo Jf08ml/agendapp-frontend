@@ -17,6 +17,7 @@ export interface Service {
   duration: number;
   isActive?: boolean;
   hidePrice?: boolean;
+  featured?: boolean; // ⭐ Destacado: se muestra primero en landing, wizard y chatbot
   maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un profesional (default: 1)
   recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
   costs?: ServiceCost[]; // 💸 Gastos por insumos/materiales
@@ -31,6 +32,7 @@ interface CreateServicePayload {
   description?: string;
   price: number;
   duration: number;
+  featured?: boolean;
   maxConcurrentAppointments?: number;
   recommendations?: string;
   costs?: ServiceCost[];
@@ -129,6 +131,7 @@ export const bulkUploadServices = async (
     price: number;
     duration: number;
     hidePrice?: boolean;
+    featured?: boolean;
     maxConcurrentAppointments?: number;
   }>,
   organizationId: string

@@ -16,6 +16,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
     "Precio": service.price,
     "Citas Simultáneas": service.maxConcurrentAppointments || 1,
     "Activo": service.isActive ? "Sí" : "No",
+    "Destacado": service.featured ? "Sí" : "No",
     "Imágenes (URLs)": service.images?.join("; ") || "",
   }));
 
@@ -30,6 +31,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
       "Precio": 25000,
       "Citas Simultáneas": 1,
       "Activo": "Sí",
+      "Destacado": "No",
       "Imágenes (URLs)": "",
     });
   }
@@ -48,6 +50,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
     { wch: 12 },  // Precio
     { wch: 16 },  // Citas Simultáneas
     { wch: 10 },  // Activo
+    { wch: 11 },  // Destacado
     { wch: 40 },  // Imágenes
   ];
 
@@ -59,7 +62,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
   };
 
   // Aplicar estilos a encabezados
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 10; i++) {
     const cellRef = XLSX.utils.encode_cell({ r: 0, c: i });
     if (!worksheet[cellRef]) continue;
     worksheet[cellRef].s = headerStyle;

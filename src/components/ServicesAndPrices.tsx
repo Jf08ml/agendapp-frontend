@@ -321,13 +321,23 @@ const ServiceCard = ({
       }}
     >
       {/* Sección Imagen */}
-      <Card.Section>
+      <Card.Section style={{ position: "relative" }}>
         {image ? (
           <Image src={image} height={180} fit="cover" alt={service.name} />
         ) : (
           <Stack align="center" justify="center" h={180} bg="gray.1" gap={4}>
             <BiImage size={32} color="gray" style={{ opacity: 0.5 }} />
           </Stack>
+        )}
+        {service.featured && (
+          <Badge
+            variant="filled"
+            color="yellow"
+            size="md"
+            style={{ position: "absolute", top: 8, left: 8 }}
+          >
+            ⭐ Destacado
+          </Badge>
         )}
       </Card.Section>
 

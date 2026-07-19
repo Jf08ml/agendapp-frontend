@@ -46,6 +46,7 @@ interface ServiceRow {
   price: number;
   duration: number;
   hidePrice?: boolean;
+  featured?: boolean; // ⭐ Destacado
   maxConcurrentAppointments?: number;
   isActive?: boolean; // Para parsear desde Excel
 }
@@ -105,6 +106,7 @@ export default function BulkUploadModal({
           price: parseFloat(row.Precio || row.precio || row.Price || row.price || 0),
           duration: parseInt(row["Duración (minutos)"] || row.Duración || row.duracion || row.Duration || row.duration || 0),
           hidePrice: row["Ocultar Precio"] === "Sí" || row["Ocultar Precio"] === "Si" || row.hidePrice === true,
+          featured: row.Destacado === "Sí" || row.Destacado === "Si" || row.featured === true,
           maxConcurrentAppointments: parseInt(row["Citas Simultáneas"] || row["Citas Concurrentes"] || row.maxConcurrentAppointments || 1),
           isActive: row.Activo === "Sí" || row.Activo === "Si" || row.isActive === true,
         }));
@@ -209,6 +211,7 @@ export default function BulkUploadModal({
         Precio: 15000,
         "Citas Simultáneas": 1,
         Activo: "Sí",
+        Destacado: "Sí",
         "Imágenes (URLs)": "",
       },
       {
@@ -220,6 +223,7 @@ export default function BulkUploadModal({
         Precio: 25000,
         "Citas Simultáneas": 2,
         Activo: "Sí",
+        Destacado: "No",
         "Imágenes (URLs)": "",
       },
       {
@@ -231,6 +235,7 @@ export default function BulkUploadModal({
         Precio: 50000,
         "Citas Simultáneas": 1,
         Activo: "No",
+        Destacado: "No",
         "Imágenes (URLs)": "",
       },
     ];

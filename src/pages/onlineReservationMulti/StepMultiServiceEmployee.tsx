@@ -74,7 +74,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
     () =>
       services.map((s) => ({
         value: s._id,
-        label: `${s.name} (${s.duration} min)`,
+        label: `${s.featured ? "⭐ " : ""}${s.name} (${s.duration} min)`,
       })),
     [services]
   );

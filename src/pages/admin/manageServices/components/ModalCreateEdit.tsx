@@ -57,6 +57,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     duration: 0,
     images: [],
     hidePrice: false,
+    featured: false,
     maxConcurrentAppointments: 1,
     recommendations: "",
     followUpServiceId: null,
@@ -94,6 +95,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         duration: 0,
         images: [],
         hidePrice: false,
+        featured: false,
         maxConcurrentAppointments: 1,
         recommendations: "",
         followUpServiceId: null,
@@ -277,6 +279,12 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
                 />
               )}
+              <Switch
+                label="⭐ Servicio destacado"
+                description="Se muestra de primero en la página pública, la reserva en línea y el asistente IA"
+                checked={editingService.featured ?? false}
+                onChange={(e) => setEditingService({ ...editingService, featured: e.currentTarget.checked })}
+              />
                 <Box>
                   <NumberInput
                     label="👥 Citas simultáneas que puede atender"

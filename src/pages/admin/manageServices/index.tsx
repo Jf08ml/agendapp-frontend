@@ -33,6 +33,8 @@ import {
   BsCheckCircle,
   BsXCircle,
   BsDownload,
+  BsStar,
+  BsStarFill,
 } from "react-icons/bs";
 import { IconFileUpload } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
@@ -225,6 +227,29 @@ const AdminServices: React.FC = () => {
     }
   };
 
+  const toggleFeatured = async (serviceId: string) => {
+    try {
+      const current = services.find((s) => s._id === serviceId);
+      if (!current) return;
+      const updated = await updateService(serviceId, {
+        ...current,
+        images: current.images?.filter((img): img is string => typeof img === "string"),
+        featured: !current.featured,
+      });
+      setServices((prev) => prev.map((s) => (s._id === serviceId ? (updated as Service) : s)));
+      showNotification({
+        title: updated?.featured ? "Servicio destacado" : "Destacado removido",
+        message: updated?.featured
+          ? "Se mostrará de primero en la página pública y la reserva en línea"
+          : "El servicio vuelve a su posición normal",
+        color: "yellow",
+      });
+    } catch (error) {
+      console.error(error);
+      showNotification({ title: "Error", message: "No se pudo actualizar el destacado", color: "red" });
+    }
+  };
+
   const toggleStatus = async (serviceId: string) => {
     try {
       const current = services.find((s) => s._id === serviceId);
@@ -414,6 +439,19 @@ const AdminServices: React.FC = () => {
                   {service.isActive ? "Activo" : "Inactivo"}
                 </Badge>
 
+                {/* Destacado */}
+                {service.featured && (
+                  <Badge
+                    variant="filled"
+                    color="yellow"
+                    leftSection={<BsStarFill size={11} />}
+                    style={{ position: "absolute", top: rem(38), left: rem(8) }}
+                    size="md"
+                  >
+                    Destacado
+                  </Badge>
+                )}
+
                 {/* Menú de acciones */}
                 <Menu shadow="md" width={200} position="bottom-end">
                   <Menu.Target>
@@ -435,12 +473,19 @@ const AdminServices: React.FC = () => {
                     >
                       Editar servicio
                     </Menu.Item>
-                    <Menu.Item 
+                    <Menu.Item
                       leftSection={service.isActive ? <BsXCircle /> : <BsCheckCircle />}
                       onClick={() => toggleStatus(service._id)}
                       color={service.isActive ? "orange" : "green"}
                     >
                       {service.isActive ? "Desactivar" : "Activar"}
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={service.featured ? <BsStarFill /> : <BsStar />}
+                      onClick={() => toggleFeatured(service._id)}
+                      color="yellow"
+                    >
+                      {service.featured ? "Quitar destacado" : "Marcar destacado"}
                     </Menu.Item>
                     <Menu.Divider />
                     <Menu.Item 
@@ -481,9 +526,18 @@ const AdminServices: React.FC = () => {
                       {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
                     </Badge>
                     <Group gap={6}>
+                      <Tooltip label={service.featured ? "Quitar destacado" : "Marcar como destacado"} withArrow>
+                        <ActionIcon
+                          variant={service.featured ? "filled" : "light"}
+                          color="yellow"
+                          onClick={() => toggleFeatured(service._id)}
+                        >
+                          {service.featured ? <BsStarFill size={16} /> : <BsStar size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label="Editar" withArrow>
-                        <ActionIcon 
-                          variant="light" 
+                        <ActionIcon
+                          variant="light"
                           color="blue"
                           onClick={() => { setIsModalOpen(true); setEditingService(service); }}
                         >
