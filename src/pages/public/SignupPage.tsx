@@ -28,18 +28,14 @@ import {
   IconRocket,
   IconCalendar,
   IconArrowRight,
+  IconArrowLeft,
   IconUser,
   IconBuildingStore,
   IconLink,
   IconBrandWhatsapp,
-  IconGlobe,
-  IconClock,
-  IconCurrencyDollar,
   IconCopy,
   IconStarFilled,
 } from "@tabler/icons-react";
-import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../utils/geoData";
-import { detectUserCountry } from "../../utils/phoneUtils";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { type CountryCode } from "libphonenumber-js";
 import {
@@ -84,24 +80,9 @@ const BUSINESS_VERTICALS = [
   { value: "otro", label: "Otro" },
 ];
 
-const COUNTRY_CURRENCY_MAP: Record<string, string> = {
-  AR: "ARS", BO: "BOB", BR: "BRL", CL: "CLP", CO: "COP",
-  CR: "CRC", CU: "CUP", DO: "DOP", EC: "USD", GT: "GTQ",
-  HN: "HNL", MX: "MXN", NI: "NIO", PA: "PAB", PE: "PEN",
-  PY: "PYG", SV: "USD", UY: "UYU", VE: "VES",
-  CA: "CAD", US: "USD",
-  AT: "EUR", BE: "EUR", CY: "EUR", DE: "EUR", EE: "EUR",
-  ES: "EUR", FI: "EUR", FR: "EUR", GR: "EUR", HR: "EUR",
-  IE: "EUR", IT: "EUR", LT: "EUR", LU: "EUR", LV: "EUR",
-  MT: "EUR", NL: "EUR", PT: "EUR", SI: "EUR", SK: "EUR",
-  GB: "GBP", CH: "CHF", SE: "SEK", NO: "NOK", DK: "DKK",
-  PL: "PLN", CZ: "CZK", HU: "HUF", RO: "RON",
-  JP: "JPY", CN: "CNY", KR: "KRW", IN: "INR", SG: "SGD",
-  HK: "HKD", TW: "TWD", TH: "THB", MY: "MYR", PH: "PHP",
-  ID: "IDR", AE: "AED", SA: "SAR", IL: "ILS", TR: "TRY",
-  AU: "AUD", NZ: "NZD", ZA: "ZAR", NG: "NGN", KE: "KES",
-  EG: "EGP", GH: "GHS",
-};
+// Por ahora el registro público solo opera en Colombia; cuando se abran campañas
+// para otros países se creará una página de signup dedicada por país.
+const COLOMBIA_REGION = { default_country: "CO", timezone: "America/Bogota", currency: "COP" } as const;
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -121,6 +102,7 @@ const INPUT_SM: React.CSSProperties = {
 const inputStyles = {
   input: INPUT_SM,
   label: { marginBottom: 3, color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 },
+  description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 },
 } as const;
 
 const selectStyles = {
@@ -162,19 +144,43 @@ function SecHeader({ label, icon }: { label: string; icon: React.ReactNode }) {
   );
 }
 
-function detectRegionalDefaults() {
-  const timezone = (() => {
-    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Bogota"; }
-    catch { return "America/Bogota"; }
-  })();
-  const country = detectUserCountry();
-  const currency = COUNTRY_CURRENCY_MAP[country] ?? "USD";
-  return { timezone, country, currency };
+function StepIndicator({ step }: { step: "personal" | "business" }) {
+  const steps: { key: "personal" | "business"; label: string }[] = [
+    { key: "personal", label: "Tus datos" },
+    { key: "business", label: "Tu negocio" },
+  ];
+  const activeIdx = steps.findIndex((s) => s.key === step);
+  return (
+    <Group gap={10} mb={20} wrap="nowrap">
+      {steps.map((s, idx) => {
+        const isActive = idx === activeIdx;
+        const isDone = idx < activeIdx;
+        return (
+          <Group key={s.key} gap={6} wrap="nowrap" align="center">
+            <ThemeIcon
+              size={22}
+              radius="xl"
+              variant={isActive || isDone ? "filled" : "light"}
+              color={isActive || isDone ? "blue" : "gray"}
+            >
+              {isDone ? <IconCheck size={12} /> : <Text size="xs" fw={800}>{idx + 1}</Text>}
+            </ThemeIcon>
+            <Text size="xs" fw={700} style={{ color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.45)" }}>
+              {s.label}
+            </Text>
+            {idx < steps.length - 1 && (
+              <Box style={{ width: 20, height: 1, background: "rgba(255,255,255,0.2)" }} />
+            )}
+          </Group>
+        );
+      })}
+    </Group>
+  );
 }
 
 export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [referralLocked, setReferralLocked] = useState(false);
+  const [step, setStep] = useState<"personal" | "business">("personal");
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -197,11 +203,6 @@ export default function SignupPage() {
     return `${SUPPORT_WA_BASE}?text=${encodeURIComponent(msg)}`;
   }, [agentName]);
 
-  const countryData = useMemo(() => getAllCountries().map((c) => ({ value: c.value, label: c.label })), []);
-  const timezoneData = useMemo(() => getAllTimezones().map((tz) => ({ value: tz.value, label: tz.label })), []);
-  const currencyData = useMemo(() => getAllCurrencies().map((c) => ({ value: c.value, label: c.label })), []);
-  const regionalDefaults = useMemo(() => detectRegionalDefaults(), []);
-
   const form = useForm<SignupFormValues>({
     validate: zodResolver(signupSchema),
     initialValues: {
@@ -211,19 +212,38 @@ export default function SignupPage() {
       email: "",
       password: "",
       phone: "",
-      default_country: regionalDefaults.country,
-      timezone: regionalDefaults.timezone,
-      currency: regionalDefaults.currency,
+      default_country: COLOMBIA_REGION.default_country,
+      timezone: COLOMBIA_REGION.timezone,
+      currency: COLOMBIA_REGION.currency,
       referralCode: "",
       businessVertical: "",
     },
   });
 
-  const handleCountryChange = (value: string | null) => {
-    form.setFieldValue("default_country", value ?? "");
-    if (value && COUNTRY_CURRENCY_MAP[value] && !form.isDirty("currency")) {
-      form.setFieldValue("currency", COUNTRY_CURRENCY_MAP[value]);
+  const personalStepSchema = z.object({
+    ownerName: z.string().min(2, "Mínimo 2 caracteres"),
+    email: z.string().email("Email inválido"),
+    password: z.string().min(6, "Mínimo 6 caracteres"),
+    phone: z.string().min(7, "Teléfono inválido"),
+  });
+
+  const goToBusinessStep = () => {
+    const result = personalStepSchema.safeParse({
+      ownerName: form.values.ownerName,
+      email: form.values.email,
+      password: form.values.password,
+      phone: form.values.phone,
+    });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        fieldErrors[String(issue.path[0])] = issue.message;
+      }
+      form.setErrors(fieldErrors);
+      return;
     }
+    form.clearErrors();
+    setStep("business");
   };
 
   const checkSlug = useCallback(async (slug: string) => {
@@ -279,7 +299,6 @@ export default function SignupPage() {
     if (code) {
       form.setFieldValue("referralCode", code);
       if (refParam) sessionStorage.setItem("signup_referral_code", code);
-      setReferralLocked(true);
       // Fetch agent name silently
       getAgentPublicInfo(code)
         .then((info) => { if (info.found && info.name) setAgentName(info.name); })
@@ -396,7 +415,7 @@ export default function SignupPage() {
               style={{ color: "#0F172A", letterSpacing: -0.5, lineHeight: 1.15, marginBottom: 24, fontSize: "clamp(1.6rem, 2.6vw, 2.2rem)" }}
             >
               Crea tu panel con tu{" "}
-              <span style={{ color: "#1D4ED8", fontWeight: 900 }}>dirección web</span>{" "}
+              <span style={{ color: "#1D4ED8", fontWeight: 900 }}>enlace propio</span>{" "}
               en minutos.
             </Title>
 
@@ -578,21 +597,8 @@ export default function SignupPage() {
               </Stack>
             ) : (
               <>
-            {/* Top info */}
-            <Group gap={20} mb={20} wrap="wrap">
-              {[
-                { icon: <IconLink size={12} />, label: "Acceso por enlace", desc: "Tu negocio tendrá una URL para entrar al panel." },
-                { icon: <IconRocket size={12} />, label: "Crear panel", desc: "Completa los datos para generar tu URL." },
-              ].map(({ icon, label, desc }) => (
-                <Group key={label} gap={8} wrap="nowrap" align="flex-start">
-                  <ThemeIcon size={24} radius="md" variant="light" color="blue">{icon}</ThemeIcon>
-                  <Box>
-                    <Text size="xs" fw={700} tt="uppercase" style={{ color: "rgba(255,255,255,0.85)", letterSpacing: 0.8, fontSize: 10 }}>{label}</Text>
-                    <Text size="xs" style={{ color: "rgba(255,255,255,0.45)" }}>{desc}</Text>
-                  </Box>
-                </Group>
-              ))}
-            </Group>
+            {/* Indicador de paso */}
+            <StepIndicator step={step} />
 
             {/* Form */}
             <form onSubmit={form.onSubmit(handleSubmit)}>
@@ -606,151 +612,7 @@ export default function SignupPage() {
                   </Alert>
                 )}
 
-                {/* ── Datos del negocio ── */}
-                <SecHeader label="Datos del negocio" icon={<IconBuildingStore size={13} />} />
-
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
-                  <TextInput
-                    label={<RLabel>Nombre del negocio</RLabel>}
-                    placeholder="Mi Salón de Belleza"
-                    value={form.values.businessName}
-                    onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
-                    error={form.errors.businessName}
-                    styles={inputStyles}
-                  />
-
-                  <Box>
-                    <TextInput
-                      label={<RLabel>Dirección web</RLabel>}
-                      placeholder="misalon"
-                      value={form.values.slug}
-                      onChange={(e) => handleSlugChange(e.currentTarget.value)}
-                      error={
-                        form.errors.slug ||
-                        (slugStatus === "taken" && "Este nombre ya está en uso") ||
-                        (slugStatus === "invalid" && "Solo letras minúsculas, sin números ni guiones")
-                      }
-                      rightSection={slugRightSection()}
-                      styles={inputStyles}
-                    />
-                    {slugHelpText && (
-                      <Box
-                        mt={4} px={8} py={5}
-                        style={{
-                          background: slugStatus === "available" ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.05)",
-                          border: slugStatus === "available" ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(255,255,255,0.10)",
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Group gap={6} align="center">
-                          {slugStatus === "available" && <IconCheck size={12} style={{ color: "#10B981", flexShrink: 0 }} />}
-                          <Text size="xs" fw={700} style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>{slugHelpText}</Text>
-                        </Group>
-                      </Box>
-                    )}
-                    {slugSuggestions.length > 0 && (
-                      <Group gap={6} mt={4} wrap="wrap">
-                        <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>Sugerencias:</Text>
-                        {slugSuggestions.map((s) => (
-                          <Anchor key={s} style={{ color: "#93C5FD", fontWeight: 700, fontSize: 11 }} onClick={() => { form.setFieldValue("slug", s); checkSlug(s); }}>
-                            {s}
-                          </Anchor>
-                        ))}
-                      </Group>
-                    )}
-                  </Box>
-
-                  <Select
-                    label="Tipo de negocio"
-                    placeholder="Elige tu rubro"
-                    leftSection={<IconBuildingStore size={13} style={{ color: "#64748B" }} />}
-                    value={form.values.businessVertical ?? null}
-                    onChange={(v) => form.setFieldValue("businessVertical", v ?? "")}
-                    data={BUSINESS_VERTICALS}
-                    comboboxProps={{ zIndex: 10001 }}
-                    styles={{ ...selectStyles, description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 } }}
-                    description="Pre-cargamos servicios de ejemplo de tu rubro para que arranques más rápido"
-                  />
-                </SimpleGrid>
-
-                {/* ── Región ── */}
-                <SecHeader label="Región" icon={<IconGlobe size={13} />} />
-
-                <SimpleGrid cols={{ base: 1, sm: 3 }} spacing={8}>
-                  <Select
-                    label="País"
-                    placeholder="País"
-                    leftSection={<IconGlobe size={13} style={{ color: "#64748B" }} />}
-                    value={form.values.default_country ?? null}
-                    onChange={handleCountryChange}
-                    error={form.errors.default_country}
-                    data={countryData}
-                    searchable
-                    comboboxProps={{ zIndex: 10001 }}
-                    styles={selectStyles}
-                  />
-                  <Select
-                    label="Zona horaria"
-                    placeholder="Zona horaria"
-                    leftSection={<IconClock size={13} style={{ color: "#64748B" }} />}
-                    {...form.getInputProps("timezone")}
-                    data={timezoneData}
-                    searchable
-                    comboboxProps={{ zIndex: 10001 }}
-                    styles={selectStyles}
-                  />
-                  <Select
-                    label="Moneda"
-                    placeholder="Moneda"
-                    leftSection={<IconCurrencyDollar size={13} style={{ color: "#64748B" }} />}
-                    {...form.getInputProps("currency")}
-                    data={currencyData}
-                    searchable
-                    comboboxProps={{ zIndex: 10001 }}
-                    styles={selectStyles}
-                  />
-                </SimpleGrid>
-
-                {/* ── Administrador ── */}
-                <SecHeader label="Administrador" icon={<IconUser size={13} />} />
-
-                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
-                  <TextInput
-                    label={<RLabel>Tu nombre</RLabel>}
-                    placeholder="Juan Pérez"
-                    leftSection={<IconUser size={13} style={{ color: "#64748B" }} />}
-                    {...form.getInputProps("ownerName")}
-                    styles={inputStyles}
-                  />
-                  <TextInput
-                    label={<RLabel>Email</RLabel>}
-                    placeholder="tu@email.com"
-                    {...form.getInputProps("email")}
-                    styles={inputStyles}
-                  />
-                  <Box>
-                    <RLabel>Teléfono</RLabel>
-                    <Box mt={3}>
-                      <InternationalPhoneInput
-                        label=""
-                        compact
-                        placeholder="300 000 0000"
-                        value={form.values.phone}
-                        defaultCountry={(form.values.default_country as CountryCode) || regionalDefaults.country as CountryCode}
-                        onChange={(e164) => form.setFieldValue("phone", e164 || "")}
-                        error={form.errors.phone as string | undefined}
-                      />
-                    </Box>
-                  </Box>
-                  <PasswordInput
-                    label={<RLabel>Contraseña</RLabel>}
-                    placeholder="Mínimo 6 caracteres"
-                    {...form.getInputProps("password")}
-                    styles={inputStyles}
-                  />
-                </SimpleGrid>
-
-                {/* Banner de referido — solo si hay agente */}
+                {/* Banner de referido — solo si hay agente, visible en ambos pasos */}
                 {agentName && (
                   <Box
                     style={{
@@ -775,54 +637,185 @@ export default function SignupPage() {
                   </Box>
                 )}
 
-                <TextInput
-                  label={
-                    <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 600 }}>
-                      Código de referido{" "}
-                      {!referralLocked && <span style={{ fontWeight: 400 }}>(opcional)</span>}
-                    </span>
-                  }
-                  placeholder="Ej: AB12CD34"
-                  value={form.values.referralCode ?? ""}
-                  onChange={(e) => form.setFieldValue("referralCode", e.currentTarget.value.toUpperCase())}
-                  disabled={referralLocked}
-                  styles={inputStyles}
-                />
+                {step === "personal" ? (
+                  <>
+                    {/* ── Tus datos ── */}
+                    <SecHeader label="Tus datos" icon={<IconUser size={13} />} />
 
-                <Box mt={4}>
-                  <Turnstile
-                    ref={turnstileRef}
-                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    options={{ size: "invisible" }}
-                    onSuccess={(token) => { setTurnstileToken(token); tokenResolverRef.current?.(token); tokenResolverRef.current = null; }}
-                    onExpire={() => setTurnstileToken("")}
-                    onError={() => setTurnstileToken("")}
-                  />
-                </Box>
+                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
+                      <TextInput
+                        label={<RLabel>Tu nombre</RLabel>}
+                        placeholder="Juan Pérez"
+                        leftSection={<IconUser size={13} style={{ color: "#64748B" }} />}
+                        {...form.getInputProps("ownerName")}
+                        styles={inputStyles}
+                      />
+                      <TextInput
+                        label={<RLabel>Email</RLabel>}
+                        placeholder="tu@email.com"
+                        {...form.getInputProps("email")}
+                        styles={inputStyles}
+                      />
+                      <Box>
+                        <RLabel>Teléfono</RLabel>
+                        <Box mt={3}>
+                          <InternationalPhoneInput
+                            label=""
+                            compact
+                            placeholder="300 000 0000"
+                            value={form.values.phone}
+                            defaultCountry={"CO" as CountryCode}
+                            onChange={(e164) => form.setFieldValue("phone", e164 || "")}
+                            error={form.errors.phone as string | undefined}
+                          />
+                        </Box>
+                      </Box>
+                      <PasswordInput
+                        label={<RLabel>Contraseña</RLabel>}
+                        placeholder="Mínimo 6 caracteres"
+                        {...form.getInputProps("password")}
+                        styles={inputStyles}
+                      />
+                    </SimpleGrid>
 
-                <Button
-                  type="submit"
-                  fullWidth
-                  mt={6}
-                  loading={isSubmitting}
-                  disabled={slugStatus === "taken" || slugStatus === "invalid"}
-                  styles={{
-                    root: {
-                      height: 40,
-                      fontWeight: 900,
-                      letterSpacing: 0.4,
-                      backgroundColor: "#FFFFFF",
-                      color: "#1D4ED8",
-                      borderRadius: 9,
-                    },
-                  }}
-                >
-                  Crear cuenta
-                </Button>
+                    <Button
+                      type="button"
+                      fullWidth
+                      mt={6}
+                      onClick={goToBusinessStep}
+                      rightSection={<IconArrowRight size={16} />}
+                      styles={{
+                        root: {
+                          height: 40,
+                          fontWeight: 900,
+                          letterSpacing: 0.4,
+                          backgroundColor: "#FFFFFF",
+                          color: "#1D4ED8",
+                          borderRadius: 9,
+                        },
+                      }}
+                    >
+                      Continuar
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {/* ── Datos del negocio ── */}
+                    <SecHeader label="Datos del negocio" icon={<IconBuildingStore size={13} />} />
 
-                <Text size="xs" ta="center" style={{ color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                  Al finalizar podrás entrar desde el enlace de tu negocio.
-                </Text>
+                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
+                      <TextInput
+                        label={<RLabel>Nombre del negocio</RLabel>}
+                        placeholder="Mi Salón de Belleza"
+                        value={form.values.businessName}
+                        onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
+                        error={form.errors.businessName}
+                        styles={inputStyles}
+                      />
+
+                      <Box>
+                        <TextInput
+                          label={<RLabel>Enlace de tu panel</RLabel>}
+                          description="No es una página web pública: es la dirección para entrar a tu panel"
+                          placeholder="misalon"
+                          value={form.values.slug}
+                          onChange={(e) => handleSlugChange(e.currentTarget.value)}
+                          error={
+                            form.errors.slug ||
+                            (slugStatus === "taken" && "Este nombre ya está en uso") ||
+                            (slugStatus === "invalid" && "Solo letras minúsculas, sin números ni guiones")
+                          }
+                          rightSection={slugRightSection()}
+                          styles={inputStyles}
+                        />
+                        {slugHelpText && (
+                          <Box
+                            mt={4} px={8} py={5}
+                            style={{
+                              background: slugStatus === "available" ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.05)",
+                              border: slugStatus === "available" ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(255,255,255,0.10)",
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Group gap={6} align="center">
+                              {slugStatus === "available" && <IconCheck size={12} style={{ color: "#10B981", flexShrink: 0 }} />}
+                              <Text size="xs" fw={700} style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>{slugHelpText}</Text>
+                            </Group>
+                          </Box>
+                        )}
+                        {slugSuggestions.length > 0 && (
+                          <Group gap={6} mt={4} wrap="wrap">
+                            <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>Sugerencias:</Text>
+                            {slugSuggestions.map((s) => (
+                              <Anchor key={s} style={{ color: "#93C5FD", fontWeight: 700, fontSize: 11 }} onClick={() => { form.setFieldValue("slug", s); checkSlug(s); }}>
+                                {s}
+                              </Anchor>
+                            ))}
+                          </Group>
+                        )}
+                      </Box>
+
+                      <Select
+                        label="Tipo de negocio"
+                        placeholder="Elige tu rubro"
+                        leftSection={<IconBuildingStore size={13} style={{ color: "#64748B" }} />}
+                        value={form.values.businessVertical ?? null}
+                        onChange={(v) => form.setFieldValue("businessVertical", v ?? "")}
+                        data={BUSINESS_VERTICALS}
+                        comboboxProps={{ zIndex: 10001 }}
+                        styles={{ ...selectStyles, description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 } }}
+                        description="Pre-cargamos servicios de ejemplo de tu rubro para que arranques más rápido"
+                      />
+                    </SimpleGrid>
+
+                    <Box mt={4}>
+                      <Turnstile
+                        ref={turnstileRef}
+                        siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                        options={{ size: "invisible" }}
+                        onSuccess={(token) => { setTurnstileToken(token); tokenResolverRef.current?.(token); tokenResolverRef.current = null; }}
+                        onExpire={() => setTurnstileToken("")}
+                        onError={() => setTurnstileToken("")}
+                      />
+                    </Box>
+
+                    <Group gap={8} mt={6} wrap="nowrap">
+                      <Button
+                        type="button"
+                        variant="subtle"
+                        onClick={() => setStep("personal")}
+                        leftSection={<IconArrowLeft size={14} />}
+                        styles={{ root: { color: "rgba(255,255,255,0.75)" } }}
+                      >
+                        Atrás
+                      </Button>
+                      <Box style={{ flex: 1 }}>
+                        <Button
+                          type="submit"
+                          fullWidth
+                          loading={isSubmitting}
+                          disabled={slugStatus === "taken" || slugStatus === "invalid"}
+                          styles={{
+                            root: {
+                              height: 40,
+                              fontWeight: 900,
+                              letterSpacing: 0.4,
+                              backgroundColor: "#FFFFFF",
+                              color: "#1D4ED8",
+                              borderRadius: 9,
+                            },
+                          }}
+                        >
+                          Crear cuenta
+                        </Button>
+                      </Box>
+                    </Group>
+
+                    <Text size="xs" ta="center" style={{ color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                      Al finalizar podrás entrar desde el enlace de tu negocio.
+                    </Text>
+                  </>
+                )}
               </Stack>
             </form>
             </>
