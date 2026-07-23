@@ -20,6 +20,8 @@ import {
 
 import { RootState } from "../../app/store";
 import { updateOrganization, seedDemoData } from "../../services/organizationService";
+import { getServicesByOrganizationId } from "../../services/serviceService";
+import { getEmployeesByOrganizationId } from "../../services/employeeService";
 import { updateOrganizationState } from "../../features/organization/sliceOrganization";
 import { zodResolver } from "../../utils/zodResolver";
 import { schema, FormValues } from "../admin/OrganizationInfo/schema";
@@ -81,6 +83,15 @@ export default function SetupWizard() {
   const [skippingSetup, setSkippingSetup] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
+  // Progreso parcial de una configuración anterior (típico: onboarding con IA
+  // que quedó a medias — los servicios/profesionales SÍ se crearon pero el
+  // setup nunca se marcó completo, y el usuario rebota aquí en cada login).
+  const [partialProgress, setPartialProgress] = useState<{
+    serviceNames: string[];
+    employeeNames: string[];
+  } | null>(null);
+  const [finishingPartial, setFinishingPartial] = useState(false);
+
   // IDs creados en pasos 0 y 1
   const [createdServiceId, setCreatedServiceId] = useState<string | null>(null);
 
@@ -105,6 +116,28 @@ export default function SetupWizard() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization?._id]);
+
+  // Detectar progreso parcial para ofrecer "continuar donde quedaste" en vez
+  // de la pantalla de elección desde cero.
+  useEffect(() => {
+    if (!organizationId) return;
+    let alive = true;
+    (async () => {
+      const [services, employees] = await Promise.all([
+        getServicesByOrganizationId(organizationId),
+        getEmployeesByOrganizationId(organizationId),
+      ]);
+      if (!alive) return;
+      const serviceNames = services.filter((s) => s.isActive !== false).map((s) => s.name);
+      const employeeNames = employees.filter((e) => e.isActive !== false).map((e) => e.names);
+      if (serviceNames.length > 0 || employeeNames.length > 0) {
+        setPartialProgress({ serviceNames, employeeNames });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [organizationId]);
 
   // Upload helper para branding (igual que en OrganizationInfo)
   const onUpload = useCallback(async (
@@ -243,6 +276,60 @@ export default function SetupWizard() {
     }
   };
 
+  // Onboarding con IA: flag para que ProtectedRoute no rebote la agenda
+  const startAiOnboarding = () => {
+    sessionStorage.setItem("ai_onboarding_active", "1");
+    navigate("/gestionar-agenda?asistente=onboarding");
+  };
+
+  // Finalizar con el progreso parcial existente: marca setupCompleted (el
+  // backend registra el milestone del funnel) y aterriza en la agenda.
+  const handleFinishPartial = async () => {
+    if (!organizationId || finishingPartial) return;
+    setFinishingPartial(true);
+    try {
+      const updated = await updateOrganization(organizationId, { setupCompleted: true } as any);
+      dispatch(updateOrganizationState(updated ?? { ...(organization as any), setupCompleted: true }));
+      navigate("/gestionar-agenda", { replace: true });
+      showNotification({
+        title: "🎉 ¡Configuración finalizada!",
+        message:
+          "Retomamos lo que ya habías creado. Toca un día del calendario para crear tu primera cita. Puedes ajustar tu horario y demás detalles en Configuración del negocio.",
+        color: "green",
+        autoClose: 12000,
+      });
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo finalizar. Intenta de nuevo.", color: "red" });
+      setFinishingPartial(false);
+    }
+  };
+
+  const canFinishPartial =
+    !!partialProgress &&
+    partialProgress.serviceNames.length > 0 &&
+    partialProgress.employeeNames.length > 0;
+
+  const partialSummary = partialProgress
+    ? [
+        partialProgress.serviceNames.length > 0
+          ? `${partialProgress.serviceNames.length} ${
+              partialProgress.serviceNames.length === 1 ? "servicio" : "servicios"
+            } (${partialProgress.serviceNames.slice(0, 4).join(", ")}${
+              partialProgress.serviceNames.length > 4 ? "…" : ""
+            })`
+          : null,
+        partialProgress.employeeNames.length > 0
+          ? `${partialProgress.employeeNames.length} ${
+              partialProgress.employeeNames.length === 1 ? "profesional" : "profesionales"
+            } (${partialProgress.employeeNames.slice(0, 3).join(", ")}${
+              partialProgress.employeeNames.length > 3 ? "…" : ""
+            })`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
   // Pantalla de elección
   if (mode === "choice") {
     return (
@@ -254,9 +341,55 @@ export default function SetupWizard() {
             </ThemeIcon>
             <Title order={2} ta="center">¡Bienvenido a {organization.name}!</Title>
             <Text c="dimmed" ta="center" size="sm">
-              Vamos a configurar tu cuenta. ¿Cómo prefieres hacerlo?
+              {partialProgress
+                ? "Encontramos avances de tu configuración anterior. Puedes continuar donde quedaste."
+                : "Vamos a configurar tu cuenta. ¿Cómo prefieres hacerlo?"}
             </Text>
           </Stack>
+
+          {partialProgress && (
+            <Paper
+              withBorder
+              p="lg"
+              radius="lg"
+              w="100%"
+              style={{
+                borderColor: theme.colors.green[4],
+                background: theme.colors.green[0],
+              }}
+            >
+              <Stack gap="xs">
+                <Group gap="xs">
+                  <ThemeIcon size="md" radius="xl" color="green" variant="light">
+                    <IconCheck size={16} />
+                  </ThemeIcon>
+                  <Text fw={700} size="sm">Ya tienes avances guardados</Text>
+                </Group>
+                <Text size="xs" c="dimmed">{partialSummary}</Text>
+                <Group gap="sm" mt={4}>
+                  {canFinishPartial && (
+                    <Button
+                      size="xs"
+                      color="green"
+                      loading={finishingPartial}
+                      onClick={handleFinishPartial}
+                    >
+                      Finalizar e ir a mi agenda
+                    </Button>
+                  )}
+                  <Button
+                    size="xs"
+                    variant={canFinishPartial ? "light" : "filled"}
+                    color="violet"
+                    leftSection={<IconRobotFace size={14} />}
+                    onClick={startAiOnboarding}
+                  >
+                    Continuar con el asistente
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          )}
 
           <SimpleGrid cols={2} spacing="md" w="100%">
             <Paper
@@ -264,11 +397,7 @@ export default function SetupWizard() {
               p="xl"
               radius="lg"
               style={{ cursor: "pointer", transition: "box-shadow .15s" }}
-              onClick={() => {
-                // Flag para que ProtectedRoute no rebote la agenda durante el onboarding IA
-                sessionStorage.setItem("ai_onboarding_active", "1");
-                navigate("/gestionar-agenda?asistente=onboarding");
-              }}
+              onClick={startAiOnboarding}
               styles={{ root: { "&:hover": { boxShadow: theme.shadows.md } } }}
             >
               <Stack align="center" gap="sm">
