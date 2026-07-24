@@ -1379,7 +1379,7 @@ function ServicesGrid({
   primary: string;
   org?: { currency?: string } | null;
   enableOnlineBooking: boolean;
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { state?: Record<string, unknown> }) => void;
 }) {
   return (
     <Grid gutter={{ base: "sm", sm: "md" }}>

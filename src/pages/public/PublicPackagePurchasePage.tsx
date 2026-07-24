@@ -369,7 +369,7 @@ export default function PublicPackagePurchasePage() {
                     <Text fw={700} size="xl">
                       {tiered
                         ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}`
-                        : formatCurrency(pkg.price, currency)}
+                        : formatCurrency(pkg.price ?? 0, currency)}
                     </Text>
                   </Group>
 
