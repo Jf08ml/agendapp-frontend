@@ -80,11 +80,22 @@ export const createClassCheckout = async (
   }
 };
 
+// 🎚️ Nivel/variante del paquete público (ej: "x4", "x8", "x12")
+export interface PublicPackageTier {
+  _id: string;
+  label: string;
+  sessionsIncluded: number;
+  price: number;
+  courtesySessions?: number;
+}
+
 export interface PublicPackageItem {
   _id: string;
   name: string;
   description?: string;
-  price: number;
+  // Ausente/irrelevante cuando el paquete tiene niveles (usar tiers[]).
+  price?: number;
+  tiers?: PublicPackageTier[];
   validityDays: number;
   services?: { serviceId?: { name?: string; duration?: number }; sessionsIncluded: number }[];
   classes?: { classId?: { name?: string; duration?: number }; sessionsIncluded: number }[];
@@ -118,6 +129,8 @@ export interface PackageCheckoutPayload {
   organizationId: string;
   servicePackageId: string;
   customerDetails: CheckoutCustomerDetails;
+  // Requerido cuando el paquete tiene niveles (tiers).
+  tierId?: string;
 }
 
 // Crea el checkout de compra de un paquete (el ClientPackage se crea al pagar).

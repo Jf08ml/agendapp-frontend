@@ -12,9 +12,10 @@ import {
   Select,
   TextInput,
   Badge,
+  SegmentedControl,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
-import { IconUserPlus } from "@tabler/icons-react";
+import { IconUserPlus, IconGift } from "@tabler/icons-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { ServicePackage } from "../../../../services/packageService";
 import { formatCurrency } from "../../../../utils/formatCurrency";
@@ -36,6 +37,7 @@ interface ModalAssignPackageProps {
     paymentMethod: string;
     paymentNotes: string;
     purchaseDate: string;
+    tierId?: string;
   }) => void;
   currency?: string;
 }
@@ -63,7 +65,11 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<string | null>("efectivo");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [purchaseDate, setPurchaseDate] = useState<Date | null>(new Date());
+  const [tierId, setTierId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const hasTiers = (servicePackage?.tiers?.length ?? 0) > 0;
+  const selectedTier = servicePackage?.tiers?.find((t) => t._id === tierId) || null;
 
   useEffect(() => {
     if (isOpen) {
@@ -72,8 +78,9 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
       setPaymentMethod("efectivo");
       setPaymentNotes("");
       setPurchaseDate(new Date());
+      setTierId(servicePackage?.tiers?.[0]?._id || null);
     }
-  }, [isOpen]);
+  }, [isOpen, servicePackage]);
 
   const clientOptions = useMemo(() => {
     const q = debouncedClientSearch.toLowerCase();
@@ -96,7 +103,8 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
     return exp;
   }, [purchaseDate, servicePackage]);
 
-  const canSave = clientId && paymentMethod && purchaseDate && servicePackage;
+  const canSave =
+    clientId && paymentMethod && purchaseDate && servicePackage && (!hasTiers || tierId);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -108,6 +116,7 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
         paymentMethod: paymentMethod!,
         paymentNotes,
         purchaseDate: purchaseDate!.toISOString(),
+        ...(hasTiers ? { tierId: tierId! } : {}),
       });
     } finally {
       setSaving(false);
@@ -143,10 +152,35 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
               </Text>
             </div>
             <Badge size="xl" variant="light" color="teal">
-              {formatCurrency(servicePackage.price, currency)}
+              {formatCurrency(hasTiers ? selectedTier?.price ?? 0 : servicePackage.price ?? 0, currency)}
             </Badge>
           </Group>
         </Paper>
+
+        {hasTiers && (
+          <Stack gap="xs">
+            <Text size="sm" fw={500}>Nivel</Text>
+            <SegmentedControl
+              fullWidth
+              value={tierId || undefined}
+              onChange={setTierId}
+              data={(servicePackage.tiers || []).map((t) => ({
+                value: t._id || t.label,
+                label: t.label,
+              }))}
+            />
+            {selectedTier && (
+              <Group gap={6} align="center">
+                <Text size="xs" c="dimmed">
+                  {selectedTier.sessionsIncluded} sesiones
+                  {!!selectedTier.courtesySessions &&
+                    ` + ${selectedTier.courtesySessions} de cortesía`}
+                </Text>
+                {!!selectedTier.courtesySessions && <IconGift size={14} color="var(--mantine-color-teal-6)" />}
+              </Group>
+            )}
+          </Stack>
+        )}
 
         <Select
           label="Cliente"

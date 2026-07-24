@@ -20,9 +20,9 @@ import {
   Badge,
   Tooltip,
 } from "@mantine/core";
-import { IconPackage, IconTrash, IconSchool } from "@tabler/icons-react";
+import { IconPackage, IconTrash, IconSchool, IconLayersSubtract, IconPlus, IconGift } from "@tabler/icons-react";
 import { Service } from "../../../../services/serviceService";
-import { ServicePackage, PackageServiceItem, PackageClassItem } from "../../../../services/packageService";
+import { ServicePackage, PackageServiceItem, PackageClassItem, PackageTier } from "../../../../services/packageService";
 import { ClassType } from "../../../../services/classService";
 import { Autocomplete } from "@mantine/core";
 
@@ -47,6 +47,23 @@ interface EditingPackageClass {
   sessionsIncluded: number;
 }
 
+interface EditingTier {
+  key: string; // solo para el key de React / identificar la fila localmente
+  _id?: string;
+  label: string;
+  sessionsIncluded: number;
+  price: number;
+  courtesySessions: number;
+}
+
+const newTier = (): EditingTier => ({
+  key: crypto.randomUUID(),
+  label: "",
+  sessionsIncluded: 1,
+  price: 0,
+  courtesySessions: 0,
+});
+
 const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
   isOpen,
   onClose,
@@ -58,6 +75,8 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState<number>(0);
+  const [hasTiers, setHasTiers] = useState(false);
+  const [tiers, setTiers] = useState<EditingTier[]>([]);
   const [validityDays, setValidityDays] = useState<number>(30);
   const [isActive, setIsActive] = useState(true);
   const [selectedServices, setSelectedServices] = useState<EditingPackageService[]>([]);
@@ -70,7 +89,19 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     if (servicePackage) {
       setName(servicePackage.name);
       setDescription(servicePackage.description || "");
-      setPrice(servicePackage.price);
+      setPrice(servicePackage.price ?? 0);
+      const existingTiers = servicePackage.tiers || [];
+      setHasTiers(existingTiers.length > 0);
+      setTiers(
+        existingTiers.map((t: PackageTier) => ({
+          key: t._id || crypto.randomUUID(),
+          _id: t._id,
+          label: t.label,
+          sessionsIncluded: t.sessionsIncluded,
+          price: t.price,
+          courtesySessions: t.courtesySessions || 0,
+        }))
+      );
       setValidityDays(servicePackage.validityDays);
       setIsActive(servicePackage.isActive);
       setSelectedServices(
@@ -78,7 +109,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
           serviceId: typeof svc.serviceId === "object" ? svc.serviceId._id : svc.serviceId,
           serviceName: typeof svc.serviceId === "object" ? svc.serviceId.name :
             availableServices.find((s) => s._id === svc.serviceId)?.name || "Servicio",
-          sessionsIncluded: svc.sessionsIncluded,
+          sessionsIncluded: svc.sessionsIncluded || 1,
         }))
       );
       setSelectedClasses(
@@ -86,13 +117,15 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
           classId: typeof cls.classId === "object" ? cls.classId._id : cls.classId,
           className: typeof cls.classId === "object" ? cls.classId.name :
             availableClasses.find((c) => c._id === cls.classId)?.name || "Clase",
-          sessionsIncluded: cls.sessionsIncluded,
+          sessionsIncluded: cls.sessionsIncluded || 1,
         }))
       );
     } else {
       setName("");
       setDescription("");
       setPrice(0);
+      setHasTiers(false);
+      setTiers([]);
       setValidityDays(30);
       setIsActive(true);
       setSelectedServices([]);
@@ -101,6 +134,21 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     setServiceSearch("");
     setClassSearch("");
   }, [servicePackage, isOpen]);
+
+  const handleToggleTiers = (checked: boolean) => {
+    setHasTiers(checked);
+    if (checked && tiers.length === 0) {
+      setTiers([newTier()]);
+    }
+  };
+
+  const handleAddTier = () => setTiers((prev) => [...prev, newTier()]);
+
+  const handleRemoveTier = (key: string) =>
+    setTiers((prev) => prev.filter((t) => t.key !== key));
+
+  const handleTierChange = (key: string, patch: Partial<EditingTier>) =>
+    setTiers((prev) => prev.map((t) => (t.key === key ? { ...t, ...patch } : t)));
 
   const handleAddService = (serviceName: string) => {
     const service = availableServices.find((s) => s.name === serviceName);
@@ -147,28 +195,47 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     );
   };
 
+  const tiersValid =
+    !hasTiers ||
+    (tiers.length > 0 &&
+      tiers.every((t) => t.label.trim().length > 0 && t.sessionsIncluded >= 1 && t.price >= 0));
+
   const canSave =
-    name.trim().length > 0 && price >= 0 && validityDays > 0 &&
-    (selectedServices.length > 0 || selectedClasses.length > 0);
+    name.trim().length > 0 &&
+    validityDays > 0 &&
+    (selectedServices.length > 0 || selectedClasses.length > 0) &&
+    (hasTiers ? tiersValid : price >= 0);
 
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
+      // Con niveles, las sesiones las define cada tier de forma uniforme —
+      // el sessionsIncluded por servicio/clase individual ya no aplica.
       const services: PackageServiceItem[] = selectedServices.map((s) => ({
         serviceId: s.serviceId,
-        sessionsIncluded: s.sessionsIncluded,
+        ...(hasTiers ? {} : { sessionsIncluded: s.sessionsIncluded }),
       }));
       const classes: PackageClassItem[] = selectedClasses.map((c) => ({
         classId: c.classId,
-        sessionsIncluded: c.sessionsIncluded,
+        ...(hasTiers ? {} : { sessionsIncluded: c.sessionsIncluded }),
       }));
 
       await onSave({
         _id: servicePackage?._id,
         name: name.trim(),
         description: description.trim(),
-        price,
+        ...(hasTiers
+          ? {
+              tiers: tiers.map((t) => ({
+                label: t.label.trim(),
+                sessionsIncluded: t.sessionsIncluded,
+                price: t.price,
+                courtesySessions: t.courtesySessions,
+              })),
+              price: null,
+            }
+          : { price, tiers: [] }),
         validityDays,
         isActive,
         services,
@@ -237,18 +304,26 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
               minRows={2}
               autosize
             />
-            <NumberInput
-              label="Precio"
-              description="Precio total del paquete"
-              prefix="$ "
-              thousandSeparator="."
-              decimalSeparator=","
-              value={price}
-              onChange={(value) => setPrice(typeof value === "number" ? value : 0)}
-              required
-              withAsterisk
-              min={0}
+            <Switch
+              label="Este paquete tiene niveles (ej: x4 / x8 / x12)"
+              description="Misma base de servicios/clases, distinta cantidad de sesiones — cada nivel con su propio precio, en vez de crear un paquete separado por cada uno"
+              checked={hasTiers}
+              onChange={(e) => handleToggleTiers(e.currentTarget.checked)}
             />
+            {!hasTiers && (
+              <NumberInput
+                label="Precio"
+                description="Precio total del paquete"
+                prefix="$ "
+                thousandSeparator="."
+                decimalSeparator=","
+                value={price}
+                onChange={(value) => setPrice(typeof value === "number" ? value : 0)}
+                required
+                withAsterisk
+                min={0}
+              />
+            )}
             <Box>
               <NumberInput
                 label="Vigencia (días)"
@@ -282,6 +357,94 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
           </Stack>
         </Paper>
 
+        {hasTiers && (
+          <Paper withBorder p="md" radius="md" shadow="xs">
+            <Group justify="space-between" mb="sm">
+              <Group gap="xs">
+                <ThemeIcon variant="light" color="teal" size="md" radius="md">
+                  <IconLayersSubtract size={16} />
+                </ThemeIcon>
+                <Title order={5}>Niveles del paquete</Title>
+              </Group>
+              <Badge variant="light" color="teal" size="lg">
+                {tiers.length} nivel{tiers.length !== 1 ? "es" : ""}
+              </Badge>
+            </Group>
+            <Divider mb="md" />
+
+            <Stack gap="sm">
+              {tiers.map((tier) => (
+                <Paper key={tier.key} withBorder p="sm" radius="sm">
+                  <Group align="flex-end" gap="sm" wrap="wrap">
+                    <TextInput
+                      label="Nombre del nivel"
+                      placeholder="Ej: x4"
+                      value={tier.label}
+                      onChange={(e) => handleTierChange(tier.key, { label: e.currentTarget.value })}
+                      w={140}
+                      required
+                    />
+                    <NumberInput
+                      label="Sesiones"
+                      value={tier.sessionsIncluded}
+                      onChange={(value) =>
+                        handleTierChange(tier.key, { sessionsIncluded: typeof value === "number" ? value : 1 })
+                      }
+                      min={1}
+                      max={100}
+                      w={100}
+                    />
+                    <NumberInput
+                      label="Precio"
+                      prefix="$ "
+                      thousandSeparator="."
+                      decimalSeparator=","
+                      value={tier.price}
+                      onChange={(value) =>
+                        handleTierChange(tier.key, { price: typeof value === "number" ? value : 0 })
+                      }
+                      min={0}
+                      w={140}
+                    />
+                    <NumberInput
+                      label="Cortesía"
+                      description="sesiones gratis extra"
+                      leftSection={<IconGift size={14} />}
+                      value={tier.courtesySessions}
+                      onChange={(value) =>
+                        handleTierChange(tier.key, { courtesySessions: typeof value === "number" ? value : 0 })
+                      }
+                      min={0}
+                      max={100}
+                      w={130}
+                    />
+                    <Tooltip label="Quitar nivel">
+                      <ActionIcon
+                        variant="light"
+                        color="red"
+                        onClick={() => handleRemoveTier(tier.key)}
+                        disabled={tiers.length === 1}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+
+            <Button
+              variant="light"
+              size="xs"
+              leftSection={<IconPlus size={14} />}
+              onClick={handleAddTier}
+              mt="md"
+            >
+              Agregar nivel
+            </Button>
+          </Paper>
+        )}
+
         <Paper withBorder p="md" radius="md" shadow="xs">
           <Group justify="space-between" mb="sm">
             <Title order={5}>Servicios Incluidos</Title>
@@ -314,26 +477,28 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
                   <Group justify="space-between" align="center">
                     <Text fw={500} style={{ flex: 1 }}>{svc.serviceName}</Text>
                     <Group gap="xs" align="center">
-                      <NumberInput
-                        label="Sesiones"
-                        value={svc.sessionsIncluded}
-                        onChange={(value) =>
-                          handleSessionsChange(
-                            svc.serviceId,
-                            typeof value === "number" ? value : 1
-                          )
-                        }
-                        min={1}
-                        max={100}
-                        w={100}
-                        size="xs"
-                      />
+                      {!hasTiers && (
+                        <NumberInput
+                          label="Sesiones"
+                          value={svc.sessionsIncluded}
+                          onChange={(value) =>
+                            handleSessionsChange(
+                              svc.serviceId,
+                              typeof value === "number" ? value : 1
+                            )
+                          }
+                          min={1}
+                          max={100}
+                          w={100}
+                          size="xs"
+                        />
+                      )}
                       <Tooltip label="Quitar servicio">
                         <ActionIcon
                           variant="light"
                           color="red"
                           onClick={() => handleRemoveService(svc.serviceId)}
-                          mt={20}
+                          mt={hasTiers ? 0 : 20}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>
@@ -386,19 +551,21 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
                   <Group justify="space-between" align="center">
                     <Text fw={500} style={{ flex: 1 }}>{cls.className}</Text>
                     <Group gap="xs" align="center">
-                      <NumberInput
-                        label="Sesiones"
-                        value={cls.sessionsIncluded}
-                        onChange={(value) =>
-                          handleClassSessionsChange(cls.classId, typeof value === "number" ? value : 1)
-                        }
-                        min={1}
-                        max={100}
-                        w={100}
-                        size="xs"
-                      />
+                      {!hasTiers && (
+                        <NumberInput
+                          label="Sesiones"
+                          value={cls.sessionsIncluded}
+                          onChange={(value) =>
+                            handleClassSessionsChange(cls.classId, typeof value === "number" ? value : 1)
+                          }
+                          min={1}
+                          max={100}
+                          w={100}
+                          size="xs"
+                        />
+                      )}
                       <Tooltip label="Quitar clase">
-                        <ActionIcon variant="light" color="red" onClick={() => handleRemoveClass(cls.classId)} mt={20}>
+                        <ActionIcon variant="light" color="red" onClick={() => handleRemoveClass(cls.classId)} mt={hasTiers ? 0 : 20}>
                           <IconTrash size={16} />
                         </ActionIcon>
                       </Tooltip>
@@ -413,7 +580,10 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
         <Divider />
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            {!canSave && "Completa nombre, precio, vigencia y al menos un servicio o clase"}
+            {!canSave &&
+              (hasTiers
+                ? "Completa nombre, vigencia, al menos un servicio o clase, y todos los niveles con nombre/sesiones/precio"
+                : "Completa nombre, precio, vigencia y al menos un servicio o clase")}
           </Text>
           <Group>
             <Button variant="default" onClick={onClose} size="md">

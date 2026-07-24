@@ -1,5 +1,5 @@
 import { GoogleMap, Marker } from "@react-google-maps/api";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Container,
   Title,
@@ -10,12 +10,16 @@ import {
   useMantineTheme,
   rem,
   Stack,
-  Badge,
   Grid,
   Group,
   Button,
   Divider,
   Anchor,
+  MantineTheme,
+  Accordion,
+  AspectRatio,
+  Center,
+  Image,
 } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
@@ -32,6 +36,7 @@ import {
   IconClock,
   IconSparkles,
   IconUserCircle,
+  IconStar,
 } from "@tabler/icons-react";
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
@@ -58,6 +63,7 @@ export function LandingLayout({
   organizationId,
   enableOnlineBooking = true,
 }: LandingLayoutProps) {
+  const navigate = useNavigate();
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
   const primaryLight = theme.colors[theme.primaryColor][1];
@@ -67,7 +73,6 @@ export function LandingLayout({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
-  const [activeCategory, setActiveCategory] = useState("all");
 
   const org = useSelector(selectOrganization);
 
@@ -195,26 +200,52 @@ export function LandingLayout({
     })();
   }, [organizationId]);
 
-  // Derive unique categories from services
-  const categories = useMemo(() => {
-    const types = Array.from(new Set(services.map((s) => s.type).filter(Boolean)));
-    return [
-      { id: "all", label: "Todos", count: services.length },
-      ...types.map((t) => ({
-        id: t,
-        label: t,
-        count: services.filter((s) => s.type === t).length,
-      })),
-    ];
-  }, [services]);
+  // El landing es un teaser corto, no el catálogo completo (ese vive en
+  // /servicios-precios): como mucho 3 secciones visibles en total (Destacados
+  // cuenta como una), con hasta 4 servicios cada una.
+  const SECTION_ITEM_LIMIT = 4;
+  const MAX_TOTAL_SECTIONS = 3;
 
-  const filteredServices = useMemo(
-    () =>
-      activeCategory === "all"
-        ? services.slice(0, 6)
-        : services.filter((s) => s.type === activeCategory).slice(0, 6),
-    [services, activeCategory]
+  // Destacados: sección/categoría principal, siempre primero si hay alguno.
+  const featuredServices = useMemo(
+    () => services.filter((s) => s.featured).slice(0, SECTION_ITEM_LIMIT),
+    [services]
   );
+
+  // Resto de servicios agrupados por tipo (categoría) en secciones — evita
+  // repetir en su categoría los que ya aparecen en Destacados.
+  const categorySections = useMemo(() => {
+    const featuredIds = new Set(featuredServices.map((s) => s._id));
+    const byType = new Map<string, Service[]>();
+    services.forEach((s) => {
+      if (featuredIds.has(s._id)) return;
+      const type = s.type || "Otros";
+      if (!byType.has(type)) byType.set(type, []);
+      byType.get(type)!.push(s);
+    });
+    const remainingSlots = MAX_TOTAL_SECTIONS - (featuredServices.length > 0 ? 1 : 0);
+    return Array.from(byType.entries())
+      .map(([type, list]) => ({
+        type,
+        count: list.length,
+        services: list.slice(0, SECTION_ITEM_LIMIT),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, Math.max(remainingSlots, 0));
+  }, [services, featuredServices]);
+
+  // Une Destacados + categorías en una sola lista para renderizarlas como
+  // acordeón (cada sección es "ocultable" pero arranca siempre abierta).
+  const serviceSections = useMemo(() => {
+    const list: { key: string; title: string; count?: number; services: Service[]; featured?: boolean }[] = [];
+    if (featuredServices.length > 0) {
+      list.push({ key: "featured", title: "Destacados", services: featuredServices, featured: true });
+    }
+    categorySections.forEach((s) => {
+      list.push({ key: s.type, title: s.type, count: s.count, services: s.services });
+    });
+    return list;
+  }, [featuredServices, categorySections]);
 
   const showLoyalty = org?.showLoyaltyProgram !== false;
   const hasLocation = !!(org?.address || org?.phoneNumber || weeklyHours.length > 0);
@@ -697,186 +728,58 @@ export function LandingLayout({
             </Text>
           </Box>
 
-          {/* Chips de categoría */}
-          {categories.length > 1 && !loadingServices && (
-            <Group gap="xs">
-              {categories.map((cat) => (
-                <Box
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  style={{
-                    height: rem(36),
-                    paddingInline: rem(16),
-                    borderRadius: rem(999),
-                    border: `1px solid ${activeCategory === cat.id ? primary : theme.colors.gray[3]}`,
-                    background:
-                      activeCategory === cat.id ? primary : theme.white,
-                    color:
-                      activeCategory === cat.id
-                        ? "white"
-                        : theme.colors.gray[7],
-                    fontSize: rem(13),
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: rem(6),
-                    transition: "all 0.15s ease",
-                    userSelect: "none",
-                  }}
-                >
-                  {cat.label}
-                  <Text
-                    span
-                    fz={rem(11)}
-                    style={{
-                      opacity: 0.65,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {cat.count}
-                  </Text>
-                </Box>
-              ))}
-            </Group>
-          )}
-
-          {/* Grid de tarjetas */}
+          {/* Secciones de servicios: Destacados primero, luego por categoría.
+              Acordeón "siempre abierto" — cada sección arranca expandida,
+              pero el visitante puede colapsar las que no le interesen. */}
           {loadingServices ? (
             <Text ta="center" c="dimmed" py="xl">
               Cargando servicios...
             </Text>
-          ) : filteredServices.length > 0 ? (
-            <Grid>
-              {filteredServices.map((service) => (
-                <Grid.Col key={service._id} span={{ base: 12, sm: 6, md: 4 }}>
-                  <Card
-                    shadow="xs"
-                    padding={0}
-                    radius="lg"
-                    withBorder
-                    style={{
-                      height: "100%",
-                      transition: "all 0.2s ease",
-                      cursor: "pointer",
-                      overflow: "hidden",
-                      borderColor: theme.colors.gray[2],
-                    }}
-                    className="landing-service-card"
-                  >
-                    <Stack gap={0} h="100%">
-                      {/* Imagen o placeholder */}
-                      <Box
-                        style={{
-                          width: "100%",
-                          aspectRatio: "4 / 3",
-                          position: "relative",
-                          overflow: "hidden",
-                          background:
-                            service.images && service.images.length > 0
-                              ? undefined
-                              : theme.colors.gray[1],
-                        }}
-                      >
-                        {service.images && service.images.length > 0 ? (
-                          <img
-                            src={service.images[0]}
-                            alt={service.name}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              display: "block",
-                            }}
-                          />
-                        ) : (
-                          <Box
-                            style={{
-                              position: "absolute",
-                              inset: 0,
-                              display: "flex",
-                              flexDirection: "column",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: rem(8),
-                            }}
-                          >
-                            <IconSparkles
-                              size={40}
-                              stroke={1.2}
-                              style={{ color: theme.colors.gray[4] }}
-                            />
-                            <Text
-                              fz="xs"
-                              fw={500}
-                              c={theme.colors.gray[5]}
-                              ta="center"
-                              px="md"
-                              lineClamp={2}
-                            >
-                              {service.name}
-                            </Text>
-                          </Box>
-                        )}
-                        <Badge
-                          color={theme.primaryColor}
-                          variant="light"
-                          size="sm"
-                          style={{ position: "absolute", top: 10, right: 10 }}
-                        >
-                          {service.type}
-                        </Badge>
-                      </Box>
-
-                      {/* Contenido */}
-                      <Stack gap="sm" p="lg" style={{ flex: 1 }}>
-                        <Box style={{ flex: 1 }}>
-                          <Text fw={500} fz="md" c={theme.colors.gray[9]} lineClamp={2}>
-                            {service.name}
-                          </Text>
-                          {service.description && (
-                            <Text fz="sm" c={theme.colors.gray[6]} lineClamp={2} mt={4}>
-                              {service.description}
-                            </Text>
-                          )}
-                        </Box>
-
-                        <Divider color={theme.colors.gray[2]} />
-
-                        <Group justify="space-between" align="center">
-                          <Box>
-                            {!service.hidePrice && (
-                              <Text fw={500} fz="lg" c={primary} style={{ letterSpacing: "-0.01em" }}>
-                                {formatCurrency(service.price, org?.currency || "COP")}
-                              </Text>
-                            )}
-                            <Group gap={4} align="center">
-                              <IconClock size={11} color={theme.colors.gray[5]} />
-                              <Text fz="xs" c={theme.colors.gray[5]}>
-                                {service.duration} min
-                              </Text>
-                            </Group>
-                          </Box>
-                          {enableOnlineBooking && (
-                            <Button
-                              component={Link}
-                              to={`/online-reservation?serviceId=${service._id}`}
-                              size="xs"
-                              variant="light"
-                              color={theme.primaryColor}
-                              radius="md"
-                              rightSection={<IconArrowRight size={12} />}
-                            >
-                              Reservar
-                            </Button>
-                          )}
-                        </Group>
-                      </Stack>
-                    </Stack>
-                  </Card>
-                </Grid.Col>
+          ) : serviceSections.length > 0 ? (
+            <Accordion
+              multiple
+              defaultValue={serviceSections.map((s) => s.key)}
+              chevronPosition="right"
+              styles={{
+                item: {
+                  border: "none",
+                  borderBottom: `1px solid ${theme.colors.gray[2]}`,
+                },
+                control: { padding: 0 },
+                label: { paddingBlock: rem(14) },
+                content: { padding: 0, paddingBottom: rem(20) },
+              }}
+            >
+              {serviceSections.map((section) => (
+                <Accordion.Item key={section.key} value={section.key}>
+                  <Accordion.Control>
+                    <Group gap={6} wrap="nowrap">
+                      {section.featured && (
+                        <IconStar size={18} style={{ color: primary, flexShrink: 0 }} fill={primary} />
+                      )}
+                      <Title order={4} fw={600} c={theme.colors.gray[9]}>
+                        {section.title}
+                      </Title>
+                      {section.count !== undefined && (
+                        <Text fz="xs" c={theme.colors.gray[5]} style={{ fontVariantNumeric: "tabular-nums" }}>
+                          {section.count}
+                        </Text>
+                      )}
+                    </Group>
+                  </Accordion.Control>
+                  <Accordion.Panel>
+                    <ServicesGrid
+                      services={section.services}
+                      theme={theme}
+                      primary={primary}
+                      org={org}
+                      enableOnlineBooking={enableOnlineBooking}
+                      navigate={navigate}
+                    />
+                  </Accordion.Panel>
+                </Accordion.Item>
               ))}
-            </Grid>
+            </Accordion>
           ) : (
             <Text ta="center" c="dimmed" py="xl">
               No hay servicios disponibles
@@ -1457,5 +1360,114 @@ export function LandingLayout({
         }
       `}</style>
     </Box>
+  );
+}
+
+// ── Grilla de tarjetas de servicio ──────────────────────────────────────────
+// Extraída para reusarse tanto en la sección "Destacados" como en cada
+// sección de categoría, sin duplicar el marcado de la tarjeta.
+function ServicesGrid({
+  services,
+  theme,
+  primary,
+  org,
+  enableOnlineBooking,
+  navigate,
+}: {
+  services: Service[];
+  theme: MantineTheme;
+  primary: string;
+  org?: { currency?: string } | null;
+  enableOnlineBooking: boolean;
+  navigate: (path: string) => void;
+}) {
+  return (
+    <Grid gutter={{ base: "sm", sm: "md" }}>
+      {services.map((service) => (
+        <Grid.Col key={service._id} span={{ base: 6, sm: 6, md: 4, lg: 3 }}>
+          <Card
+            shadow="xs"
+            padding={0}
+            radius="lg"
+            withBorder
+            style={{
+              height: "100%",
+              transition: "all 0.2s ease",
+              cursor: "pointer",
+              overflow: "hidden",
+              borderColor: theme.colors.gray[2],
+            }}
+            className="landing-service-card"
+            onClick={() => navigate(`/servicio/${service._id}`, { state: { backTo: "/" } })}
+          >
+            <Stack gap={0} h="100%">
+              {/* Imagen o placeholder */}
+              <AspectRatio ratio={4 / 3}>
+                {service.images && service.images.length > 0 ? (
+                  <Image src={service.images[0]} fit="cover" alt={service.name} />
+                ) : (
+                  <Center bg={theme.colors.gray[1]}>
+                    <Stack align="center" gap={rem(8)}>
+                      <IconSparkles
+                        size={40}
+                        stroke={1.2}
+                        style={{ color: theme.colors.gray[4] }}
+                      />
+                      <Text
+                        fz="xs"
+                        fw={500}
+                        c={theme.colors.gray[5]}
+                        ta="center"
+                        px="md"
+                        lineClamp={2}
+                      >
+                        {service.name}
+                      </Text>
+                    </Stack>
+                  </Center>
+                )}
+              </AspectRatio>
+
+              {/* Contenido */}
+              <Stack gap={6} p="sm" style={{ flex: 1 }}>
+                <Text fw={500} fz="sm" c={theme.colors.gray[9]} lineClamp={2}>
+                  {service.name}
+                </Text>
+
+                <Group justify="space-between" align="center" gap={6}>
+                  {!service.hidePrice && (
+                    <Text fw={600} fz="sm" c={primary} style={{ letterSpacing: "-0.01em" }}>
+                      {service.price === 0 ? "Gratis" : formatCurrency(service.price, org?.currency || "COP")}
+                    </Text>
+                  )}
+                  <Group gap={4} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
+                    <IconClock size={11} color={theme.colors.gray[5]} />
+                    <Text fz="xs" c={theme.colors.gray[5]}>
+                      {service.duration} min
+                    </Text>
+                  </Group>
+                </Group>
+
+                {enableOnlineBooking && (
+                  <Box onClick={(e) => e.stopPropagation()} mt="auto" pt={2}>
+                    <Button
+                      component={Link}
+                      to={`/online-reservation?serviceId=${service._id}`}
+                      size="xs"
+                      variant="light"
+                      color={theme.primaryColor}
+                      radius="md"
+                      fullWidth
+                    >
+                      Reservar
+                    </Button>
+                  </Box>
+                )}
+              </Stack>
+            </Stack>
+          </Card>
+        </Grid.Col>
+      ))}
+    </Grid>
   );
 }

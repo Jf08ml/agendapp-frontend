@@ -17,7 +17,7 @@ import {
 } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
-import { IconRepeat } from "@tabler/icons-react";
+import { IconRepeat, IconPackage } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
@@ -65,6 +65,8 @@ interface Props {
   recurrencePattern?: RecurrencePattern;
   seriesPreview?: SeriesPreview | null;
   timeFormat?: string;
+  // Se detectó un paquete de sesiones que cubre esta reserva — el costo es $0.
+  usingPackage?: boolean;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -87,6 +89,7 @@ export default function StepMultiServiceSummary({
   recurrencePattern,
   seriesPreview,
   timeFormat,
+  usingPackage = false,
 }: Props) {
   if (!times) return null;
 
@@ -110,11 +113,13 @@ export default function StepMultiServiceSummary({
     startText = formatTime(times.intervals[0].from, timeFormat);
   }
 
-  // Total del bloque
-  const grandTotal = times.intervals.reduce((acc, iv) => {
-    const svc = svcMap[iv.serviceId];
-    return acc + toNumber(svc?.price);
-  }, 0);
+  // Total del bloque — $0 si se paga con un paquete de sesiones ya cubierto.
+  const grandTotal = usingPackage
+    ? 0
+    : times.intervals.reduce((acc, iv) => {
+        const svc = svcMap[iv.serviceId];
+        return acc + toNumber(svc?.price);
+      }, 0);
 
   // Si algún servicio tiene precio oculto, no mostrar precios ni total
   const anyHidePrice = times.intervals.some((iv) => svcMap[iv.serviceId]?.hidePrice);
@@ -139,6 +144,15 @@ export default function StepMultiServiceSummary({
         </Group>
       </Group>
 
+      {usingPackage && (
+        <Group gap={6} p="xs" style={{ borderRadius: 8 }} bg="green.0">
+          <IconPackage size={16} color="var(--mantine-color-green-7)" />
+          <Text size="sm" fw={600} c="green.8">
+            Esta reserva se paga con tu paquete de sesiones — no pagas nada ahora.
+          </Text>
+        </Group>
+      )}
+
       <Divider />
 
       <Paper withBorder p="md" radius="md">
@@ -158,7 +172,7 @@ export default function StepMultiServiceSummary({
             {times.intervals.map((iv, idx) => {
               const svc = svcMap[iv.serviceId];
               const emp = iv.employeeId ? empMap[iv.employeeId] : undefined;
-              const price = toNumber(svc?.price);
+              const price = usingPackage ? 0 : toNumber(svc?.price);
 
               // Usar strings originales si existen
               // eslint-disable-next-line @typescript-eslint/no-explicit-any

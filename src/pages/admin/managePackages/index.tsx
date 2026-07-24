@@ -20,6 +20,7 @@ import {
   Stack,
   Paper,
   Tabs,
+  List,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import {
@@ -40,7 +41,8 @@ import {
   getServicePackages,
   createServicePackage,
   updateServicePackage,
-  deleteServicePackage,
+  permanentlyDeleteServicePackage,
+  forceDeleteServicePackage,
   assignPackageToClient,
   ServicePackage,
 } from "../../../services/packageService";
@@ -170,33 +172,81 @@ const AdminPackages: React.FC = () => {
     }
   };
 
-  const confirmDelete = (pkg: ServicePackage) => {
+  const confirmPermanentDelete = (pkg: ServicePackage) => {
     modals.openConfirmModal({
-      title: "Desactivar paquete",
+      title: "Eliminar paquete definitivamente",
       children: (
         <Text size="sm">
-          ¿Seguro que deseas desactivar el paquete "{pkg.name}"? Los paquetes ya
-          asignados a clientes no se verán afectados.
+          Esta acción eliminará "{pkg.name}" de forma permanente y no se puede
+          deshacer. Solo es posible si el paquete nunca fue vendido ni
+          asignado a un cliente — si ya tiene ventas, te ofreceremos forzar la
+          eliminación o puedes desactivarlo en su lugar.
         </Text>
       ),
-      labels: { confirm: "Desactivar", cancel: "Cancelar" },
+      labels: { confirm: "Eliminar definitivamente", cancel: "Cancelar" },
       confirmProps: { color: "red" },
       onConfirm: async () => {
         try {
-          await deleteServicePackage(pkg._id, organizationId!);
-          setPackages((prev) =>
-            prev.map((p) => (p._id === pkg._id ? { ...p, isActive: false } : p))
-          );
+          await permanentlyDeleteServicePackage(pkg._id, organizationId!);
+          setPackages((prev) => prev.filter((p) => p._id !== pkg._id));
           showNotification({
-            title: "Paquete desactivado",
-            message: "Se desactivó correctamente",
+            title: "Paquete eliminado",
+            message: "Se eliminó permanentemente",
             color: "green",
           });
         } catch (error) {
-          console.error(error);
+          const message =
+            error instanceof Error ? error.message : "No se pudo eliminar el paquete";
+          const blockedBySales =
+            message.includes("ya fue vendido") || message.includes("pagos registrados");
+          if (blockedBySales) {
+            confirmForceDelete(pkg, message);
+          } else {
+            showNotification({ title: "No se pudo eliminar", message, color: "red" });
+          }
+        }
+      },
+    });
+  };
+
+  const confirmForceDelete = (pkg: ServicePackage, reason: string) => {
+    modals.openConfirmModal({
+      title: "¿Forzar eliminación total?",
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">{reason}</Text>
+          <Text size="sm" fw={600} c="red">
+            Puedes forzar la eliminación, pero esto borra TODO lo relacionado
+            con "{pkg.name}" de forma irreversible:
+          </Text>
+          <List size="sm" spacing={4}>
+            <List.Item>Los paquetes ya comprados/asignados a clientes</List.Item>
+            <List.Item>Las citas y clases agendadas pagadas con esas sesiones</List.Item>
+            <List.Item>El historial de compra y pagos de ese paquete</List.Item>
+          </List>
+          <Text size="xs" c="dimmed">
+            Los clientes afectados perderán ese historial por completo.
+          </Text>
+        </Stack>
+      ),
+      labels: { confirm: "Sí, forzar eliminación total", cancel: "Cancelar" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        try {
+          const deleted = await forceDeleteServicePackage(pkg._id, organizationId!);
+          setPackages((prev) => prev.filter((p) => p._id !== pkg._id));
           showNotification({
-            title: "Error",
-            message: "No se pudo desactivar el paquete",
+            title: "Paquete eliminado",
+            message: deleted
+              ? `Se eliminó junto con ${deleted.clientPackages} paquete(s) de cliente, ${deleted.appointments} cita(s), ${deleted.enrollments} clase(s) y ${deleted.reservations} reserva(s).`
+              : "Se eliminó permanentemente",
+            color: "green",
+          });
+        } catch (error) {
+          showNotification({
+            title: "No se pudo eliminar",
+            message:
+              error instanceof Error ? error.message : "No se pudo eliminar el paquete",
             color: "red",
           });
         }
@@ -383,9 +433,9 @@ const AdminPackages: React.FC = () => {
                       <Menu.Item
                         color="red"
                         leftSection={<BsTrash />}
-                        onClick={() => confirmDelete(pkg)}
+                        onClick={() => confirmPermanentDelete(pkg)}
                       >
-                        Desactivar paquete
+                        Eliminar definitivamente
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
@@ -412,9 +462,11 @@ const AdminPackages: React.FC = () => {
                           <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
                             {getServiceName(svc.serviceId)}
                           </Text>
-                          <Badge variant="light" size="sm" color="violet">
-                            {svc.sessionsIncluded} sesiones
-                          </Badge>
+                          {svc.sessionsIncluded != null && (
+                            <Badge variant="light" size="sm" color="violet">
+                              {svc.sessionsIncluded} sesiones
+                            </Badge>
+                          )}
                         </Group>
                       ))}
                     </Stack>
@@ -432,8 +484,34 @@ const AdminPackages: React.FC = () => {
                           <Text size="sm" lineClamp={1} style={{ flex: 1 }}>
                             {getClassName(cls.classId)}
                           </Text>
-                          <Badge variant="light" size="sm" color="grape">
-                            {cls.sessionsIncluded} sesiones
+                          {cls.sessionsIncluded != null && (
+                            <Badge variant="light" size="sm" color="grape">
+                              {cls.sessionsIncluded} sesiones
+                            </Badge>
+                          )}
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Paper>
+                )}
+
+                {(pkg.tiers?.length ?? 0) > 0 && (
+                  <Paper withBorder p="xs" radius="sm" mb="sm" bg="teal.0">
+                    <Text size="xs" fw={600} mb={4} c="teal.8">
+                      NIVELES
+                    </Text>
+                    <Stack gap={4}>
+                      {pkg.tiers!.map((tier) => (
+                        <Group key={tier._id || tier.label} justify="space-between" gap="xs" wrap="nowrap">
+                          <Text size="sm" fw={600} style={{ flexShrink: 0 }}>
+                            {tier.label}
+                          </Text>
+                          <Text size="xs" c="dimmed" lineClamp={1} style={{ flex: 1 }}>
+                            {tier.sessionsIncluded} sesiones
+                            {!!tier.courtesySessions && ` + ${tier.courtesySessions} cortesía`}
+                          </Text>
+                          <Badge variant="light" size="sm" color="teal">
+                            {formatCurrency(tier.price, currency)}
                           </Badge>
                         </Group>
                       ))}
@@ -442,9 +520,15 @@ const AdminPackages: React.FC = () => {
                 )}
 
                 <Group justify="space-between" align="center">
-                  <Badge color="teal" variant="light" size="xl" radius="md">
-                    {formatCurrency(pkg.price, currency)}
-                  </Badge>
+                  {(pkg.tiers?.length ?? 0) > 0 ? (
+                    <Badge color="teal" variant="light" size="xl" radius="md">
+                      Desde {formatCurrency(Math.min(...pkg.tiers!.map((t) => t.price)), currency)}
+                    </Badge>
+                  ) : (
+                    <Badge color="teal" variant="light" size="xl" radius="md">
+                      {formatCurrency(pkg.price ?? 0, currency)}
+                    </Badge>
+                  )}
                   <Tooltip label="Asignar a cliente">
                     <ActionIcon
                       variant="light"

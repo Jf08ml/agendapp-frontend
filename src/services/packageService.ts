@@ -7,13 +7,25 @@ import { handleAxiosError } from "../utils/handleAxiosError";
 
 export interface PackageServiceItem {
   serviceId: string;
-  sessionsIncluded: number;
+  // Obligatorio solo si el paquete NO tiene niveles — con niveles, las
+  // sesiones las define cada tier de forma uniforme.
+  sessionsIncluded?: number;
 }
 
 // 📚 Clase incluida en la plantilla de paquete
 export interface PackageClassItem {
   classId: string;
+  sessionsIncluded?: number;
+}
+
+// 🎚️ Nivel/variante del paquete (ej: "x4", "x8", "x12") — mismo servicio/clase
+// base, distinta cantidad de sesiones, precio y sesiones de cortesía.
+export interface PackageTier {
+  _id?: string;
+  label: string;
   sessionsIncluded: number;
+  price: number;
+  courtesySessions?: number;
 }
 
 export interface ServicePackage {
@@ -23,7 +35,10 @@ export interface ServicePackage {
   organizationId: string;
   services: PackageServiceItem[];
   classes?: PackageClassItem[];
-  price: number;
+  // Obligatorio solo si el paquete NO tiene niveles (tiers vacío/ausente).
+  price?: number;
+  // Niveles del paquete. Vacío = paquete "simple" (un solo price/sessionsIncluded).
+  tiers?: PackageTier[];
   validityDays: number;
   isActive: boolean;
   createdAt: string;
@@ -37,6 +52,8 @@ export interface ClientPackageService {
   sessionsIncluded: number;
   sessionsUsed: number;
   sessionsRemaining: number;
+  // Cuántas de sessionsIncluded fueron de cortesía (informativo).
+  courtesySessions?: number;
 }
 
 // 📚 Crédito de clase en el paquete del cliente
@@ -47,6 +64,7 @@ export interface ClientPackageClass {
   sessionsIncluded: number;
   sessionsUsed: number;
   sessionsRemaining: number;
+  courtesySessions?: number;
 }
 
 export interface ConsumptionHistoryItem {
@@ -77,6 +95,8 @@ export interface ClientPackage {
   organizationId: string;
   services: ClientPackageService[];
   classes?: ClientPackageClass[];
+  // Nivel comprado, si el paquete tenía niveles (ej: "x8"). null si no.
+  tierLabel?: string | null;
   purchaseDate: string;
   expirationDate: string;
   status: "active" | "expired" | "exhausted" | "cancelled";
@@ -164,6 +184,47 @@ export const deleteServicePackage = async (id: string, organizationId: string): 
   }
 };
 
+// Borrado permanente (irreversible). El backend lo rechaza si el paquete ya
+// fue vendido/asignado a algún cliente — en ese caso hay que desactivarlo.
+export const permanentlyDeleteServicePackage = async (
+  id: string,
+  organizationId: string
+): Promise<void> => {
+  try {
+    await apiPackage.delete<Response<void>>(`/${id}/permanent`, {
+      data: { organizationId },
+    });
+  } catch (error) {
+    handleAxiosError(error, "No se pudo eliminar el paquete");
+  }
+};
+
+export interface DeletedPackageCascade {
+  clientPackages: number;
+  appointments: number;
+  enrollments: number;
+  reservations: number;
+  orders: number;
+}
+
+// Borrado FORZADO (irreversible): ignora ventas/asignaciones existentes y
+// elimina en cascada los ClientPackage y también las citas/clases/reservas
+// (Appointment/Enrollment/Reservation) pagadas con esas sesiones.
+export const forceDeleteServicePackage = async (
+  id: string,
+  organizationId: string
+): Promise<DeletedPackageCascade | undefined> => {
+  try {
+    const response = await apiPackage.delete<Response<DeletedPackageCascade>>(
+      `/${id}/force`,
+      { data: { organizationId } }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "No se pudo eliminar el paquete de forma forzada");
+  }
+};
+
 // =============================================
 // ClientPackage (asignación y consulta)
 // =============================================
@@ -175,6 +236,8 @@ export interface AssignPackagePayload {
   paymentMethod: string;
   paymentNotes?: string;
   purchaseDate?: string;
+  // Requerido cuando el paquete tiene niveles (tiers).
+  tierId?: string;
 }
 
 export const assignPackageToClient = async (

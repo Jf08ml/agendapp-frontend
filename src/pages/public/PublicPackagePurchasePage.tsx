@@ -19,6 +19,7 @@ import {
   TextInput,
   Textarea,
   Divider,
+  SegmentedControl,
 } from "@mantine/core";
 import {
   IconCheck,
@@ -26,6 +27,7 @@ import {
   IconClock,
   IconAlertCircle,
   IconShoppingCart,
+  IconGift,
 } from "@tabler/icons-react";
 import { CountryCode } from "libphonenumber-js";
 import { useSelector } from "react-redux";
@@ -75,6 +77,11 @@ const IDENTIFIER_LABELS: Record<string, string> = {
 
 const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
+const hasTiers = (pkg: PublicPackageItem | null) => (pkg?.tiers?.length ?? 0) > 0;
+
+const minTierPrice = (pkg: PublicPackageItem) =>
+  Math.min(...(pkg.tiers || []).map((t) => t.price));
+
 // Página pública para que un cliente compre un paquete y lo pague online (MP).
 // El ClientPackage se crea cuando el webhook confirma el pago.
 export default function PublicPackagePurchasePage() {
@@ -104,6 +111,7 @@ export default function PublicPackagePurchasePage() {
 
   // ── Modal de compra ────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<PublicPackageItem | null>(null);
+  const [tierId, setTierId] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerForm>(emptyCustomer());
   const [phoneValid, setPhoneValid] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -131,8 +139,14 @@ export default function PublicPackagePurchasePage() {
     })();
   }, [organization?._id]);
 
+  const selectedTier = selected?.tiers?.find((t) => t._id === tierId) || null;
+  const selectedPrice = hasTiers(selected)
+    ? selectedTier?.price ?? 0
+    : selected?.price ?? 0;
+
   const openBuy = (pkg: PublicPackageItem) => {
     setSelected(pkg);
+    setTierId(pkg.tiers?.[0]?._id || null);
     setForm(emptyCustomer());
     setPhoneValid(false);
     setPhoneError(null);
@@ -215,6 +229,10 @@ export default function PublicPackagePurchasePage() {
       setFormError("Ingresa tu número de documento.");
       return;
     }
+    if (hasTiers(selected) && !tierId) {
+      setFormError("Selecciona un nivel del paquete.");
+      return;
+    }
 
     setSubmitting(true);
     setFormError(null);
@@ -230,6 +248,7 @@ export default function PublicPackagePurchasePage() {
           birthDate: form.birthDate || undefined,
           notes: form.notes.trim() || undefined,
         },
+        ...(hasTiers(selected) ? { tierId: tierId! } : {}),
       };
 
       // MP (automático) si está conectado y no se prefiere transferencia; si no,
@@ -330,68 +349,87 @@ export default function PublicPackagePurchasePage() {
         </Center>
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-          {packages.map((pkg) => (
-            <Card key={pkg._id} withBorder radius="md" padding="lg">
-              <Stack gap="sm" h="100%">
-                <Stack gap={4}>
-                  <Text fw={600} size="lg">
-                    {pkg.name}
-                  </Text>
-                  {pkg.description && (
-                    <Text size="sm" c="dimmed" lineClamp={3}>
-                      {pkg.description}
+          {packages.map((pkg) => {
+            const tiered = hasTiers(pkg);
+            return (
+              <Card key={pkg._id} withBorder radius="md" padding="lg">
+                <Stack gap="sm" h="100%">
+                  <Stack gap={4}>
+                    <Text fw={600} size="lg">
+                      {pkg.name}
                     </Text>
+                    {pkg.description && (
+                      <Text size="sm" c="dimmed" lineClamp={3}>
+                        {pkg.description}
+                      </Text>
+                    )}
+                  </Stack>
+
+                  <Group gap="xs">
+                    <Text fw={700} size="xl">
+                      {tiered
+                        ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}`
+                        : formatCurrency(pkg.price, currency)}
+                    </Text>
+                  </Group>
+
+                  {tiered && (
+                    <Group gap={6}>
+                      {pkg.tiers!.map((t) => (
+                        <Badge key={t._id} variant="outline" color="violet" size="sm">
+                          {t.label}
+                        </Badge>
+                      ))}
+                    </Group>
                   )}
+
+                  <Badge
+                    variant="light"
+                    color="gray"
+                    leftSection={<IconClock size={12} />}
+                  >
+                    Vigencia {pkg.validityDays} días
+                  </Badge>
+
+                  <List
+                    spacing={4}
+                    size="sm"
+                    center
+                    icon={
+                      <ThemeIcon color="teal" size={16} radius="xl">
+                        <IconCheck size={11} />
+                      </ThemeIcon>
+                    }
+                  >
+                    {(pkg.services || []).map((s, i) => (
+                      <List.Item key={`s-${i}`}>
+                        {tiered
+                          ? s.serviceId?.name || "Servicio"
+                          : `${s.sessionsIncluded}× ${s.serviceId?.name || "Servicio"}`}
+                      </List.Item>
+                    ))}
+                    {(pkg.classes || []).map((c, i) => (
+                      <List.Item key={`c-${i}`}>
+                        {tiered
+                          ? c.classId?.name || "Clase"
+                          : `${c.sessionsIncluded}× ${c.classId?.name || "Clase"}`}
+                      </List.Item>
+                    ))}
+                  </List>
+
+                  <Button
+                    mt="auto"
+                    fullWidth
+                    leftSection={<IconShoppingCart size={16} />}
+                    disabled={!canPay}
+                    onClick={() => openBuy(pkg)}
+                  >
+                    Comprar
+                  </Button>
                 </Stack>
-
-                <Group gap="xs">
-                  <Text fw={700} size="xl">
-                    {formatCurrency(pkg.price, currency)}
-                  </Text>
-                </Group>
-
-                <Badge
-                  variant="light"
-                  color="gray"
-                  leftSection={<IconClock size={12} />}
-                >
-                  Vigencia {pkg.validityDays} días
-                </Badge>
-
-                <List
-                  spacing={4}
-                  size="sm"
-                  center
-                  icon={
-                    <ThemeIcon color="teal" size={16} radius="xl">
-                      <IconCheck size={11} />
-                    </ThemeIcon>
-                  }
-                >
-                  {(pkg.services || []).map((s, i) => (
-                    <List.Item key={`s-${i}`}>
-                      {s.sessionsIncluded}× {s.serviceId?.name || "Servicio"}
-                    </List.Item>
-                  ))}
-                  {(pkg.classes || []).map((c, i) => (
-                    <List.Item key={`c-${i}`}>
-                      {c.sessionsIncluded}× {c.classId?.name || "Clase"}
-                    </List.Item>
-                  ))}
-                </List>
-
-                <Button
-                  mt="auto"
-                  fullWidth
-                  leftSection={<IconShoppingCart size={16} />}
-                  disabled={!canPay}
-                  onClick={() => openBuy(pkg)}
-                >
-                  Comprar
-                </Button>
-              </Stack>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </SimpleGrid>
       )}
 
@@ -400,8 +438,36 @@ export default function PublicPackagePurchasePage() {
           <Stack gap="md">
             <Group justify="space-between">
               <Text fw={600}>{selected.name}</Text>
-              <Text fw={700}>{formatCurrency(selected.price, currency)}</Text>
+              <Text fw={700}>{formatCurrency(selectedPrice, currency)}</Text>
             </Group>
+
+            {hasTiers(selected) && (
+              <Stack gap="xs">
+                <Text size="sm" fw={500}>Nivel</Text>
+                <SegmentedControl
+                  fullWidth
+                  value={tierId || undefined}
+                  onChange={setTierId}
+                  data={(selected.tiers || []).map((t) => ({
+                    value: t._id,
+                    label: t.label,
+                  }))}
+                />
+                {selectedTier && (
+                  <Group gap={6} align="center">
+                    <Text size="xs" c="dimmed">
+                      {selectedTier.sessionsIncluded} sesiones
+                      {!!selectedTier.courtesySessions &&
+                        ` + ${selectedTier.courtesySessions} de cortesía`}
+                    </Text>
+                    {!!selectedTier.courtesySessions && (
+                      <IconGift size={14} color="var(--mantine-color-violet-6)" />
+                    )}
+                  </Group>
+                )}
+              </Stack>
+            )}
+
             <Divider />
 
             {/* Identificador configurado por la organización (siempre primero) */}
@@ -537,7 +603,7 @@ export default function PublicPackagePurchasePage() {
               leftSection={<IconShoppingCart size={16} />}
               onClick={handleBuy}
             >
-              Pagar {formatCurrency(selected.price, currency)}
+              Pagar {formatCurrency(selectedPrice, currency)}
             </Button>
             <Text size="xs" c="dimmed" ta="center">
               {willUseMp

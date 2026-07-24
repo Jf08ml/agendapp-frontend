@@ -45,6 +45,10 @@ export interface BookingPayload {
     birthDate: null;
   };
   organizationId: string;
+  // Presente cuando el backend detectó un paquete de sesiones del cliente que
+  // cubre todos los servicios pedidos — la reserva se paga con el paquete
+  // ($0, sin depósito).
+  clientPackageId?: string;
 }
 
 export const sendBookingMessage = async (

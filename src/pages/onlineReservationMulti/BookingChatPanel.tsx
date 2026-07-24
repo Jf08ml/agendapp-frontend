@@ -159,7 +159,10 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
     try {
       // 💳 Pay-to-confirm: si la org exige depósito, cobramos antes de crear la
       // reserva. MP (automático) si está conectado; si no, transferencia + comprobante.
+      // Si el servicio ya se paga con un paquete de sesiones (clientPackageId en
+      // el payload preparado por el AI), el costo es $0 — no se cobra depósito.
       const depositConfigured =
+        !pendingPayload?.clientPackageId &&
         !!org?.requireReservationDeposit &&
         (org?.reservationDepositPercentage ?? 0) > 0;
       const hasMp = !!org?.mpCollect?.connected;
@@ -531,7 +534,14 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                     </Alert>
                   )}
 
-                  {!!org?.requireReservationDeposit &&
+                  {pendingPayload?.clientPackageId ? (
+                    <Alert color="green" icon={<IconCheck size={14} />} radius="md" py="xs">
+                      <Text size="xs" fw={600}>
+                        Se paga con tu paquete de sesiones — no pagas nada ahora.
+                      </Text>
+                    </Alert>
+                  ) : (
+                    !!org?.requireReservationDeposit &&
                     (org?.reservationDepositPercentage ?? 0) > 0 &&
                     (!!org?.mpCollect?.connected ||
                       (org?.paymentMethods?.length ?? 0) > 0) && (
@@ -540,7 +550,8 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                         currency={org?.currency ?? "COP"}
                         objectLabel="tu reserva"
                       />
-                    )}
+                    )
+                  )}
 
                   <Flex gap="sm">
                     <Button

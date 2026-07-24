@@ -55,6 +55,7 @@ import ReceiptReviewPage from "../pages/admin/payments/ReceiptReviewPage";
 import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage";
 import PublicStorePage from "../pages/public/PublicStorePage";
 import StoreOrdersPage from "../pages/admin/storeOrders";
+import PublicServiceDetailPage from "../pages/public/PublicServiceDetailPage";
 
 const generalRoutes = [
   {
@@ -127,6 +128,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Nuestros Servicios",
       description: "Consulta nuestros  en Galaxia Glamour.",
+    },
+  },
+  {
+    path: "/servicio/:id",
+    component: PublicServiceDetailPage,
+    MediaMetadata: {
+      title: "Servicio",
+      description: "Detalle de servicio, compartible por enlace.",
     },
   },
   // {

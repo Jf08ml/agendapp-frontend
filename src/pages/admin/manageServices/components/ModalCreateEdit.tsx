@@ -9,6 +9,7 @@ import {
   Chip,
   Button,
   Image,
+  AspectRatio,
   ActionIcon,
   Group,
   Text,
@@ -30,6 +31,7 @@ import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
 import { BsImage, BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle } from "react-icons/bs";
 import { Service, ServiceCost } from "../../../../services/serviceService";
+import ImageCropModal from "../../../../components/ImageCropModal";
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -64,6 +66,9 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     followUpDays: null,
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
+  // Cola de imágenes recién soltadas pendientes de pasar por el recortador
+  // (una a la vez; al confirmar/omitir/quitar se avanza a la siguiente).
+  const [cropQueue, setCropQueue] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [isFreeService, setIsFreeService] = useState(false);
   const [hasCosts, setHasCosts] = useState(false);
@@ -110,7 +115,25 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   }, [service]);
 
   const handleDrop = (files: File[]) => {
-    setImageFiles((prev) => [...prev, ...files]);
+    setCropQueue((prev) => [...prev, ...files]);
+  };
+
+  // Avanza la cola de recorte (se llama tras confirmar, omitir o quitar la
+  // imagen actual — en los tres casos la cola pierde su primer elemento).
+  const advanceCropQueue = () => setCropQueue((prev) => prev.slice(1));
+
+  const handleCropConfirm = (croppedFile: File) => {
+    setImageFiles((prev) => [...prev, croppedFile]);
+    advanceCropQueue();
+  };
+
+  const handleCropSkip = (originalFile: File) => {
+    setImageFiles((prev) => [...prev, originalFile]);
+    advanceCropQueue();
+  };
+
+  const handleCropCancel = () => {
+    advanceCropQueue();
   };
 
   const handleRemoveImage = (index: number) => {
@@ -164,6 +187,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   };
 
   return (
+    <>
     <Modal
       opened={isOpen}
       onClose={onClose}
@@ -439,7 +463,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                       <div>
                         <Text size="sm" fw={600} ta="center">Arrastra imágenes aquí o haz clic</Text>
                         <Text size="xs" c="dimmed" ta="center">Formatos: JPEG, PNG, WebP</Text>
-                        <Text size="xs" c="dimmed" ta="center">Dimensiones ideales: 1200 × 675 px (proporción 16:9)</Text>
+                        <Text size="xs" c="dimmed" ta="center">Podrás recortarla a proporción 4:3 antes de guardar</Text>
                       </div>
                     </Stack>
                   </Center>
@@ -454,15 +478,15 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
                     {imageFiles.map((file, idx) => (
                       <Paper key={idx} pos="relative" withBorder radius="md" p={4}>
-                        <Image
-                          src={typeof file === "string" ? file : URL.createObjectURL(file)}
-                          alt={`Imagen ${idx + 1}`}
-                          radius="sm"
-                          h={120}
-                          w="100%"
-                          fit="cover"
-                        />
-                        
+                        <AspectRatio ratio={4 / 3}>
+                          <Image
+                            src={typeof file === "string" ? file : URL.createObjectURL(file)}
+                            alt={`Imagen ${idx + 1}`}
+                            radius="sm"
+                            fit="cover"
+                          />
+                        </AspectRatio>
+
                         {/* Badge de imagen principal */}
                         {idx === 0 && (
                           <Badge
@@ -609,6 +633,15 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         </Group>
       </Stack>
     </Modal>
+
+    <ImageCropModal
+      file={cropQueue[0] ?? null}
+      remaining={Math.max(cropQueue.length - 1, 0)}
+      onConfirm={handleCropConfirm}
+      onSkip={handleCropSkip}
+      onCancel={handleCropCancel}
+    />
+    </>
   );
 };
 

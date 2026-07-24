@@ -1,7 +1,7 @@
 import {
   Stack, Text, Divider, Card, Group, Badge, ThemeIcon,
 } from "@mantine/core";
-import { IconCalendar, IconUsers, IconClock, IconDiscount, IconSchool } from "@tabler/icons-react";
+import { IconCalendar, IconUsers, IconClock, IconDiscount, IconSchool, IconPackage } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -22,9 +22,11 @@ interface Props {
   timezone?: string;
   /** Si la inscripción exige abono online (MP), info del depósito a mostrar. */
   deposit?: { percentage: number; currency: string } | null;
+  // Se detectó un paquete de sesiones que cubre esta inscripción — el costo es $0.
+  usingPackage?: boolean;
 }
 
-export default function StepSummary({ classDoc, session, attendee, companion, timezone: tz = "America/Bogota", deposit }: Props) {
+export default function StepSummary({ classDoc, session, attendee, companion, timezone: tz = "America/Bogota", deposit, usingPackage = false }: Props) {
   if (!classDoc || !session) return null;
 
   const numPeople = companion ? 2 : 1;
@@ -34,9 +36,9 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
     numPeople >= (discount.minPeople ?? 2) &&
     (!discount.maxPeople || numPeople <= discount.maxPeople);
   const discountPct = discountApplies ? discount!.discountPercent : 0;
-  const pricePerPerson = classDoc.pricePerPerson;
-  const finalPerPerson = Math.round(pricePerPerson * (1 - discountPct / 100));
-  const total = finalPerPerson * numPeople;
+  const pricePerPerson = usingPackage ? 0 : classDoc.pricePerPerson;
+  const finalPerPerson = usingPackage ? 0 : Math.round(pricePerPerson * (1 - discountPct / 100));
+  const total = usingPackage ? 0 : finalPerPerson * numPeople;
 
   const start = dayjs(session.startDate).tz(tz);
   const end = dayjs(session.endDate).tz(tz);
@@ -116,41 +118,52 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
       </Card>
 
       {/* Precio */}
-      <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
-        <Stack gap={6}>
-          <Group justify="space-between">
-            <Text size="sm">Precio por persona</Text>
-            <Text size="sm">${pricePerPerson.toLocaleString("es-CO")}</Text>
-          </Group>
-          {numPeople > 1 && (
-            <Group justify="space-between">
-              <Text size="sm">{numPeople} personas</Text>
-              <Text size="sm">${(pricePerPerson * numPeople).toLocaleString("es-CO")}</Text>
-            </Group>
-          )}
-          {discountApplies && (
-            <Group justify="space-between">
-              <Group gap="xs">
-                <IconDiscount size={14} color="green" />
-                <Text size="sm" c="green" fw={500}>Descuento grupal ({discountPct}%)</Text>
-              </Group>
-              <Text size="sm" c="green" fw={500}>
-                -${(pricePerPerson * numPeople - total).toLocaleString("es-CO")}
-              </Text>
-            </Group>
-          )}
-          <Divider my={4} />
-          <Group justify="space-between">
-            <Text fw={700} size="md">Total a pagar</Text>
-            <Text fw={700} size="lg" c="green">${total.toLocaleString("es-CO")}</Text>
-          </Group>
-          {discountApplies && numPeople > 1 && (
-            <Text size="xs" c="dimmed" ta="right">
-              ${finalPerPerson.toLocaleString("es-CO")} por persona
+      {usingPackage ? (
+        <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
+          <Group gap={6}>
+            <IconPackage size={16} color="var(--mantine-color-green-7)" />
+            <Text size="sm" fw={600} c="green.8">
+              Esta inscripción se paga con tu paquete de sesiones — no pagas nada ahora.
             </Text>
-          )}
-        </Stack>
-      </Card>
+          </Group>
+        </Card>
+      ) : (
+        <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
+          <Stack gap={6}>
+            <Group justify="space-between">
+              <Text size="sm">Precio por persona</Text>
+              <Text size="sm">${pricePerPerson.toLocaleString("es-CO")}</Text>
+            </Group>
+            {numPeople > 1 && (
+              <Group justify="space-between">
+                <Text size="sm">{numPeople} personas</Text>
+                <Text size="sm">${(pricePerPerson * numPeople).toLocaleString("es-CO")}</Text>
+              </Group>
+            )}
+            {discountApplies && (
+              <Group justify="space-between">
+                <Group gap="xs">
+                  <IconDiscount size={14} color="green" />
+                  <Text size="sm" c="green" fw={500}>Descuento grupal ({discountPct}%)</Text>
+                </Group>
+                <Text size="sm" c="green" fw={500}>
+                  -${(pricePerPerson * numPeople - total).toLocaleString("es-CO")}
+                </Text>
+              </Group>
+            )}
+            <Divider my={4} />
+            <Group justify="space-between">
+              <Text fw={700} size="md">Total a pagar</Text>
+              <Text fw={700} size="lg" c="green">${total.toLocaleString("es-CO")}</Text>
+            </Group>
+            {discountApplies && numPeople > 1 && (
+              <Text size="xs" c="dimmed" ta="right">
+                ${finalPerPerson.toLocaleString("es-CO")} por persona
+              </Text>
+            )}
+          </Stack>
+        </Card>
+      )}
 
       {/* Aviso de abono (pay-to-confirm vía Mercado Pago) */}
       {deposit && deposit.percentage > 0 && (

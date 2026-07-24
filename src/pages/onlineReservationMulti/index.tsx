@@ -257,6 +257,7 @@ export default function MultiBookingWizard() {
       // hay métodos de transferencia, usamos el flujo de comprobante con IA.
       // (El depósito no aplica a series recurrentes en esta versión.)
       const depositConfigured =
+        !clientPackageId &&
         !!organization?.requireReservationDeposit &&
         (organization?.reservationDepositPercentage ?? 0) > 0 &&
         recurrencePattern.type !== "weekly";
@@ -473,6 +474,7 @@ export default function MultiBookingWizard() {
       case 4: {
         const depositPct = organization?.reservationDepositPercentage ?? 0;
         const depositActive =
+          !clientPackageId &&
           !!organization?.requireReservationDeposit &&
           depositPct > 0 &&
           (!!organization?.mpCollect?.connected ||
@@ -493,6 +495,7 @@ export default function MultiBookingWizard() {
               recurrencePattern={recurrencePattern}
               seriesPreview={seriesPreview}
               timeFormat={organization?.timeFormat}
+              usingPackage={!!clientPackageId}
             />
             {depositActive && (
               <MpDepositNotice
@@ -606,8 +609,9 @@ export default function MultiBookingWizard() {
             </Text>
             <Divider my="md" />
 
-            {/* Deposit Alert - Mostrar solo si hay reservas y está habilitado */}
-            {finishInfo &&
+            {/* Deposit Alert - Mostrar solo si hay reservas, está habilitado y NO se pagó con un paquete */}
+            {!clientPackageId &&
+              finishInfo &&
               dates.length > 0 &&
               finishInfo.reservationIds.length > 0 && (
                 <ReservationDepositAlert

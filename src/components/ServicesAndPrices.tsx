@@ -1,17 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Accordion,
+  AspectRatio,
   Badge,
-  Box,
   Button,
   Card,
+  Center,
   Container,
   Group,
   Image,
-  Modal,
-  Pill,
-  ScrollArea,
   SimpleGrid,
   Skeleton,
   Stack,
@@ -22,7 +20,6 @@ import {
   ActionIcon,
   rem,
 } from "@mantine/core";
-import { Carousel } from "@mantine/carousel";
 import { useMediaQuery } from "@mantine/hooks";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store"; // Ajusta tu import
@@ -31,7 +28,7 @@ import {
   getServicesByOrganizationId,
   Service,
 } from "../services/serviceService"; // Ajusta tu import
-import { BiImage, BiSearch, BiX } from "react-icons/bi";
+import { BiImage, BiSearch, BiX, BiTime, BiStar } from "react-icons/bi";
 
 // ---------------- Utils ----------------
 
@@ -40,12 +37,6 @@ const normalize = (s: string) =>
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .trim();
-
-const plainText = (html?: string) =>
-  (html || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
     .trim();
 
 // ---------------- Componente Principal ----------------
@@ -58,8 +49,6 @@ const ServicesAndPrices: React.FC = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
-  const [modalService, setModalService] = useState<Service | null>(null);
 
   // Redux
   const organization = useSelector(
@@ -82,28 +71,48 @@ const ServicesAndPrices: React.FC = () => {
     fetch();
   }, [orgId]);
 
-  // Lógica de Categorías y Filtros
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    services.forEach((s) => set.add(s.type || "Otros"));
-    return ["Todos", ...Array.from(set).sort()];
-  }, [services]);
-
+  // Búsqueda libre por nombre/descripción — corta transversalmente las
+  // categorías, así que cuando hay texto se muestra como grilla plana.
   const filteredServices = useMemo(() => {
     const q = normalize(query);
-    return services.filter((s) => {
-      const matchQuery =
-        !q ||
-        normalize(s.name).includes(q) ||
-        normalize(s.description || "").includes(q);
+    if (!q) return services;
+    return services.filter(
+      (s) => normalize(s.name).includes(q) || normalize(s.description || "").includes(q)
+    );
+  }, [services, query]);
 
-      const matchCategory =
-        selectedCategory === "Todos" ||
-        (s.type || "Otros") === selectedCategory;
+  // Destacados: sección principal, siempre primero si hay alguno. Sin límite
+  // de items — a diferencia del landing, esta página ES el catálogo completo.
+  const featuredServices = useMemo(() => services.filter((s) => s.featured), [services]);
 
-      return matchQuery && matchCategory;
+  // Resto del catálogo agrupado por categoría/tipo, en secciones de acordeón
+  // (todas abiertas por defecto, el visitante puede colapsar las que no le
+  // interesen) — excluye los que ya aparecen en Destacados para no repetirlos.
+  const categorySections = useMemo(() => {
+    const featuredIds = new Set(featuredServices.map((s) => s._id));
+    const byType = new Map<string, Service[]>();
+    services.forEach((s) => {
+      if (featuredIds.has(s._id)) return;
+      const type = s.type || "Otros";
+      if (!byType.has(type)) byType.set(type, []);
+      byType.get(type)!.push(s);
     });
-  }, [services, query, selectedCategory]);
+    return Array.from(byType.entries())
+      .map(([type, list]) => ({ type, services: list }))
+      .sort((a, b) => b.services.length - a.services.length);
+  }, [services, featuredServices]);
+
+  // Une Destacados + categorías en una sola lista para el acordeón.
+  const serviceSections = useMemo(() => {
+    const list: { key: string; title: string; services: Service[]; featured?: boolean }[] = [];
+    if (featuredServices.length > 0) {
+      list.push({ key: "featured", title: "Destacados", services: featuredServices, featured: true });
+    }
+    categorySections.forEach((s) => {
+      list.push({ key: s.type, title: s.type, services: s.services });
+    });
+    return list;
+  }, [featuredServices, categorySections]);
 
   // Render Loading
   if (loading) {
@@ -113,7 +122,7 @@ const ServicesAndPrices: React.FC = () => {
           <Skeleton height={40} width={200} radius="xl" />
           <Skeleton height={40} width="100%" radius="xl" />
         </Group>
-        <SimpleGrid cols={{ base: 1, xs: 2, md: 3, lg: 4 }} spacing="md">
+        <SimpleGrid cols={{ base: 2, sm: 2, md: 3, lg: 4 }} spacing="md">
           {[1, 2, 3, 4].map((i) => (
             <Skeleton key={i} height={300} radius="md" />
           ))}
@@ -135,162 +144,106 @@ const ServicesAndPrices: React.FC = () => {
           </Badge>
         </Group>
 
-        {/* Barra de Filtros Unificada */}
-        <Card withBorder shadow="sm" radius="lg" p="xs">
-          <Group gap="sm" wrap={isMobile ? "wrap" : "nowrap"}>
-            {/* Buscador */}
-            <TextInput
-              placeholder="Buscar servicio..."
-              leftSection={<BiSearch size={16} />}
-              rightSection={
-                query && (
-                  <ActionIcon
-                    variant="subtle"
-                    size="sm"
-                    onClick={() => setQuery("")}
-                  >
-                    <BiX />
-                  </ActionIcon>
-                )
-              }
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-              radius="md"
-              style={{ flex: isMobile ? "1 1 100%" : 1 }}
-            />
-
-            {/* Scroll horizontal de categorías */}
-            <ScrollArea
-              type="never"
-              style={{ maxWidth: isMobile ? "100%" : "60%" }}
-            >
-              <Group gap={8} wrap="nowrap">
-                {categories.map((cat) => (
-                  <Pill
-                    key={cat}
-                    size="md"
-                    style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-                    // --- CAMBIOS AQUÍ ---
-                    // 1. Si está activo, usamos el tono 6 (el color "puro" o fuerte)
-                    bg={
-                      selectedCategory === cat
-                        ? theme.colors[primary][6]
-                        : undefined
-                    }
-                    // 2. Si está activo, el texto es BLANCO. Si no, dejamos el default.
-                    c={selectedCategory === cat ? "white" : undefined}
-                    // --------------------
-
-                    fw={selectedCategory === cat ? 700 : 500}
-                    onClick={() => setSelectedCategory(cat)}
-                  >
-                    {cat}
-                  </Pill>
-                ))}
-              </Group>
-            </ScrollArea>
-          </Group>
-        </Card>
+        {/* Buscador */}
+        <TextInput
+          placeholder="Buscar servicio..."
+          leftSection={<BiSearch size={16} />}
+          rightSection={
+            query && (
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                onClick={() => setQuery("")}
+              >
+                <BiX />
+              </ActionIcon>
+            )
+          }
+          value={query}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+          radius="md"
+        />
       </Stack>
 
-      {/* --- Grid de Tarjetas --- */}
-      {filteredServices.length === 0 ? (
+      {/* --- Resultados --- */}
+      {query ? (
+        // Buscando: grilla plana con lo que matchea (cruza categorías)
+        filteredServices.length === 0 ? (
+          <Text c="dimmed" ta="center" py="xl">
+            No encontramos servicios con esa búsqueda.
+          </Text>
+        ) : (
+          <ServiceCardsGrid services={filteredServices} primaryColor={primary} />
+        )
+      ) : services.length === 0 ? (
         <Text c="dimmed" ta="center" py="xl">
-          No encontramos servicios con esa búsqueda.
+          No hay servicios disponibles.
         </Text>
       ) : (
-        <SimpleGrid
-          cols={{ base: 1, xs: 2, sm: 2, md: 3, lg: 4 }}
-          spacing="lg"
-          mb="xl"
+        // Sin búsqueda: catálogo completo agrupado por categoría, en acordeón
+        <Accordion
+          multiple
+          defaultValue={serviceSections.map((s) => s.key)}
+          chevronPosition="right"
+          styles={{
+            item: {
+              border: "none",
+              borderBottom: `1px solid ${theme.colors.gray[2]}`,
+            },
+            control: { padding: 0 },
+            label: { paddingBlock: rem(14) },
+            content: { padding: 0, paddingBottom: rem(20) },
+          }}
         >
-          {filteredServices.map((service) => (
-            <ServiceCard
-              key={service._id}
-              service={service}
-              primaryColor={primary}
-              onClick={() => setModalService(service)}
-            />
+          {serviceSections.map((section) => (
+            <Accordion.Item key={section.key} value={section.key}>
+              <Accordion.Control>
+                <Group gap={6} wrap="nowrap">
+                  {section.featured && (
+                    <BiStar size={18} color={theme.colors.yellow[6]} style={{ flexShrink: 0 }} />
+                  )}
+                  <Title order={4} fw={600} c={theme.colors.gray[9]}>
+                    {section.title}
+                  </Title>
+                  <Text fz="xs" c="dimmed" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {section.services.length}
+                  </Text>
+                </Group>
+              </Accordion.Control>
+              <Accordion.Panel>
+                <ServiceCardsGrid services={section.services} primaryColor={primary} />
+              </Accordion.Panel>
+            </Accordion.Item>
           ))}
-        </SimpleGrid>
+        </Accordion>
       )}
-
-      {/* --- Modal de Detalle (Simplificado) --- */}
-      <Modal
-        opened={!!modalService}
-        onClose={() => setModalService(null)}
-        title={
-          <Text fw={700} lineClamp={1}>
-            {modalService?.name}
-          </Text>
-        }
-        centered
-        size="md"
-        radius="lg"
-      >
-        {modalService && (
-          <Stack>
-            {/* Carrusel o Imagen */}
-            <Box bg="gray.1" style={{ borderRadius: 12, overflow: "hidden" }}>
-              {modalService.images && modalService.images.length > 0 ? (
-                <Carousel withIndicators loop height={250}>
-                  {modalService.images.map((img, i) => (
-                    <Carousel.Slide key={i}>
-                      <Image src={img} height={250} fit="cover" />
-                    </Carousel.Slide>
-                  ))}
-                </Carousel>
-              ) : (
-                <Stack align="center" justify="center" h={200} c="dimmed">
-                  <BiImage size={40} />
-                  <Text size="xs">Sin imagen</Text>
-                </Stack>
-              )}
-            </Box>
-
-            <Group justify="space-between" align="center">
-              {!modalService.hidePrice && (
-                <Text fz="xl" fw={800} c={modalService.price === 0 ? "green" : primary}>
-                  {modalService.price === 0 ? "Gratis" : formatCurrency(modalService.price, organization?.currency || "COP")}
-                </Text>
-              )}
-              {typeof (modalService as any).duration === "number" && (
-                <Badge variant="outline" color="gray">
-                  {(modalService as any).duration} min
-                </Badge>
-              )}
-            </Group>
-
-            <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
-              {plainText(modalService.description)}
-            </Text>
-
-            {organization?.enableOnlineBooking !== false && (
-              <Button
-                component={Link}
-                to={`/online-reservation?serviceId=${modalService._id}`}
-                fullWidth
-                mt="xs"
-                onClick={() => setModalService(null)}
-              >
-                Reservar ahora
-              </Button>
-            )}
-          </Stack>
-        )}
-      </Modal>
     </Container>
   );
 };
 
+// ---------------- Grilla de tarjetas ----------------
+// Compartida entre los resultados de búsqueda (plana) y cada sección del
+// acordeón, para no duplicar el marcado de la grilla.
+const ServiceCardsGrid = ({
+  services,
+  primaryColor,
+}: {
+  services: Service[];
+  primaryColor: string;
+}) => (
+  <SimpleGrid cols={{ base: 2, sm: 2, md: 3, lg: 4 }} spacing="lg" mb="xl">
+    {services.map((service) => (
+      <ServiceCard key={service._id} service={service} primaryColor={primaryColor} />
+    ))}
+  </SimpleGrid>
+);
+
 // ---------------- Componente Tarjeta Individual ----------------
 const ServiceCard = ({
   service,
-  onClick,
   primaryColor,
 }: {
   service: Service;
-  onClick: () => void;
   primaryColor: string;
 }) => {
   const image = service.images?.[0];
@@ -303,14 +256,12 @@ const ServiceCard = ({
       radius="md"
       withBorder
       style={{
-        cursor: "pointer",
         transition: "transform 0.2s, box-shadow 0.2s",
         height: "100%",
         display: "flex",
         flexDirection: "column",
       }}
-      onClick={onClick}
-      className="service-card-hover" // Puedes añadir CSS global para hover si gustas
+      className="service-card-hover"
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-4px)";
         e.currentTarget.style.boxShadow = "var(--mantine-shadow-md)";
@@ -322,18 +273,20 @@ const ServiceCard = ({
     >
       {/* Sección Imagen */}
       <Card.Section style={{ position: "relative" }}>
-        {image ? (
-          <Image src={image} height={180} fit="cover" alt={service.name} />
-        ) : (
-          <Stack align="center" justify="center" h={180} bg="gray.1" gap={4}>
-            <BiImage size={32} color="gray" style={{ opacity: 0.5 }} />
-          </Stack>
-        )}
+        <AspectRatio ratio={4 / 3}>
+          {image ? (
+            <Image src={image} fit="cover" alt={service.name} />
+          ) : (
+            <Center bg="gray.1">
+              <BiImage size={32} color="gray" style={{ opacity: 0.5 }} />
+            </Center>
+          )}
+        </AspectRatio>
         {service.featured && (
           <Badge
             variant="filled"
             color="yellow"
-            size="md"
+            size="sm"
             style={{ position: "absolute", top: 8, left: 8 }}
           >
             ⭐ Destacado
@@ -342,44 +295,41 @@ const ServiceCard = ({
       </Card.Section>
 
       {/* Sección Contenido */}
-      <Stack p="md" gap="xs" justify="space-between" style={{ flex: 1 }}>
-        <Box>
-          <Group justify="space-between" align="start" wrap="nowrap" mb={4}>
-            <Text fw={700} lineClamp={2} style={{ lineHeight: 1.2 }}>
-              {service.name}
-            </Text>
-          </Group>
+      <Stack p="sm" gap={6} style={{ flex: 1 }}>
+        <Text fw={600} fz="sm" lineClamp={2} style={{ lineHeight: 1.2 }}>
+          {service.name}
+        </Text>
 
-          <Text
-            size="sm"
-            c="dimmed"
-            lineClamp={6}
-            h={rem(140)}
-            style={{ lineHeight: 1.5 }}
-          >
-            {plainText(service.description) || "Sin descripción disponible."}
-          </Text>
-        </Box>
-
-        <Group justify="space-between" align="flex-end" mt="xs">
+        <Group justify="space-between" align="center" gap={6}>
           {!service.hidePrice ? (
-            <Text fw={800} size="lg" c={service.price === 0 ? "green" : primaryColor}>
+            <Text fw={700} fz="sm" c={service.price === 0 ? "green" : primaryColor}>
               {service.price === 0 ? "Gratis" : formatCurrency(service.price, organization?.currency || "COP")}
             </Text>
           ) : (
-            <Text size="sm" c="dimmed" fs="italic">
+            <Text size="xs" c="dimmed" fs="italic">
               Consultar
             </Text>
           )}
-
-          {/* Pequeño tag de categoría */}
-          <Badge size="xs" variant="light" color="gray">
-            {service.type || "General"}
-          </Badge>
+          <Group gap={4} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
+            <BiTime size={12} color="var(--mantine-color-gray-5)" />
+            <Text fz="xs" c="dimmed">
+              {service.duration} min
+            </Text>
+          </Group>
         </Group>
 
-        {organization?.enableOnlineBooking !== false && (
-          <Box onClick={(e) => e.stopPropagation()} mt="xs">
+        <Stack gap={6} mt="auto" pt={4}>
+          <Button
+            component={Link}
+            to={`/servicio/${service._id}`}
+            state={{ backTo: "/servicios-precios" }}
+            size="xs"
+            variant="default"
+            fullWidth
+          >
+            Ver más
+          </Button>
+          {organization?.enableOnlineBooking !== false && (
             <Button
               component={Link}
               to={`/online-reservation?serviceId=${service._id}`}
@@ -390,8 +340,8 @@ const ServiceCard = ({
             >
               Reservar ahora
             </Button>
-          </Box>
-        )}
+          )}
+        </Stack>
       </Stack>
     </Card>
   );

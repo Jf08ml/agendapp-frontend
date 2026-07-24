@@ -316,6 +316,7 @@ export default function ClassBookingWizard() {
             attendee={attendee}
             companion={companion}
             timezone={tz}
+            usingPackage={usePkg && !!pkgId}
             deposit={
               classDepositNeeded
                 ? {

@@ -85,6 +85,24 @@ export const getServiceById = async (
   }
 };
 
+// Obtener un servicio por ID — versión pública (vista de detalle compartible,
+// sin autenticación). Silencioso ante error (ej: link viejo a un servicio
+// desactivado) para que la página muestre su propio estado de "no encontrado".
+export const getPublicServiceById = async (
+  serviceId: string,
+  organizationId: string
+): Promise<Service | undefined> => {
+  try {
+    const response = await apiServicePublic.get<Response<Service>>(
+      `/public/${serviceId}`,
+      { params: { organizationId } }
+    );
+    return response.data.data;
+  } catch {
+    return undefined;
+  }
+};
+
 // Crear un nuevo servicio
 export const createService = async (
   serviceData: CreateServicePayload
