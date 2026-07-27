@@ -9,9 +9,9 @@ import {
   useMantineTheme,
   rem,
   Stack,
-  Paper,
   Group,
 } from "@mantine/core";
+import { IconArrowRight } from "@tabler/icons-react";
 import { ReactNode } from "react";
 
 interface Feature {
@@ -31,164 +31,84 @@ interface ModernLayoutProps {
 export function ModernLayout({
   features,
   welcomeTitle,
-  welcomeDescription
+  welcomeDescription,
 }: ModernLayoutProps) {
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
-  const primaryLight = theme.colors[theme.primaryColor][0];
 
   return (
-    <Box
-      style={{
-        minHeight: "100vh",
-        backgroundColor: theme.colors.gray[0],
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Decorative gradient - lado a lado del viewport */}
-      <Box
-        style={{
-          position: "fixed",
-          top: "20%",
-          left: -200,
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background: theme.colors[theme.primaryColor][1],
-          filter: "blur(150px)",
-          opacity: 0.4,
-          zIndex: 0,
-        }}
-      />
-      <Box
-        style={{
-          position: "fixed",
-          top: "20%",
-          right: -200,
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background: theme.colors[theme.primaryColor][0],
-          filter: "blur(150px)",
-          opacity: 0.5,
-          zIndex: 0,
-        }}
-      />
+    <Box style={{ minHeight: "100vh", backgroundColor: theme.colors.gray[0] }}>
+      <Container size="sm" py={{ base: rem(48), sm: rem(72) }}>
+        {/* Hero */}
+        <Stack gap="sm" align="center" mb={{ base: rem(40), sm: rem(56) }} style={{ textAlign: "center" }}>
+          <Title
+            fw={700}
+            fz={{ base: rem(26), sm: rem(34), md: rem(40) }}
+            c={theme.colors.gray[9]}
+            style={{ letterSpacing: "-0.02em", lineHeight: 1.15 }}
+          >
+            {welcomeTitle}
+          </Title>
 
-      <Container size="sm" py="xl" style={{ position: "relative", zIndex: 1 }}>
-        {/* Hero Section */}
-        <Paper
-          radius="xl"
-          p="sm"
-          mb="xl"
-          style={{ backgroundColor: "transparent", position: "relative" }}
-        >
-          <Stack gap="md" style={{ position: "relative", zIndex: 1 }}>
-            <Title
-              ta="center"
-              fw={900}
-              // tamaño responsive
-              fz={{ base: rem(24), sm: rem(30), md: rem(36) }}
-              c={theme.colors[theme.primaryColor][8]}
-              style={{
-                textShadow: `0 2px 4px ${theme.colors[theme.primaryColor][2]}`,
-              }}
-            >
-              {welcomeTitle}
-            </Title>
-
-            <Text
-              ta="center"
-              c={theme.colors.gray[7]}
-              // tamaño responsive
-              fz={{ base: "sm", sm: "md", md: "lg" }}
-              fw={500}
-              style={{ lineHeight: 1.6, margin: "0 auto" }}
-            >
-              {welcomeDescription}
-            </Text>
-          </Stack>
-        </Paper>
+          <Text
+            c={theme.colors.gray[6]}
+            fz={{ base: "sm", sm: "md", md: "lg" }}
+            fw={400}
+            style={{ lineHeight: 1.6, maxWidth: 480 }}
+          >
+            {welcomeDescription}
+          </Text>
+        </Stack>
 
         {/* Features Grid */}
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
           {features.map((f) => (
             <Card
               key={f.link}
               component={Link}
               to={f.link}
               withBorder
-              radius="xl"
+              radius="lg"
               p="lg"
-              shadow="sm"
               style={{
                 transition: "all 200ms ease",
-                position: "relative",
-                overflow: "hidden",
                 backgroundColor: theme.white,
-                borderColor: theme.colors.gray[3],
+                borderColor: theme.colors.gray[2],
               }}
               className="feature-card"
             >
-              <Box
-                className="card-overlay"
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: `linear-gradient(135deg, ${primaryLight} 0%, ${theme.white} 100%)`,
-                  opacity: 0,
-                  transition: "opacity 200ms ease",
-                  pointerEvents: "none",
-                }}
-              />
-
-              {/* CAMBIO: Usamos Group en lugar de Stack y añadimos align="center" */}
-              <Group
-                gap="md"
-                align="center"
-                wrap="nowrap"
-                style={{ position: "relative", zIndex: 1 }}
-              >
+              <Group gap="md" align="center" wrap="nowrap">
                 <Box
                   style={{
                     borderRadius: "50%",
-                    padding: rem(12), // Reduje un poco el padding si quieres que se vea más compacto
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    width: rem(64),
-                    height: rem(64),
-                    backgroundColor: theme.colors[theme.primaryColor][6],
-                    boxShadow: `0 4px 16px ${primary}30`,
-                    flexShrink: 0, // Evita que el icono se aplaste si el texto es largo
+                    width: rem(52),
+                    height: rem(52),
+                    backgroundColor: primary,
+                    color: theme.white,
+                    flexShrink: 0,
                   }}
                 >
-                  <Box
-                    style={{
-                      color: theme.white,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {f.icon}
-                  </Box>
+                  {f.icon}
                 </Box>
 
                 <Text
                   size="lg"
-                  fw={700}
+                  fw={600}
                   c={theme.colors.gray[9]}
-                  style={{ letterSpacing: 0.3, lineHeight: 1.2 }}
+                  style={{ letterSpacing: "-0.01em", lineHeight: 1.25, flex: 1 }}
                 >
                   {f.title}
                 </Text>
+
+                <IconArrowRight
+                  size={18}
+                  className="card-arrow"
+                  style={{ color: theme.colors.gray[4], flexShrink: 0, transition: "all 200ms ease" }}
+                />
               </Group>
-              {/* Fin del Group */}
             </Card>
           ))}
         </SimpleGrid>
@@ -197,10 +117,16 @@ export function ModernLayout({
       <style>
         {`
           @media (prefers-reduced-motion: no-preference) {
-            .feature-card:hover { transform: translateY(-8px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12) !important; }
-            .feature-card:hover .card-overlay { opacity: 1; }
-            .feature-card:focus-visible { transform: translateY(-8px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12) !important; outline: 2px solid ${primary}; outline-offset: 2px; }
-            .feature-card:active { transform: translateY(-4px); }
+            .feature-card:hover, .feature-card:focus-visible {
+              transform: translateY(-3px);
+              border-color: ${theme.colors[theme.primaryColor][3]} !important;
+              box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06) !important;
+            }
+            .feature-card:hover .card-arrow, .feature-card:focus-visible .card-arrow {
+              transform: translateX(3px);
+              color: ${primary};
+            }
+            .feature-card:focus-visible { outline: 2px solid ${primary}; outline-offset: 2px; }
           }
         `}
       </style>

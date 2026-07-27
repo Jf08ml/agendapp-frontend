@@ -161,9 +161,9 @@ export default function ContactTab({
             {...form.getInputProps("homeLayout")}
             disabled={!isEditing}
             data={[
-              { value: "modern", label: "Moderno - Con gradientes difuminados" },
+              { value: "modern", label: "Moderno - Tarjetas en fila con ícono circular" },
               { value: "minimal", label: "Minimalista - Diseño limpio y simple" },
-              { value: "cards", label: "Tarjetas - Enfoque en servicios" },
+              { value: "cards", label: "Tarjetas - Cuadrícula centrada" },
               {
                 value: "landing",
                 label: canUseLanding

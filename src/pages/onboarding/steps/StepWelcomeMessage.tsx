@@ -20,18 +20,15 @@ interface Props {
 function PreviewModern({ title, description, primary }: { title: string; description: string; primary: string }) {
   const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
   return (
-    <Box style={{ width: "100%", height: "100%", background: "#f8f9fa", position: "relative", overflow: "hidden", padding: 8 }}>
-      {/* Blobs decorativos */}
-      <Box style={{ position: "absolute", top: -20, left: -20, width: 80, height: 80, borderRadius: "50%", background: `${primary}22`, filter: "blur(20px)" }} />
-      <Box style={{ position: "absolute", top: -10, right: -20, width: 80, height: 80, borderRadius: "50%", background: `${primary}18`, filter: "blur(20px)" }} />
+    <Box style={{ width: "100%", height: "100%", background: "#f8f9fa", padding: 8 }}>
       {/* Título */}
-      <Text size="xs" fw={900} ta="center" c={primary} mb={3} lineClamp={1} style={{ fontSize: 9, lineHeight: 1.2 }}>
+      <Text size="xs" fw={700} ta="center" c="#111" mb={3} lineClamp={1} style={{ fontSize: 9, lineHeight: 1.2 }}>
         {title || "¡Hola! Bienvenido"}
       </Text>
       <Text size="xs" ta="center" c="dimmed" mb={6} lineClamp={2} style={{ fontSize: 7, lineHeight: 1.3 }}>
         {description || "Estamos felices de tenerte aquí."}
       </Text>
-      {/* Cards 2 columnas con icono circular + texto */}
+      {/* Cards 2 columnas con icono circular + texto, en fila */}
       <SimpleGrid cols={2} spacing={4}>
         {rows.map((r) => (
           <Box key={r} style={{ background: "#fff", borderRadius: 6, border: "1px solid #e9ecef", padding: "4px 5px", display: "flex", alignItems: "center", gap: 4 }}>
@@ -48,17 +45,17 @@ function PreviewMinimal({ title, description, primary }: { title: string; descri
   const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
   return (
     <Box style={{ width: "100%", height: "100%", background: "#fff", padding: 8 }}>
-      <Text fw={900} ta="center" c="#111" mb={3} style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>
+      <Text fw={700} ta="center" c="#111" mb={3} style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>
         {title || "¡Hola! Bienvenido"}
       </Text>
       <Text ta="center" c="#999" mb={7} style={{ fontSize: 7, lineHeight: 1.3 }} lineClamp={2}>
         {description || "Estamos felices de tenerte aquí."}
       </Text>
-      {/* Lista horizontal */}
+      {/* Lista vertical, ícono con fondo tenue, sin sombra a la vista */}
       <Stack gap={4}>
         {rows.map((r) => (
-          <Box key={r} style={{ borderRadius: 5, border: `1px solid ${primary}44`, padding: "3px 6px", display: "flex", alignItems: "center", gap: 5, boxShadow: `0 0 0 1px ${primary}22` }}>
-            <Box style={{ width: 8, height: 8, borderRadius: 2, background: primary, flexShrink: 0 }} />
+          <Box key={r} style={{ borderRadius: 5, border: "1px solid #e9ecef", padding: "3px 6px", display: "flex", alignItems: "center", gap: 5 }}>
+            <Box style={{ width: 10, height: 10, borderRadius: 3, background: `${primary}20`, flexShrink: 0 }} />
             <Text style={{ fontSize: 7, fontWeight: 600, color: "#333" }}>{r}</Text>
           </Box>
         ))}
@@ -70,16 +67,16 @@ function PreviewMinimal({ title, description, primary }: { title: string; descri
 function PreviewCards({ title, description, primary }: { title: string; description: string; primary: string }) {
   const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
   return (
-    <Box style={{ width: "100%", height: "100%", background: `linear-gradient(180deg, ${primary}18 0%, #fff 55%)`, padding: 8 }}>
-      {/* Hero card */}
-      <Box style={{ background: "#fff", borderRadius: 7, border: "1px solid #e9ecef", padding: "5px 7px", marginBottom: 6, textAlign: "center" }}>
-        <Text fw={800} c={primary} style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>{title || "¡Hola! Bienvenido"}</Text>
+    <Box style={{ width: "100%", height: "100%", background: "#fff", padding: 8 }}>
+      {/* Hero centrado, sin card ni gradiente */}
+      <Box style={{ textAlign: "center", marginBottom: 6 }}>
+        <Text fw={700} c="#111" style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>{title || "¡Hola! Bienvenido"}</Text>
         <Text c="dimmed" style={{ fontSize: 7, lineHeight: 1.3, marginTop: 2 }} lineClamp={2}>{description || "Estamos felices de tenerte aquí."}</Text>
       </Box>
-      {/* Cards 2 col centradas */}
+      {/* Cards 2 col, ícono cuadrado centrado arriba, título debajo */}
       <SimpleGrid cols={2} spacing={4}>
         {rows.map((r) => (
-          <Box key={r} style={{ background: "#fff", borderRadius: 6, border: "1px solid #dee2e6", padding: "5px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+          <Box key={r} style={{ background: "#fff", borderRadius: 6, border: "1px solid #dee2e6", padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
             <Box style={{ width: 16, height: 16, borderRadius: 4, background: primary }} />
             <Text style={{ fontSize: 7, fontWeight: 700, color: "#333", textAlign: "center" }}>{r}</Text>
           </Box>
@@ -132,7 +129,7 @@ const LAYOUTS = [
   {
     id: "modern",
     label: "Moderno",
-    description: "Fondo claro con blobs decorativos, tarjetas en grilla con icono circular.",
+    description: "Fondo claro, tarjetas en fila con icono circular y texto a la izquierda.",
     color: "violet" as const,
   },
   {
@@ -144,7 +141,7 @@ const LAYOUTS = [
   {
     id: "cards",
     label: "Tarjetas",
-    description: "Gradiente suave, hero en card, acciones en cuadrícula centrada.",
+    description: "Fondo blanco, acciones en cuadrícula centrada con icono cuadrado arriba.",
     color: "blue" as const,
   },
   {
