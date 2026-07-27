@@ -121,7 +121,8 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
       );
       onChange?.(null, null, false);
     }
-  }, [selectedCountry, nationalNumber, onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCountry, nationalNumber]);
 
   // Detectar si el usuario pega un número con +
   const handleNationalNumberChange = (

@@ -97,6 +97,12 @@ export default function StepAttendees({
         if (!attendee.name.trim() && client.name) onAttendeeChange("name", client.name);
         if (!attendee.email.trim() && client.email) onAttendeeChange("email", client.email);
         if (!attendee.documentId.trim() && (client as any).documentId) onAttendeeChange("documentId", (client as any).documentId);
+        const clientPhone = client.phone_e164 || client.phoneNumber;
+        if (!attendee.phone_e164 && !attendee.phone && clientPhone) {
+          onAttendeeChange("phone_e164", clientPhone);
+          onAttendeeChange("phone", clientPhone);
+          onAttendeeChange("phone_country", client.phone_country || organizationCountry);
+        }
         setFoundName(client.name || null);
       }
     } catch {

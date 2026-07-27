@@ -41,6 +41,7 @@ interface OrganizationState {
   whatsappReadySince?: number | null; // epoch ms cuando pasó a ready (si lo envías)
   whatsappMe?: WaMe | null; // info de la cuenta, si la envías
   savingPolicy?: boolean; // para el updateReservationPolicy thunk
+  savingClassPolicy?: boolean; // para el updateClassReservationPolicy thunk
 }
 
 const initialState: OrganizationState = {
@@ -106,6 +107,29 @@ export const updateReservationPolicy = createAsyncThunk(
       console.error("Error updating reservation policy:", error);
       return rejectWithValue(
         "No se pudo actualizar la política de agendamiento"
+      );
+    }
+  }
+);
+
+export const updateClassReservationPolicy = createAsyncThunk(
+  "organization/updateClassReservationPolicy",
+  async (
+    {
+      organizationId,
+      policy,
+    }: { organizationId: string; policy: ReservationPolicy },
+    { rejectWithValue }
+  ) => {
+    try {
+      const updated = await updateOrganization(organizationId, {
+        classReservationPolicy: policy,
+      });
+      return updated; // Organization
+    } catch (error) {
+      console.error("Error updating class reservation policy:", error);
+      return rejectWithValue(
+        "No se pudo actualizar la política de agendamiento de clases"
       );
     }
   }
@@ -209,6 +233,26 @@ const organizationSlice = createSlice({
         state.error =
           (action.payload as string) ?? "Error al guardar la política";
       });
+
+    builder
+      .addCase(updateClassReservationPolicy.pending, (state) => {
+        state.savingClassPolicy = true;
+      })
+      .addCase(
+        updateClassReservationPolicy.fulfilled,
+        (state, action: PayloadAction<Organization | null>) => {
+          state.savingClassPolicy = false;
+          if (action.payload) {
+            state.organization = action.payload; // ya trae classReservationPolicy actualizada
+          }
+        }
+      )
+      .addCase(updateClassReservationPolicy.rejected, (state, action) => {
+        state.savingClassPolicy = false;
+        state.error =
+          (action.payload as string) ??
+          "Error al guardar la política de clases";
+      });
   },
 });
 
@@ -236,5 +280,13 @@ export const selectReservationPolicy = (s: {
   organization: OrganizationState;
 }) => s.organization.organization?.reservationPolicy ?? "manual";
 
+export const selectClassReservationPolicy = (s: {
+  organization: OrganizationState;
+}) => s.organization.organization?.classReservationPolicy ?? "manual";
+
 export const selectSavingPolicy = (s: { organization: OrganizationState }) =>
   Boolean(s.organization.savingPolicy);
+
+export const selectSavingClassPolicy = (s: {
+  organization: OrganizationState;
+}) => Boolean(s.organization.savingClassPolicy);

@@ -57,7 +57,9 @@ export default function BulkSessionModal({
       employeeId: "",
       roomId: "",
       weekdays: [] as number[],
-      time: "08:00",
+      startTime: "08:00",
+      endTime: "",
+      breakMinutes: undefined as number | undefined,
       periodStart: null as Date | null,
       periodEnd: null as Date | null,
       capacity: undefined as number | undefined,
@@ -68,7 +70,14 @@ export default function BulkSessionModal({
       employeeId:  (v) => (!v ? "Selecciona un instructor" : null),
       roomId:      (v) => (!v ? "Selecciona un salón" : null),
       weekdays:    (v) => (!v.length ? "Selecciona al menos un día" : null),
-      time:        (v) => (!v || !/^\d{2}:\d{2}$/.test(v) ? "Hora inválida (HH:MM)" : null),
+      startTime:   (v) => (!v || !/^\d{2}:\d{2}$/.test(v) ? "Hora inválida (HH:MM)" : null),
+      endTime:     (v, vals) => {
+        if (!v) return null; // opcional: sin esto, una sola sesión por día
+        if (!/^\d{2}:\d{2}$/.test(v)) return "Hora inválida (HH:MM)";
+        if (vals.startTime && v <= vals.startTime) return "Debe ser posterior a la hora de inicio";
+        return null;
+      },
+      breakMinutes: (v) => (v !== undefined && v < 0 ? "No puede ser negativo" : null),
       periodStart: (v) => (!v ? "Selecciona la fecha de inicio" : null),
       periodEnd:   (v, vals) => {
         if (!v) return "Selecciona la fecha de fin";
@@ -86,15 +95,26 @@ export default function BulkSessionModal({
     }
   }, [opened]);
 
-  // Preview de sesiones que se generarían
+  // Preview de sesiones que se generarían (réplica de la lógica del backend:
+  // sin "hasta", una sola sesión por día; con "hasta", rellena la ventana con
+  // sesiones consecutivas de la duración de la clase, separadas por el descanso).
   const previewDates = useMemo(() => {
-    const { weekdays, time, periodStart, periodEnd, classId } = form.values;
-    if (!weekdays.length || !time || !periodStart || !periodEnd) return [];
+    const { weekdays, startTime, endTime, breakMinutes, periodStart, periodEnd, classId } = form.values;
+    if (!weekdays.length || !startTime || !periodStart || !periodEnd) return [];
 
     const selectedClass = classes.find((c) => c._id === classId);
     const durationMin = selectedClass?.duration ?? 60;
-    const [h, m] = time.split(":").map(Number);
+    const [h, m] = startTime.split(":").map(Number);
     if (isNaN(h) || isNaN(m)) return [];
+
+    let windowEndH = h, windowEndM = m;
+    if (endTime) {
+      const [eh, em] = endTime.split(":").map(Number);
+      if (isNaN(eh) || isNaN(em)) return [];
+      windowEndH = eh;
+      windowEndM = em;
+    }
+    const gap = breakMinutes || 0;
 
     const result: { start: dayjs.Dayjs; end: dayjs.Dayjs }[] = [];
     const cursor = dayjs(periodStart).startOf("day");
@@ -104,13 +124,25 @@ export default function BulkSessionModal({
     let current = cursor;
     while (current.isBefore(end) && result.length < MAX) {
       if (weekdays.includes(current.day())) {
-        const start = current.hour(h).minute(m).second(0);
-        result.push({ start, end: start.add(durationMin, "minute") });
+        let slotStart = current.hour(h).minute(m).second(0);
+        const windowEnd = endTime
+          ? current.hour(windowEndH).minute(windowEndM).second(0)
+          : slotStart.add(durationMin, "minute");
+
+        while (result.length < MAX) {
+          const slotEnd = slotStart.add(durationMin, "minute");
+          if (slotEnd.isAfter(windowEnd)) break;
+          result.push({ start: slotStart, end: slotEnd });
+          slotStart = slotEnd.add(gap, "minute");
+        }
       }
       current = current.add(1, "day");
     }
     return result;
-  }, [form.values.weekdays, form.values.time, form.values.periodStart, form.values.periodEnd, form.values.classId]);
+  }, [
+    form.values.weekdays, form.values.startTime, form.values.endTime, form.values.breakMinutes,
+    form.values.periodStart, form.values.periodEnd, form.values.classId,
+  ]);
 
   const handleSubmit = async (values: typeof form.values) => {
     setSubmitting(true);
@@ -121,7 +153,9 @@ export default function BulkSessionModal({
         employeeId: values.employeeId,
         roomId: values.roomId,
         weekdays: values.weekdays,
-        time: values.time,
+        startTime: values.startTime,
+        endTime: values.endTime || undefined,
+        breakMinutes: values.breakMinutes,
         periodStart: dayjs(values.periodStart!).format("YYYY-MM-DD"),
         periodEnd: dayjs(values.periodEnd!).format("YYYY-MM-DD"),
         capacity: values.capacity,
@@ -264,20 +298,36 @@ export default function BulkSessionModal({
             )}
           </div>
 
-          {/* Hora + cupo */}
+          {/* Ventana horaria */}
           <SimpleGrid cols={2}>
             <TimeInput
-              label="Hora de inicio"
+              label="Desde"
               required
-              {...form.getInputProps("time")}
+              {...form.getInputProps("startTime")}
             />
-            <NumberInput
-              label="Cupo por sesión"
-              description={selectedClass ? `Default: ${selectedClass.defaultCapacity}` : "Opcional"}
-              min={1}
-              {...form.getInputProps("capacity")}
+            <TimeInput
+              label="Hasta (opcional)"
+              description="Repite la clase hasta esta hora"
+              {...form.getInputProps("endTime")}
             />
           </SimpleGrid>
+
+          {form.values.endTime && (
+            <NumberInput
+              label="Descanso entre sesiones (min)"
+              description="Opcional — tiempo libre entre el fin de una sesión y el inicio de la siguiente"
+              min={0}
+              placeholder="0"
+              {...form.getInputProps("breakMinutes")}
+            />
+          )}
+
+          <NumberInput
+            label="Cupo por sesión"
+            description={selectedClass ? `Default: ${selectedClass.defaultCapacity}` : "Opcional"}
+            min={1}
+            {...form.getInputProps("capacity")}
+          />
 
           {/* Período */}
           <SimpleGrid cols={2}>
@@ -322,7 +372,7 @@ export default function BulkSessionModal({
                 <Group gap={6} wrap="wrap">
                   {previewDates.map((d, i) => (
                     <Badge key={i} size="xs" variant="light" color="blue">
-                      {d.start.format("ddd D MMM")} {d.start.format("HH:mm")}
+                      {d.start.format("ddd D MMM")} {d.start.format("HH:mm")}–{d.end.format("HH:mm")}
                     </Badge>
                   ))}
                 </Group>

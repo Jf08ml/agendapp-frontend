@@ -5,6 +5,7 @@ import {
   Box, Title, Tabs, Button, Group, Text, Badge, Card, Stack,
   ActionIcon, Tooltip, Table, ScrollArea, Skeleton, Center,
   Menu, Alert, Progress, SimpleGrid,  Checkbox, SegmentedControl,
+  Select, Loader,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
@@ -13,8 +14,13 @@ import {
   IconCheck, IconX, IconSchool, IconDoor, IconCalendar, IconUsers,
   IconBrandWhatsapp,
 } from "@tabler/icons-react";
-import { useSelector } from "react-redux";
-import { RootState } from "../../../app/store";
+import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
+import {
+  selectClassReservationPolicy,
+  selectSavingClassPolicy,
+  updateClassReservationPolicy,
+} from "../../../features/organization/sliceOrganization";
+import type { ReservationPolicy } from "../../../services/organizationService";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -54,9 +60,39 @@ const STATUS_LABELS: Record<string, string> = {
 // ══════════════════════════════════════════════════════
 
 export default function ManageClasses() {
-  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
-  const organization = useSelector((s: RootState) => s.organization.organization);
+  const dispatch = useAppDispatch();
+  const organizationId = useAppSelector((s: RootState) => s.auth.organizationId);
+  const organization = useAppSelector((s: RootState) => s.organization.organization);
+  const classPolicy = useAppSelector(selectClassReservationPolicy);
+  const savingClassPolicy = useAppSelector(selectSavingClassPolicy);
+  const canAutoConfirmClasses = (organization as any)?.planLimits?.autoConfirmations !== false;
   const tz = organization?.timezone || "America/Bogota";
+
+  const handleChangeClassPolicy = async (nextPolicy: ReservationPolicy) => {
+    if (!organization?._id) return;
+    try {
+      await dispatch(
+        updateClassReservationPolicy({
+          organizationId: organization._id,
+          policy: nextPolicy,
+        })
+      ).unwrap();
+      showNotification({
+        title: "Configuración guardada",
+        message:
+          nextPolicy === "auto_if_available"
+            ? "Inscripción automática activada (si hay cupo disponible)."
+            : "Aprobación manual activada para inscripciones a clases.",
+        color: "green",
+      });
+    } catch {
+      showNotification({
+        title: "Error",
+        message: "No se pudo actualizar la política de inscripción a clases",
+        color: "red",
+      });
+    }
+  };
 
   // Datos
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -570,8 +606,31 @@ export default function ManageClasses() {
 
         {/* ─── RESERVAS PENDIENTES ───────────────────────── */}
         <Tabs.Panel value="enrollments">
-          <Group justify="space-between" mb="md">
+          <Group justify="space-between" align="flex-end" mb="md" wrap="wrap">
             <Text fw={600}>Reservas de clases</Text>
+            <Group gap="xs" align="flex-end">
+              <Select
+                w={260}
+                label="Política de inscripción"
+                value={classPolicy}
+                onChange={(val) =>
+                  val && handleChangeClassPolicy(val as ReservationPolicy)
+                }
+                data={[
+                  { value: "manual", label: "Aprobación manual" },
+                  {
+                    value: "auto_if_available",
+                    label: canAutoConfirmClasses
+                      ? "Automática si hay cupo"
+                      : "Automática si hay cupo (Plan Esencial o superior)",
+                    disabled: !canAutoConfirmClasses,
+                  },
+                ]}
+                disabled={!organization?._id || savingClassPolicy}
+                comboboxProps={{ withinPortal: true }}
+                rightSection={savingClassPolicy ? <Loader size="xs" /> : null}
+              />
+            </Group>
           </Group>
 
           {loadingEnrollments ? (

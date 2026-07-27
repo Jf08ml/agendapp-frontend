@@ -1,7 +1,10 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   Stack, Card, Text, Badge, Group, Center, Loader,
-  Progress, ThemeIcon, Alert,
+  Progress, ThemeIcon, Alert, Paper, Divider,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { DatePicker } from "@mantine/dates";
 import { IconCalendar, IconAlertCircle, IconClock } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
@@ -36,9 +39,55 @@ const STATUS_LABEL: Record<string, string> = {
   completed: "Finalizada",
 };
 
+// Un día del calendario es una etiqueta pura (YYYY-MM-DD), no un instante:
+// se construye/lee con getters locales para que coincida siempre con las
+// celdas del propio DatePicker, sin pasar por conversión de timezone.
+const dateToKey = (date: Date) => dayjs(date).format("YYYY-MM-DD");
+const dayKeyToDate = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 export default function StepSelectSession({
   sessions, loading, selected, onSelect, selectedClass, timezone: tz = "America/Bogota",
 }: Props) {
+  const isMobile = useMediaQuery("(max-width: 48rem)");
+
+  const availableSessions = useMemo(
+    () => sessions.filter((s) => s.status === "open" && dayjs(s.startDate).isAfter(dayjs())),
+    [sessions]
+  );
+
+  // Agrupar sesiones disponibles por día, en el timezone de la organización
+  // (una sesión a las 11pm en Bogotá puede caer en otro día en UTC).
+  const sessionsByDay = useMemo(() => {
+    const map: Record<string, ClassSession[]> = {};
+    for (const s of availableSessions) {
+      const key = dayjs(s.startDate).tz(tz).format("YYYY-MM-DD");
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    }
+    return map;
+  }, [availableSessions, tz]);
+
+  const availableDays = useMemo(
+    () => Object.keys(sessionsByDay).sort(),
+    [sessionsByDay]
+  );
+
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+
+  // Preseleccionar el día de la sesión ya elegida (al volver a este paso) o,
+  // si no hay ninguna, el primer día con disponibilidad.
+  useEffect(() => {
+    if (selected) {
+      setSelectedDayKey(dayjs(selected.startDate).tz(tz).format("YYYY-MM-DD"));
+      return;
+    }
+    setSelectedDayKey(availableDays[0] ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?._id, availableDays.join(","), tz]);
+
   if (loading) {
     return <Center h={200}><Loader /></Center>;
   }
@@ -51,10 +100,6 @@ export default function StepSelectSession({
     );
   }
 
-  const availableSessions = sessions.filter(
-    (s) => s.status === "open" && dayjs(s.startDate).isAfter(dayjs())
-  );
-
   if (availableSessions.length === 0) {
     return (
       <Center h={200}>
@@ -66,23 +111,61 @@ export default function StepSelectSession({
     );
   }
 
-  // Agrupar por mes para mejorar legibilidad
-  const grouped = availableSessions.reduce<Record<string, ClassSession[]>>((acc, s) => {
-    const month = dayjs(s.startDate).tz(tz).format("MMMM YYYY");
-    if (!acc[month]) acc[month] = [];
-    acc[month].push(s);
-    return acc;
-  }, {});
+  const sessionsOfSelectedDay = selectedDayKey ? sessionsByDay[selectedDayKey] ?? [] : [];
+
+  const getDayProps = (date: Date) => {
+    const key = dateToKey(date);
+    if (!sessionsByDay[key]) {
+      return { disabled: true };
+    }
+    if (key === selectedDayKey) {
+      return {
+        style: {
+          backgroundColor: "var(--mantine-color-blue-6)",
+          color: "#fff",
+          fontWeight: 700,
+        },
+      };
+    }
+    return {
+      style: {
+        backgroundColor: "var(--mantine-color-green-1)",
+        color: "var(--mantine-color-green-8)",
+        fontWeight: 700,
+      },
+    };
+  };
 
   return (
     <Stack gap="md">
       <Text fw={600} size="lg">Elige una sesión</Text>
       <Text size="sm" c="dimmed">{selectedClass.name} · {selectedClass.duration} min</Text>
+      <Text size="xs" c="dimmed">
+        Los días en <Text span c="green" fw={600}>verde</Text> tienen sesiones disponibles.
+      </Text>
 
-      {Object.entries(grouped).map(([month, monthSessions]) => (
-        <Stack key={month} gap="xs">
-          <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt="xs">{month}</Text>
-          {monthSessions.map((s) => {
+      <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
+        <DatePicker
+          value={selectedDayKey ? dayKeyToDate(selectedDayKey) : null}
+          onChange={(d) => d && setSelectedDayKey(dateToKey(d))}
+          defaultDate={availableDays[0] ? dayKeyToDate(availableDays[0]) : undefined}
+          minDate={new Date()}
+          maxDate={dayKeyToDate(availableDays[availableDays.length - 1])}
+          excludeDate={(d) => dayjs(d).isBefore(dayjs(), "day")}
+          getDayProps={getDayProps}
+          locale="es"
+          size={isMobile ? "sm" : "md"}
+          style={{ width: "100%" }}
+        />
+      </Paper>
+
+      {selectedDayKey && sessionsOfSelectedDay.length > 0 && (
+        <Stack gap="xs">
+          <Divider
+            label={dayjs(dayKeyToDate(selectedDayKey)).format("dddd D [de] MMMM")}
+            labelPosition="left"
+          />
+          {sessionsOfSelectedDay.map((s) => {
             const isSelected = selected?._id === s._id;
             const start = dayjs(s.startDate).tz(tz);
             const end = dayjs(s.endDate).tz(tz);
@@ -114,21 +197,15 @@ export default function StepSelectSession({
                       color={isSelected ? "blue" : "gray"}
                       radius="xl"
                     >
-                      <IconCalendar size={16} />
+                      <IconClock size={16} />
                     </ThemeIcon>
                     <Stack gap={2} style={{ minWidth: 0 }}>
                       <Text fw={600} size="sm">
-                        {start.format("dddd D [de] MMMM")}
+                        {start.format("HH:mm")} – {end.format("HH:mm")}
                       </Text>
                       <Group gap="xs">
-                        <ThemeIcon size="xs" variant="transparent" color="gray">
-                          <IconClock size={12} />
-                        </ThemeIcon>
-                        <Text size="xs" c="dimmed">
-                          {start.format("HH:mm")} – {end.format("HH:mm")}
-                        </Text>
                         {employee && (
-                          <Text size="xs" c="dimmed">· {employee.names}</Text>
+                          <Text size="xs" c="dimmed">{employee.names}</Text>
                         )}
                         {room && (
                           <Text size="xs" c="dimmed">· {room.name}</Text>
@@ -157,7 +234,7 @@ export default function StepSelectSession({
             );
           })}
         </Stack>
-      ))}
+      )}
     </Stack>
   );
 }

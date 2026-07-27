@@ -267,7 +267,9 @@ export interface BulkSessionPayload {
   employeeId: string;
   roomId: string;
   weekdays: number[];      // 0=Dom, 1=Lun … 6=Sáb
-  time: string;            // "HH:MM"
+  startTime: string;       // "HH:MM" — inicio de la ventana horaria
+  endTime?: string;        // "HH:MM" — fin de la ventana (opcional; sin esto, una sola sesión por día)
+  breakMinutes?: number;   // descanso entre sesiones consecutivas dentro de la ventana (opcional)
   periodStart: string;     // ISO date
   periodEnd: string;       // ISO date
   capacity?: number;
