@@ -24,7 +24,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
-import { QRCodeCanvas } from "qrcode.react";
+import { QRCodeSVG } from "qrcode.react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../../app/store";
 import {
@@ -284,7 +284,7 @@ const WhatsappOrgSession: React.FC = () => {
               {!organization?.hideBaileysUI && (
                 <Stack gap="md">
                   <Group justify="space-between" align="center">
-                    <Title order={5}>WhatsApp Web (Baileys)</Title>
+                    <Title order={5}>WhatsApp Web (WEB)</Title>
                     <Badge color={ui.color} size="lg" radius="sm">
                       {ui.title}
                     </Badge>
@@ -485,7 +485,7 @@ const WhatsappOrgSession: React.FC = () => {
                             </Button>
                           ) : (
                             <Stack align="center" gap={6}>
-                              <QRCodeCanvas value={qr} size={240} includeMargin />
+                              <QRCodeSVG value={qr} size={240} includeMargin />
                               <Text size="xs" c="gray">
                                 {qrMeta?.seq ? `QR #${qrMeta.seq} · ` : null}
                                 Expira en {qrTtl}s
