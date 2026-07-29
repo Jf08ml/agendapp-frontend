@@ -78,6 +78,10 @@ export default function SuperadminWaInbox() {
     try {
       const data = await getConversationMessages(phone);
       setMessages(data);
+      // El hilo está abierto — cualquier mensaje entrante (incluido uno que
+      // haya llegado justo en este poll) se da por leído de una vez.
+      setConversations((prev) => prev.map((c) => (c.phone === phone ? { ...c, unreadCount: 0 } : c)));
+      markConversationRead(phone).catch((err) => console.error("Error marcando como leído:", err));
     } catch (err) {
       console.error("Error cargando mensajes:", err);
     } finally {
@@ -103,12 +107,8 @@ export default function SuperadminWaInbox() {
   }, [messages]);
 
   const handleSelect = (phone: string) => {
+    // loadThread (disparado por el efecto de selectedPhone) ya marca como leído.
     setSelectedPhone(phone);
-    const convo = conversations.find((c) => c.phone === phone);
-    if (convo && convo.unreadCount > 0) {
-      setConversations((prev) => prev.map((c) => (c.phone === phone ? { ...c, unreadCount: 0 } : c)));
-      markConversationRead(phone).catch((err) => console.error("Error marcando como leído:", err));
-    }
   };
 
   const selectedConversation = conversations.find((c) => c.phone === selectedPhone) || null;
