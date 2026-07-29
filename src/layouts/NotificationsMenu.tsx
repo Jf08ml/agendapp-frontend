@@ -75,13 +75,22 @@ export default function NotificationsMenu({
   useEffect(() => {
     void fetchNotifications();
 
+    // Respaldo: el push (SW) puede no llegar (suscripción vencida, permiso
+    // denegado, pestaña en segundo plano, etc.). Sin este poll, el badge se
+    // queda desactualizado hasta que se refresca o se reabre la app, ya que
+    // este componente se monta una sola vez en el shell (App.tsx) y nunca
+    // se vuelve a montar al navegar.
+    const pollId = window.setInterval(() => {
+      void fetchNotifications();
+    }, 60_000);
+
     const hasServiceWorker =
       typeof navigator !== "undefined" &&
       "serviceWorker" in navigator &&
       !!navigator.serviceWorker;
 
     if (!hasServiceWorker) {
-      return;
+      return () => window.clearInterval(pollId);
     }
 
     // SW listener con cleanup correcto
@@ -95,9 +104,10 @@ export default function NotificationsMenu({
 
     navigator.serviceWorker.addEventListener("message", onSwMessage);
     return () => {
+      window.clearInterval(pollId);
       navigator.serviceWorker.removeEventListener("message", onSwMessage);
     };
-  }, []);
+  }, [auth.userId]);
 
   const handleNotificationClick = async (notification: Notification) => {
     try {
@@ -284,6 +294,7 @@ export default function NotificationsMenu({
       floatingStrategy="fixed"
       trapFocus={false}
       closeOnItemClick={false}
+      onOpen={() => void fetchNotifications()}
     >
       <Menu.Target>
         <Box style={{ touchAction: "manipulation" }}>
