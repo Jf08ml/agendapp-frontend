@@ -68,7 +68,7 @@ const LoginAdmin: React.FC = () => {
       }
 
       const initialOrgId = organization?._id as string;
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmail = email.replace(/\s+/g, "").toLowerCase();
       const data = await login(normalizedEmail, password, initialOrgId);
       if (data) {
         const organizationId =
