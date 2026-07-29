@@ -9,6 +9,7 @@ import {
   IconRocket,
   IconBell,
   IconTrophy,
+  IconBrandWhatsapp,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -22,6 +23,7 @@ const NAV_ITEMS: { label: string; to: string; icon: React.ReactNode }[] = [
   { label: "Agentes", to: "/superadmin/agentes", icon: <IconUserCheck size={16} /> },
   { label: "Analítica", to: "/superadmin/analiticas", icon: <IconChartBar size={16} /> },
   { label: "Chatbots", to: "/superadmin/chatbots", icon: <IconRobot size={16} /> },
+  { label: "WhatsApp", to: "/superadmin/whatsapp", icon: <IconBrandWhatsapp size={16} /> },
   { label: "Activación", to: "/superadmin/activacion", icon: <IconRocket size={16} /> },
   { label: "Impacto", to: "/superadmin/impacto", icon: <IconTrophy size={16} /> },
   { label: "Anuncios", to: "/superadmin/anuncios", icon: <IconBell size={16} /> },
