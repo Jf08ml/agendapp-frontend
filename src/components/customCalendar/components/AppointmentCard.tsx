@@ -1265,18 +1265,17 @@ ${clientServices}`;
           </Badge>
         )}
 
-        {/* Horario */}
+        {/* Servicio (la hora ya se identifica por la columna de línea de tiempo) */}
         <Text
           style={{
             fontSize: 10,
             fontWeight: 700,
             marginTop: 6,
             letterSpacing: -0.2,
+            lineHeight: 1.15,
           }}
         >
-          {formatInTimezone(appointment.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm")}
-          {" - "}
-          {formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm a")}
+          {appointment.service ? appointment.service.name : "Sin servicio"}
         </Text>
 
         {/* Cliente */}

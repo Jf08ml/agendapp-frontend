@@ -1,7 +1,6 @@
 import { FC, useMemo } from "react";
 import { Box, Text, Stack, Group } from "@mantine/core";
 import { Appointment } from "../../../../services/appointmentService";
-import { formatInTimezone } from "../../../../utils/timezoneUtils";
 
 interface DayModalCompactViewProps {
   appointments: Appointment[];
@@ -10,10 +9,10 @@ interface DayModalCompactViewProps {
   timeFormat?: string;
 }
 
-const HOUR_PX = 48; // más legible que 30
+const HOUR_PX = 64; // más alto que antes (48) para dar espacio al texto de las cards
 const PX_PER_MIN = HOUR_PX / 60;
 const STEP_MIN = 15; // redondeo para recortar "vacíos"
-const MIN_CARD_HEIGHT = 22;
+const MIN_CARD_HEIGHT = 28;
 const GUTTER_PX = 6;
 
 const clampToStepDown = (minutes: number, step: number) =>
@@ -27,7 +26,7 @@ const toDayMinutes = (d: Date) => d.getHours() * 60 + d.getMinutes();
 const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   appointments,
   onEditAppointment,
-  timezone = 'America/Bogota', // 🌍 Default timezone
+  // timezone = 'America/Bogota', // 🌍 Default timezone
   timeFormat,
 }) => {
   const getClientName = (appointment: Appointment) => appointment.client?.name || "Sin cliente";
@@ -228,9 +227,6 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
 
             {/* Citas */}
             {appointmentsWithLayout.map(({ appointment, column, totalColumns, top, height }) => {
-              const startTime = new Date(appointment.startDate);
-              const endTime = new Date(appointment.endDate);
-
               const employeeColor = appointment.employee?.color || "#228be6";
               
               // 🚫 Detectar si está cancelada
@@ -292,8 +288,8 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                   <Text size="xs" fw={800} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
                     {getClientName(appointment)}
                   </Text>
-                  <Text size="xs" fw={600} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
-                    {formatInTimezone(startTime, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")} - {formatInTimezone(endTime, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                  <Text size="xs" fw={600} style={{ color: darkenColor(employeeColor), lineHeight: 1.15 }}>
+                    {appointment.service ? appointment.service.name : "Sin servicio"}
                   </Text>
                 </Box>
               );

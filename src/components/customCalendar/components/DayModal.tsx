@@ -31,7 +31,7 @@ import EmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
 import DayModalCompactView from "./subcomponents/DayModalCompactView";
 import CustomLoader from "../../../components/customLoader/CustomLoader"; // Importa tu loader aquí
 
-export const HOUR_HEIGHT = 60;
+export const HOUR_HEIGHT = 80; // más alto que antes (60) para dar espacio al texto de las cards (mismo criterio que la vista compacta)
 export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 export const CARD_WIDTH = 80;
 
