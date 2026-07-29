@@ -17,7 +17,7 @@ import {
   Paper,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconBrandWhatsapp } from "@tabler/icons-react";
+import { IconBrandWhatsapp, IconCheck, IconChecks, IconAlertTriangle } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import SuperadminNav from "./SuperadminNav";
@@ -50,6 +50,22 @@ const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
 
 function conversationLabel(c: PlatformConversation) {
   return c.organization?.name || `+${c.phone}`;
+}
+
+// Ticks estilo WhatsApp para mensajes salientes: 1 palomita gris (enviado),
+// 2 grises (entregado), 2 azules (leído por el destinatario).
+function StatusTicks({ status }: { status: PlatformWaMessage["status"] }) {
+  if (!status) return null;
+  if (status === "failed") {
+    return <IconAlertTriangle size={14} color="var(--mantine-color-red-6)" />;
+  }
+  if (status === "read") {
+    return <IconChecks size={14} color="var(--mantine-color-blue-5)" />;
+  }
+  if (status === "delivered") {
+    return <IconChecks size={14} color="var(--mantine-color-gray-6)" />;
+  }
+  return <IconCheck size={14} color="var(--mantine-color-gray-6)" />;
 }
 
 export default function SuperadminWaInbox() {
@@ -263,6 +279,7 @@ export default function SuperadminWaInbox() {
                             <Text size="xs" c="dimmed">
                               {dayjs(m.createdAt).format("DD/MM HH:mm")}
                             </Text>
+                            {m.direction === "outbound" && <StatusTicks status={m.status} />}
                           </Group>
                         </Box>
                       ))}

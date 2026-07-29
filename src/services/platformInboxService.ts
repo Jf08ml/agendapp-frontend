@@ -27,6 +27,8 @@ export interface PlatformWaMessage {
   body: string;
   templateName?: string | null;
   read: boolean;
+  status?: "sent" | "delivered" | "read" | "failed" | null;
+  statusUpdatedAt?: string | null;
   createdAt: string;
 }
 
