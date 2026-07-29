@@ -68,7 +68,8 @@ const LoginAdmin: React.FC = () => {
       }
 
       const initialOrgId = organization?._id as string;
-      const data = await login(email, password, initialOrgId);
+      const normalizedEmail = email.trim().toLowerCase();
+      const data = await login(normalizedEmail, password, initialOrgId);
       if (data) {
         const organizationId =
           data.userType === "admin" ? data.userId : (data.organizationId || initialOrgId);
@@ -85,7 +86,7 @@ const LoginAdmin: React.FC = () => {
         navigation("/gestionar-agenda");
 
         if (rememberMe) {
-          localStorage.setItem("rememberedEmail", email);
+          localStorage.setItem("rememberedEmail", normalizedEmail);
         } else {
           localStorage.removeItem("rememberedEmail");
         }
