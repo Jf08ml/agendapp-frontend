@@ -33,7 +33,7 @@ import CustomLoader from "../../../components/customLoader/CustomLoader"; // Imp
 
 export const HOUR_HEIGHT = 80; // más alto que antes (60) para dar espacio al texto de las cards (mismo criterio que la vista compacta)
 export const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
-export const CARD_WIDTH = 80;
+export const CARD_WIDTH = 100; // más ancho que antes (80) para dar espacio a la hora + texto de las cards
 
 interface DayModalProps {
   opened: boolean;

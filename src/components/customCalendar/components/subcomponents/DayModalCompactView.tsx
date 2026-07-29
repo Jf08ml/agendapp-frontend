@@ -23,6 +23,16 @@ const clampToStepUp = (minutes: number, step: number) =>
 
 const toDayMinutes = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
+const formatClock = (d: Date, timeFormat?: string) => {
+  if (timeFormat === "24h") {
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  const hours24 = d.getHours();
+  const period = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  return `${hours12}:${String(d.getMinutes()).padStart(2, "0")} ${period}`;
+};
+
 const DayModalCompactView: FC<DayModalCompactViewProps> = ({
   appointments,
   onEditAppointment,
@@ -285,6 +295,26 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                     e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
+                  {/* Hora de inicio-fin — esquina fija arriba, no agrega alto al flujo.
+                      Lleva fondo propio porque se superpone al nombre del cliente. */}
+                  <Box
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      right: 2,
+                      fontSize: 8,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      whiteSpace: "nowrap",
+                      padding: "1px 3px",
+                      borderRadius: 4,
+                      color: "#fff",
+                      backgroundColor: "rgba(0, 0, 0, 0.55)",
+                    }}
+                  >
+                    {formatClock(new Date(appointment.startDate), timeFormat)}–{formatClock(new Date(appointment.endDate), timeFormat)}
+                  </Box>
+
                   <Text size="xs" fw={800} lineClamp={1} style={{ color: darkenColor(employeeColor) }}>
                     {getClientName(appointment)}
                   </Text>

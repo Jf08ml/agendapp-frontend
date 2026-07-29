@@ -316,6 +316,12 @@ ${clientServices}`;
   const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
   const isBirthday = getIsBirthday(appointment.client.birthDate);
 
+  // 🕒 Hora de inicio/fin — se muestra en una esquina fija (position absolute) para
+  // no agregar una fila al flujo del contenido y evitar que desborde cards chicas.
+  const cardTimeFormat = timeFormat === "24h" ? "HH:mm" : "h:mm A";
+  const startTimeLabel = formatInTimezone(appointment.startDate, timezone, cardTimeFormat);
+  const endTimeLabel = formatInTimezone(appointment.endDate, timezone, cardTimeFormat);
+
   // 💰 Cálculos de cobro para esta cita
   const thisTotal = (customPrice ?? appointment.totalPrice ?? 0) +
     additionalItems.reduce((s, i) => s + (i.price || 0), 0);
@@ -1097,6 +1103,24 @@ ${clientServices}`;
           }
         }}
       >
+        {/* Hora de inicio-fin (esquina fija arriba-derecha, texto simple sin badge) */}
+        <Text
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 2,
+            fontSize: 8,
+            fontWeight: 700,
+            lineHeight: 1,
+            letterSpacing: -0.2,
+            whiteSpace: "nowrap",
+            color: isPastAppointment ? "#8B92A6" : textColor,
+            opacity: 0.85,
+          }}
+        >
+          {startTimeLabel}–{endTimeLabel}
+        </Text>
+
         {/* Badge "solicitado" */}
         {appointment.employeeRequestedByClient && (
           <Badge
@@ -1105,7 +1129,7 @@ ${clientServices}`;
             radius="sm"
             style={{
               position: "absolute",
-              top: 0,
+              top: 10,
               right: 0,
               fontSize: 7,
               boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
@@ -1124,7 +1148,7 @@ ${clientServices}`;
             radius="sm"
             style={{
               position: "absolute",
-              top: appointment.employeeRequestedByClient ? 35 : 0,
+              top: appointment.employeeRequestedByClient ? 45 : 10,
               right: 0,
               fontSize: 7,
               boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
