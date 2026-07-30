@@ -217,15 +217,31 @@ export default function PublicServiceDetailPage() {
           <Badge color={primary} variant="light" size="sm">
             {service.type || "General"}
           </Badge>
-          <Button
-            variant="subtle"
-            color="gray"
-            size="xs"
-            leftSection={<IconShare size={14} />}
-            onClick={handleShare}
-          >
-            Compartir
-          </Button>
+          <Group gap={4} wrap="nowrap">
+            {service.pdfUrl && (
+              <Button
+                component="a"
+                href={service.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="subtle"
+                color="gray"
+                size="xs"
+                leftSection={<IconFileTypePdf size={14} />}
+              >
+                PDF
+              </Button>
+            )}
+            <Button
+              variant="subtle"
+              color="gray"
+              size="xs"
+              leftSection={<IconShare size={14} />}
+              onClick={handleShare}
+            >
+              Compartir
+            </Button>
+          </Group>
         </Group>
 
         <Title order={2}>{service.name}</Title>
@@ -307,24 +323,6 @@ export default function PublicServiceDetailPage() {
                 </Button>
               )}
             </Box>
-          </>
-        )}
-
-        {service.pdfUrl && (
-          <>
-            <Divider />
-            <Button
-              component="a"
-              href={service.pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              variant="light"
-              color={primary}
-              radius="md"
-              leftSection={<IconFileTypePdf size={18} />}
-            >
-              Ver PDF
-            </Button>
           </>
         )}
       </Stack>
