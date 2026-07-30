@@ -27,10 +27,36 @@ import {
   IconSparkles,
   IconShare,
   IconClipboardCheck,
+  IconFileTypePdf,
 } from "@tabler/icons-react";
 import { RootState } from "../../app/store";
 import { getPublicServiceById, Service } from "../../services/serviceService";
 import { formatCurrency } from "../../utils/formatCurrency";
+
+// Convierte un link de YouTube/Vimeo a su URL de embed; null si no matchea
+// (en ese caso se muestra como enlace en vez de reproductor incrustado).
+function getVideoEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com")) {
+      const id = u.searchParams.get("v");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+      const shortsMatch = u.pathname.match(/\/(embed|shorts)\/([\w-]+)/);
+      if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[2]}`;
+    }
+    if (u.hostname === "youtu.be") {
+      const id = u.pathname.replace("/", "");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (u.hostname.includes("vimeo.com")) {
+      const id = u.pathname.split("/").filter(Boolean).pop();
+      if (id) return `https://player.vimeo.com/video/${id}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export default function PublicServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -139,6 +165,7 @@ export default function PublicServiceDetailPage() {
 
   const enableOnlineBooking = organization.enableOnlineBooking ?? true;
   const isFree = service.price === 0;
+  const videoEmbedUrl = service.videoUrl ? getVideoEmbedUrl(service.videoUrl) : null;
 
   return (
     <Container size="sm" py={{ base: "md", sm: rem(48) }}>
@@ -246,6 +273,58 @@ export default function PublicServiceDetailPage() {
                 {service.recommendations}
               </Text>
             </Box>
+          </>
+        )}
+
+        {service.videoUrl && (
+          <>
+            <Divider />
+            <Box>
+              <Text fw={600} fz="sm" mb={8}>
+                Video
+              </Text>
+              {videoEmbedUrl ? (
+                <AspectRatio ratio={16 / 9} style={{ borderRadius: theme.radius.md, overflow: "hidden" }}>
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`Video — ${service.name}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ border: 0 }}
+                  />
+                </AspectRatio>
+              ) : (
+                <Button
+                  component="a"
+                  href={service.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="light"
+                  color={primary}
+                  radius="md"
+                >
+                  Ver video
+                </Button>
+              )}
+            </Box>
+          </>
+        )}
+
+        {service.pdfUrl && (
+          <>
+            <Divider />
+            <Button
+              component="a"
+              href={service.pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="light"
+              color={primary}
+              radius="md"
+              leftSection={<IconFileTypePdf size={18} />}
+            >
+              Ver PDF
+            </Button>
           </>
         )}
       </Stack>

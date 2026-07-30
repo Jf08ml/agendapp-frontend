@@ -17,7 +17,7 @@ import {
 } from "../../../services/classService";
 import { checkClientClassPackagesByIdentifier } from "../../../services/packageService";
 import { createClassCheckout, createReceiptClassCheckout } from "../../../services/collectionService";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
@@ -37,6 +37,13 @@ export default function ClassBookingWizard() {
   const contentTopRef = useRef<HTMLDivElement | null>(null);
   const organization = useSelector((s: RootState) => s.organization.organization);
   const tz = organization?.timezone || "America/Bogota";
+
+  // Deep-link desde el landing: "Reservar" en una sesión específica preselecciona
+  // la clase/sesión y salta directo al paso correspondiente del wizard.
+  const [searchParams] = useSearchParams();
+  const preselectClassId = searchParams.get("classId");
+  const preselectSessionId = searchParams.get("sessionId");
+  const preselectSessionAppliedRef = useRef(false);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState(false);
@@ -76,7 +83,16 @@ export default function ClassBookingWizard() {
     if (!organization?._id) return;
     setLoadingClasses(true);
     getClassesByOrganization(organization._id)
-      .then(setClasses)
+      .then((data) => {
+        setClasses(data);
+        if (preselectClassId) {
+          const match = data.find((c) => c._id === preselectClassId);
+          if (match) {
+            setSelectedClass(match);
+            setCurrentStep(1);
+          }
+        }
+      })
       .finally(() => setLoadingClasses(false));
   }, [organization?._id]);
 
@@ -87,7 +103,17 @@ export default function ClassBookingWizard() {
     setSessions([]);
     setLoadingSessions(true);
     getAvailableSessions(organization._id, { classId: selectedClass._id })
-      .then(setSessions)
+      .then((data) => {
+        setSessions(data);
+        if (preselectSessionId && !preselectSessionAppliedRef.current) {
+          preselectSessionAppliedRef.current = true;
+          const match = data.find((s) => s._id === preselectSessionId);
+          if (match) {
+            setSelectedSession(match);
+            setCurrentStep(2);
+          }
+        }
+      })
       .finally(() => setLoadingSessions(false));
   }, [selectedClass?._id, organization?._id]);
 

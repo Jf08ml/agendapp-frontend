@@ -27,9 +27,9 @@ import {
   SegmentedControl,
   Select,
 } from "@mantine/core";
-import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
+import { Dropzone, IMAGE_MIME_TYPE, PDF_MIME_TYPE } from "@mantine/dropzone";
 import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
-import { BsImage, BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle } from "react-icons/bs";
+import { BsImage, BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle, BsFilePdf } from "react-icons/bs";
 import { Service, ServiceCost } from "../../../../services/serviceService";
 import ImageCropModal from "../../../../components/ImageCropModal";
 
@@ -64,8 +64,10 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     recommendations: "",
     followUpServiceId: null,
     followUpDays: null,
+    videoUrl: "",
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
+  const [pdfFile, setPdfFile] = useState<File | string | null>(null);
   // Cola de imágenes recién soltadas pendientes de pasar por el recortador
   // (una a la vez; al confirmar/omitir/quitar se avanza a la siguiente).
   const [cropQueue, setCropQueue] = useState<File[]>([]);
@@ -77,8 +79,9 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
   useEffect(() => {
     if (service) {
-      setEditingService({ ...service, type: service.type ?? "" });
+      setEditingService({ ...service, type: service.type ?? "", videoUrl: service.videoUrl ?? "" });
       setImageFiles(service.images || []);
+      setPdfFile(service.pdfUrl ?? null);
       setIsFreeService(service.price === 0);
       const existingCosts = service.costs ?? [];
       if (existingCosts.length > 0) {
@@ -105,8 +108,10 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         recommendations: "",
         followUpServiceId: null,
         followUpDays: null,
+        videoUrl: "",
       });
       setImageFiles([]);
+      setPdfFile(null);
       setIsFreeService(false);
       setHasCosts(false);
       setCostsMode("simple");
@@ -139,6 +144,12 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   const handleRemoveImage = (index: number) => {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleDropPdf = (files: File[]) => {
+    if (files[0]) setPdfFile(files[0]);
+  };
+
+  const pdfFileName = typeof pdfFile === "string" ? pdfFile.split("/").pop() : pdfFile?.name;
 
   const moveImageLeft = (index: number) => {
     if (index === 0) return;
@@ -179,7 +190,13 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     setSaving(true);
     try {
       const finalCosts = hasCosts ? costs.filter((c) => c.amount > 0) : [];
-      await onSave({ ...editingService, images: imageFiles as any, costs: finalCosts });
+      await onSave({
+        ...editingService,
+        images: imageFiles as any,
+        costs: finalCosts,
+        pdfUrl: pdfFile as any,
+        videoUrl: editingService.videoUrl?.trim() || null,
+      });
       onClose();
     } finally {
       setSaving(false);
@@ -570,6 +587,49 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
             </Stack>
           </Paper>
         </SimpleGrid>
+
+        <Paper withBorder p="md" radius="md" shadow="xs">
+          <Title order={5} mb="sm">📄 Material adicional (opcional)</Title>
+          <Divider mb="md" />
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <Box>
+              <Text size="sm" fw={500} mb={6}>PDF (ficha técnica, catálogo, etc.)</Text>
+              {pdfFileName ? (
+                <Paper withBorder radius="md" p="xs">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+                      <ThemeIcon color="red" variant="light" radius="md">
+                        <BsFilePdf size={16} />
+                      </ThemeIcon>
+                      <Text size="sm" truncate>{pdfFileName}</Text>
+                    </Group>
+                    <ActionIcon color="red" variant="light" onClick={() => setPdfFile(null)}>
+                      <BiSolidXCircle size={16} />
+                    </ActionIcon>
+                  </Group>
+                </Paper>
+              ) : (
+                <Dropzone onDrop={handleDropPdf} accept={PDF_MIME_TYPE} multiple={false}>
+                  <Center>
+                    <Stack align="center" gap={4} py="xs">
+                      <ThemeIcon size={40} radius="md" variant="light" color="red">
+                        <BsFilePdf size={20} />
+                      </ThemeIcon>
+                      <Text size="xs" fw={600} ta="center">Arrastra un PDF aquí o haz clic</Text>
+                    </Stack>
+                  </Center>
+                </Dropzone>
+              )}
+            </Box>
+            <TextInput
+              label="Video (YouTube o Vimeo)"
+              description="Se muestra incrustado en el detalle del servicio"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={editingService.videoUrl ?? ""}
+              onChange={(e) => setEditingService({ ...editingService, videoUrl: e.currentTarget.value })}
+            />
+          </SimpleGrid>
+        </Paper>
 
         <Paper withBorder p="md" radius="md" shadow="xs">
           <Title order={5} mb="sm">🔁 Recordatorio de seguimiento (opcional)</Title>

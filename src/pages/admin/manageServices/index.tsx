@@ -153,16 +153,25 @@ const AdminServices: React.FC = () => {
         ...validUploaded,
       ];
 
+      // El PDF llega como File (nuevo/reemplazado), string (ya subido) o null (sin PDF)
+      const pdfCandidate = service.pdfUrl as unknown as File | string | null;
+      const finalPdfUrl =
+        pdfCandidate && typeof pdfCandidate !== "string"
+          ? (await uploadImage(pdfCandidate)) ?? null
+          : pdfCandidate;
+
       if (service._id) {
         const updated = await updateService(service._id, {
           ...service,
           images: finalImages,
+          pdfUrl: finalPdfUrl,
         });
         updatedServices = services.map((s) => (s._id === service._id ? updated : s));
       } else {
         const created = await createService({
           ...service,
           images: finalImages,
+          pdfUrl: finalPdfUrl,
           organizationId,
         } as any);
         updatedServices = [...services, created];

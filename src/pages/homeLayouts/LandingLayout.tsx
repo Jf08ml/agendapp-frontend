@@ -20,10 +20,12 @@ import {
   AspectRatio,
   Center,
   Image,
+  Badge,
 } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
 import { getEmployeesByOrganizationId, Employee } from "../../services/employeeService";
+import { getAvailableSessions, ClassSession } from "../../services/classService";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { useSelector } from "react-redux";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
@@ -37,7 +39,16 @@ import {
   IconSparkles,
   IconUserCircle,
   IconStar,
+  IconSchool,
 } from "@tabler/icons-react";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import "dayjs/locale/es";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.locale("es");
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -71,8 +82,10 @@ export function LandingLayout({
 
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
+  const [loadingClassSessions, setLoadingClassSessions] = useState(true);
 
   const org = useSelector(selectOrganization);
 
@@ -199,6 +212,23 @@ export function LandingLayout({
       }
     })();
   }, [organizationId]);
+
+  useEffect(() => {
+    if (!organizationId || !org?.enableClassBooking) {
+      setLoadingClassSessions(false);
+      return;
+    }
+    void (async () => {
+      try {
+        const all = await getAvailableSessions(organizationId);
+        setClassSessions(all.slice(0, 6));
+      } catch {
+        // silencioso
+      } finally {
+        setLoadingClassSessions(false);
+      }
+    })();
+  }, [organizationId, org?.enableClassBooking]);
 
   // El landing es un teaser corto, no el catálogo completo (ese vive en
   // /servicios-precios): como mucho 3 secciones visibles en total (Destacados
@@ -802,6 +832,126 @@ export function LandingLayout({
           </Group>
         </Stack>
       </Container>
+
+      {/* ─── Clases ───────────────────────────────────────────────────────── */}
+      {org?.enableClassBooking && (loadingClassSessions || classSessions.length > 0) && (
+        <Container id="clases" size="lg" py={{ base: rem(64), sm: rem(88) }}>
+          <Stack gap="xl">
+            <Box>
+              <Text
+                fz="xs"
+                fw={600}
+                tt="uppercase"
+                style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }}
+                mb="xs"
+              >
+                Clases
+              </Text>
+              <Title
+                fw={500}
+                fz={{ base: rem(28), sm: rem(38) }}
+                c={theme.colors.gray[9]}
+                style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}
+              >
+                Próximas sesiones.
+              </Title>
+              <Text c={theme.colors.gray[6]} fz={{ base: "md", sm: "lg" }} mt="xs">
+                Reserva tu cupo en nuestras clases programadas.
+              </Text>
+            </Box>
+
+            {loadingClassSessions ? (
+              <Text ta="center" c="dimmed" py="xl">
+                Cargando clases...
+              </Text>
+            ) : (
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                {classSessions.map((session) => {
+                  const classDoc = typeof session.classId === "string" ? null : session.classId;
+                  const employee = typeof session.employeeId === "string" ? null : session.employeeId;
+                  const classIdValue = typeof session.classId === "string" ? session.classId : session.classId._id;
+                  const start = dayjs(session.startDate).tz(org?.timezone || "America/Bogota");
+                  const remaining = session.capacity - session.enrolledCount;
+
+                  return (
+                    <Card
+                      key={session._id}
+                      shadow="xs"
+                      radius="lg"
+                      withBorder
+                      p="md"
+                      style={{ borderColor: theme.colors.gray[2] }}
+                    >
+                      <Stack gap={8}>
+                        <Group justify="space-between" align="flex-start" wrap="nowrap">
+                          <Text fw={600} fz="sm" c={theme.colors.gray[9]} lineClamp={1}>
+                            {classDoc?.name || "Clase"}
+                          </Text>
+                          <Badge
+                            size="sm"
+                            variant="light"
+                            color={remaining <= 3 ? "red" : "green"}
+                          >
+                            {remaining} {remaining === 1 ? "cupo" : "cupos"}
+                          </Badge>
+                        </Group>
+
+                        <Group gap={6} align="center">
+                          <IconCalendar size={14} color={theme.colors.gray[5]} />
+                          <Text fz="xs" c={theme.colors.gray[6]} tt="capitalize">
+                            {start.format("ddd D MMM · h:mm A")}
+                          </Text>
+                        </Group>
+
+                        {employee && (
+                          <Text fz="xs" c={theme.colors.gray[5]}>
+                            Con {employee.names}
+                          </Text>
+                        )}
+
+                        <Group justify="space-between" align="center" mt={4}>
+                          {classDoc && (
+                            <Text fw={600} fz="sm" c={primary}>
+                              {classDoc.pricePerPerson === 0
+                                ? "Gratis"
+                                : formatCurrency(classDoc.pricePerPerson, org?.currency || "COP")}
+                            </Text>
+                          )}
+                          <Button
+                            component={Link}
+                            to={`/reservar-clase?classId=${classIdValue}&sessionId=${session._id}`}
+                            size="xs"
+                            variant="light"
+                            color={theme.primaryColor}
+                            radius="md"
+                          >
+                            Reservar
+                          </Button>
+                        </Group>
+                      </Stack>
+                    </Card>
+                  );
+                })}
+              </SimpleGrid>
+            )}
+
+            <Group justify="space-between" align="center" mt="xs">
+              <Button
+                component={Link}
+                to="/reservar-clase"
+                size="md"
+                variant="outline"
+                color={theme.primaryColor}
+                radius="md"
+                rightSection={<IconArrowRight size={15} />}
+                leftSection={<IconSchool size={18} />}
+              >
+                Ver todas las clases
+              </Button>
+            </Group>
+          </Stack>
+        </Container>
+      )}
 
       {/* ─── Profesionales ────────────────────────────────────────────────── */}
       {(loadingEmployees || employees.length > 0) && (
@@ -1448,8 +1598,19 @@ function ServicesGrid({
                   </Group>
                 </Group>
 
-                {enableOnlineBooking && (
-                  <Box onClick={(e) => e.stopPropagation()} mt="auto" pt={2}>
+                <Stack gap={4} mt="auto" pt={2} onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    component={Link}
+                    to={`/servicio/${service._id}`}
+                    state={{ backTo: "/" }}
+                    size="xs"
+                    variant="default"
+                    radius="md"
+                    fullWidth
+                  >
+                    Ver más
+                  </Button>
+                  {enableOnlineBooking && (
                     <Button
                       component={Link}
                       to={`/online-reservation?serviceId=${service._id}`}
@@ -1461,8 +1622,8 @@ function ServicesGrid({
                     >
                       Reservar
                     </Button>
-                  </Box>
-                )}
+                  )}
+                </Stack>
               </Stack>
             </Stack>
           </Card>

@@ -23,6 +23,8 @@ export interface Service {
   costs?: ServiceCost[]; // 💸 Gastos por insumos/materiales
   followUpServiceId?: string | null; // 🔁 Servicio de seguimiento a recomendar N días después
   followUpDays?: number | null; // 🔁 Días de espera antes de recordar el servicio de seguimiento
+  pdfUrl?: string | null; // 📄 PDF con información adicional (ej: ficha técnica, catálogo)
+  videoUrl?: string | null; // 🎬 URL de video (YouTube/Vimeo) mostrado en el detalle público
 }
 
 interface CreateServicePayload {
@@ -38,6 +40,8 @@ interface CreateServicePayload {
   costs?: ServiceCost[];
   followUpServiceId?: string | null;
   followUpDays?: number | null;
+  pdfUrl?: string | null;
+  videoUrl?: string | null;
 }
 
 interface Response<T> {
