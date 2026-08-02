@@ -54,13 +54,15 @@ export default function ProgramDetailPage() {
 
   useEffect(() => {
     if (!id || !organization?._id) return;
+    const classId = id;
+    const organizationId = organization._id;
     let alive = true;
     setLoading(true);
     setNotFound(false);
     void (async () => {
       const [data, packagesResult] = await Promise.all([
-        getPublicClassById(id, organization._id),
-        listPublicPackages(organization._id),
+        getPublicClassById(classId, organizationId),
+        listPublicPackages(organizationId),
       ]);
       if (!alive) return;
       if (data) {
