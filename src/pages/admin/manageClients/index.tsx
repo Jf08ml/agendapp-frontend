@@ -14,14 +14,16 @@ import {
   Select,
   Text,
   Alert,
+  Menu,
+  ActionIcon,
 } from "@mantine/core";
 import { useState, useEffect, useMemo } from "react";
 import ClientFormModal from "./ClientFormModal";
 import BulkUploadModal from "./BulkUploadModal";
-import ClientTable from "./ClientTable";
+import ClientList from "./ClientList";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
-import { IconFileUpload, IconRefresh, IconAlertTriangle } from "@tabler/icons-react";
+import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical } from "@tabler/icons-react";
 import {
   deleteClient,
   forceDeleteClient,
@@ -197,6 +199,12 @@ const ClientsDashboard = () => {
     }
   };
 
+  // Permite que el Drawer parchee un cliente en el array compartido sin
+  // esperar un refetch completo (ej. tras canjear un premio).
+  const handleClientUpdated = (updated: Client) => {
+    setClients((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+  };
+
   const handleOpenMerge = (client: Client) => {
     setMergeSourceClient(client);
     setMergeTargetId(null);
@@ -325,26 +333,6 @@ const ClientsDashboard = () => {
               w={isMobile ? "100%" : 320}
               radius="md"
             />
-            <Tooltip label="Restablecer servicios y referidos a 0 para todos los clientes">
-              <Button
-                leftSection={<IconRefresh size={18} />}
-                onClick={handleResetAllLoyalty}
-                variant="light"
-                color="orange"
-              >
-                {isMobile ? "Resetear" : "Restablecer todo"}
-              </Button>
-            </Tooltip>
-            <Tooltip label="Carga masiva desde Excel">
-              <Button
-                leftSection={<IconFileUpload size={18} />}
-                onClick={() => setOpenBulkUploadModal(true)}
-                variant="light"
-                color="blue"
-              >
-                {isMobile ? "Excel" : "Carga masiva"}
-              </Button>
-            </Tooltip>
             <Tooltip label="Crear nuevo cliente">
               <Button
                 leftSection={<IoAddCircleOutline />}
@@ -353,6 +341,30 @@ const ClientsDashboard = () => {
                 {isMobile ? "Crear" : "Crear cliente"}
               </Button>
             </Tooltip>
+            <Menu shadow="sm" width={240} withinPortal>
+              <Menu.Target>
+                <ActionIcon variant="default" size="lg" radius="md">
+                  <IconDotsVertical size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Label>Acciones administrativas</Menu.Label>
+                <Menu.Item
+                  leftSection={<IconRefresh size={16} />}
+                  color="orange"
+                  onClick={handleResetAllLoyalty}
+                >
+                  Restablecer todo
+                </Menu.Item>
+                <Menu.Item
+                  leftSection={<IconFileUpload size={16} />}
+                  color="blue"
+                  onClick={() => setOpenBulkUploadModal(true)}
+                >
+                  Carga masiva
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Flex>
       </Card>
@@ -365,15 +377,16 @@ const ClientsDashboard = () => {
         </Card>
       ) : (
         <Card withBorder radius="md" p="md">
-          <ClientTable
+          <ClientList
             clients={filteredClients}
-            handleDeleteClient={handleDeleteClient}
-            handleForceDeleteClient={handleForceDeleteClient}
-            handleMergeClient={handleOpenMerge}
-            handleResetClientLoyalty={handleResetClientLoyalty}
-            handleRegisterService={handleRegisterService}
-            handleReferral={handleReferral}
-            handleEditClient={handleOpenModal}
+            onDeleteClient={handleDeleteClient}
+            onForceDeleteClient={handleForceDeleteClient}
+            onMergeClient={handleOpenMerge}
+            onResetClientLoyalty={handleResetClientLoyalty}
+            onRegisterService={handleRegisterService}
+            onReferral={handleReferral}
+            onEditClient={handleOpenModal}
+            onClientUpdated={handleClientUpdated}
             error={error}
           />
         </Card>
@@ -398,6 +411,7 @@ const ClientsDashboard = () => {
         onClose={closeMerge}
         title={`Fusionar cliente: ${mergeSourceClient?.name}`}
         size="md"
+        zIndex={1000}
       >
         <Text size="sm" c="dimmed" mb="sm">
           Selecciona el cliente al que se transferirán las citas, paquetes y puntos de fidelidad.

@@ -26,6 +26,7 @@ import {
   Paper,
   Menu,
   Tabs,
+  Textarea,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
@@ -33,6 +34,7 @@ import {
   Appointment,
   getAppointmentsByOrganizationId,
   updateAppointment,
+  updateAppointmentNotes,
   batchConfirmAppointments,
 } from "../../services/appointmentService";
 import { showNotification } from "@mantine/notifications";
@@ -311,6 +313,8 @@ const DailyCashbox: React.FC = () => {
   const [drawerAdditionalItems, setDrawerAdditionalItems] = useState<{ name: string; price: number }[]>([]);
   const [drawerNewItem, setDrawerNewItem] = useState({ name: "", price: 0 });
   const [drawerSavingPrice, setDrawerSavingPrice] = useState(false);
+  const [drawerSessionNotes, setDrawerSessionNotes] = useState("");
+  const [drawerSavingNotes, setDrawerSavingNotes] = useState(false);
 
   // Pagos de paquetes/planes
   const [clientPackages, setClientPackages] = useState<ClientPackage[]>([]);
@@ -627,6 +631,7 @@ const DailyCashbox: React.FC = () => {
     setDrawerCustomPrice(appt.customPrice ?? appt.totalPrice ?? 0);
     setDrawerAdditionalItems(appt.additionalItems || []);
     setDrawerNewItem({ name: "", price: 0 });
+    setDrawerSessionNotes(appt.sessionNotes || "");
     setApptDrawerOpened(true);
   };
 
@@ -770,6 +775,22 @@ const DailyCashbox: React.FC = () => {
       showNotification({ title: "Error", message: "No se pudo actualizar el precio", color: "red", autoClose: 3000, position: "top-right" });
     } finally {
       setDrawerSavingPrice(false);
+    }
+  };
+
+  const handleDrawerSaveNotes = async () => {
+    if (!selectedAppt) return;
+    setDrawerSavingNotes(true);
+    try {
+      const updated = await updateAppointmentNotes(selectedAppt._id, drawerSessionNotes);
+      if (updated) {
+        syncApptInState(updated);
+        showNotification({ title: "Notas guardadas", message: "El registro de la sesión se actualizó correctamente", color: "green", autoClose: 2000, position: "top-right" });
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudieron guardar las notas", color: "red", autoClose: 3000, position: "top-right" });
+    } finally {
+      setDrawerSavingNotes(false);
     }
   };
 
@@ -1683,6 +1704,30 @@ const DailyCashbox: React.FC = () => {
                     </Stack>
                   </>
                 )}
+              </Paper>
+
+              {/* Notas de la sesión */}
+              <Paper withBorder p="sm" radius="md">
+                <Group justify="space-between" mb="sm">
+                  <Text size="sm" fw={700}>Notas de la sesión</Text>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={handleDrawerSaveNotes}
+                    loading={drawerSavingNotes}
+                    disabled={drawerSessionNotes === (selectedAppt.sessionNotes || "")}
+                  >
+                    Guardar
+                  </Button>
+                </Group>
+                <Textarea
+                  placeholder="¿Qué se hizo en esta sesión? Observaciones, seguimiento, próximos pasos..."
+                  value={drawerSessionNotes}
+                  onChange={(e) => setDrawerSessionNotes(e.currentTarget.value)}
+                  minRows={3}
+                  autosize
+                  maxRows={8}
+                />
               </Paper>
             </Stack>
           );

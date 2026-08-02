@@ -17,6 +17,7 @@ import {
   Divider,
   Badge,
   ActionIcon,
+  Textarea,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
@@ -25,7 +26,7 @@ import { addMinutes } from "date-fns";
 import { Service } from "../../../../services/serviceService";
 import { Employee } from "../../../../services/employeeService";
 import { Client, searchClients } from "../../../../services/clientService";
-import { Appointment } from "../../../../services/appointmentService";
+import { Appointment, updateAppointmentNotes } from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -42,7 +43,7 @@ import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
-import { IconPackage, IconX } from "@tabler/icons-react";
+import { IconPackage, IconX, IconNotes } from "@tabler/icons-react";
 
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
@@ -260,6 +261,48 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   // Estado para paquetes de sesiones del cliente
   const [availablePackages, setAvailablePackages] = useState<Record<string, ClientPackage[]>>({});
   const [usePackage, setUsePackage] = useState<Record<string, string>>({}); // serviceId -> clientPackageId
+
+  // 📝 Notas de la sesión (registro genérico de lo hecho en la cita).
+  // lastSavedNotes se trackea localmente (no desde la prop `appointment`,
+  // que no se actualiza sola tras guardar) para que el botón "Guardar" se
+  // deshabilite correctamente justo después de un guardado exitoso.
+  const [sessionNotesDraft, setSessionNotesDraft] = useState("");
+  const [lastSavedNotes, setLastSavedNotes] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    setSessionNotesDraft(appointment?.sessionNotes || "");
+    setLastSavedNotes(appointment?.sessionNotes || "");
+  }, [appointment?._id, appointment?.sessionNotes]);
+
+  const handleSaveNotes = async () => {
+    if (!appointment) return;
+    setSavingNotes(true);
+    try {
+      const updated = await updateAppointmentNotes(appointment._id, sessionNotesDraft);
+      if (updated) {
+        setLastSavedNotes(sessionNotesDraft);
+        // Refresca la lista de citas del mes para que, si se vuelve a abrir
+        // esta misma cita más tarde, ya venga con la nota actualizada.
+        await fetchAppointmentsForMonth?.(appointment.startDate);
+        notifications.show({
+          title: "Notas guardadas",
+          message: "El registro de la sesión se actualizó correctamente",
+          color: "green",
+          autoClose: 2500,
+        });
+      }
+    } catch (error: unknown) {
+      notifications.show({
+        title: "Error",
+        message: error instanceof Error ? error.message : "No se pudieron guardar las notas",
+        color: "red",
+        autoClose: 4000,
+      });
+    } finally {
+      setSavingNotes(false);
+    }
+  };
 
   const today = dayjs();
   const organization = useSelector(
@@ -1674,6 +1717,45 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               </Box>
             )}
           </Box>
+
+          {/* Sección: Notas de la sesión (solo al editar una cita ya existente) */}
+          {appointment && (
+            <Box
+              mb="xl"
+              p="md"
+              style={{
+                backgroundColor: "#f8f9fa",
+                borderRadius: 8,
+                border: "1px solid #e9ecef",
+              }}
+            >
+              <Group justify="space-between" mb="md">
+                <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+                  <IconNotes size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  Notas de la sesión
+                </Text>
+                <Button
+                  size="xs"
+                  variant="light"
+                  onClick={handleSaveNotes}
+                  loading={savingNotes}
+                  disabled={sessionNotesDraft === lastSavedNotes}
+                >
+                  Guardar notas
+                </Button>
+              </Group>
+              <Textarea
+                placeholder="¿Qué se hizo en esta sesión? Observaciones, seguimiento, próximos pasos..."
+                value={sessionNotesDraft}
+                onChange={(e) => setSessionNotesDraft(e.currentTarget.value)}
+                minRows={3}
+                autosize
+                maxRows={8}
+                styles={{ input: { borderRadius: 8 } }}
+              />
+            </Box>
+          )}
+
           {/* Botones de acción */}
           <Group
             mt="xl"

@@ -38,6 +38,7 @@ export interface Appointment {
   payments?: PaymentRecord[];
   paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'free';
   clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
+  sessionNotes?: string; // 📝 Registro de lo hecho en la sesión (concepto genérico)
   reminderSent?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -246,6 +247,23 @@ export const getAppointmentsByEmployee = async (
   } catch (error) {
     handleAxiosError(error, "Error al obtener las citas");
     return [];
+  }
+};
+
+// 📝 Guardar/editar el registro de la sesión (lo hecho en la cita) — no
+// reprograma la cita, solo actualiza esta nota.
+export const updateAppointmentNotes = async (
+  appointmentId: string,
+  sessionNotes: string
+): Promise<Appointment | undefined> => {
+  try {
+    const response = await apiAppointment.patch<Response<Appointment>>(
+      `/${appointmentId}/notes`,
+      { sessionNotes }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al guardar las notas de la sesión");
   }
 };
 
