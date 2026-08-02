@@ -25,6 +25,8 @@ export interface Service {
   followUpDays?: number | null; // 🔁 Días de espera antes de recordar el servicio de seguimiento
   pdfUrl?: string | null; // 📄 PDF con información adicional (ej: ficha técnica, catálogo)
   videoUrl?: string | null; // 🎬 URL de video (YouTube/Vimeo) mostrado en el detalle público
+  ctaMode?: "booking" | "whatsapp_quote"; // 💬 CTA: reserva normal o cotizar por WhatsApp
+  whatsappQuoteMessage?: string | null; // 💬 Mensaje prellenado para el link de WhatsApp
 }
 
 interface CreateServicePayload {
@@ -42,6 +44,8 @@ interface CreateServicePayload {
   followUpDays?: number | null;
   pdfUrl?: string | null;
   videoUrl?: string | null;
+  ctaMode?: "booking" | "whatsapp_quote";
+  whatsappQuoteMessage?: string | null;
 }
 
 interface Response<T> {

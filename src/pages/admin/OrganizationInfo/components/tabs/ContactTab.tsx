@@ -171,6 +171,13 @@ export default function ContactTab({
                   : "Landing - Página de presentación completa (Plan Marca/Pro)",
                 disabled: !canUseLanding,
               },
+              {
+                value: "academy",
+                label: canUseLanding
+                  ? "Academia - Programas y servicios"
+                  : "Academia - Programas y servicios (Plan Marca/Pro)",
+                disabled: !canUseLanding,
+              },
             ]}
           />
           <TextInput

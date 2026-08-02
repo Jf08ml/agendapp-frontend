@@ -24,32 +24,31 @@ import { useSelector } from "react-redux";
 import {
   IconArrowLeft,
   IconClock,
-  IconSparkles,
+  IconSchool,
   IconShare,
   IconClipboardCheck,
   IconFileTypePdf,
-  IconBrandWhatsapp,
 } from "@tabler/icons-react";
 import { RootState } from "../../app/store";
-import { getPublicServiceById, Service } from "../../services/serviceService";
+import { getPublicClassById, ClassType } from "../../services/classService";
+import { listPublicPackages, PublicPackageItem } from "../../services/collectionService";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { getVideoEmbedUrl } from "../../utils/videoEmbed";
-import { buildWhatsappQuoteLink } from "../../utils/whatsappLink";
+import { findPackageForClass, buildClassReserveLink, buildPackageBuyLink } from "../../utils/programPurchase";
 
-export default function PublicServiceDetailPage() {
+export default function ProgramDetailPage() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
-  // De dónde vino el visitante: landing ("/") o catálogo completo
-  // (/servicios-precios). Viaja por location.state (no ensucia el link
-  // compartible); sin estado (visita directa/compartida) cae a la raíz.
+  // De dónde vino el visitante: landing ("/") o catálogo completo de
+  // programas (/programas). Viaja por location.state; sin estado (visita
+  // directa/compartida) cae a la raíz.
   const backTo = (location.state as { backTo?: string } | null)?.backTo || "/";
   const theme = useMantineTheme();
-  const organization = useSelector(
-    (s: RootState) => s.organization.organization
-  );
+  const organization = useSelector((s: RootState) => s.organization.organization);
   const primary = organization?.branding?.primaryColor || theme.colors[theme.primaryColor][6];
 
-  const [service, setService] = useState<Service | null>(null);
+  const [classDoc, setClassDoc] = useState<ClassType | null>(null);
+  const [packages, setPackages] = useState<PublicPackageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -58,35 +57,40 @@ export default function PublicServiceDetailPage() {
     let alive = true;
     setLoading(true);
     setNotFound(false);
-    getPublicServiceById(id, organization._id).then((data) => {
+    void (async () => {
+      const [data, packagesResult] = await Promise.all([
+        getPublicClassById(id, organization._id),
+        listPublicPackages(organization._id),
+      ]);
       if (!alive) return;
       if (data) {
-        setService(data);
+        setClassDoc(data);
+        setPackages(packagesResult?.packages || []);
       } else {
         setNotFound(true);
       }
       setLoading(false);
-    });
+    })();
     return () => {
       alive = false;
     };
   }, [id, organization?._id]);
 
   useEffect(() => {
-    if (service) {
-      document.title = `${service.name} — ${organization?.name || ""}`;
+    if (classDoc) {
+      document.title = `${classDoc.name} — ${organization?.name || ""}`;
     }
     return () => {
       document.title = organization?.name || "AgenditApp";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service]);
+  }, [classDoc]);
 
   const handleShare = async () => {
     const url = window.location.href;
     const shareData = {
-      title: service?.name,
-      text: service ? `${service.name} — ${organization?.name || ""}` : undefined,
+      title: classDoc?.name,
+      text: classDoc ? `${classDoc.name} — ${organization?.name || ""}` : undefined,
       url,
     };
     if (navigator.share) {
@@ -122,28 +126,28 @@ export default function PublicServiceDetailPage() {
     );
   }
 
-  if (notFound || !service) {
+  if (notFound || !classDoc) {
     return (
       <Container size="sm" py={rem(80)}>
         <Stack align="center" gap="sm">
           <Title order={3} ta="center">
-            No encontramos este servicio
+            No encontramos esta clase
           </Title>
           <Text c="dimmed" ta="center">
-            Puede que ya no esté disponible. Mira el resto de servicios de{" "}
+            Puede que ya no esté disponible. Mira el resto de clases de{" "}
             {organization.name}.
           </Text>
           <Anchor component={Link} to={backTo} fw={600}>
-            Ver todos los servicios
+            Ver todas las clases
           </Anchor>
         </Stack>
       </Container>
     );
   }
 
-  const enableOnlineBooking = organization.enableOnlineBooking ?? true;
-  const isFree = service.price === 0;
-  const videoEmbedUrl = service.videoUrl ? getVideoEmbedUrl(service.videoUrl) : null;
+  const isFree = classDoc.pricePerPerson === 0;
+  const videoEmbedUrl = classDoc.videoUrl ? getVideoEmbedUrl(classDoc.videoUrl) : null;
+  const packageId = findPackageForClass(classDoc._id, packages);
 
   return (
     <Container size="sm" py={{ base: "md", sm: rem(48) }}>
@@ -155,7 +159,7 @@ export default function PublicServiceDetailPage() {
         style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
         mb="md"
       >
-        <IconArrowLeft size={14} /> Volver a servicios
+        <IconArrowLeft size={14} /> Volver a clases
       </Anchor>
 
       <AspectRatio
@@ -166,24 +170,24 @@ export default function PublicServiceDetailPage() {
           background: theme.colors.gray[1],
         }}
       >
-        {service.images && service.images.length > 0 ? (
-          service.images.length > 1 ? (
+        {classDoc.images && classDoc.images.length > 0 ? (
+          classDoc.images.length > 1 ? (
             <Carousel withIndicators loop height="100%">
-              {service.images.map((img, i) => (
+              {classDoc.images.map((img, i) => (
                 <Carousel.Slide key={i}>
-                  <Image src={img} h="100%" fit="cover" alt={service.name} />
+                  <Image src={img} h="100%" fit="cover" alt={classDoc.name} />
                 </Carousel.Slide>
               ))}
             </Carousel>
           ) : (
-            <Image src={service.images[0]} h="100%" fit="cover" alt={service.name} />
+            <Image src={classDoc.images[0]} h="100%" fit="cover" alt={classDoc.name} />
           )
         ) : (
           <Center h="100%">
             <Stack align="center" gap={8}>
-              <IconSparkles size={48} stroke={1.2} color={theme.colors.gray[4]} />
+              <IconSchool size={48} stroke={1.2} color={theme.colors.gray[4]} />
               <Text fz="sm" fw={500} c={theme.colors.gray[5]}>
-                {service.name}
+                {classDoc.name}
               </Text>
             </Stack>
           </Center>
@@ -193,13 +197,13 @@ export default function PublicServiceDetailPage() {
       <Stack gap="sm" mt="lg">
         <Group justify="space-between" align="flex-start" wrap="nowrap">
           <Badge color={primary} variant="light" size="sm">
-            {service.type || "General"}
+            Clase
           </Badge>
           <Group gap={4} wrap="nowrap">
-            {service.pdfUrl && (
+            {classDoc.pdfUrl && (
               <Button
                 component="a"
-                href={service.pdfUrl}
+                href={classDoc.pdfUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="subtle"
@@ -222,73 +226,71 @@ export default function PublicServiceDetailPage() {
           </Group>
         </Group>
 
-        <Title order={2}>{service.name}</Title>
+        <Title order={2}>{classDoc.name}</Title>
 
         <Group gap="lg" align="center">
-          {!service.hidePrice && (
-            <Text fw={700} fz={rem(28)} c={isFree ? "green" : primary}>
-              {isFree ? "Gratis" : formatCurrency(service.price, organization.currency || "COP")}
+          <Text fw={700} fz={rem(28)} c={isFree ? "green" : primary}>
+            {isFree ? "Gratis" : formatCurrency(classDoc.pricePerPerson, organization.currency || "COP")}
+            <Text span fz="sm" c="dimmed" fw={400}>
+              {" "}/ persona
             </Text>
-          )}
+          </Text>
           <Group gap={6} align="center">
             <IconClock size={16} color={theme.colors.gray[6]} />
-            <Text c="dimmed">{service.duration} min</Text>
+            <Text c="dimmed">{classDoc.duration} min</Text>
           </Group>
         </Group>
 
-        {service.ctaMode === "whatsapp_quote" ? (
-          organization.whatsappUrl && (
-            <Button
-              component="a"
-              href={buildWhatsappQuoteLink(organization.whatsappUrl, service.whatsappQuoteMessage)}
-              target="_blank"
-              rel="noopener noreferrer"
-              size="md"
-              color="green"
-              radius="md"
-              leftSection={<IconBrandWhatsapp size={18} />}
-              fullWidth
-            >
-              Cotizar por WhatsApp
-            </Button>
-          )
-        ) : (
-          enableOnlineBooking && (
+        <Stack gap="xs">
+          <Button
+            component={Link}
+            to={buildClassReserveLink(classDoc._id)}
+            size="md"
+            color={primary}
+            radius="md"
+            fullWidth
+          >
+            Reservar clase
+          </Button>
+          {packageId && (
             <Button
               component={Link}
-              to={`/online-reservation?serviceId=${service._id}`}
+              to={buildPackageBuyLink(packageId)}
               size="md"
+              variant="outline"
               color={primary}
               radius="md"
               fullWidth
             >
-              Reservar
+              Comprar paquete
             </Button>
-          )
-        )}
+          )}
+        </Stack>
 
-        {service.description && (
+        {classDoc.description && (
           <>
             <Divider mt="sm" />
-            <Text style={{ whiteSpace: "pre-wrap" }}>{service.description}</Text>
+            <Text style={{ whiteSpace: "pre-wrap" }}>{classDoc.description}</Text>
           </>
         )}
 
-        {service.recommendations && (
+        {classDoc.groupDiscount?.enabled && (
           <>
             <Divider />
             <Box>
               <Text fw={600} fz="sm" mb={4}>
-                Recomendaciones antes de tu cita
+                Descuento grupal
               </Text>
-              <Text c="dimmed" fz="sm" style={{ whiteSpace: "pre-wrap" }}>
-                {service.recommendations}
+              <Text c="dimmed" fz="sm">
+                {classDoc.groupDiscount.discountPercent}% de descuento reservando desde{" "}
+                {classDoc.groupDiscount.minPeople} personas
+                {classDoc.groupDiscount.maxPeople ? ` hasta ${classDoc.groupDiscount.maxPeople}` : ""}.
               </Text>
             </Box>
           </>
         )}
 
-        {service.videoUrl && (
+        {classDoc.videoUrl && (
           <>
             <Divider />
             <Box>
@@ -299,7 +301,7 @@ export default function PublicServiceDetailPage() {
                 <AspectRatio ratio={16 / 9} style={{ borderRadius: theme.radius.md, overflow: "hidden" }}>
                   <iframe
                     src={videoEmbedUrl}
-                    title={`Video — ${service.name}`}
+                    title={`Video — ${classDoc.name}`}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                     style={{ border: 0 }}
@@ -308,7 +310,7 @@ export default function PublicServiceDetailPage() {
               ) : (
                 <Button
                   component="a"
-                  href={service.videoUrl}
+                  href={classDoc.videoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   variant="light"

@@ -35,6 +35,7 @@ import {
   getEnrollments, approveEnrollment, cancelEnrollment,
 } from "../../../services/classService";
 import { getEmployeesByOrganizationId, Employee } from "../../../services/employeeService";
+import { uploadImage } from "../../../services/imageService";
 
 import RoomFormModal from "./components/RoomFormModal";
 import ClassFormModal from "./components/ClassFormModal";
@@ -196,11 +197,32 @@ export default function ManageClasses() {
   const handleClassSubmit = async (data: any) => {
     setSaving(true);
     try {
+      // Subir archivos nuevos (imágenes File[] + PDF File) antes de guardar,
+      // igual que el flujo de Servicios (handleSaveService).
+      const images = (data.images || []) as (string | File)[];
+      const filesToUpload = images.filter((img) => img && typeof img !== "string") as File[];
+      let uploadedUrls: (string | undefined)[] = [];
+      if (filesToUpload.length > 0) {
+        uploadedUrls = await Promise.all(filesToUpload.map((f) => uploadImage(f)));
+      }
+      const finalImages = [
+        ...images.filter((img): img is string => typeof img === "string"),
+        ...(uploadedUrls.filter(Boolean) as string[]),
+      ];
+
+      const pdfCandidate = data.pdfUrl as File | string | null;
+      const finalPdfUrl =
+        pdfCandidate && typeof pdfCandidate !== "string"
+          ? (await uploadImage(pdfCandidate)) ?? null
+          : pdfCandidate;
+
+      const payload = { ...data, images: finalImages, pdfUrl: finalPdfUrl };
+
       if (editingClass) {
-        await updateClass(editingClass._id, data);
+        await updateClass(editingClass._id, payload);
         showNotification({ message: "Clase actualizada", color: "green" });
       } else {
-        await createClass(data);
+        await createClass(payload);
         showNotification({ message: "Clase creada", color: "green" });
       }
       setClassModal(false);

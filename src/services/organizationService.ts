@@ -178,7 +178,7 @@ export interface Organization {
   mpCollect?: { connected?: boolean };
   welcomeTitle?: string;
   welcomeDescription?: string;
-  homeLayout?: "modern" | "minimal" | "cards" | "landing";
+  homeLayout?: "modern" | "minimal" | "cards" | "landing" | "academy";
   reminderSettings?: ReminderSettings;
   autoMarkAttended?: boolean;
   cancellationPolicy?: CancellationPolicy;

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Accordion,
+  Anchor,
   AspectRatio,
   Badge,
   Button,
@@ -29,6 +30,8 @@ import {
   Service,
 } from "../services/serviceService"; // Ajusta tu import
 import { BiImage, BiSearch, BiX, BiTime, BiStar } from "react-icons/bi";
+import { IconBrandWhatsapp } from "@tabler/icons-react";
+import { buildWhatsappQuoteLink } from "../utils/whatsappLink";
 
 // ---------------- Utils ----------------
 
@@ -318,29 +321,40 @@ const ServiceCard = ({
           </Group>
         </Group>
 
-        <Stack gap={6} mt="auto" pt={4}>
-          <Button
-            component={Link}
-            to={`/servicio/${service._id}`}
-            state={{ backTo: "/servicios-precios" }}
-            size="xs"
-            variant="default"
-            fullWidth
-          >
-            Ver más
-          </Button>
-          {organization?.enableOnlineBooking !== false && (
-            <Button
-              component={Link}
-              to={`/online-reservation?serviceId=${service._id}`}
-              size="xs"
-              variant="light"
-              color={primaryColor}
-              fullWidth
-            >
-              Reservar ahora
-            </Button>
+        <Stack gap={4} mt="auto" pt={4} align="center">
+          {service.ctaMode === "whatsapp_quote" ? (
+            organization?.whatsappUrl && (
+              <Button
+                component="a"
+                href={buildWhatsappQuoteLink(organization.whatsappUrl, service.whatsappQuoteMessage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="xs"
+                variant="light"
+                color="green"
+                leftSection={<IconBrandWhatsapp size={14} />}
+                fullWidth
+              >
+                Cotizar por WhatsApp
+              </Button>
+            )
+          ) : (
+            organization?.enableOnlineBooking !== false && (
+              <Button
+                component={Link}
+                to={`/online-reservation?serviceId=${service._id}`}
+                size="xs"
+                variant="light"
+                color={primaryColor}
+                fullWidth
+              >
+                Reservar ahora
+              </Button>
+            )
           )}
+          <Anchor component={Link} to={`/servicio/${service._id}`} state={{ backTo: "/servicios-precios" }} fz="xs" fw={600}>
+            Ver más →
+          </Anchor>
         </Stack>
       </Stack>
     </Card>

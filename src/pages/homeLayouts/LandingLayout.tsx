@@ -1598,18 +1598,7 @@ function ServicesGrid({
                   </Group>
                 </Group>
 
-                <Stack gap={4} mt="auto" pt={2} onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    component={Link}
-                    to={`/servicio/${service._id}`}
-                    state={{ backTo: "/" }}
-                    size="xs"
-                    variant="default"
-                    radius="md"
-                    fullWidth
-                  >
-                    Ver más
-                  </Button>
+                <Stack gap={4} mt="auto" pt={2} align="center" onClick={(e) => e.stopPropagation()}>
                   {enableOnlineBooking && (
                     <Button
                       component={Link}
@@ -1623,6 +1612,15 @@ function ServicesGrid({
                       Reservar
                     </Button>
                   )}
+                  <Anchor
+                    component={Link}
+                    to={`/servicio/${service._id}`}
+                    state={{ backTo: "/" }}
+                    fz="xs"
+                    fw={600}
+                  >
+                    Ver más →
+                  </Anchor>
                 </Stack>
               </Stack>
             </Stack>

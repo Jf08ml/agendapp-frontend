@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Container,
   Title,
@@ -86,6 +86,7 @@ const minTierPrice = (pkg: PublicPackageItem) =>
 // El ClientPackage se crea cuando el webhook confirma el pago.
 export default function PublicPackagePurchasePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const organization = useSelector((s: RootState) => s.organization.organization);
   const orgCountry = (organization?.default_country || "CO") as CountryCode;
 
@@ -159,6 +160,17 @@ export default function PublicPackagePurchasePage() {
     if (submitting) return;
     setSelected(null);
   };
+
+  // Deep-link desde el catálogo de programas (?packageId=...): abre
+  // directamente el modal de compra de ese paquete al cargar.
+  useEffect(() => {
+    if (packages.length === 0) return;
+    const packageId = searchParams.get("packageId");
+    if (!packageId) return;
+    const pkg = packages.find((p) => p._id === packageId);
+    if (pkg) openBuy(pkg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packages]);
 
   // Autocompletar por el identificador configurado.
   const runLookup = async (field: typeof identifierField, value: string) => {

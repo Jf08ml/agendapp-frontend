@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   TextInput,
@@ -11,11 +11,13 @@ import {
   Stack,
   Divider,
   Text,
+  Title,
   ColorInput,
   SimpleGrid,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { ClassType } from "../../../../services/classService";
+import { ImageUploadField, PdfAndVideoFields } from "../../components/MediaUploadFields";
 
 interface Props {
   opened: boolean;
@@ -35,6 +37,9 @@ interface FormValues {
   pricePerPerson: number;
   color: string;
   isActive: boolean;
+  isPublic: boolean;
+  featured: boolean;
+  videoUrl: string;
   groupDiscount: {
     enabled: boolean;
     minPeople: number;
@@ -50,6 +55,9 @@ export default function ClassFormModal({
   editing,
   loading,
 }: Props) {
+  const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
+  const [pdfFile, setPdfFile] = useState<File | string | null>(null);
+
   const form = useForm<FormValues>({
     initialValues: {
       name: "",
@@ -59,6 +67,9 @@ export default function ClassFormModal({
       pricePerPerson: 0,
       color: "#4C6EF5",
       isActive: true,
+      isPublic: true,
+      featured: false,
+      videoUrl: "",
       groupDiscount: {
         enabled: false,
         minPeople: 2,
@@ -92,6 +103,9 @@ export default function ClassFormModal({
         pricePerPerson: editing.pricePerPerson,
         color: editing.color || "#4C6EF5",
         isActive: editing.isActive,
+        isPublic: editing.isPublic ?? true,
+        featured: editing.featured ?? false,
+        videoUrl: editing.videoUrl ?? "",
         groupDiscount: {
           enabled: editing.groupDiscount?.enabled ?? false,
           minPeople: editing.groupDiscount?.minPeople ?? 2,
@@ -99,14 +113,25 @@ export default function ClassFormModal({
           discountPercent: editing.groupDiscount?.discountPercent ?? 10,
         },
       });
+      setImageFiles(editing.images || []);
+      setPdfFile(editing.pdfUrl ?? null);
     } else {
       form.reset();
+      setImageFiles([]);
+      setPdfFile(null);
     }
   }, [editing, opened]);
 
   const handleSubmit = async (values: typeof form.values) => {
-    await onSubmit(values);
+    await onSubmit({
+      ...values,
+      images: imageFiles as unknown as string[],
+      pdfUrl: pdfFile as unknown as string | null,
+      videoUrl: values.videoUrl?.trim() || null,
+    });
     form.reset();
+    setImageFiles([]);
+    setPdfFile(null);
   };
 
   const discountEnabled = form.values.groupDiscount.enabled;
@@ -117,7 +142,7 @@ export default function ClassFormModal({
       onClose={onClose}
       title={editing ? "Editar clase" : "Nueva clase"}
       centered
-      size="lg"
+      size="xl"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="sm">
@@ -227,8 +252,37 @@ export default function ClassFormModal({
             </Stack>
           )}
 
+          <Divider label="Imágenes del programa" labelPosition="left" />
+          <Title order={6} c="dimmed" fw={500}>
+            Se muestran en el catálogo y detalle público de programas
+          </Title>
+          <ImageUploadField images={imageFiles} onChange={setImageFiles} />
+
+          <Divider label="Material adicional (opcional)" labelPosition="left" />
+          <PdfAndVideoFields
+            pdfFile={pdfFile}
+            onPdfChange={setPdfFile}
+            videoUrl={form.values.videoUrl}
+            onVideoUrlChange={(v) => form.setFieldValue("videoUrl", v)}
+            pdfLabel="PDF (temario, ficha del programa, etc.)"
+            videoDescription="Se muestra incrustado en el detalle público del programa"
+          />
+
+          <Switch
+            label="⭐ Programa destacado"
+            description="Se muestra primero en el catálogo de programas y en la landing"
+            {...form.getInputProps("featured", { type: "checkbox" })}
+          />
+
+          <Switch
+            label="🌐 Clase pública"
+            description="Si se desactiva, sigue disponible para programar sesiones desde este panel, pero no aparece en la landing ni en el catálogo/reserva de clases para los clientes"
+            {...form.getInputProps("isPublic", { type: "checkbox" })}
+          />
+
           <Switch
             label="Clase activa"
+            description="Si se desactiva, la clase no se puede usar para programar nuevas sesiones"
             {...form.getInputProps("isActive", { type: "checkbox" })}
           />
 

@@ -151,7 +151,7 @@ export const schema = z.object({
     .optional(),
   welcomeTitle: optionalString,
   welcomeDescription: optionalString,
-  homeLayout: z.enum(["modern", "minimal", "cards", "landing"]).optional(),
+  homeLayout: z.enum(["modern", "minimal", "cards", "landing", "academy"]).optional(),
 
   reminderSettings: z
     .object({

@@ -6,7 +6,7 @@ import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
 import { IconSchool, IconPackage, IconBuildingStore } from "@tabler/icons-react";
-import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout } from "./HomeLayouts";
+import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout, AcademyLandingLayout } from "./HomeLayouts";
 
 export default function Home() {
   const theme = useMantineTheme();
@@ -69,9 +69,12 @@ export default function Home() {
   const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
   const planLimits = (organization as any)?.planLimits;
-  const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing";
+  const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing" | "academy";
   // Si el plan no permite landing (downgrade), caer a modern sin tocar la BD
-  const homeLayout = rawLayout === "landing" && planLimits?.professionalLanding === false ? "modern" : rawLayout;
+  const homeLayout =
+    (rawLayout === "landing" || rawLayout === "academy") && planLimits?.professionalLanding === false
+      ? "modern"
+      : rawLayout;
 
   const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
 
@@ -86,6 +89,9 @@ export default function Home() {
       break;
     case "landing":
       LayoutComponent = LandingLayout;
+      break;
+    case "academy":
+      LayoutComponent = AcademyLandingLayout;
       break;
     case "modern":
     default:

@@ -57,6 +57,8 @@ import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage
 import PublicStorePage from "../pages/public/PublicStorePage";
 import StoreOrdersPage from "../pages/admin/storeOrders";
 import PublicServiceDetailPage from "../pages/public/PublicServiceDetailPage";
+import ProgramsCatalogPage from "../pages/public/ProgramsCatalogPage";
+import ProgramDetailPage from "../pages/public/ProgramDetailPage";
 
 const generalRoutes = [
   {
@@ -137,6 +139,22 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Servicio",
       description: "Detalle de servicio, compartible por enlace.",
+    },
+  },
+  {
+    path: "/programas",
+    component: ProgramsCatalogPage,
+    MediaMetadata: {
+      title: "Nuestros Programas",
+      description: "Catálogo de programas y clases disponibles.",
+    },
+  },
+  {
+    path: "/programa/:id",
+    component: ProgramDetailPage,
+    MediaMetadata: {
+      title: "Programa",
+      description: "Detalle de programa, compartible por enlace.",
     },
   },
   // {

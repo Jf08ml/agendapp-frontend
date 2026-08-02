@@ -8,8 +8,6 @@ import {
   Textarea,
   Chip,
   Button,
-  Image,
-  AspectRatio,
   ActionIcon,
   Group,
   Text,
@@ -21,17 +19,13 @@ import {
   Switch,
   Title,
   Divider,
-  Tooltip,
-  Center,
   ThemeIcon,
   SegmentedControl,
   Select,
 } from "@mantine/core";
-import { Dropzone, IMAGE_MIME_TYPE, PDF_MIME_TYPE } from "@mantine/dropzone";
-import { BiImageAdd, BiSolidXCircle, BiStar } from "react-icons/bi";
-import { BsImage, BsArrowLeft, BsArrowRight, BsTrash, BsPlusCircle, BsFilePdf } from "react-icons/bs";
+import { BsImage, BsTrash, BsPlusCircle } from "react-icons/bs";
 import { Service, ServiceCost } from "../../../../services/serviceService";
-import ImageCropModal from "../../../../components/ImageCropModal";
+import { ImageUploadField, PdfAndVideoFields } from "../../components/MediaUploadFields";
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -65,12 +59,11 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
     followUpServiceId: null,
     followUpDays: null,
     videoUrl: "",
+    ctaMode: "booking",
+    whatsappQuoteMessage: "",
   });
   const [imageFiles, setImageFiles] = useState<(File | string)[]>([]);
   const [pdfFile, setPdfFile] = useState<File | string | null>(null);
-  // Cola de imágenes recién soltadas pendientes de pasar por el recortador
-  // (una a la vez; al confirmar/omitir/quitar se avanza a la siguiente).
-  const [cropQueue, setCropQueue] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [isFreeService, setIsFreeService] = useState(false);
   const [hasCosts, setHasCosts] = useState(false);
@@ -79,7 +72,13 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
   useEffect(() => {
     if (service) {
-      setEditingService({ ...service, type: service.type ?? "", videoUrl: service.videoUrl ?? "" });
+      setEditingService({
+        ...service,
+        type: service.type ?? "",
+        videoUrl: service.videoUrl ?? "",
+        ctaMode: service.ctaMode ?? "booking",
+        whatsappQuoteMessage: service.whatsappQuoteMessage ?? "",
+      });
       setImageFiles(service.images || []);
       setPdfFile(service.pdfUrl ?? null);
       setIsFreeService(service.price === 0);
@@ -109,6 +108,8 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         followUpServiceId: null,
         followUpDays: null,
         videoUrl: "",
+        ctaMode: "booking",
+        whatsappQuoteMessage: "",
       });
       setImageFiles([]);
       setPdfFile(null);
@@ -118,66 +119,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
       setCosts([{ concept: "", amount: 0 }]);
     }
   }, [service]);
-
-  const handleDrop = (files: File[]) => {
-    setCropQueue((prev) => [...prev, ...files]);
-  };
-
-  // Avanza la cola de recorte (se llama tras confirmar, omitir o quitar la
-  // imagen actual — en los tres casos la cola pierde su primer elemento).
-  const advanceCropQueue = () => setCropQueue((prev) => prev.slice(1));
-
-  const handleCropConfirm = (croppedFile: File) => {
-    setImageFiles((prev) => [...prev, croppedFile]);
-    advanceCropQueue();
-  };
-
-  const handleCropSkip = (originalFile: File) => {
-    setImageFiles((prev) => [...prev, originalFile]);
-    advanceCropQueue();
-  };
-
-  const handleCropCancel = () => {
-    advanceCropQueue();
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDropPdf = (files: File[]) => {
-    if (files[0]) setPdfFile(files[0]);
-  };
-
-  const pdfFileName = typeof pdfFile === "string" ? pdfFile.split("/").pop() : pdfFile?.name;
-
-  const moveImageLeft = (index: number) => {
-    if (index === 0) return;
-    setImageFiles((prev) => {
-      const newArr = [...prev];
-      [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
-      return newArr;
-    });
-  };
-
-  const moveImageRight = (index: number) => {
-    if (index === imageFiles.length - 1) return;
-    setImageFiles((prev) => {
-      const newArr = [...prev];
-      [newArr[index], newArr[index + 1]] = [newArr[index + 1], newArr[index]];
-      return newArr;
-    });
-  };
-
-  const setAsMain = (index: number) => {
-    if (index === 0) return;
-    setImageFiles((prev) => {
-      const newArr = [...prev];
-      const [item] = newArr.splice(index, 1);
-      newArr.unshift(item);
-      return newArr;
-    });
-  };
 
   const canSave =
     editingService.name.trim().length > 1 &&
@@ -466,124 +407,8 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   )}
                 </Group>
                 <Divider mb="md" />
-                <Dropzone
-                  onDrop={handleDrop}
-                  accept={IMAGE_MIME_TYPE}
-                  multiple
-                  styles={{ inner: { paddingBlock: 20 } }}
-                >
-                  <Center>
-                    <Stack align="center" gap="xs">
-                      <ThemeIcon size={60} radius="md" variant="light">
-                        <BiImageAdd size={32} />
-                      </ThemeIcon>
-                      <div>
-                        <Text size="sm" fw={600} ta="center">Arrastra imágenes aquí o haz clic</Text>
-                        <Text size="xs" c="dimmed" ta="center">Formatos: JPEG, PNG, WebP</Text>
-                        <Text size="xs" c="dimmed" ta="center">Podrás recortarla a proporción 4:3 antes de guardar</Text>
-                      </div>
-                    </Stack>
-                  </Center>
-                </Dropzone>
+                <ImageUploadField images={imageFiles} onChange={setImageFiles} />
               </Box>
-
-              {imageFiles.length > 0 && (
-                <Box>
-                  <Text size="sm" c="dimmed" mb="xs">
-                    💡 La primera imagen es la principal. Usa las flechas para reordenar o la estrella para marcar como principal.
-                  </Text>
-                  <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="sm">
-                    {imageFiles.map((file, idx) => (
-                      <Paper key={idx} pos="relative" withBorder radius="md" p={4}>
-                        <AspectRatio ratio={4 / 3}>
-                          <Image
-                            src={typeof file === "string" ? file : URL.createObjectURL(file)}
-                            alt={`Imagen ${idx + 1}`}
-                            radius="sm"
-                            fit="cover"
-                          />
-                        </AspectRatio>
-
-                        {/* Badge de imagen principal */}
-                        {idx === 0 && (
-                          <Badge
-                            color="yellow"
-                            variant="filled"
-                            leftSection={<BiStar size={12} />}
-                            style={{ position: "absolute", left: 8, top: 8 }}
-                            size="sm"
-                          >
-                            Principal
-                          </Badge>
-                        )}
-
-                        {/* Botones de control */}
-                        <Group
-                          gap={4}
-                          style={{ position: "absolute", top: 8, right: 8 }}
-                        >
-                          <Tooltip label="Eliminar" withArrow>
-                            <ActionIcon
-                              variant="filled"
-                              color="red"
-                              size="sm"
-                              radius="xl"
-                              onClick={() => handleRemoveImage(idx)}
-                            >
-                              <BiSolidXCircle size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        </Group>
-
-                        {/* Controles de reordenamiento */}
-                        <Group
-                          gap={4}
-                          justify="center"
-                          style={{ position: "absolute", bottom: 8, left: '50%', transform: 'translateX(-50%)' }}
-                        >
-                          {idx !== 0 && (
-                            <Tooltip label="Mover a la izquierda" withArrow>
-                              <ActionIcon
-                                variant="filled"
-                                size="sm"
-                                radius="xl"
-                                onClick={() => moveImageLeft(idx)}
-                              >
-                                <BsArrowLeft size={14} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                          {idx !== 0 && (
-                            <Tooltip label="Marcar como principal" withArrow>
-                              <ActionIcon
-                                variant="filled"
-                                color="yellow"
-                                size="sm"
-                                radius="xl"
-                                onClick={() => setAsMain(idx)}
-                              >
-                                <BiStar size={14} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                          {idx !== imageFiles.length - 1 && (
-                            <Tooltip label="Mover a la derecha" withArrow>
-                              <ActionIcon
-                                variant="filled"
-                                size="sm"
-                                radius="xl"
-                                onClick={() => moveImageRight(idx)}
-                              >
-                                <BsArrowRight size={14} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
-                        </Group>
-                      </Paper>
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              )}
             </Stack>
           </Paper>
         </SimpleGrid>
@@ -591,44 +416,44 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         <Paper withBorder p="md" radius="md" shadow="xs">
           <Title order={5} mb="sm">📄 Material adicional (opcional)</Title>
           <Divider mb="md" />
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <Box>
-              <Text size="sm" fw={500} mb={6}>PDF (ficha técnica, catálogo, etc.)</Text>
-              {pdfFileName ? (
-                <Paper withBorder radius="md" p="xs">
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-                      <ThemeIcon color="red" variant="light" radius="md">
-                        <BsFilePdf size={16} />
-                      </ThemeIcon>
-                      <Text size="sm" truncate>{pdfFileName}</Text>
-                    </Group>
-                    <ActionIcon color="red" variant="light" onClick={() => setPdfFile(null)}>
-                      <BiSolidXCircle size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Paper>
-              ) : (
-                <Dropzone onDrop={handleDropPdf} accept={PDF_MIME_TYPE} multiple={false}>
-                  <Center>
-                    <Stack align="center" gap={4} py="xs">
-                      <ThemeIcon size={40} radius="md" variant="light" color="red">
-                        <BsFilePdf size={20} />
-                      </ThemeIcon>
-                      <Text size="xs" fw={600} ta="center">Arrastra un PDF aquí o haz clic</Text>
-                    </Stack>
-                  </Center>
-                </Dropzone>
-              )}
-            </Box>
-            <TextInput
-              label="Video (YouTube o Vimeo)"
-              description="Se muestra incrustado en el detalle del servicio"
-              placeholder="https://www.youtube.com/watch?v=..."
-              value={editingService.videoUrl ?? ""}
-              onChange={(e) => setEditingService({ ...editingService, videoUrl: e.currentTarget.value })}
+          <PdfAndVideoFields
+            pdfFile={pdfFile}
+            onPdfChange={setPdfFile}
+            videoUrl={editingService.videoUrl ?? ""}
+            onVideoUrlChange={(v) => setEditingService({ ...editingService, videoUrl: v })}
+            videoDescription="Se muestra incrustado en el detalle del servicio"
+          />
+        </Paper>
+
+        <Paper withBorder p="md" radius="md" shadow="xs">
+          <Title order={5} mb="sm">💬 Botón de acción (CTA)</Title>
+          <Divider mb="md" />
+          <Stack gap="md">
+            <SegmentedControl
+              value={editingService.ctaMode ?? "booking"}
+              onChange={(v) =>
+                setEditingService({ ...editingService, ctaMode: v as "booking" | "whatsapp_quote" })
+              }
+              data={[
+                { value: "booking", label: "Reservar en línea" },
+                { value: "whatsapp_quote", label: "Cotizar por WhatsApp" },
+              ]}
+              fullWidth
             />
-          </SimpleGrid>
+            {editingService.ctaMode === "whatsapp_quote" && (
+              <Textarea
+                label="Mensaje prellenado de WhatsApp (opcional)"
+                description="Se abrirá el WhatsApp de la organización con este texto ya escrito"
+                placeholder={`Hola, quiero cotizar ${editingService.name || "este servicio"}`}
+                autosize
+                minRows={2}
+                value={editingService.whatsappQuoteMessage ?? ""}
+                onChange={(e) =>
+                  setEditingService({ ...editingService, whatsappQuoteMessage: e.currentTarget.value })
+                }
+              />
+            )}
+          </Stack>
         </Paper>
 
         <Paper withBorder p="md" radius="md" shadow="xs">
@@ -693,14 +518,6 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         </Group>
       </Stack>
     </Modal>
-
-    <ImageCropModal
-      file={cropQueue[0] ?? null}
-      remaining={Math.max(cropQueue.length - 1, 0)}
-      onConfirm={handleCropConfirm}
-      onSkip={handleCropSkip}
-      onCancel={handleCropCancel}
-    />
     </>
   );
 };

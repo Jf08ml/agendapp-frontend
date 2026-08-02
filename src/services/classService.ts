@@ -33,7 +33,14 @@ export interface ClassType {
   groupDiscount: GroupDiscount;
   color?: string | null;
   isActive: boolean;
+  // 🌐 Visibilidad pública: si es false, sigue disponible para programar
+  // sesiones desde el panel, pero no aparece en landing/catálogo/reserva.
+  isPublic?: boolean;
   createdAt?: string;
+  images?: string[]; // 🖼️ Imágenes representativas (catálogo/detalle público)
+  featured?: boolean; // ⭐ Destacado: se muestra primero en catálogo y landing
+  pdfUrl?: string | null; // 📄 PDF con información adicional
+  videoUrl?: string | null; // 🎬 URL de video (YouTube/Vimeo) mostrado en el detalle público
 }
 
 export interface ClassSession {
@@ -195,6 +202,23 @@ export const deleteClass = async (id: string): Promise<void> => {
     await apiClass.delete(`/${id}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar la clase");
+  }
+};
+
+// 🌐 Público: detalle de un programa/clase (vista compartible, sin auth).
+// Silencioso ante error (ej: link viejo a una clase desactivada) para que la
+// página muestre su propio estado de "no encontrado".
+export const getPublicClassById = async (
+  id: string,
+  organizationId: string
+): Promise<ClassType | undefined> => {
+  try {
+    const res = await apiClassPublic.get<ApiResponse<ClassType>>(`/public/${id}`, {
+      params: { organizationId },
+    });
+    return res.data.data;
+  } catch {
+    return undefined;
   }
 };
 

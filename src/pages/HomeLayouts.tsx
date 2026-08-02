@@ -20,3 +20,4 @@ export { ModernLayout } from "./homeLayouts/ModernLayout";
 export { MinimalLayout } from "./homeLayouts/MinimalLayout";
 export { CardsLayout } from "./homeLayouts/CardsLayout";
 export { LandingLayout } from "./homeLayouts/LandingLayout";
+export { AcademyLandingLayout } from "./homeLayouts/AcademyLandingLayout";

@@ -3,6 +3,7 @@ export { ModernLayout } from "./ModernLayout";
 export { MinimalLayout } from "./MinimalLayout";
 export { CardsLayout } from "./CardsLayout";
 export { LandingLayout } from "./LandingLayout";
+export { AcademyLandingLayout } from "./AcademyLandingLayout";
 
 // Tipos compartidos
 export interface Feature {
