@@ -23,7 +23,11 @@ import {
   Select,
   Box,
   SimpleGrid,
+  Table,
+  Modal,
+  UnstyledButton,
 } from "@mantine/core";
+import { DateInput } from "@mantine/dates";
 import { useDebouncedValue } from "@mantine/hooks";
 import { openConfirmModal } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
@@ -34,6 +38,12 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconRefresh,
+  IconLayoutGrid,
+  IconTable,
+  IconEye,
+  IconArrowsSort,
+  IconClockExclamation,
+  IconPencil,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
@@ -41,6 +51,7 @@ import {
   getAllOrgClientPackages,
   cancelClientPackage,
   deleteClientPackage,
+  editClientPackage,
   addClientPackagePayment,
   removeClientPackagePayment,
   ClientPackage,
@@ -101,6 +112,9 @@ const getPackageName = (pkg: ClientPackage): string => {
   return "Paquete";
 };
 
+const getRefId = (ref: string | { _id: string } | null | undefined): string =>
+  typeof ref === "object" && ref !== null ? ref._id : (ref as string) || "";
+
 const getClientInfo = (pkg: ClientPackage): { name: string; phone: string } => {
   if (typeof pkg.clientId === "object" && pkg.clientId !== null) {
     const c = pkg.clientId as any;
@@ -117,6 +131,45 @@ const getTotalSessionsSummary = (pkg: ClientPackage): { remaining: number; total
   return { remaining: svcRemaining + clsRemaining, total: svcTotal + clsTotal };
 };
 
+const getPendingAmount = (pkg: ClientPackage): number => {
+  const paid = (pkg.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+  return Math.max(0, (pkg.totalPrice || 0) - paid);
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysUntil = (dateStr: string): number => (new Date(dateStr).getTime() - Date.now()) / DAY_MS;
+
+type SortField = "client" | "expirationDate" | "pending";
+
+// ─── Sortable table header ─────────────────────────────────────────────────────
+function SortableTh({
+  label,
+  field,
+  sortField,
+  sortAsc,
+  onSort,
+}: {
+  label: string;
+  field: SortField;
+  sortField: SortField | null;
+  sortAsc: boolean;
+  onSort: (field: SortField) => void;
+}) {
+  const active = sortField === field;
+  return (
+    <Table.Th>
+      <UnstyledButton onClick={() => onSort(field)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <Text size="xs" fw={700} tt="uppercase" c={active ? undefined : "dimmed"}>{label}</Text>
+        {active ? (
+          sortAsc ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />
+        ) : (
+          <IconArrowsSort size={13} color="var(--mantine-color-gray-5)" />
+        )}
+      </UnstyledButton>
+    </Table.Th>
+  );
+}
+
 // ─── Package card ─────────────────────────────────────────────────────────────
 function PackageCard({
   pkg,
@@ -126,6 +179,7 @@ function PackageCard({
   onCancel,
   onDelete,
   onUpdate,
+  defaultExpanded = false,
 }: {
   pkg: ClientPackage;
   currency: string;
@@ -134,12 +188,14 @@ function PackageCard({
   onCancel: (pkg: ClientPackage) => void;
   onDelete: (pkg: ClientPackage) => void;
   onUpdate: (updated: ClientPackage) => void;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded,      setExpanded]      = useState(false);
+  const [expanded,      setExpanded]      = useState(defaultExpanded);
   const [payments,      setPayments]      = useState<PackagePaymentRecord[]>(pkg.payments || []);
   const [paymentStatus, setPaymentStatus] = useState(pkg.paymentStatus || "unpaid");
   const [newPayment,    setNewPayment]    = useState({ amount: 0, method: "cash", note: "" });
   const [savingPayment, setSavingPayment] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   const statusInfo        = STATUS_MAP[pkg.status]         || STATUS_MAP.active;
   const paymentStatusInfo = PAYMENT_STATUS_MAP[paymentStatus] || PAYMENT_STATUS_MAP.unpaid;
@@ -515,6 +571,17 @@ function PackageCard({
       {/* ── Action buttons ── */}
       <Divider />
       <Group px="md" py="xs" gap="xs" justify="flex-end">
+        {pkg.status !== "cancelled" && (
+          <Button
+            variant="subtle"
+            color="blue"
+            size="xs"
+            leftSection={<IconPencil size={14} />}
+            onClick={() => setEditModalOpen(true)}
+          >
+            Editar
+          </Button>
+        )}
         {canCancel && (
           <Button
             variant="subtle"
@@ -536,7 +603,150 @@ function PackageCard({
           Eliminar
         </Button>
       </Group>
+
+      <EditPackageModal
+        pkg={pkg}
+        opened={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onSaved={onUpdate}
+      />
     </Paper>
+  );
+}
+
+// ─── Edit package modal (extender vencimiento / añadir sesiones) ──────────────
+function EditPackageModal({
+  pkg,
+  opened,
+  onClose,
+  onSaved,
+}: {
+  pkg: ClientPackage;
+  opened: boolean;
+  onClose: () => void;
+  onSaved: (updated: ClientPackage) => void;
+}) {
+  const [expirationDate, setExpirationDate] = useState<Date | null>(new Date(pkg.expirationDate));
+  const [serviceAdds,    setServiceAdds]    = useState<Record<string, number>>({});
+  const [classAdds,      setClassAdds]      = useState<Record<string, number>>({});
+  const [saving,         setSaving]         = useState(false);
+
+  useEffect(() => {
+    if (opened) {
+      setExpirationDate(new Date(pkg.expirationDate));
+      setServiceAdds({});
+      setClassAdds({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, pkg._id]);
+
+  const dateChanged =
+    !!expirationDate &&
+    expirationDate.toDateString() !== new Date(pkg.expirationDate).toDateString();
+  const hasSessionAdds =
+    Object.values(serviceAdds).some((v) => v > 0) || Object.values(classAdds).some((v) => v > 0);
+  const canSave = dateChanged || hasSessionAdds;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      const serviceAdjustments = Object.entries(serviceAdds)
+        .filter(([, v]) => v > 0)
+        .map(([serviceId, sessionsToAdd]) => ({ serviceId, sessionsToAdd }));
+      const classAdjustments = Object.entries(classAdds)
+        .filter(([, v]) => v > 0)
+        .map(([classId, sessionsToAdd]) => ({ classId, sessionsToAdd }));
+
+      const updated = await editClientPackage(pkg._id, pkg.organizationId, {
+        expirationDate: dateChanged && expirationDate ? expirationDate.toISOString() : undefined,
+        serviceAdjustments: serviceAdjustments.length ? serviceAdjustments : undefined,
+        classAdjustments: classAdjustments.length ? classAdjustments : undefined,
+      });
+
+      if (updated) {
+        onSaved(updated);
+        showNotification({ title: "Paquete actualizado", message: "Los cambios se guardaron correctamente", color: "green" });
+        onClose();
+      }
+    } catch {
+      showNotification({ title: "Error", message: "No se pudo actualizar el paquete", color: "red" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal opened={opened} onClose={onClose} title="Editar paquete" centered>
+      <Stack gap="md">
+        <DateInput
+          label="Fecha de vencimiento"
+          description="Extiende el vencimiento para que el paquete siga siendo utilizable"
+          value={expirationDate}
+          onChange={setExpirationDate}
+        />
+
+        {pkg.services.length > 0 && (
+          <Box>
+            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
+              Añadir sesiones por servicio
+            </Text>
+            <Stack gap="xs">
+              {pkg.services.map((svc, idx) => {
+                const id = getRefId(svc.serviceId);
+                return (
+                  <Group key={idx} justify="space-between" wrap="nowrap">
+                    <Box style={{ minWidth: 0 }}>
+                      <Text size="sm" truncate>{getServiceName(svc)}</Text>
+                      <Text size="xs" c="dimmed">{svc.sessionsRemaining}/{svc.sessionsIncluded} disponibles</Text>
+                    </Box>
+                    <NumberInput
+                      size="xs"
+                      w={90}
+                      min={0}
+                      value={serviceAdds[id] || 0}
+                      onChange={(v) => setServiceAdds((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                    />
+                  </Group>
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
+
+        {(pkg.classes?.length ?? 0) > 0 && (
+          <Box>
+            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
+              Añadir sesiones por clase
+            </Text>
+            <Stack gap="xs">
+              {pkg.classes!.map((cls, idx) => {
+                const id = getRefId(cls.classId);
+                return (
+                  <Group key={idx} justify="space-between" wrap="nowrap">
+                    <Box style={{ minWidth: 0 }}>
+                      <Text size="sm" truncate>{getClassNameFromCredit(cls)}</Text>
+                      <Text size="xs" c="dimmed">{cls.sessionsRemaining}/{cls.sessionsIncluded} disponibles</Text>
+                    </Box>
+                    <NumberInput
+                      size="xs"
+                      w={90}
+                      min={0}
+                      value={classAdds[id] || 0}
+                      onChange={(v) => setClassAdds((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                    />
+                  </Group>
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
+
+        <Button fullWidth loading={saving} disabled={!canSave} onClick={handleSave}>
+          Guardar cambios
+        </Button>
+      </Stack>
+    </Modal>
   );
 }
 
@@ -551,6 +761,10 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
   const [debouncedSearch]                     = useDebouncedValue(search, 250);
   const [statusFilter,    setStatusFilter]    = useState("active");
   const [page,            setPage]            = useState(1);
+  const [viewMode,        setViewMode]        = useState<"cards" | "table">("table");
+  const [sortField,       setSortField]       = useState<SortField | null>(null);
+  const [sortAsc,         setSortAsc]         = useState(true);
+  const [detailPkg,       setDetailPkg]       = useState<ClientPackage | null>(null);
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [deletingId,   setDeletingId]   = useState<string | null>(null);
@@ -584,16 +798,67 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
     return data;
   }, [allPackages, statusFilter, debouncedSearch]);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter]);
+  // ── Sorting (mainly useful in table view, applied regardless of view) ──────
+  const sortedFiltered = useMemo(() => {
+    if (!sortField) return filtered;
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      let av: number | string, bv: number | string;
+      if (sortField === "client") {
+        av = getClientInfo(a).name.toLowerCase();
+        bv = getClientInfo(b).name.toLowerCase();
+      } else if (sortField === "expirationDate") {
+        av = new Date(a.expirationDate).getTime();
+        bv = new Date(b.expirationDate).getTime();
+      } else {
+        av = getPendingAmount(a);
+        bv = getPendingAmount(b);
+      }
+      if (av < bv) return sortAsc ? -1 : 1;
+      if (av > bv) return sortAsc ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filtered, sortField, sortAsc]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortAsc((a) => !a);
+    else { setSortField(field); setSortAsc(true); }
+  };
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, statusFilter, sortField, sortAsc]);
+
+  const totalPages = Math.ceil(sortedFiltered.length / PAGE_SIZE);
+  const paginated  = sortedFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const countByStatus = useMemo(() => {
     const counts: Record<string, number> = { all: allPackages.length };
     allPackages.forEach((p) => { counts[p.status] = (counts[p.status] || 0) + 1; });
     return counts;
   }, [allPackages]);
+
+  // ── KPIs (sobre el universo completo, no el filtro/búsqueda actual) ────────
+  const kpis = useMemo(() => {
+    let totalPending = 0;
+    let totalCollected = 0;
+    let expiringSoon = 0;
+    allPackages.forEach((p) => {
+      const paid = (p.payments || []).reduce((s, pay) => s + (pay.amount || 0), 0);
+      totalCollected += paid;
+      if (p.status !== "cancelled") totalPending += Math.max(0, (p.totalPrice || 0) - paid);
+      if (p.status === "active") {
+        const d = daysUntil(p.expirationDate);
+        if (d >= 0 && d <= 7) expiringSoon++;
+      }
+    });
+    return { totalPending, totalCollected, expiringSoon };
+  }, [allPackages]);
+
+  const showExpiringSoon = () => {
+    setStatusFilter("active");
+    setSortField("expirationDate");
+    setSortAsc(true);
+  };
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleCancel = (pkg: ClientPackage) => {
@@ -613,6 +878,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         try {
           await cancelClientPackage(pkg._id, organizationId!);
           setAllPackages((prev) => prev.map((p) => p._id === pkg._id ? { ...p, status: "cancelled" as const } : p));
+          setDetailPkg(null);
           showNotification({ title: "Paquete cancelado", message: `"${pkgName}" cancelado`, color: "green" });
         } catch {
           showNotification({ title: "Error", message: "No se pudo cancelar", color: "red" });
@@ -640,6 +906,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         try {
           await deleteClientPackage(pkg._id, organizationId!);
           setAllPackages((prev) => prev.filter((p) => p._id !== pkg._id));
+          setDetailPkg(null);
           showNotification({ title: "Paquete eliminado", message: `"${pkgName}" eliminado`, color: "green" });
         } catch {
           showNotification({ title: "Error", message: "No se pudo eliminar", color: "red" });
@@ -653,6 +920,40 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Stack gap="md">
+      {/* KPIs — resumen rápido, siempre sobre el universo completo (no el filtro actual) */}
+      {allPackages.length > 0 && (
+        <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">Pendiente por cobrar</Text>
+            <Text size="xl" fw={700} c={kpis.totalPending > 0 ? "red" : "dimmed"}>
+              {formatCurrency(kpis.totalPending, currency)}
+            </Text>
+          </Paper>
+          <Paper withBorder p="sm" radius="md">
+            <Text size="xs" c="dimmed">Cobrado (histórico)</Text>
+            <Text size="xl" fw={700} c="teal">
+              {formatCurrency(kpis.totalCollected, currency)}
+            </Text>
+          </Paper>
+          <Paper
+            component="button"
+            onClick={showExpiringSoon}
+            withBorder
+            p="sm"
+            radius="md"
+            style={{ cursor: "pointer", textAlign: "left", width: "100%" }}
+          >
+            <Group gap={6} wrap="nowrap">
+              <IconClockExclamation size={14} color="var(--mantine-color-orange-6)" />
+              <Text size="xs" c="dimmed">Vencen en 7 días</Text>
+            </Group>
+            <Text size="xl" fw={700} c={kpis.expiringSoon > 0 ? "orange" : "dimmed"}>
+              {kpis.expiringSoon}
+            </Text>
+          </Paper>
+        </SimpleGrid>
+      )}
+
       {/* Toolbar */}
       <Group gap="sm" wrap="wrap">
         <TextInput
@@ -662,6 +963,15 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
           onChange={(e) => setSearch(e.currentTarget.value)}
           style={{ flex: 1, minWidth: 200 }}
           disabled={loading}
+        />
+        <SegmentedControl
+          size="sm"
+          value={viewMode}
+          onChange={(v) => setViewMode(v as "cards" | "table")}
+          data={[
+            { value: "table", label: <Center><IconTable size={15} /></Center> },
+            { value: "cards", label: <Center><IconLayoutGrid size={15} /></Center> },
+          ]}
         />
         <Tooltip label="Recargar lista">
           <ActionIcon variant="light" size="lg" onClick={load} loading={loading}>
@@ -699,7 +1009,7 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
             </Text>
           </Stack>
         </Center>
-      ) : filtered.length === 0 ? (
+      ) : sortedFiltered.length === 0 ? (
         <Center mih={150}>
           <Stack align="center" gap="xs">
             <Text c="dimmed" ta="center">No se encontraron paquetes con los filtros aplicados.</Text>
@@ -711,23 +1021,93 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       ) : (
         <>
           <Text size="xs" c="dimmed">
-            Mostrando {paginated.length} de {filtered.length} paquete{filtered.length !== 1 ? "s" : ""}
+            Mostrando {paginated.length} de {sortedFiltered.length} paquete{sortedFiltered.length !== 1 ? "s" : ""}
           </Text>
 
-          <Stack gap="sm">
-            {paginated.map((pkg) => (
-              <PackageCard
-                key={pkg._id}
-                pkg={pkg}
-                currency={currency}
-                cancellingId={cancellingId}
-                deletingId={deletingId}
-                onCancel={handleCancel}
-                onDelete={handleDelete}
-                onUpdate={(updated) => setAllPackages((prev) => prev.map((p) => p._id === updated._id ? updated : p))}
-              />
-            ))}
-          </Stack>
+          {viewMode === "table" ? (
+            <Table.ScrollContainer minWidth={780}>
+              <Table verticalSpacing="xs" highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <SortableTh label="Cliente" field="client" sortField={sortField} sortAsc={sortAsc} onSort={toggleSort} />
+                    <Table.Th>Paquete</Table.Th>
+                    <Table.Th>Sesiones</Table.Th>
+                    <SortableTh label="Pendiente" field="pending" sortField={sortField} sortAsc={sortAsc} onSort={toggleSort} />
+                    <SortableTh label="Vence" field="expirationDate" sortField={sortField} sortAsc={sortAsc} onSort={toggleSort} />
+                    <Table.Th>Estado</Table.Th>
+                    <Table.Th>Pago</Table.Th>
+                    <Table.Th />
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {paginated.map((pkg) => {
+                    const { name, phone } = getClientInfo(pkg);
+                    const pkgName = getPackageName(pkg);
+                    const statusInfo = STATUS_MAP[pkg.status] || STATUS_MAP.active;
+                    const paymentInfo = PAYMENT_STATUS_MAP[pkg.paymentStatus || "unpaid"];
+                    const pending = getPendingAmount(pkg);
+                    const { remaining, total } = getTotalSessionsSummary(pkg);
+                    const expStr = new Date(pkg.expirationDate).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+                    const isExpiredDate = new Date(pkg.expirationDate) < new Date();
+                    return (
+                      <Table.Tr key={pkg._id} style={{ cursor: "pointer" }} onClick={() => setDetailPkg(pkg)}>
+                        <Table.Td>
+                          <Text size="sm" fw={600}>{name}</Text>
+                          {phone && <Text size="xs" c="dimmed">{phone}</Text>}
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm">{pkgName}{pkg.tierLabel ? ` (${pkg.tierLabel})` : ""}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="sm" variant="light" color={remaining > 0 ? "teal" : "red"}>
+                            {remaining}/{total}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={600} c={pending > 0 ? "red" : "dimmed"}>
+                            {formatCurrency(pending, currency)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" fw={isExpiredDate && pkg.status === "active" ? 700 : 400} c={isExpiredDate && pkg.status === "active" ? "red" : undefined}>
+                            {expStr}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="sm" variant="light" color={statusInfo.color}>{statusInfo.label}</Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge size="sm" variant="filled" color={paymentInfo.color}>{paymentInfo.label}</Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Tooltip label="Ver detalle">
+                            <ActionIcon variant="subtle" onClick={(e) => { e.stopPropagation(); setDetailPkg(pkg); }}>
+                              <IconEye size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+          ) : (
+            <Stack gap="sm">
+              {paginated.map((pkg) => (
+                <PackageCard
+                  key={pkg._id}
+                  pkg={pkg}
+                  currency={currency}
+                  cancellingId={cancellingId}
+                  deletingId={deletingId}
+                  onCancel={handleCancel}
+                  onDelete={handleDelete}
+                  onUpdate={(updated) => setAllPackages((prev) => prev.map((p) => p._id === updated._id ? updated : p))}
+                />
+              ))}
+            </Stack>
+          )}
 
           {totalPages > 1 && (
             <Group justify="center" mt="sm">
@@ -736,6 +1116,32 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
           )}
         </>
       )}
+
+      {/* Modal de detalle — usado por la vista de tabla para no duplicar el
+          contenido de sesiones/pagos que ya vive en PackageCard */}
+      <Modal
+        opened={!!detailPkg}
+        onClose={() => setDetailPkg(null)}
+        title="Detalle del paquete"
+        size="lg"
+        centered
+      >
+        {detailPkg && (
+          <PackageCard
+            pkg={detailPkg}
+            currency={currency}
+            cancellingId={cancellingId}
+            deletingId={deletingId}
+            onCancel={handleCancel}
+            onDelete={handleDelete}
+            onUpdate={(updated) => {
+              setAllPackages((prev) => prev.map((p) => p._id === updated._id ? updated : p));
+              setDetailPkg(updated);
+            }}
+            defaultExpanded
+          />
+        )}
+      </Modal>
     </Stack>
   );
 };

@@ -285,6 +285,30 @@ export const cancelClientPackage = async (
   }
 };
 
+export interface EditClientPackagePayload {
+  // ISO string. Omitir para no tocar la fecha de vencimiento actual.
+  expirationDate?: string;
+  // Solo suma sesiones (sessionsIncluded y sessionsRemaining) — no permite quitar.
+  serviceAdjustments?: { serviceId: string; sessionsToAdd: number }[];
+  classAdjustments?: { classId: string; sessionsToAdd: number }[];
+}
+
+export const editClientPackage = async (
+  clientPackageId: string,
+  organizationId: string,
+  data: EditClientPackagePayload
+): Promise<ClientPackage | undefined> => {
+  try {
+    const response = await apiPackage.put<Response<ClientPackage>>(
+      `/client-package/${clientPackageId}/edit`,
+      { organizationId, ...data }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al editar el paquete");
+  }
+};
+
 export const deleteClientPackage = async (
   clientPackageId: string,
   organizationId: string

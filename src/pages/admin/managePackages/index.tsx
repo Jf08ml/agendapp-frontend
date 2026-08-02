@@ -282,54 +282,57 @@ const AdminPackages: React.FC = () => {
     return cls?.name || "Clase";
   };
 
-  const Toolbar = (
+  const HeaderBar = (
     <Card withBorder radius="md" p="md" mb="md" shadow="sm">
-      <Stack gap="md">
-        <Group justify="space-between" align="center" wrap="nowrap">
-          <Group gap="xs">
-            <IconPackage size={28} />
-            <Title order={isMobile ? 3 : 2}>Paquetes de Sesiones</Title>
-          </Group>
-          <Button
-            leftSection={<BsPlusCircle size={18} />}
-            onClick={() => {
-              setIsCreateModalOpen(true);
-              setEditingPackage(null);
-            }}
-            size={isMobile ? "sm" : "md"}
-          >
-            {isMobile ? "Nuevo" : "Nuevo Paquete"}
-          </Button>
+      <Group justify="space-between" align="center" wrap="nowrap">
+        <Group gap="xs">
+          <IconPackage size={28} />
+          <Title order={isMobile ? 3 : 2}>Paquetes de Sesiones</Title>
         </Group>
-
-        <Group wrap="wrap" gap="sm" align="end">
-          <TextInput
-            leftSection={<BsSearch />}
-            placeholder="Buscar por nombre o descripción..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.currentTarget.value)}
-            style={{
-              flex: isMobile ? "1 1 100%" : "1 1 280px",
-              minWidth: isMobile ? "100%" : 240,
-            }}
-          />
-          <Box style={{ flex: isMobile ? "1 1 100%" : "0 0 auto" }}>
-            <Text size="xs" fw={500} mb={4}>Estado</Text>
-            <SegmentedControl
-              value={status}
-              onChange={(v: any) => setStatus(v)}
-              data={[
-                { label: "Todos", value: "all" },
-                { label: "Activos", value: "active" },
-                { label: "Inactivos", value: "inactive" },
-              ]}
-              size={isMobile ? "xs" : "sm"}
-              fullWidth={isMobile}
-            />
-          </Box>
-        </Group>
-      </Stack>
+        <Button
+          leftSection={<BsPlusCircle size={18} />}
+          onClick={() => {
+            setIsCreateModalOpen(true);
+            setEditingPackage(null);
+          }}
+          size={isMobile ? "sm" : "md"}
+        >
+          {isMobile ? "Nuevo" : "Nuevo Paquete"}
+        </Button>
+      </Group>
     </Card>
+  );
+
+  // Buscador + filtro de esta pestaña únicamente (plantillas). Vive dentro
+  // del panel para que no parezca un buscador global que también debería
+  // aplicar a "Paquetes asignados" — esa pestaña tiene el suyo propio.
+  const TemplatesToolbar = (
+    <Group wrap="wrap" gap="sm" align="end" mb="md">
+      <TextInput
+        leftSection={<BsSearch />}
+        placeholder="Buscar plantillas por nombre o descripción..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.currentTarget.value)}
+        style={{
+          flex: isMobile ? "1 1 100%" : "1 1 280px",
+          minWidth: isMobile ? "100%" : 240,
+        }}
+      />
+      <Box style={{ flex: isMobile ? "1 1 100%" : "0 0 auto" }}>
+        <Text size="xs" fw={500} mb={4}>Estado</Text>
+        <SegmentedControl
+          value={status}
+          onChange={(v: any) => setStatus(v)}
+          data={[
+            { label: "Todos", value: "all" },
+            { label: "Activos", value: "active" },
+            { label: "Inactivos", value: "inactive" },
+          ]}
+          size={isMobile ? "xs" : "sm"}
+          fullWidth={isMobile}
+        />
+      </Box>
+    </Group>
   );
 
   const PackageTemplatesContent = (
@@ -403,16 +406,6 @@ const AdminPackages: React.FC = () => {
                     </Menu.Target>
                     <Menu.Dropdown>
                       <Menu.Label>Acciones</Menu.Label>
-                      <Menu.Item
-                        leftSection={<IconUserPlus size={16} />}
-                        onClick={() => {
-                          setAssigningPackage(pkg);
-                          setIsAssignModalOpen(true);
-                        }}
-                        color="teal"
-                      >
-                        Asignar a cliente
-                      </Menu.Item>
                       <Menu.Item
                         leftSection={<BsPencil />}
                         onClick={() => {
@@ -553,7 +546,7 @@ const AdminPackages: React.FC = () => {
 
   return (
     <Box>
-      {Toolbar}
+      {HeaderBar}
 
       <Tabs defaultValue="templates" keepMounted={false}>
         <Tabs.List mb="md">
@@ -566,6 +559,7 @@ const AdminPackages: React.FC = () => {
         </Tabs.List>
 
         <Tabs.Panel value="templates">
+          {TemplatesToolbar}
           {PackageTemplatesContent}
         </Tabs.Panel>
 
