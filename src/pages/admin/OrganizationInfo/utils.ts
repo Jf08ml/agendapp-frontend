@@ -1,7 +1,14 @@
 import type { Organization } from "../../../services/organizationService";
 import { DEFAULT_CLIENT_FORM_CONFIG, DEFAULT_STORE_FORM_CONFIG } from "../../../services/organizationService";
 
-export const ensureBranding = (b?: Organization["branding"]) => b ? { ...b } : {};
+export const ensureBranding = (b?: Organization["branding"]) => ({
+  ...(b ? { ...b } : {}),
+  // ColorInput de Mantine llama value.trim() internamente; null/undefined lo rompe
+  primaryColor: b?.primaryColor ?? "",
+  secondaryColor: b?.secondaryColor ?? "",
+  themeColor: b?.themeColor ?? "",
+  footerTextColor: b?.footerTextColor ?? "",
+});
 export const ensureDomains = (d?: string[]) => (Array.isArray(d) ? d : []);
 
 // ---------------------------------------------------------------------------
