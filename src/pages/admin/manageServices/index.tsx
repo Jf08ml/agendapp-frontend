@@ -9,17 +9,14 @@ import {
   Button,
   Text,
   ActionIcon,
-  Image,
-  Grid,
+  Table,
+  Avatar,
   TextInput,
   Badge,
-  Menu,
   Tooltip,
   SegmentedControl,
   Select,
   Skeleton,
-  AspectRatio,
-  rem,
   Center,
   Stack,
 } from "@mantine/core";
@@ -28,7 +25,7 @@ import {
   BsTrash,
   BsPencil,
   BsSearch,
-  BsThreeDotsVertical,
+  BsImage,
   BsPlusCircle,
   BsCheckCircle,
   BsXCircle,
@@ -277,6 +274,95 @@ const AdminServices: React.FC = () => {
     }
   };
 
+  const rows = filtered.map((service, index) => (
+    <Table.Tr key={service._id} style={{ opacity: service.isActive ? 1 : 0.6 }}>
+      <Table.Td>
+        <Group gap="sm" wrap="nowrap">
+          <Avatar
+            src={typeof service.images?.[0] === "string" ? (service.images[0] as string) : undefined}
+            alt={service.name}
+            size={44}
+            radius="sm"
+            color="gray"
+          >
+            <BsImage size={18} />
+          </Avatar>
+          <Box>
+            <Group gap={6} wrap="nowrap">
+              <Text fw={600} size="sm" lineClamp={1}>
+                {service.name}
+              </Text>
+              {!service.isActive && (
+                <Badge color="gray" size="xs" variant="light">
+                  Inactivo
+                </Badge>
+              )}
+              {service.featured && (
+                <Badge color="yellow" size="xs" variant="light" leftSection={<BsStarFill size={9} />}>
+                  Destacado
+                </Badge>
+              )}
+            </Group>
+            {service.description && (
+              <Text size="xs" c="dimmed" lineClamp={1} style={{ maxWidth: 320 }}>
+                {service.description}
+              </Text>
+            )}
+          </Box>
+        </Group>
+      </Table.Td>
+      <Table.Td>
+        <Badge variant="dot" color="violet" size="sm">
+          {service.type}
+        </Badge>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm">{service.duration} min</Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm" fw={600}>
+          {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Group gap={6} wrap="nowrap">
+          <Tooltip label={service.featured ? "Quitar destacado" : "Marcar como destacado"} withArrow>
+            <ActionIcon
+              variant={service.featured ? "filled" : "light"}
+              color="yellow"
+              onClick={() => toggleFeatured(service._id)}
+            >
+              {service.featured ? <BsStarFill size={14} /> : <BsStar size={14} />}
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label={service.isActive ? "Desactivar" : "Activar"} withArrow>
+            <ActionIcon
+              variant="light"
+              color={service.isActive ? "orange" : "green"}
+              onClick={() => toggleStatus(service._id)}
+            >
+              {service.isActive ? <BsXCircle size={14} /> : <BsCheckCircle size={14} />}
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Editar" withArrow>
+            <ActionIcon
+              variant="light"
+              color="blue"
+              onClick={() => { setIsModalOpen(true); setEditingService(service); }}
+            >
+              <BsPencil size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Eliminar" withArrow>
+            <ActionIcon variant="light" color="red" onClick={() => confirmDelete(service._id, index)}>
+              <BsTrash size={14} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  ));
+
   const Toolbar = (
     <Card withBorder radius="md" p="md" mb="md" shadow="sm">
       <Stack gap="md">
@@ -379,18 +465,11 @@ const AdminServices: React.FC = () => {
 
       {/* Cargando inicial -> skeletons bonitos */}
       {!initialLoaded ? (
-        <Grid>
+        <Card withBorder radius="md" p="md">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Grid.Col key={i} span={{ base: 12, xs: 6, md: 4, lg: 3 }}>
-              <Card withBorder radius="md" p="xs">
-                <Skeleton height={140} mb="sm" />
-                <Skeleton height={12} width="60%" mb="xs" />
-                <Skeleton height={10} width="40%" mb="xs" />
-                <Skeleton height={10} width="30%" />
-              </Card>
-            </Grid.Col>
+            <Skeleton key={i} height={40} mb="sm" />
           ))}
-        </Grid>
+        </Card>
       ) : filtered.length === 0 ? (
         <Center mih={240}>
           <Stack align="center" gap="xs">
@@ -401,175 +480,22 @@ const AdminServices: React.FC = () => {
           </Stack>
         </Center>
       ) : (
-        <Grid>
-          {filtered.map((service, index) => (
-            <Grid.Col span={{ base: 12, xs: 6, md: 4, lg: 3 }} key={service._id}>
-              <Card
-                shadow="sm"
-                radius="md"
-                withBorder
-                style={{ 
-                  position: "relative",
-                  opacity: service.isActive ? 1 : 0.7,
-                  borderColor: service.isActive ? undefined : 'var(--mantine-color-gray-4)',
-                  transition: 'all 0.2s ease',
-                }}
-                className={service.isActive ? '' : 'inactive-service'}
-              >
-                {/* Imagen principal */}
-                {service.images?.length ? (
-                  <Card.Section>
-                    <AspectRatio ratio={4 / 3}>
-                      <Image
-                        src={typeof service.images[0] === "string" ? (service.images[0] as string) : undefined}
-                        alt={service.name}
-                        fit="cover"
-                        style={{ filter: service.isActive ? 'none' : 'grayscale(50%)' }}
-                      />
-                    </AspectRatio>
-                  </Card.Section>
-                ) : (
-                  <Card.Section>
-                    <AspectRatio ratio={4 / 3}>
-                      <Center bg={service.isActive ? "gray.1" : "gray.2"}>
-                        <Text c="dimmed" size="sm">Sin imagen</Text>
-                      </Center>
-                    </AspectRatio>
-                  </Card.Section>
-                )}
-
-                {/* Estado */}
-                <Badge
-                  variant="filled"
-                  color={service.isActive ? "green" : "gray"}
-                  leftSection={service.isActive ? <BsCheckCircle size={12} /> : <BsXCircle size={12} />}
-                  style={{ position: "absolute", top: rem(8), left: rem(8) }}
-                  size="md"
-                >
-                  {service.isActive ? "Activo" : "Inactivo"}
-                </Badge>
-
-                {/* Destacado */}
-                {service.featured && (
-                  <Badge
-                    variant="filled"
-                    color="yellow"
-                    leftSection={<BsStarFill size={11} />}
-                    style={{ position: "absolute", top: rem(38), left: rem(8) }}
-                    size="md"
-                  >
-                    Destacado
-                  </Badge>
-                )}
-
-                {/* Menú de acciones */}
-                <Menu shadow="md" width={200} position="bottom-end">
-                  <Menu.Target>
-                    <ActionIcon
-                      variant="filled"
-                      color="gray"
-                      style={{ position: "absolute", top: rem(8), right: rem(8) }}
-                      aria-label="Acciones"
-                      size="lg"
-                    >
-                      <BsThreeDotsVertical size={18} />
-                    </ActionIcon>
-                  </Menu.Target>
-                  <Menu.Dropdown>
-                    <Menu.Label>Acciones del servicio</Menu.Label>
-                    <Menu.Item 
-                      leftSection={<BsPencil />} 
-                      onClick={() => { setIsModalOpen(true); setEditingService(service); }}
-                    >
-                      Editar servicio
-                    </Menu.Item>
-                    <Menu.Item
-                      leftSection={service.isActive ? <BsXCircle /> : <BsCheckCircle />}
-                      onClick={() => toggleStatus(service._id)}
-                      color={service.isActive ? "orange" : "green"}
-                    >
-                      {service.isActive ? "Desactivar" : "Activar"}
-                    </Menu.Item>
-                    <Menu.Item
-                      leftSection={service.featured ? <BsStarFill /> : <BsStar />}
-                      onClick={() => toggleFeatured(service._id)}
-                      color="yellow"
-                    >
-                      {service.featured ? "Quitar destacado" : "Marcar destacado"}
-                    </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Item 
-                      color="red" 
-                      leftSection={<BsTrash />} 
-                      onClick={() => confirmDelete(service._id, index)}
-                    >
-                      Eliminar servicio
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
-
-                {/* Contenido */}
-                <Card.Section p="md">
-                  <Group justify="space-between" mb={8}>
-                    <Text fw={700} size="lg" lineClamp={1}>{service.name}</Text>
-                    <Tooltip label="Duración del servicio" withArrow>
-                      <Badge variant="light" color="blue" size="lg">
-                        {service.duration} min
-                      </Badge>
-                    </Tooltip>
-                  </Group>
-                  
-                  <Group mb={8}>
-                    <Badge variant="dot" color="violet" size="md">
-                      {service.type}
-                    </Badge>
-                  </Group>
-
-                  {service.description && (
-                    <Text size="sm" lineClamp={2} c="dimmed" mb="md" style={{ minHeight: 40 }}>
-                      {service.description}
-                    </Text>
-                  )}
-                  
-                  <Group justify="space-between" align="center" mt="md">
-                    <Badge color={service.isActive ? (service.price === 0 ? "green" : "teal") : "gray"} variant="light" size="xl" radius="md">
-                      {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
-                    </Badge>
-                    <Group gap={6}>
-                      <Tooltip label={service.featured ? "Quitar destacado" : "Marcar como destacado"} withArrow>
-                        <ActionIcon
-                          variant={service.featured ? "filled" : "light"}
-                          color="yellow"
-                          onClick={() => toggleFeatured(service._id)}
-                        >
-                          {service.featured ? <BsStarFill size={16} /> : <BsStar size={16} />}
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Editar" withArrow>
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
-                          onClick={() => { setIsModalOpen(true); setEditingService(service); }}
-                        >
-                          <BsPencil size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Eliminar" withArrow>
-                        <ActionIcon 
-                          variant="light" 
-                          color="red"
-                          onClick={() => confirmDelete(service._id, index)}
-                        >
-                          <BsTrash size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Group>
-                </Card.Section>
-              </Card>
-            </Grid.Col>
-          ))}
-        </Grid>
+        <Card withBorder radius="md" p={0}>
+          <Table.ScrollContainer minWidth={720}>
+            <Table striped highlightOnHover verticalSpacing="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Servicio</Table.Th>
+                  <Table.Th>Tipo</Table.Th>
+                  <Table.Th>Duración</Table.Th>
+                  <Table.Th>Precio</Table.Th>
+                  <Table.Th>Acciones</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>{rows}</Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Card>
       )}
 
       <ModalCreateEdit
