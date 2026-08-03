@@ -230,9 +230,10 @@ const AdminServices: React.FC = () => {
       await deleteService(serviceId);
       setServices((prev) => prev.filter((_, i) => i !== index));
       showNotification({ title: "Servicio eliminado", message: "Se eliminó correctamente", color: "green" });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      showNotification({ title: "Error", message: "No se pudo eliminar el servicio", color: "red" });
+      const message = error.response?.data?.message || error.message || "No se pudo eliminar el servicio";
+      showNotification({ title: "Error", message, color: "red" });
     }
   };
 
