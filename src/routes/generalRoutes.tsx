@@ -55,6 +55,7 @@ import PublicReceiptPaymentPage from "../pages/public/PublicReceiptPaymentPage";
 import ReceiptReviewPage from "../pages/admin/payments/ReceiptReviewPage";
 import PublicPackagePurchasePage from "../pages/public/PublicPackagePurchasePage";
 import PublicStorePage from "../pages/public/PublicStorePage";
+import PublicProductDetailPage from "../pages/public/PublicProductDetailPage";
 import StoreOrdersPage from "../pages/admin/storeOrders";
 import PublicServiceDetailPage from "../pages/public/PublicServiceDetailPage";
 import ProgramsCatalogPage from "../pages/public/ProgramsCatalogPage";
@@ -467,6 +468,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Tienda",
       description: "Compra los productos del negocio y págalos en línea.",
+    },
+  },
+  {
+    path: "/tienda/producto/:id",
+    component: PublicProductDetailPage,
+    MediaMetadata: {
+      title: "Producto",
+      description: "Detalle de producto, compartible por enlace.",
     },
   },
 

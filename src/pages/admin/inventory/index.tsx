@@ -159,10 +159,12 @@ const InventoryPage: React.FC = () => {
   const handleSaveProduct = async (form: ProductFormData) => {
     try {
       if (form._id) {
-        // No enviar stockQuantity en edición: los ajustes van por adjustStock
+        // No enviar stockQuantity en edición: los ajustes van por adjustStock.
+        // `images` llega como (File | string)[] a nivel de tipos, pero ProductModal
+        // ya subió los File pendientes antes de llamar onSave — siempre son string[] acá.
         const { _id, stockQuantity: _stock, ...data } = form;
         void _stock;
-        const updated = await updateProduct(_id, data);
+        const updated = await updateProduct(_id, data as unknown as Partial<Product>);
         if (updated) {
           setProducts((prev) =>
             prev.map((p) => (p._id === _id ? updated : p))
@@ -171,7 +173,7 @@ const InventoryPage: React.FC = () => {
       } else {
         const { _id, ...data } = form;
         void _id;
-        const created = await createProduct(data);
+        const created = await createProduct(data as unknown as Omit<Product, "_id" | "organizationId" | "createdAt" | "updatedAt">);
         if (created) setProducts((prev) => [...prev, created]);
       }
       setIsProductModalOpen(false);

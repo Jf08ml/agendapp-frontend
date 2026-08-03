@@ -24,6 +24,7 @@ import { showNotification } from "@mantine/notifications";
 import { IconPackage, IconPhotoPlus, IconCircleXFilled } from "@tabler/icons-react";
 import { Product } from "../../../../services/productService";
 import { uploadImage } from "../../../../services/imageService";
+import { ImageUploadField } from "../../components/MediaUploadFields";
 
 export interface ProductFormData {
   _id?: string;
@@ -34,6 +35,11 @@ export interface ProductFormData {
   barcode: string;
   description: string;
   imageUrl: string;
+  // Galería adicional para el detalle público (imageUrl sigue siendo la portada).
+  // Mezcla File (recién soltados, se suben al guardar) y string (ya subidos).
+  images: (File | string)[];
+  usageInstructions: string;
+  featured: boolean;
   costPrice: number;
   salePrice: number;
   trackStock: boolean;
@@ -60,6 +66,9 @@ const emptyForm = (): ProductFormData => ({
   barcode: "",
   description: "",
   imageUrl: "",
+  images: [],
+  usageInstructions: "",
+  featured: false,
   costPrice: 0,
   salePrice: 0,
   trackStock: true,
@@ -94,6 +103,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
         barcode: product.barcode ?? "",
         description: product.description ?? "",
         imageUrl: product.imageUrl ?? "",
+        images: product.images ?? [],
+        usageInstructions: product.usageInstructions ?? "",
+        featured: product.featured ?? false,
         costPrice: product.costPrice ?? 0,
         salePrice: product.salePrice ?? 0,
         trackStock: product.trackStock ?? true,
@@ -116,7 +128,18 @@ const ProductModal: React.FC<ProductModalProps> = ({
     if (!canSave || isUploading) return;
     setSaving(true);
     try {
-      await onSave(form);
+      // La galería llega mezclada (File recién soltados + string ya subidos):
+      // sube los File pendientes ahora, igual que el flujo de servicios.
+      const filesToUpload = form.images.filter((img): img is File => typeof img !== "string");
+      let uploadedUrls: (string | undefined)[] = [];
+      if (filesToUpload.length > 0) {
+        uploadedUrls = await Promise.all(filesToUpload.map((f) => uploadImage(f)));
+      }
+      const finalImages = [
+        ...form.images.filter((img): img is string => typeof img === "string"),
+        ...uploadedUrls.filter((u): u is string => !!u),
+      ];
+      await onSave({ ...form, images: finalImages });
     } finally {
       setSaving(false);
     }
@@ -255,6 +278,18 @@ const ProductModal: React.FC<ProductModalProps> = ({
           autosize
         />
 
+        <Textarea
+          label="Modo de uso / instrucciones"
+          description="Se muestra en el detalle público del producto (ej: aplicar sobre cabello húmedo, dejar actuar 5 min)"
+          placeholder="Opcional"
+          value={form.usageInstructions}
+          onChange={(e) =>
+            setForm({ ...form, usageInstructions: e.currentTarget.value })
+          }
+          minRows={2}
+          autosize
+        />
+
         <Box>
           <Text size="sm" fw={500} mb="xs">
             Imagen del producto
@@ -316,6 +351,19 @@ const ProductModal: React.FC<ProductModalProps> = ({
           </Dropzone>
         </Box>
 
+        <Box>
+          <Text size="sm" fw={500} mb="xs">
+            Galería adicional (opcional)
+          </Text>
+          <Text size="xs" c="dimmed" mb="xs">
+            Fotos extra que se muestran en el detalle público del producto, además de la imagen principal.
+          </Text>
+          <ImageUploadField
+            images={form.images}
+            onChange={(images) => setForm({ ...form, images })}
+          />
+        </Box>
+
         <Divider />
 
         <Switch
@@ -324,6 +372,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
           checked={form.visibleInStore}
           onChange={(e) =>
             setForm({ ...form, visibleInStore: e.currentTarget.checked })
+          }
+        />
+
+        <Switch
+          label="Producto destacado"
+          description="Se muestra primero en la tienda pública"
+          checked={form.featured}
+          onChange={(e) =>
+            setForm({ ...form, featured: e.currentTarget.checked })
           }
         />
 

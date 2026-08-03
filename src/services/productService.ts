@@ -12,6 +12,12 @@ export interface Product {
   description?: string;
   // Imagen del producto (URL de ImageKit); "" = sin imagen
   imageUrl?: string;
+  // Galería adicional para el detalle público (imageUrl sigue siendo la portada)
+  images?: string[];
+  // Modo de uso / instrucciones mostradas en el detalle público
+  usageInstructions?: string;
+  // Se muestra primero en la tienda pública
+  featured?: boolean;
   costPrice: number;
   salePrice: number;
   trackStock: boolean;

@@ -54,6 +54,8 @@ import { RootState } from "../../app/store";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import AddressMapPicker from "../../components/AddressMapPicker";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { storeImageSrc } from "../../utils/storeImage";
+import { useStoreCart } from "../../hooks/useStoreCart";
 import { getClientByIdentifier } from "../../services/clientService";
 import {
   DEFAULT_STORE_FORM_CONFIG,
@@ -106,14 +108,6 @@ interface CodConfirmation {
 }
 
 const isValidEmail = (v: string) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-
-// Miniatura optimizada vía transformaciones de ImageKit (encaja en 600×600 sin
-// recortar; el recorte visual final lo hace el CSS del contenedor 1:1). Si la
-// URL ya trae parámetros o no es de ImageKit, se usa tal cual.
-const storeImageSrc = (url: string) =>
-  url.includes("ik.imagekit.io") && !url.includes("?")
-    ? `${url}?tr=w-600,h-600,c-at_max`
-    : url;
 
 // Búsqueda tolerante a tildes y mayúsculas.
 const normalizeText = (s: string) =>
@@ -172,8 +166,9 @@ export default function PublicStorePage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES);
 
-  // ── Carrito (estado local) ─────────────────────────────────────────────────
-  const [cart, setCart] = useState<StoreCartItem[]>([]);
+  // ── Carrito (persistido en localStorage por organización — ver useStoreCart,
+  // necesario para que sobreviva la navegación a /tienda/producto/:id) ───────
+  const [cart, setCart] = useStoreCart(organization?._id);
   const [cartOpen, setCartOpen] = useState(false);
 
   // ── Config del formulario de tienda (independiente del de reservas/citas) ──
@@ -759,6 +754,8 @@ export default function PublicStorePage() {
                   radius="lg"
                   padding={isMobile ? "sm" : "lg"}
                   className="store-product-card"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => navigate(`/tienda/producto/${product._id}`)}
                 >
                   {/* Imagen (o placeholder) siempre presente: mantiene las
                       tarjetas alineadas aunque solo algunos productos la tengan.
@@ -808,6 +805,21 @@ export default function PublicStorePage() {
                         {product.category}
                       </Badge>
                     )}
+                    {product.featured && (
+                      <Badge
+                        size="sm"
+                        color="yellow"
+                        variant="filled"
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          boxShadow: "var(--mantine-shadow-xs)",
+                        }}
+                      >
+                        Destacado
+                      </Badge>
+                    )}
                     {product.outOfStock && (
                       <Center style={{ position: "absolute", inset: 0 }}>
                         <Badge size="lg" color="dark" variant="filled">
@@ -850,12 +862,15 @@ export default function PublicStorePage() {
                         radius="md"
                         leftSection={<IconShoppingCart size={16} />}
                         disabled={!!product.outOfStock || !canPay}
-                        onClick={() => addToCart(product)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product);
+                        }}
                       >
                         Agregar
                       </Button>
                     ) : (
-                      <Group gap="xs" wrap="nowrap">
+                      <Group gap="xs" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
                         <ActionIcon
                           variant="light"
                           size="lg"

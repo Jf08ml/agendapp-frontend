@@ -16,11 +16,16 @@ export interface StoreProduct {
   brand?: string;
   category?: string;
   description?: string;
+  // Modo de uso / instrucciones — solo viene poblado en el detalle (no en el catálogo)
+  usageInstructions?: string;
   // Imagen del producto (URL de ImageKit); "" = sin imagen
   imageUrl?: string;
+  // Galería adicional — solo viene poblada en el detalle (no en el catálogo)
+  images?: string[];
   salePrice: number;
   // true cuando trackStock && stockQuantity <= 0 (calculado por el backend)
   outOfStock?: boolean;
+  featured?: boolean;
 }
 
 // Ítem del carrito (estado local del frontend).
@@ -50,6 +55,23 @@ export const getCatalog = async (
   } catch (error) {
     handleAxiosError(error, "No se pudo cargar la tienda");
     return null;
+  }
+};
+
+// Detalle público de un producto (vista compartible /tienda/producto/:id).
+// Igual que getPublicServiceById: silencia el error (404 = no existe/no
+// visible) y deja que la página muestre el estado "no encontrado".
+export const getProductDetail = async (
+  productId: string,
+  organizationId?: string
+): Promise<StoreProduct | undefined> => {
+  try {
+    const { data } = await apiStorePublic.get(`/product/${productId}`, {
+      params: organizationId ? { org: organizationId } : undefined,
+    });
+    return data.data as StoreProduct;
+  } catch {
+    return undefined;
   }
 };
 
