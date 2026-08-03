@@ -34,6 +34,13 @@ export interface OrganizationRankingItem {
   membershipStatus: string | null;
 }
 
+export interface OrganizationActivityItem {
+  organizationId: string;
+  totalAppointments: number;
+  lastAppointmentAt: string | null;
+  appointmentsLast30d: number;
+}
+
 export interface PlatformAnalyticsParams {
   startDate?: string;
   endDate?: string;
@@ -67,5 +74,10 @@ export const getOrganizationRanking = async (
   params: PlatformAnalyticsParams & { sortBy?: "citas" | "ingresos"; limit?: number }
 ): Promise<OrganizationRankingItem[]> => {
   const response = await apiGeneral.get(`/admin/analytics/organizations?${buildParams(params)}`);
+  return response.data.data;
+};
+
+export const getOrganizationsActivityOverview = async (): Promise<OrganizationActivityItem[]> => {
+  const response = await apiGeneral.get(`/admin/analytics/organizations-activity`);
   return response.data.data;
 };

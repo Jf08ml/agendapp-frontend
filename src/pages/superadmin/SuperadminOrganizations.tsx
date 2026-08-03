@@ -19,8 +19,12 @@ import {
   Badge,
   Tooltip,
   ActionIcon,
+  SegmentedControl,
+  Paper,
+  UnstyledButton,
 } from "@mantine/core";
-import { BiEdit, BiKey, BiUserCheck, BiTrash } from "react-icons/bi";
+import { BiEdit, BiKey, BiUserCheck, BiTrash, BiLink } from "react-icons/bi";
+import { notifications } from "@mantine/notifications";
 import SuperadminNav from "./SuperadminNav";
 import {
   getOrganizations,
@@ -29,9 +33,64 @@ import {
   createOrganization,
 } from "../../services/organizationService";
 import { getAllMemberships, Membership } from "../../services/membershipService";
+import {
+  getOrganizationsActivityOverview,
+  OrganizationActivityItem,
+} from "../../services/platformAnalyticsService";
 import { uploadImage } from "../../services/imageService";
 import { TimeInput } from "@mantine/dates";
 import { apiGeneral } from "../../services/axiosConfig";
+import { MAIN_DOMAIN } from "../../utils/domainUtils";
+
+// Enlace público de la organización: prioriza su primer dominio propio;
+// si no tiene, cae al subdominio {slug}.agenditapp.com.
+const getOrgUrl = (org: Organization): string | null => {
+  if (Array.isArray(org.domains) && org.domains.length > 0 && org.domains[0]) {
+    const domain = org.domains[0].replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${domain}`;
+  }
+  if (org.slug) {
+    return `https://${org.slug}.${MAIN_DOMAIN}`;
+  }
+  return null;
+};
+
+type ActivityStatus = "unconfigured" | "no_appointments" | "active" | "inactive";
+
+const INACTIVITY_THRESHOLD_DAYS = 30;
+
+const ACTIVITY_CONFIG: Record<ActivityStatus, { color: string; label: string }> = {
+  unconfigured:   { color: "gray",   label: "Sin configurar" },
+  no_appointments:{ color: "blue",   label: "Configurada, sin citas" },
+  active:         { color: "green",  label: "Activa" },
+  inactive:       { color: "orange", label: "Inactiva" },
+};
+
+const ACTIVITY_FILTER_OPTIONS: { value: "all" | ActivityStatus; label: string }[] = [
+  { value: "all", label: "Todas" },
+  { value: "active", label: "Activas" },
+  { value: "inactive", label: "Inactivas" },
+  { value: "no_appointments", label: "Sin citas" },
+  { value: "unconfigured", label: "Sin configurar" },
+];
+
+// Diferencia en días completos entre ahora y una fecha ISO (o null si no hay fecha)
+const daysSince = (iso?: string | null): number | null => {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+const getActivityStatus = (
+  org: Organization,
+  activity: OrganizationActivityItem | undefined
+): ActivityStatus => {
+  if (!org.setupCompleted) return "unconfigured";
+  if (!activity || activity.totalAppointments === 0) return "no_appointments";
+  const days = daysSince(activity.lastAppointmentAt);
+  if (days !== null && days <= INACTIVITY_THRESHOLD_DAYS) return "active";
+  return "inactive";
+};
 
 type Notif = { msg: string; color: "red" | "green" | "yellow" | "blue" } | null;
 
@@ -56,8 +115,10 @@ export default function SuperadminOrganizations() {
   const navigate = useNavigate();
   const [orgs, setOrgs] = useState<Organization[] | null>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [activity, setActivity] = useState<OrganizationActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [activityFilter, setActivityFilter] = useState<"all" | ActivityStatus>("all");
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -145,12 +206,14 @@ export default function SuperadminOrganizations() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [orgsData, membershipsData] = await Promise.all([
+      const [orgsData, membershipsData, activityData] = await Promise.all([
         getOrganizations(),
         getAllMemberships().catch(() => []),
+        getOrganizationsActivityOverview().catch(() => []),
       ]);
       setOrgs(orgsData);
       setMemberships(membershipsData);
+      setActivity(activityData);
       setLoading(false);
     })();
   }, []);
@@ -164,6 +227,32 @@ export default function SuperadminOrganizations() {
         m,
       ])
   );
+
+  // Map orgId → actividad (última cita, totales) for quick lookup
+  const activityByOrg = new Map<string, OrganizationActivityItem>(
+    activity.map((a) => [a.organizationId, a])
+  );
+
+  const activityBadge = (org: Organization) => {
+    const orgActivity = org._id ? activityByOrg.get(org._id) : undefined;
+    const status = getActivityStatus(org, orgActivity);
+    const { color, label } = ACTIVITY_CONFIG[status];
+    const days = daysSince(orgActivity?.lastAppointmentAt);
+    const detail =
+      status === "unconfigured"
+        ? null
+        : days === null
+        ? "Nunca ha agendado"
+        : days === 0
+        ? "Última cita: hoy"
+        : `Última cita: hace ${days} día${days === 1 ? "" : "s"}`;
+    return (
+      <Stack gap={2}>
+        <Badge color={color} variant="filled" size="sm">{label}</Badge>
+        {detail && <Text size="xs" c="dimmed">{detail}</Text>}
+      </Stack>
+    );
+  };
 
   const membershipBadge = (orgId?: string) => {
     if (!orgId) return <Badge color="gray" variant="light">Sin membresía</Badge>;
@@ -189,11 +278,50 @@ export default function SuperadminOrganizations() {
     );
   };
 
-  const filteredOrgs = orgs?.filter(
-    (o) =>
-      o.name?.toLowerCase().includes(search.toLowerCase()) ||
-      o.email?.toLowerCase().includes(search.toLowerCase())
+  // Conteos por estado de actividad, para la franja de resumen (sobre TODAS las orgs, sin aplicar el filtro de búsqueda)
+  const activityCounts = (orgs || []).reduce(
+    (acc, o) => {
+      const status = getActivityStatus(o, o._id ? activityByOrg.get(o._id) : undefined);
+      acc[status] += 1;
+      return acc;
+    },
+    { unconfigured: 0, no_appointments: 0, active: 0, inactive: 0 } as Record<ActivityStatus, number>
   );
+
+  let filteredOrgs = orgs?.filter(
+    (o) =>
+      (o.name?.toLowerCase().includes(search.toLowerCase()) ||
+        o.email?.toLowerCase().includes(search.toLowerCase())) &&
+      (activityFilter === "all" ||
+        getActivityStatus(o, o._id ? activityByOrg.get(o._id) : undefined) === activityFilter)
+  );
+
+  // Con un filtro de actividad activo, mostrar primero las orgs más "dormidas"
+  // (sin actividad reciente primero) para orientar de inmediato a cuáles atender.
+  if (filteredOrgs && activityFilter !== "all") {
+    filteredOrgs = [...filteredOrgs].sort((a, b) => {
+      const aLast = a._id ? activityByOrg.get(a._id)?.lastAppointmentAt : null;
+      const bLast = b._id ? activityByOrg.get(b._id)?.lastAppointmentAt : null;
+      if (!aLast && !bLast) return 0;
+      if (!aLast) return -1;
+      if (!bLast) return 1;
+      return new Date(aLast).getTime() - new Date(bLast).getTime();
+    });
+  }
+
+  const handleCopyLink = async (org: Organization) => {
+    const url = getOrgUrl(org);
+    if (!url) {
+      notifications.show({ color: "red", message: "Esta organización no tiene dominio ni slug configurado." });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      notifications.show({ color: "green", message: `Enlace copiado: ${url}` });
+    } catch {
+      notifications.show({ color: "red", message: "No se pudo copiar el enlace." });
+    }
+  };
 
   const handleOpenModal = (org: Organization) => {
     setSelectedOrg(org);
@@ -346,6 +474,41 @@ export default function SuperadminOrganizations() {
         </Group>
       </Group>
 
+      {!loading && (
+        <Paper withBorder p="sm" mb="md">
+          <Group justify="space-between" wrap="wrap" gap="md">
+            <Group gap="lg">
+              {(
+                [
+                  { status: "active" as ActivityStatus, label: "Activas" },
+                  { status: "inactive" as ActivityStatus, label: `Inactivas (>${INACTIVITY_THRESHOLD_DAYS}d)` },
+                  { status: "no_appointments" as ActivityStatus, label: "Sin citas" },
+                  { status: "unconfigured" as ActivityStatus, label: "Sin configurar" },
+                ] as const
+              ).map(({ status, label }) => (
+                <UnstyledButton
+                  key={status}
+                  onClick={() => setActivityFilter((prev) => (prev === status ? "all" : status))}
+                >
+                  <Group gap={6}>
+                    <Badge color={ACTIVITY_CONFIG[status].color} variant={activityFilter === status ? "filled" : "light"} size="lg">
+                      {activityCounts[status]}
+                    </Badge>
+                    <Text size="sm" c="dimmed">{label}</Text>
+                  </Group>
+                </UnstyledButton>
+              ))}
+            </Group>
+            <SegmentedControl
+              value={activityFilter}
+              onChange={(v) => setActivityFilter(v as "all" | ActivityStatus)}
+              data={ACTIVITY_FILTER_OPTIONS}
+              size="xs"
+            />
+          </Group>
+        </Paper>
+      )}
+
       {loading ? (
         <Loader mt={40} />
       ) : (
@@ -354,8 +517,8 @@ export default function SuperadminOrganizations() {
             <Table.Tr>
               <Table.Th>Nombre</Table.Th>
               <Table.Th>Email / Teléfono</Table.Th>
-              <Table.Th>Dominio(s)</Table.Th>
               <Table.Th>Membresía</Table.Th>
+              <Table.Th>Actividad</Table.Th>
               <Table.Th>Estado</Table.Th>
               <Table.Th>Acciones</Table.Th>
             </Table.Tr>
@@ -373,14 +536,8 @@ export default function SuperadminOrganizations() {
                       <Text size="xs" c="dimmed">{org.phoneNumber}</Text>
                     </Stack>
                   </Table.Td>
-                  <Table.Td>
-                    <Text size="sm">
-                      {Array.isArray(org.domains) && org.domains.length
-                        ? org.domains.join(", ")
-                        : "-"}
-                    </Text>
-                  </Table.Td>
                   <Table.Td>{membershipBadge(org._id)}</Table.Td>
+                  <Table.Td>{activityBadge(org)}</Table.Td>
                   <Table.Td>
                     <Badge color={org.isActive ? "green" : "red"} variant="light">
                       {org.isActive ? "Activo" : "Inactivo"}
@@ -388,6 +545,17 @@ export default function SuperadminOrganizations() {
                   </Table.Td>
                   <Table.Td>
                     <Group gap={6} wrap="nowrap">
+                      <Tooltip label={getOrgUrl(org) ? "Copiar enlace" : "Sin dominio ni slug configurado"}>
+                        <ActionIcon
+                          color="grape"
+                          variant="light"
+                          size="sm"
+                          disabled={!getOrgUrl(org)}
+                          onClick={() => handleCopyLink(org)}
+                        >
+                          <BiLink size={14} />
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label="Entrar como este admin">
                         <ActionIcon
                           color="teal"

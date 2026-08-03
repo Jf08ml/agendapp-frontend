@@ -1,4 +1,4 @@
-const MAIN_DOMAIN = "agenditapp.com";
+export const MAIN_DOMAIN = "agenditapp.com";
 const SIGNUP_SUBDOMAIN = "app";
 
 export type DomainType = "signup" | "tenant" | "custom" | "landing";

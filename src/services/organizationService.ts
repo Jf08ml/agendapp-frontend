@@ -119,6 +119,7 @@ export const DEFAULT_STORE_FORM_CONFIG: ClientFormConfig = {
 export interface Organization {
   _id?: string;
   slug?: string;
+  createdAt?: string;
   name: string;
   email: string;
   location: {
