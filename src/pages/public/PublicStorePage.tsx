@@ -24,7 +24,6 @@ import {
   AspectRatio,
   Drawer,
   Affix,
-  Chip,
   Skeleton,
   Paper,
   Box,
@@ -123,15 +122,16 @@ const ALL_CATEGORIES = "__all__";
 // tarjetas de opción del checkout. Solo CSS, sin listeners de JS.
 const STORE_STYLES = `
   .store-product-card {
-    transition: transform 160ms ease, box-shadow 160ms ease;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   }
   .store-product-img {
     transition: transform 300ms ease;
   }
   @media (hover: hover) {
     .store-product-card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       box-shadow: var(--mantine-shadow-md);
+      border-color: var(--mantine-primary-color-filled);
     }
     .store-product-card:hover .store-product-img {
       transform: scale(1.04);
@@ -143,6 +143,51 @@ const STORE_STYLES = `
   .store-option-card[data-checked] {
     border-color: var(--mantine-primary-color-filled);
     background-color: var(--mantine-primary-color-light);
+  }
+  .store-category-scroll {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-behavior: smooth;
+  }
+  .store-category-scroll::-webkit-scrollbar {
+    display: none;
+  }
+  .store-tabs-bar {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--mantine-color-gray-3);
+  }
+  .store-tab {
+    position: relative;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    padding: 10px 14px;
+    font-size: var(--mantine-font-size-sm);
+    font-weight: 500;
+    color: var(--mantine-color-dimmed);
+    transition: color 150ms ease;
+  }
+  .store-tab:hover {
+    color: var(--mantine-color-text);
+  }
+  .store-tab[data-active="true"] {
+    color: var(--mantine-color-text);
+    font-weight: 700;
+  }
+  .store-tab[data-active="true"]::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--mantine-primary-color-filled);
   }
 `;
 
@@ -506,17 +551,10 @@ export default function PublicStorePage() {
   if (hasReceipt) payHints.push({ Icon: IconReceipt2, label: "Transferencia" });
   if (hasCod) payHints.push({ Icon: IconCash, label: "Contraentrega" });
 
-  // Encabezado de la tienda (se reutiliza en el estado de carga).
+  // Encabezado de la tienda (se reutiliza en el estado de carga). Sin logo ni
+  // nombre del negocio: ya aparecen en el header/footer del sitio.
   const headerBlock = (
     <Stack gap={6} align="center">
-      <ThemeIcon size={56} radius="xl" variant="light">
-        <IconBuildingStore size={32} />
-      </ThemeIcon>
-      {organization?.name && (
-        <Text size="sm" fw={600} c="dimmed" tt="uppercase" lts={1} ta="center">
-          {organization.name}
-        </Text>
-      )}
       <Title order={1} size="h2" ta="center">
         Tienda
       </Title>
@@ -656,8 +694,12 @@ export default function PublicStorePage() {
     );
   }
 
+  // En móvil, la barra de carrito es fija al fondo: reserva espacio para que
+  // no tape la última fila de productos.
+  const mobileCartBarSpace = isMobile && cart.length > 0 ? 88 : 0;
+
   return (
-    <Container size="xl" py="xl">
+    <Container size="xl" py="xl" pb={mobileCartBarSpace || undefined}>
       <style>{STORE_STYLES}</style>
 
       <Stack gap="xl">
@@ -680,22 +722,36 @@ export default function PublicStorePage() {
                 mx="auto"
               />
               {categories.length >= 2 && (
-                <Chip.Group
-                  multiple={false}
-                  value={categoryFilter}
-                  onChange={(v) => setCategoryFilter(v || ALL_CATEGORIES)}
-                >
-                  <Group gap="xs" justify="center">
-                    <Chip value={ALL_CATEGORIES} size="sm" radius="xl">
+                // Pestañas con subrayado, fijas debajo del buscador al hacer scroll
+                // (top = alto del header fijo de la app, 50px — ver App.tsx).
+                <Box style={{ position: "sticky", top: 50, zIndex: 20, background: "var(--mantine-color-body)" }}>
+                  <Box
+                    className={
+                      isMobile ? "store-tabs-bar store-category-scroll" : "store-tabs-bar"
+                    }
+                    style={{ justifyContent: isMobile ? "flex-start" : "center" }}
+                  >
+                    <button
+                      type="button"
+                      className="store-tab"
+                      data-active={categoryFilter === ALL_CATEGORIES}
+                      onClick={() => setCategoryFilter(ALL_CATEGORIES)}
+                    >
                       Todas
-                    </Chip>
+                    </button>
                     {categories.map((c) => (
-                      <Chip key={c} value={c} size="sm" radius="xl">
+                      <button
+                        key={c}
+                        type="button"
+                        className="store-tab"
+                        data-active={categoryFilter === c}
+                        onClick={() => setCategoryFilter(c)}
+                      >
                         {c}
-                      </Chip>
+                      </button>
                     ))}
-                  </Group>
-                </Chip.Group>
+                  </Box>
+                </Box>
               )}
             </Stack>
           )}
@@ -751,10 +807,11 @@ export default function PublicStorePage() {
                 <Card
                   key={product._id}
                   withBorder
+                  shadow="xs"
                   radius="lg"
                   padding={isMobile ? "sm" : "lg"}
                   className="store-product-card"
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}
                   onClick={() => navigate(`/tienda/producto/${product._id}`)}
                 >
                   {/* Imagen (o placeholder) siempre presente: mantiene las
@@ -851,14 +908,14 @@ export default function PublicStorePage() {
                       </Text>
                     )}
 
-                    <Text size="xl" fw={800} mt="auto" pt={6}>
+                    <Text size="xl" fw={800} c="var(--mantine-primary-color-filled)" mt="auto" pt={6}>
                       {formatCurrency(product.salePrice, currency)}
                     </Text>
 
                     {qty === 0 ? (
                       <Button
                         fullWidth
-                        variant="light"
+                        variant="filled"
                         radius="md"
                         leftSection={<IconShoppingCart size={16} />}
                         disabled={!!product.outOfStock || !canPay}
@@ -902,25 +959,54 @@ export default function PublicStorePage() {
         )}
       </Stack>
 
-      {/* ── Botón flotante del carrito ── */}
-      {cart.length > 0 && (
-        <Affix position={{ bottom: 20, right: 20 }} zIndex={150}>
-          <Button
-            size="md"
-            radius="xl"
-            leftSection={<IconShoppingCart size={18} />}
-            rightSection={
-              <Badge size="sm" variant="white" circle>
-                {itemCount}
-              </Badge>
-            }
-            style={{ boxShadow: "var(--mantine-shadow-lg)" }}
-            onClick={() => setCartOpen(true)}
-          >
-            {formatCurrency(total, currency)}
-          </Button>
-        </Affix>
-      )}
+      {/* ── Botón del carrito: barra inferior en móvil (más fácil de tocar con
+          el pulgar), pill flotante en desktop ── */}
+      {cart.length > 0 &&
+        (isMobile ? (
+          <Affix position={{ bottom: 0, left: 0, right: 0 }} zIndex={150}>
+            <Box
+              p="sm"
+              style={{
+                background: "var(--mantine-color-body)",
+                borderTop: "1px solid var(--mantine-color-gray-3)",
+                boxShadow: "var(--mantine-shadow-lg)",
+                paddingBottom: "calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
+              <Button
+                fullWidth
+                size="md"
+                radius="md"
+                leftSection={<IconShoppingCart size={18} />}
+                rightSection={
+                  <Badge size="sm" variant="white" circle>
+                    {itemCount}
+                  </Badge>
+                }
+                onClick={() => setCartOpen(true)}
+              >
+                Ver pedido · {formatCurrency(total, currency)}
+              </Button>
+            </Box>
+          </Affix>
+        ) : (
+          <Affix position={{ bottom: 20, right: 20 }} zIndex={150}>
+            <Button
+              size="md"
+              radius="xl"
+              leftSection={<IconShoppingCart size={18} />}
+              rightSection={
+                <Badge size="sm" variant="white" circle>
+                  {itemCount}
+                </Badge>
+              }
+              style={{ boxShadow: "var(--mantine-shadow-lg)" }}
+              onClick={() => setCartOpen(true)}
+            >
+              {formatCurrency(total, currency)}
+            </Button>
+          </Affix>
+        ))}
 
       {/* ── Carrito (Drawer) ── */}
       <Drawer
@@ -1074,6 +1160,7 @@ export default function PublicStorePage() {
         centered
         size="lg"
         radius="lg"
+        fullScreen={isMobile}
       >
         <Stack gap="md">
           <Divider label="Tus datos" labelPosition="left" />
