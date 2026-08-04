@@ -702,60 +702,61 @@ export default function PublicStorePage() {
     <Container size="xl" py="xl" pb={mobileCartBarSpace || undefined}>
       <style>{STORE_STYLES}</style>
 
-      <Stack gap="xl">
-        {/* ── Encabezado + búsqueda + categorías ── */}
-        <Stack gap="md">
-          {headerBlock}
+      {/*
+        Un solo Stack plano (header → buscador → pestañas → grilla): la barra
+        de pestañas sticky necesita que su contenedor abarque hasta el final
+        de la grilla, si no, se queda sin espacio para "pegarse" y se va con
+        el resto al hacer scroll (el contenedor anterior solo envolvía el
+        buscador, apenas ~100px de alto).
+      */}
+      <Stack gap="md">
+        {headerBlock}
 
-          {products.length > 0 && (
-            <Stack gap="sm">
-              <TextInput
-                placeholder="Buscar productos..."
-                aria-label="Buscar productos"
-                leftSection={<IconSearch size={16} />}
-                value={search}
-                onChange={(e) => setSearch(e.currentTarget.value)}
-                radius="md"
-                size="md"
-                maw={480}
-                w="100%"
-                mx="auto"
-              />
-              {categories.length >= 2 && (
-                // Pestañas con subrayado, fijas debajo del buscador al hacer scroll
-                // (top = alto del header fijo de la app, 50px — ver App.tsx).
-                <Box style={{ position: "sticky", top: 50, zIndex: 20, background: "var(--mantine-color-body)" }}>
-                  <Box
-                    className={
-                      isMobile ? "store-tabs-bar store-category-scroll" : "store-tabs-bar"
-                    }
-                    style={{ justifyContent: isMobile ? "flex-start" : "center" }}
-                  >
-                    <button
-                      type="button"
-                      className="store-tab"
-                      data-active={categoryFilter === ALL_CATEGORIES}
-                      onClick={() => setCategoryFilter(ALL_CATEGORIES)}
-                    >
-                      Todas
-                    </button>
-                    {categories.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className="store-tab"
-                        data-active={categoryFilter === c}
-                        onClick={() => setCategoryFilter(c)}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </Box>
-                </Box>
-              )}
-            </Stack>
-          )}
-        </Stack>
+        {products.length > 0 && (
+          <TextInput
+            placeholder="Buscar productos..."
+            aria-label="Buscar productos"
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            radius="md"
+            size="md"
+            maw={480}
+            w="100%"
+            mx="auto"
+          />
+        )}
+
+        {products.length > 0 && categories.length >= 2 && (
+          // Pestañas con subrayado, fijas debajo del buscador al hacer scroll
+          // (top = alto del header fijo de la app, 50px — ver App.tsx).
+          <Box style={{ position: "sticky", top: 50, zIndex: 20, background: "var(--mantine-color-body)" }}>
+            <Box
+              className={isMobile ? "store-tabs-bar store-category-scroll" : "store-tabs-bar"}
+              style={{ justifyContent: isMobile ? "flex-start" : "center" }}
+            >
+              <button
+                type="button"
+                className="store-tab"
+                data-active={categoryFilter === ALL_CATEGORIES}
+                onClick={() => setCategoryFilter(ALL_CATEGORIES)}
+              >
+                Todas
+              </button>
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="store-tab"
+                  data-active={categoryFilter === c}
+                  onClick={() => setCategoryFilter(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {!canPay && products.length > 0 && (
           <Alert icon={<IconAlertCircle size={18} />} color="yellow" variant="light">
