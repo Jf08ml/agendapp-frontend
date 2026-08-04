@@ -1,4 +1,4 @@
-import { Alert, Divider, List, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
+import { Alert, Divider, List, NumberInput, SegmentedControl, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
 import { IconBell, IconBulb, IconBrandWhatsapp, IconLock, IconUserCheck } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
@@ -20,6 +20,7 @@ export default function ReminderSettingsTab({
 
   const enabled = form.values.reminderSettings?.enabled;
   const hours = form.values.reminderSettings?.hoursBefore ?? 24;
+  const graceHours = form.values.reminderSettings?.graceHours ?? 4;
   const start = form.values.reminderSettings?.sendTimeStart ?? "07:00";
   const end = form.values.reminderSettings?.sendTimeEnd ?? "20:00";
 
@@ -80,6 +81,30 @@ export default function ReminderSettingsTab({
                   {` (${hours}h antes)`}
                 </Alert>
               </SimpleGrid>
+
+              <div>
+                <Text size="sm" fw={500} mb={2}>
+                  Margen de gracia tras crear la cita
+                </Text>
+                <Text size="xs" c="dimmed" mb={8}>
+                  Si una cita se crea muy cerca de su hora ideal de recordatorio, espera este tiempo antes de
+                  enviarlo — para que no le llegue al cliente justo después de la confirmación. Igual se envía
+                  después, apenas se cumpla el margen.
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  value={String(graceHours)}
+                  onChange={(val) =>
+                    form.setFieldValue("reminderSettings.graceHours", Number(val) as 0 | 2 | 4)
+                  }
+                  disabled={!isEditing}
+                  data={[
+                    { label: "Sin gracia", value: "0" },
+                    { label: "2 horas", value: "2" },
+                    { label: "4 horas (recomendado)", value: "4" },
+                  ]}
+                />
+              </div>
 
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                 <TextInput

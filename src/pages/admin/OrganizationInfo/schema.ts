@@ -161,6 +161,15 @@ export const schema = z.object({
         z.null(),
         z.undefined()
       ]).optional(),
+      // 3 opciones fijas (no un número libre) para evitar que el admin ponga
+      // un valor mayor que hoursBefore y termine bloqueando recordatorios.
+      graceHours: z.union([
+        z.literal(0),
+        z.literal(2),
+        z.literal(4),
+        z.null(),
+        z.undefined()
+      ]).optional(),
       sendTimeStart: hhmmOrEmpty.optional(),
       sendTimeEnd: hhmmOrEmpty.optional(),
       secondReminder: z.object({

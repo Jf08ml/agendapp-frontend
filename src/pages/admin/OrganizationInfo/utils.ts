@@ -59,6 +59,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
   reminderSettings: {
     enabled: response.reminderSettings?.enabled ?? true,
     hoursBefore: response.reminderSettings?.hoursBefore ?? 24,
+    graceHours: response.reminderSettings?.graceHours ?? 4,
     sendTimeStart: response.reminderSettings?.sendTimeStart ?? "07:00",
     sendTimeEnd: response.reminderSettings?.sendTimeEnd ?? "20:00",
     secondReminder: {

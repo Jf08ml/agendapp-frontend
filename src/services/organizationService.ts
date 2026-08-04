@@ -41,6 +41,8 @@ export interface Branding {
 export interface ReminderSettings {
   enabled?: boolean;
   hoursBefore?: number;
+  // Periodo de gracia post-creación (horas). 3 opciones fijas en el UI.
+  graceHours?: 0 | 2 | 4;
   sendTimeStart?: string;
   sendTimeEnd?: string;
   secondReminder?: {
