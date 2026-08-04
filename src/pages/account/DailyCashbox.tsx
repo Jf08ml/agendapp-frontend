@@ -645,10 +645,9 @@ const DailyCashbox: React.FC = () => {
     setDrawerActionLoading(true);
     try {
       await updateAppointment(selectedAppt._id, { status: "confirmed" });
-      await registerService(selectedAppt.client?._id || "");
       const updated = { ...selectedAppt, status: "confirmed" };
       syncApptInState(updated as Appointment);
-      showNotification({ title: "Cita confirmada", message: "Servicio registrado exitosamente", color: "green", autoClose: 2500, position: "top-right" });
+      showNotification({ title: "Cita confirmada", message: "", color: "green", autoClose: 2500, position: "top-right" });
     } catch {
       showNotification({ title: "Error", message: "No se pudo confirmar la cita", color: "red", autoClose: 3000, position: "top-right" });
     } finally {
@@ -661,9 +660,12 @@ const DailyCashbox: React.FC = () => {
     setDrawerActionLoading(true);
     try {
       await markAttendance(selectedAppt._id, status);
+      if (status === "attended" && selectedAppt.client?._id) {
+        await registerService(selectedAppt.client._id);
+      }
       const updated = { ...selectedAppt, status };
       syncApptInState(updated as Appointment);
-      showNotification({ title: status === "attended" ? "Marcado: Asistió" : "Marcado: No asistió", message: "", color: status === "attended" ? "teal" : "pink", autoClose: 2000, position: "top-right" });
+      showNotification({ title: status === "attended" ? "Marcado: Asistió" : "Marcado: No asistió", message: status === "attended" ? "Servicio registrado exitosamente" : "", color: status === "attended" ? "teal" : "pink", autoClose: 2000, position: "top-right" });
     } catch {
       showNotification({ title: "Error", message: "No se pudo actualizar la asistencia", color: "red", autoClose: 3000, position: "top-right" });
     } finally {
