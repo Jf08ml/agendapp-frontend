@@ -59,6 +59,8 @@ import { useMediaQuery } from "@mantine/hooks";
 import { sendOrgReminders } from "../../../services/reminderService";
 
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
+import type { WaCode } from "../../../utils/waRealtime";
+import { getMetaStatus } from "../../../services/organizationService";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import SetupGuide from "./components/SetupGuide";
@@ -151,15 +153,59 @@ const ScheduleView: React.FC = () => {
     [organization?._id, organization?.clientIdWhatsapp],
   );
 
-  // ✅ Hook centralizado de WA: es la ÚNICA fuente de la UI de WhatsApp aquí
+  const isMetaConnection = organization?.waConnectionType === "meta";
+
+  // ✅ Hook centralizado de WA (stack Baileys). Solo es la fuente de verdad para
+  // orgs conectadas por Baileys — las orgs con waConnectionType "meta" no tienen
+  // sesión Baileys real y este hook siempre reportaría "desconectado" para ellas.
   const {
-    code, // "ready" | "connecting" | ...
-    reason, // detalle técnico si aplica
+    code: baileysCode, // "ready" | "connecting" | ...
+    reason: baileysReason, // detalle técnico si aplica
     // me,           // si quieres mostrar cuenta conectada, está disponible
 
     // acciones y utilidades
-    recheck, // para el botón "Reconsultar"
+    recheck: recheckBaileys, // para el botón "Reconsultar"
   } = useWhatsappStatus(organizationId, initialClientId);
+
+  // Estado de conexión Meta (Cloud API) — solo se consulta para orgs conectadas por Meta.
+  const [metaStatus, setMetaStatus] = useState<{
+    connected: boolean;
+    pending: boolean;
+    reason?: string;
+  } | null>(null);
+
+  const recheckMeta = useCallback(async () => {
+    if (!organizationId) return;
+    try {
+      const s = await getMetaStatus(organizationId as string);
+      setMetaStatus(s);
+    } catch {
+      setMetaStatus({ connected: false, pending: false, reason: "status_fetch_failed" });
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (!isMetaConnection || !organizationId) return;
+    recheckMeta();
+  }, [isMetaConnection, organizationId, recheckMeta]);
+
+  const code: WaCode = isMetaConnection
+    ? metaStatus?.connected
+      ? "ready"
+      : metaStatus?.pending
+      ? "waiting_qr"
+      : metaStatus
+      ? "disconnected"
+      : "connecting"
+    : baileysCode;
+
+  const reason = isMetaConnection
+    ? metaStatus?.pending
+      ? "Verificación del número en progreso."
+      : metaStatus?.reason || ""
+    : baileysReason;
+
+  const recheck = isMetaConnection ? recheckMeta : recheckBaileys;
 
   const { hasPermission } = usePermissions();
   const canViewAll = hasPermission("appointments:view_all");

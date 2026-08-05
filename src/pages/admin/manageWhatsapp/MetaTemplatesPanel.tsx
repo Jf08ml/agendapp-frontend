@@ -95,24 +95,21 @@ const STATUS_DOT: Record<string, string> = {
 
 /**
  * Diccionario de ejemplos para variables conocidas.
- * Incluye variables de sistema (nombre, fecha...) y variables comunes de campaña.
+ * A diferencia de MetaTemplateFormTab (plantillas transaccionales por cita),
+ * aquí NO se incluyen variables tipo fecha_cita/servicio/profesional/direccion:
+ * en una campaña masiva no hay una cita de referencia por destinatario, así que
+ * esos datos no se pueden personalizar — solo {{1}} (nombre) se llena por cliente,
+ * el resto es un mismo texto fijo para todos los destinatarios de la campaña.
  */
 const VARIABLE_EXAMPLES: Record<string, string> = {
-  // Variables de sistema (compartidas con MetaTemplateFormTab)
+  // Variable personalizada por destinatario (debe ir en la posición {{1}})
   nombre_cliente: "Maria Garcia",
   nombre:         "Maria Garcia",
   cliente:        "Maria Garcia",
-  fecha_cita:     "lunes 13 de enero a las 10:00 AM",
-  fecha:          "13 de enero",
+  // Datos del negocio (fijos, iguales para todos)
   nombre_negocio: "Mi Negocio",
   negocio:        "Mi Negocio",
-  direccion:      "Calle 19 #27-38",
-  servicio:       "Pestañas pelo a pelo",
-  lista_servicios:"Pestañas pelo a pelo",
-  profesional:    "Nataly Martinez",
-  enlace_cancelacion: "https://agenditapp.com/cancelar/abc123",
-  enlace_gestion: "https://agenditapp.com/gestionar/abc123",
-  // Variables típicas de campañas
+  // Variables típicas de campañas (texto fijo, igual para todos)
   descuento:      "30%",
   porcentaje:     "20%",
   promocion:      "20% de descuento en tu próxima cita",
@@ -436,8 +433,12 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
                   Usa <strong>{"{{nombre_variable}}"}</strong> para variables. Se convierten automáticamente al formato de Meta{" "}
                   <strong>{"{{1}}"}, {"{{2}}"}…</strong>
                   <br />
-                  Para personalizar por cliente, incluye <strong>{"{{nombre_cliente}}"}</strong> como primera variable.
-                  Las demás se completan al crear cada campaña.
+                  La <strong>primera variable</strong> del cuerpo siempre se llena con el nombre de cada destinatario —
+                  ponle el nombre que quieras (ej. <strong>{"{{nombre_cliente}}"}</strong>), pero debe ser la primera.
+                  <br />
+                  ⚠️ Las demás variables (2ª en adelante) <strong>no se personalizan por cliente ni por cita</strong>:
+                  al crear la campaña escribes un solo texto y ese mismo texto se envía a todos los destinatarios.
+                  No uses variables como fecha, servicio o profesional esperando que cambien por persona.
                 </Text>
               </Alert>
             )}
@@ -530,8 +531,8 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
                         <Table.Td ff="monospace" c="blue">{`{{${position}}}`}</Table.Td>
                         <Table.Td c="dimmed">
                           {position === 1
-                            ? "Nombre del cliente (automático)"
-                            : "Valor fijo — lo defines al crear la campaña"}
+                            ? "Nombre del destinatario (automático, por cliente)"
+                            : "Mismo texto fijo para todos — no varía por cliente ni cita"}
                         </Table.Td>
                       </Table.Tr>
                     ))}
