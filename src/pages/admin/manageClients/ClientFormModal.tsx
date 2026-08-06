@@ -16,7 +16,10 @@ import {
 
 interface ClientFormModalProps {
   opened: boolean;
-  onClose: () => void;
+  // 🎯 Cuando se crea/actualiza con éxito, se llama con el cliente resultante
+  // (para que quien abrió el modal pueda auto-seleccionarlo). Al cancelar o
+  // cerrar sin guardar, se llama sin argumento.
+  onClose: (savedClient?: Client) => void;
   fetchClients: () => void;
   client?: Client | null;
   setClient?: React.Dispatch<React.SetStateAction<Client | null>>;
@@ -151,17 +154,18 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         notes: notes.trim() || undefined,
       };
 
+      let savedClient: Client | undefined;
       if (client) {
-        await updateClient(client._id, payload);
+        savedClient = await updateClient(client._id, payload);
         showNotification({ title: "Éxito", message: "Cliente actualizado con éxito", color: "green", autoClose: 2000, position: "top-right" });
       } else {
-        await createClient({ ...payload, organizationId });
+        savedClient = await createClient({ ...payload, organizationId });
         showNotification({ title: "Éxito", message: "Cliente creado con éxito", color: "green", autoClose: 2000, position: "top-right" });
       }
 
       fetchClients();
       resetForm();
-      onClose();
+      onClose(savedClient);
     } catch (err: any) {
       console.error(err);
       showNotification({

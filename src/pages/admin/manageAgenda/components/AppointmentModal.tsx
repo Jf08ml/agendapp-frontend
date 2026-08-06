@@ -663,11 +663,28 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </Text>
 
             <Select
-              label="Cliente"
+              label={
+                <Group justify="space-between" wrap="nowrap" gap="xs" mb={2}>
+                  <Text size="sm" fw={500}>Cliente</Text>
+                  <Button
+                    variant="subtle"
+                    size="compact-xs"
+                    onClick={() => setCreateClientModalOpened(true)}
+                  >
+                    + Nuevo cliente
+                  </Button>
+                </Group>
+              }
               size="md"
               placeholder="Escribe para buscar cliente..."
               searchable
               mb="md"
+              // 🔎 La lista ya viene filtrada por el servidor (searchClients con
+              // debounce); desactivamos el filtro local de Mantine porque, si no,
+              // filtraría también la opción estática "+ Crear nuevo cliente" en
+              // cuanto el usuario escribiera algo (su label nunca matchea el texto
+              // buscado), haciéndola desaparecer justo cuando más se necesita.
+              filter={({ options }) => options}
               styles={{
                 input: {
                   borderRadius: 8,
@@ -1928,9 +1945,22 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       {/* Modal para crear cliente */}
       <ClientFormModal
         opened={createClientModalOpened}
-        onClose={() => {
+        onClose={(createdClient) => {
           setCreateClientModalOpened(false);
-          // Recargar búsqueda después de crear cliente
+
+          if (createdClient) {
+            // 🎯 Auto-seleccionar el cliente recién creado, sin tener que
+            // buscarlo de nuevo en el desplegable.
+            setSearchedClients((prev) => [
+              createdClient,
+              ...prev.filter((c) => c._id !== createdClient._id),
+            ]);
+            onClientChange(createdClient);
+            setClientSearchQuery("");
+            return;
+          }
+
+          // Se cerró sin crear cliente: solo refrescar la búsqueda actual
           if (organizationId) {
             searchClients(organizationId, clientSearchQuery, 20).then(
               setSearchedClients,
