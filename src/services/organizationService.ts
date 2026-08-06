@@ -175,6 +175,8 @@ export interface Organization {
   classDepositPercentage?: number;
   // Política de aprobación para inscripción a clases (config propia, independiente de reservationPolicy).
   classReservationPolicy?: ReservationPolicy;
+  // Permite que el cliente agregue un acompañante al reservar una clase.
+  allowCompanionInClassBooking?: boolean;
   // Medio preferido para el abono cuando hay AMBOS disponibles (MP + transferencia).
   depositPreferredMethod?: "mercadopago" | "receipt";
   // Cobro de depósito vía Mercado Pago. El endpoint público solo expone `connected`.

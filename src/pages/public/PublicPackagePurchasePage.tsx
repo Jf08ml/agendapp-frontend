@@ -455,7 +455,7 @@ export default function PublicPackagePurchasePage() {
 
             {hasTiers(selected) && (
               <Stack gap="xs">
-                <Text size="sm" fw={500}>Nivel</Text>
+                <Text size="sm" fw={500}>Paquete</Text>
                 <SegmentedControl
                   fullWidth
                   value={tierId || undefined}

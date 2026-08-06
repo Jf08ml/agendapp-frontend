@@ -1,26 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Box, Title, Tabs, Button, Group, Text, Badge, Card, Stack,
   ActionIcon, Tooltip, Table, ScrollArea, Skeleton, Center,
   Menu, Alert, Progress, SimpleGrid,  Checkbox, SegmentedControl,
-  Select, Loader,
+  Select, Loader, Switch, TextInput,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import {
   IconPlus, IconPencil, IconTrash, IconDots, IconEye,
   IconCheck, IconX, IconSchool, IconDoor, IconCalendar, IconUsers,
-  IconBrandWhatsapp,
+  IconBrandWhatsapp, IconSearch,
 } from "@tabler/icons-react";
 import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
 import {
   selectClassReservationPolicy,
   selectSavingClassPolicy,
   updateClassReservationPolicy,
+  fetchOrganizationConfig,
 } from "../../../features/organization/sliceOrganization";
-import type { ReservationPolicy } from "../../../services/organizationService";
+import { updateOrganization, type ReservationPolicy } from "../../../services/organizationService";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -54,6 +55,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 const STATUS_LABELS: Record<string, string> = {
   open: "Disponible", full: "Llena", cancelled: "Cancelada", completed: "Completada",
+};
+
+const ENROLLMENT_STATUS_COLORS: Record<string, string> = {
+  pending_payment: "yellow", pending: "orange", confirmed: "green",
+  cancelled: "red", attended: "blue", no_show: "gray",
+};
+const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
+  pending_payment: "Pendiente de pago", pending: "Pendiente", confirmed: "Confirmada",
+  cancelled: "Cancelada", attended: "Asistió", no_show: "No asistió",
 };
 
 // ══════════════════════════════════════════════════════
@@ -95,11 +105,39 @@ export default function ManageClasses() {
     }
   };
 
+  // undefined = orgs sin migrar (docs viejos sin el campo) → true por defecto,
+  // igual que el comportamiento histórico (siempre visible en la reserva pública).
+  const allowCompanion = organization?.allowCompanionInClassBooking !== false;
+  const [savingCompanionToggle, setSavingCompanionToggle] = useState(false);
+
+  const handleToggleAllowCompanion = async (checked: boolean) => {
+    if (!organization?._id) return;
+    setSavingCompanionToggle(true);
+    try {
+      await updateOrganization(organization._id, { allowCompanionInClassBooking: checked });
+      await dispatch(fetchOrganizationConfig());
+      showNotification({
+        message: checked
+          ? "Se muestra la opción de acompañante en la reserva de clases."
+          : "Se ocultó la opción de acompañante en la reserva de clases.",
+        color: "green",
+      });
+    } catch {
+      showNotification({ message: "No se pudo actualizar la configuración", color: "red" });
+    } finally {
+      setSavingCompanionToggle(false);
+    }
+  };
+
   // Datos
   const [rooms, setRooms] = useState<Room[]>([]);
   const [classes, setClasses] = useState<ClassType[]>([]);
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [pendingEnrollments, setPendingEnrollments] = useState<Enrollment[]>([]);
+  const [viewEnrollments, setViewEnrollments] = useState<Enrollment[]>([]);
+  const [loadingViewEnrollments, setLoadingViewEnrollments] = useState(false);
+  const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState<string>("pending");
+  const [enrollmentSearch, setEnrollmentSearch] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   // Loading
@@ -153,6 +191,40 @@ export default function ManageClasses() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // ── RESERVAS: historial (cualquier estado distinto de "pending", que ya se
+  // carga arriba para el badge de la pestaña) ────────
+  const loadEnrollmentsView = useCallback(async (status: string) => {
+    setLoadingViewEnrollments(true);
+    try {
+      const res = await getEnrollments(
+        status === "all" ? { limit: 200 } : { status, limit: 200 }
+      );
+      setViewEnrollments(res.enrollments);
+    } finally {
+      setLoadingViewEnrollments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (enrollmentStatusFilter === "pending" || !organizationId) return;
+    loadEnrollmentsView(enrollmentStatusFilter);
+  }, [enrollmentStatusFilter, organizationId, loadEnrollmentsView]);
+
+  // Lista a mostrar en la tabla según el filtro activo + búsqueda por cliente
+  const enrollmentsToShow =
+    enrollmentStatusFilter === "pending" ? pendingEnrollments : viewEnrollments;
+  const loadingEnrollmentsToShow =
+    enrollmentStatusFilter === "pending" ? loadingEnrollments : loadingViewEnrollments;
+  const filteredEnrollments = useMemo(() => {
+    const term = enrollmentSearch.trim().toLowerCase();
+    if (!term) return enrollmentsToShow;
+    return enrollmentsToShow.filter(
+      (e) =>
+        e.attendee.name.toLowerCase().includes(term) ||
+        e.attendee.phone?.toLowerCase().includes(term)
+    );
+  }, [enrollmentsToShow, enrollmentSearch]);
 
   // ── ROOMS ──────────────────────────────────────────
   const handleRoomSubmit = async (data: any) => {
@@ -371,12 +443,17 @@ export default function ManageClasses() {
   };
 
   // ── ENROLLMENTS ────────────────────────────────────
+  const refreshEnrollments = () => {
+    loadAll();
+    if (enrollmentStatusFilter !== "pending") loadEnrollmentsView(enrollmentStatusFilter);
+  };
+
   const handleApprove = async (id: string) => {
     setActionLoading(id);
     try {
       await approveEnrollment(id);
       showNotification({ message: "Inscripción aprobada", color: "green" });
-      loadAll();
+      refreshEnrollments();
     } catch (err) {
       showNotification({ message: err instanceof Error ? err.message : "Error", color: "red" });
     } finally {
@@ -395,7 +472,7 @@ export default function ManageClasses() {
         try {
           await cancelEnrollment(id);
           showNotification({ message: "Inscripción cancelada", color: "orange" });
-          loadAll();
+          refreshEnrollments();
         } catch (err) {
           showNotification({ message: err instanceof Error ? err.message : "Error", color: "red" });
         } finally {
@@ -626,40 +703,76 @@ export default function ManageClasses() {
           )}
         </Tabs.Panel>
 
-        {/* ─── RESERVAS PENDIENTES ───────────────────────── */}
+        {/* ─── RESERVAS ─────────────────────────────────── */}
         <Tabs.Panel value="enrollments">
-          <Group justify="space-between" align="flex-end" mb="md" wrap="wrap">
-            <Text fw={600}>Reservas de clases</Text>
-            <Group gap="xs" align="flex-end">
+          <Stack gap="sm" mb="md">
+            <Group justify="space-between" align="flex-end" wrap="wrap">
+              <Text fw={600}>Reservas de clases</Text>
+              <Group gap="md" align="flex-end" wrap="wrap">
+                <Select
+                  w={260}
+                  label="Política de inscripción"
+                  value={classPolicy}
+                  onChange={(val) =>
+                    val && handleChangeClassPolicy(val as ReservationPolicy)
+                  }
+                  data={[
+                    { value: "manual", label: "Aprobación manual" },
+                    {
+                      value: "auto_if_available",
+                      label: canAutoConfirmClasses
+                        ? "Automática si hay cupo"
+                        : "Automática si hay cupo (Plan Esencial o superior)",
+                      disabled: !canAutoConfirmClasses,
+                    },
+                  ]}
+                  disabled={!organization?._id || savingClassPolicy}
+                  comboboxProps={{ withinPortal: true }}
+                  rightSection={savingClassPolicy ? <Loader size="xs" /> : null}
+                />
+                <Switch
+                  label={allowCompanion ? "Acompañante permitido" : "Acompañante oculto"}
+                  description="Mostrar la opción de agregar acompañante en la reserva pública"
+                  checked={allowCompanion}
+                  onChange={(e) => handleToggleAllowCompanion(e.currentTarget.checked)}
+                  disabled={!organization?._id || savingCompanionToggle}
+                />
+              </Group>
+            </Group>
+
+            <Group gap="xs" wrap="wrap">
+              <TextInput
+                w={240}
+                placeholder="Buscar por nombre o teléfono"
+                leftSection={<IconSearch size={14} />}
+                value={enrollmentSearch}
+                onChange={(e) => setEnrollmentSearch(e.currentTarget.value)}
+              />
               <Select
-                w={260}
-                label="Política de inscripción"
-                value={classPolicy}
-                onChange={(val) =>
-                  val && handleChangeClassPolicy(val as ReservationPolicy)
-                }
+                w={220}
+                value={enrollmentStatusFilter}
+                onChange={(val) => val && setEnrollmentStatusFilter(val)}
                 data={[
-                  { value: "manual", label: "Aprobación manual" },
-                  {
-                    value: "auto_if_available",
-                    label: canAutoConfirmClasses
-                      ? "Automática si hay cupo"
-                      : "Automática si hay cupo (Plan Esencial o superior)",
-                    disabled: !canAutoConfirmClasses,
-                  },
+                  { value: "pending", label: "Pendientes" },
+                  { value: "all", label: "Todas (historial)" },
+                  { value: "confirmed", label: "Confirmadas" },
+                  { value: "attended", label: "Asistió" },
+                  { value: "no_show", label: "No asistió" },
+                  { value: "cancelled", label: "Canceladas" },
+                  { value: "pending_payment", label: "Pendiente de pago" },
                 ]}
-                disabled={!organization?._id || savingClassPolicy}
                 comboboxProps={{ withinPortal: true }}
-                rightSection={savingClassPolicy ? <Loader size="xs" /> : null}
               />
             </Group>
-          </Group>
+          </Stack>
 
-          {loadingEnrollments ? (
+          {loadingEnrollmentsToShow ? (
             <Stack gap="xs">{Array(3).fill(0).map((_, i) => <Skeleton key={i} h={70} radius="md" />)}</Stack>
-          ) : pendingEnrollments.length === 0 ? (
-            <Alert color="green" icon={<IconCheck size={16} />}>
-              No hay reservas pendientes de aprobación.
+          ) : filteredEnrollments.length === 0 ? (
+            <Alert color={enrollmentStatusFilter === "pending" ? "green" : "gray"} icon={<IconCheck size={16} />}>
+              {enrollmentStatusFilter === "pending"
+                ? "No hay reservas pendientes de aprobación."
+                : "No hay reservas con este filtro."}
             </Alert>
           ) : (
             <ScrollArea>
@@ -669,13 +782,14 @@ export default function ManageClasses() {
                     <Table.Th>Asistente</Table.Th>
                     <Table.Th>Clase / Sesión</Table.Th>
                     <Table.Th>Teléfono</Table.Th>
+                    <Table.Th>Estado</Table.Th>
                     <Table.Th>Total</Table.Th>
                     <Table.Th>Descuento</Table.Th>
                     <Table.Th>Acciones</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {pendingEnrollments.map((e) => {
+                  {filteredEnrollments.map((e) => {
                     const classDoc = typeof e.classId === "object" ? e.classId : null;
                     const session = typeof e.sessionId === "object" ? e.sessionId : null;
                     const sessionStart = session ? dayjs(session.startDate).tz(tz).format("D MMM, HH:mm") : "—";
@@ -693,6 +807,11 @@ export default function ManageClasses() {
                           <Text size="sm">{e.attendee.phone}</Text>
                         </Table.Td>
                         <Table.Td>
+                          <Badge size="sm" color={ENROLLMENT_STATUS_COLORS[e.status] ?? "gray"}>
+                            {ENROLLMENT_STATUS_LABELS[e.status] ?? e.status}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
                           <Text size="sm">${e.totalPrice.toLocaleString("es-CO")}</Text>
                         </Table.Td>
                         <Table.Td>
@@ -705,30 +824,34 @@ export default function ManageClasses() {
                           )}
                         </Table.Td>
                         <Table.Td>
-                          <Group gap="xs">
-                            <Tooltip label="Aprobar">
-                              <ActionIcon
-                                color="green"
-                                variant="light"
-                                size="sm"
-                                loading={actionLoading === e._id}
-                                onClick={() => handleApprove(e._id)}
-                              >
-                                <IconCheck size={14} />
-                              </ActionIcon>
-                            </Tooltip>
-                            <Tooltip label="Cancelar">
-                              <ActionIcon
-                                color="red"
-                                variant="light"
-                                size="sm"
-                                loading={actionLoading === e._id}
-                                onClick={() => handleCancelEnrollment(e._id, e.attendee.name)}
-                              >
-                                <IconX size={14} />
-                              </ActionIcon>
-                            </Tooltip>
-                          </Group>
+                          {e.status === "pending" ? (
+                            <Group gap="xs">
+                              <Tooltip label="Aprobar">
+                                <ActionIcon
+                                  color="green"
+                                  variant="light"
+                                  size="sm"
+                                  loading={actionLoading === e._id}
+                                  onClick={() => handleApprove(e._id)}
+                                >
+                                  <IconCheck size={14} />
+                                </ActionIcon>
+                              </Tooltip>
+                              <Tooltip label="Cancelar">
+                                <ActionIcon
+                                  color="red"
+                                  variant="light"
+                                  size="sm"
+                                  loading={actionLoading === e._id}
+                                  onClick={() => handleCancelEnrollment(e._id, e.attendee.name)}
+                                >
+                                  <IconX size={14} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          ) : (
+                            <Text size="xs" c="dimmed">—</Text>
+                          )}
                         </Table.Td>
                       </Table.Tr>
                     );

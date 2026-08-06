@@ -28,6 +28,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
+import "dayjs/locale/es";
 import { useDebouncedValue } from "@mantine/hooks";
 import { openConfirmModal } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
@@ -627,15 +628,42 @@ function EditPackageModal({
   onSaved: (updated: ClientPackage) => void;
 }) {
   const [expirationDate, setExpirationDate] = useState<Date | null>(new Date(pkg.expirationDate));
-  const [serviceAdds,    setServiceAdds]    = useState<Record<string, number>>({});
-  const [classAdds,      setClassAdds]      = useState<Record<string, number>>({});
-  const [saving,         setSaving]         = useState(false);
+  const [serviceIncludedEdits, setServiceIncludedEdits] = useState<Record<string, number>>({});
+  const [classIncludedEdits,   setClassIncludedEdits]   = useState<Record<string, number>>({});
+  const [serviceUsedEdits,     setServiceUsedEdits]     = useState<Record<string, number>>({});
+  const [classUsedEdits,       setClassUsedEdits]       = useState<Record<string, number>>({});
+  const [saving,               setSaving]               = useState(false);
+
+  // Valores originales — sirven para detectar qué cambió realmente el admin
+  // (y no enviar campos que no se tocaron).
+  const originalServiceIncluded = useMemo(() => {
+    const map: Record<string, number> = {};
+    pkg.services.forEach((svc) => { map[getRefId(svc.serviceId)] = svc.sessionsIncluded; });
+    return map;
+  }, [pkg]);
+  const originalClassIncluded = useMemo(() => {
+    const map: Record<string, number> = {};
+    (pkg.classes || []).forEach((cls) => { map[getRefId(cls.classId)] = cls.sessionsIncluded; });
+    return map;
+  }, [pkg]);
+  const originalServiceUsed = useMemo(() => {
+    const map: Record<string, number> = {};
+    pkg.services.forEach((svc) => { map[getRefId(svc.serviceId)] = svc.sessionsUsed; });
+    return map;
+  }, [pkg]);
+  const originalClassUsed = useMemo(() => {
+    const map: Record<string, number> = {};
+    (pkg.classes || []).forEach((cls) => { map[getRefId(cls.classId)] = cls.sessionsUsed; });
+    return map;
+  }, [pkg]);
 
   useEffect(() => {
     if (opened) {
       setExpirationDate(new Date(pkg.expirationDate));
-      setServiceAdds({});
-      setClassAdds({});
+      setServiceIncludedEdits({ ...originalServiceIncluded });
+      setClassIncludedEdits({ ...originalClassIncluded });
+      setServiceUsedEdits({ ...originalServiceUsed });
+      setClassUsedEdits({ ...originalClassUsed });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened, pkg._id]);
@@ -643,20 +671,45 @@ function EditPackageModal({
   const dateChanged =
     !!expirationDate &&
     expirationDate.toDateString() !== new Date(pkg.expirationDate).toDateString();
-  const hasSessionAdds =
-    Object.values(serviceAdds).some((v) => v > 0) || Object.values(classAdds).some((v) => v > 0);
-  const canSave = dateChanged || hasSessionAdds;
+  const hasIncludedEdits =
+    Object.entries(serviceIncludedEdits).some(([id, v]) => v !== originalServiceIncluded[id]) ||
+    Object.entries(classIncludedEdits).some(([id, v]) => v !== originalClassIncluded[id]);
+  const hasUsedEdits =
+    Object.entries(serviceUsedEdits).some(([id, v]) => v !== originalServiceUsed[id]) ||
+    Object.entries(classUsedEdits).some(([id, v]) => v !== originalClassUsed[id]);
+  const canSave = dateChanged || hasIncludedEdits || hasUsedEdits;
 
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
     try {
-      const serviceAdjustments = Object.entries(serviceAdds)
-        .filter(([, v]) => v > 0)
-        .map(([serviceId, sessionsToAdd]) => ({ serviceId, sessionsToAdd }));
-      const classAdjustments = Object.entries(classAdds)
-        .filter(([, v]) => v > 0)
-        .map(([classId, sessionsToAdd]) => ({ classId, sessionsToAdd }));
+      const serviceAdjustments = pkg.services
+        .map((svc) => {
+          const id = getRefId(svc.serviceId);
+          const includedChanged = serviceIncludedEdits[id] !== originalServiceIncluded[id];
+          const usedChanged = serviceUsedEdits[id] !== originalServiceUsed[id];
+          if (!includedChanged && !usedChanged) return null;
+          return {
+            serviceId: id,
+            ...(includedChanged ? { sessionsIncluded: serviceIncludedEdits[id] } : {}),
+            ...(usedChanged ? { sessionsUsed: serviceUsedEdits[id] } : {}),
+          };
+        })
+        .filter((v): v is { serviceId: string; sessionsIncluded?: number; sessionsUsed?: number } => v !== null);
+
+      const classAdjustments = (pkg.classes || [])
+        .map((cls) => {
+          const id = getRefId(cls.classId);
+          const includedChanged = classIncludedEdits[id] !== originalClassIncluded[id];
+          const usedChanged = classUsedEdits[id] !== originalClassUsed[id];
+          if (!includedChanged && !usedChanged) return null;
+          return {
+            classId: id,
+            ...(includedChanged ? { sessionsIncluded: classIncludedEdits[id] } : {}),
+            ...(usedChanged ? { sessionsUsed: classUsedEdits[id] } : {}),
+          };
+        })
+        .filter((v): v is { classId: string; sessionsIncluded?: number; sessionsUsed?: number } => v !== null);
 
       const updated = await editClientPackage(pkg._id, pkg.organizationId, {
         expirationDate: dateChanged && expirationDate ? expirationDate.toISOString() : undefined,
@@ -682,32 +735,55 @@ function EditPackageModal({
         <DateInput
           label="Fecha de vencimiento"
           description="Extiende el vencimiento para que el paquete siga siendo utilizable"
+          locale="es"
           value={expirationDate}
           onChange={setExpirationDate}
         />
 
         {pkg.services.length > 0 && (
           <Box>
-            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
-              Añadir sesiones por servicio
+            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={2} style={{ letterSpacing: "0.05em" }}>
+              Sesiones por servicio
+            </Text>
+            <Text size="xs" c="dimmed" mb="xs">
+              Corrige el total de sesiones del paquete y/o cuántas ya se usaron. Puedes subir
+              o bajar ambos valores; las disponibles se recalculan automáticamente.
             </Text>
             <Stack gap="xs">
               {pkg.services.map((svc, idx) => {
                 const id = getRefId(svc.serviceId);
+                const included = serviceIncludedEdits[id] ?? svc.sessionsIncluded;
+                const used = serviceUsedEdits[id] ?? svc.sessionsUsed;
+                const remaining = Math.max(0, included - used);
+                const changed = included !== svc.sessionsIncluded || used !== svc.sessionsUsed;
                 return (
-                  <Group key={idx} justify="space-between" wrap="nowrap">
-                    <Box style={{ minWidth: 0 }}>
-                      <Text size="sm" truncate>{getServiceName(svc)}</Text>
-                      <Text size="xs" c="dimmed">{svc.sessionsRemaining}/{svc.sessionsIncluded} disponibles</Text>
-                    </Box>
-                    <NumberInput
-                      size="xs"
-                      w={90}
-                      min={0}
-                      value={serviceAdds[id] || 0}
-                      onChange={(v) => setServiceAdds((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
-                    />
-                  </Group>
+                  <Paper key={idx} withBorder p="xs" radius="sm">
+                    <Stack gap={6}>
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={500} truncate>{getServiceName(svc)}</Text>
+                        <Badge size="sm" variant="light" color={changed ? "blue" : "gray"}>
+                          {remaining}/{included} disponibles
+                        </Badge>
+                      </Group>
+                      <Group grow gap="xs" align="flex-start">
+                        <NumberInput
+                          label="Total incluidas"
+                          size="xs"
+                          min={0}
+                          value={included}
+                          onChange={(v) => setServiceIncludedEdits((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                        />
+                        <NumberInput
+                          label="Sesiones usadas"
+                          size="xs"
+                          min={0}
+                          max={included}
+                          value={used}
+                          onChange={(v) => setServiceUsedEdits((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                        />
+                      </Group>
+                    </Stack>
+                  </Paper>
                 );
               })}
             </Stack>
@@ -716,26 +792,48 @@ function EditPackageModal({
 
         {(pkg.classes?.length ?? 0) > 0 && (
           <Box>
-            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="xs" style={{ letterSpacing: "0.05em" }}>
-              Añadir sesiones por clase
+            <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb={2} style={{ letterSpacing: "0.05em" }}>
+              Sesiones por clase
+            </Text>
+            <Text size="xs" c="dimmed" mb="xs">
+              Corrige el total de sesiones del paquete y/o cuántas ya se usaron. Puedes subir
+              o bajar ambos valores; las disponibles se recalculan automáticamente.
             </Text>
             <Stack gap="xs">
               {pkg.classes!.map((cls, idx) => {
                 const id = getRefId(cls.classId);
+                const included = classIncludedEdits[id] ?? cls.sessionsIncluded;
+                const used = classUsedEdits[id] ?? cls.sessionsUsed;
+                const remaining = Math.max(0, included - used);
+                const changed = included !== cls.sessionsIncluded || used !== cls.sessionsUsed;
                 return (
-                  <Group key={idx} justify="space-between" wrap="nowrap">
-                    <Box style={{ minWidth: 0 }}>
-                      <Text size="sm" truncate>{getClassNameFromCredit(cls)}</Text>
-                      <Text size="xs" c="dimmed">{cls.sessionsRemaining}/{cls.sessionsIncluded} disponibles</Text>
-                    </Box>
-                    <NumberInput
-                      size="xs"
-                      w={90}
-                      min={0}
-                      value={classAdds[id] || 0}
-                      onChange={(v) => setClassAdds((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
-                    />
-                  </Group>
+                  <Paper key={idx} withBorder p="xs" radius="sm">
+                    <Stack gap={6}>
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={500} truncate>{getClassNameFromCredit(cls)}</Text>
+                        <Badge size="sm" variant="light" color={changed ? "blue" : "gray"}>
+                          {remaining}/{included} disponibles
+                        </Badge>
+                      </Group>
+                      <Group grow gap="xs" align="flex-start">
+                        <NumberInput
+                          label="Total incluidas"
+                          size="xs"
+                          min={0}
+                          value={included}
+                          onChange={(v) => setClassIncludedEdits((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                        />
+                        <NumberInput
+                          label="Sesiones usadas"
+                          size="xs"
+                          min={0}
+                          max={included}
+                          value={used}
+                          onChange={(v) => setClassUsedEdits((prev) => ({ ...prev, [id]: Number(v) || 0 }))}
+                        />
+                      </Group>
+                    </Stack>
+                  </Paper>
                 );
               })}
             </Stack>

@@ -82,7 +82,7 @@ export interface Enrollment {
   totalPrice: number;
   payments: PaymentRecord[];
   paymentStatus: "unpaid" | "partial" | "paid" | "free";
-  status: "pending" | "confirmed" | "cancelled" | "attended" | "no_show";
+  status: "pending_payment" | "pending" | "confirmed" | "cancelled" | "attended" | "no_show";
   approvalMode: "manual" | "auto";
   notes?: string;
   createdAt?: string;

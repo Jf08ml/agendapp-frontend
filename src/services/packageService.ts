@@ -288,9 +288,13 @@ export const cancelClientPackage = async (
 export interface EditClientPackagePayload {
   // ISO string. Omitir para no tocar la fecha de vencimiento actual.
   expirationDate?: string;
-  // Solo suma sesiones (sessionsIncluded y sessionsRemaining) — no permite quitar.
-  serviceAdjustments?: { serviceId: string; sessionsToAdd: number }[];
-  classAdjustments?: { classId: string; sessionsToAdd: number }[];
+  // Ambos campos son valores absolutos (no deltas) — el que se omita conserva
+  // su valor actual. sessionsRemaining se recalcula siempre como
+  // sessionsIncluded - sessionsUsed. Sirve tanto para subir como bajar
+  // cualquiera de los dos (ej. corregir paquetes cargados manualmente que ya
+  // traían sesiones descontadas o un total distinto al real).
+  serviceAdjustments?: { serviceId: string; sessionsIncluded?: number; sessionsUsed?: number }[];
+  classAdjustments?: { classId: string; sessionsIncluded?: number; sessionsUsed?: number }[];
 }
 
 export const editClientPackage = async (
