@@ -156,12 +156,21 @@ export default function SuperadminOrganizations() {
         );
       }
 
+      // Se abre en pestaña nueva (no se navega la pestaña del superadmin) para
+      // no perder el panel de superadmin al entrar a la organización.
       const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-      if (isDev) {
-        window.location.href = `/exchange?slug=${impersonateOrg.slug}&code=${exchangeCode}`;
-      } else {
-        window.location.href = `https://${subdomain}/exchange?code=${exchangeCode}`;
-      }
+      const url = isDev
+        ? `/exchange?slug=${impersonateOrg.slug}&code=${exchangeCode}`
+        : `https://${subdomain}/exchange?code=${exchangeCode}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+
+      setImpersonating(false);
+      setImpersonateOrg(null);
+      setImpersonateReason("");
+      notifications.show({
+        color: "teal",
+        message: `Se abrió "${impersonateOrg.name}" en una pestaña nueva.`,
+      });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       setImpersonateError(e?.response?.data?.message || "Error al generar acceso");

@@ -40,6 +40,10 @@ export interface Appointment {
   clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
   sessionNotes?: string; // 📝 Registro de lo hecho en la sesión (concepto genérico)
   reminderSent?: boolean;
+  // 📨 Resultado del envío de la confirmación de agendamiento por WhatsApp
+  waConfirmationStatus?: "sent" | "failed" | "blocked" | "skipped";
+  waConfirmationSentAt?: Date;
+  waConfirmationError?: string;
   createdAt: Date;
   updatedAt: Date;
   // 🔁 Campos para citas recurrentes

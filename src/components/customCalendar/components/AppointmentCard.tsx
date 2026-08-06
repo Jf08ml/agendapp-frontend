@@ -316,6 +316,38 @@ ${clientServices}`;
   const whatsappURL = `https://wa.me/${appointment.client.phoneNumber}`;
   const isBirthday = getIsBirthday(appointment.client.birthDate);
 
+  // 📨 Confirmación de WhatsApp: color + texto según el resultado que el
+  // backend guardó al intentar enviar el mensaje de agendamiento.
+  const waConfirmationConfig: Record<string, { color: string; shortLabel: string; fullLabel: string }> = {
+    sent: { color: "#25D366", shortLabel: "Enviada", fullLabel: "Confirmación de WhatsApp enviada" },
+    failed: { color: "#e03131", shortLabel: "Falló el envío", fullLabel: "Confirmación de WhatsApp: falló el envío" },
+    blocked: { color: "#f08c00", shortLabel: "Bloqueada", fullLabel: "Confirmación de WhatsApp bloqueada (plan o plantilla deshabilitada)" },
+    skipped: { color: "#868e96", shortLabel: "Omitida", fullLabel: "Confirmación de WhatsApp omitida (sin teléfono utilizable)" },
+  };
+  const waConfirmation = appointment.waConfirmationStatus
+    ? waConfirmationConfig[appointment.waConfirmationStatus]
+    : null;
+  const waConfirmationColor = waConfirmation?.color || "#868e96";
+  const waConfirmationTooltip = waConfirmation ? (
+    <>
+      {waConfirmation.fullLabel}
+      {appointment.waConfirmationError && (
+        <>
+          <br />
+          {appointment.waConfirmationError}
+        </>
+      )}
+      {appointment.waConfirmationSentAt && (
+        <>
+          <br />
+          {dayjs(appointment.waConfirmationSentAt).locale("es").format("D MMM YYYY, h:mm A")}
+        </>
+      )}
+    </>
+  ) : (
+    ""
+  );
+
   // 🕒 Hora de inicio/fin — se muestra en una esquina fija (position absolute) para
   // no agregar una fila al flujo del contenido y evitar que desborde cards chicas.
   const cardTimeFormat = timeFormat === "24h" ? "HH:mm" : "h:mm A";
@@ -525,6 +557,20 @@ ${clientServices}`;
                             )}
                           </CopyButton>
                         </Flex>
+                      )}
+
+                      {role === "admin" && waConfirmation && (
+                        <Flex align="center" gap={6} wrap="wrap">
+                          <FaWhatsapp size={13} color={waConfirmationColor} />
+                          <Text size="sm">
+                            <strong>Confirmación WhatsApp:</strong> {waConfirmation.shortLabel}
+                          </Text>
+                        </Flex>
+                      )}
+                      {role === "admin" && appointment.waConfirmationStatus === "failed" && appointment.waConfirmationError && (
+                        <Text size="xs" c="red" ml={19}>
+                          {appointment.waConfirmationError}
+                        </Text>
                       )}
                     </Flex>
                   </Box>
@@ -1390,6 +1436,28 @@ ${clientServices}`;
             )}
           </ActionIcon>
         </Tooltip>
+
+        {/* Ícono de confirmación de WhatsApp (esquina fija, solo informativo) */}
+        {appointment.waConfirmationStatus && (
+          <Tooltip
+            label={waConfirmationTooltip}
+            withArrow
+            multiline
+            w={220}
+          >
+            <Box
+              style={{
+                position: "absolute",
+                bottom: -2,
+                left: -2,
+                display: "flex",
+                pointerEvents: "auto",
+              }}
+            >
+              <FaWhatsapp size={12} color={waConfirmationColor} />
+            </Box>
+          </Tooltip>
+        )}
       </Paper>
     </>
   );
