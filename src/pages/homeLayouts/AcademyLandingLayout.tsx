@@ -469,11 +469,13 @@ export function AcademyLandingLayout({
                         <Text fz="xs" fw={600} c={theme.colors.gray[9]} lineClamp={1}>
                           {cls.name}
                         </Text>
-                        <Text fz={rem(10)} c={theme.colors.gray[5]}>
-                          {cls.pricePerPerson === 0
-                            ? "Gratis"
-                            : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
-                        </Text>
+                        {!cls.hidePrice && (
+                          <Text fz={rem(10)} c={theme.colors.gray[5]}>
+                            {cls.pricePerPerson === 0
+                              ? "Gratis"
+                              : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
+                          </Text>
+                        )}
                       </Box>
                     </Box>
                   ))}
@@ -640,9 +642,11 @@ export function AcademyLandingLayout({
                         )}
                       </Group>
                       <Group justify="space-between" align="center" gap={6}>
-                        <Text fw={600} fz="sm" c={isFree ? "green" : primary}>
-                          {isFree ? "Gratis" : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
-                        </Text>
+                        {!cls.hidePrice && (
+                          <Text fw={600} fz="sm" c={isFree ? "green" : primary}>
+                            {isFree ? "Gratis" : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
+                          </Text>
+                        )}
                         <Group gap={4} align="center" wrap="nowrap">
                           <IconClock size={11} color={theme.colors.gray[5]} />
                           <Text fz="xs" c={theme.colors.gray[5]}>{cls.duration} min</Text>

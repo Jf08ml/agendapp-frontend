@@ -88,14 +88,16 @@ export default function StepSelectClass({ classes, loading, selected, onSelect }
                   </ThemeIcon>
                   <Text size="xs" c="dimmed">Cupo máximo: {c.defaultCapacity} personas</Text>
                 </Group>
-                <Group gap="xs">
-                  <ThemeIcon size="xs" variant="transparent" color="green">
-                    <IconSchool size={13} />
-                  </ThemeIcon>
-                  <Text size="sm" fw={600} c="green">
-                    ${c.pricePerPerson.toLocaleString("es-CO")} / persona
-                  </Text>
-                </Group>
+                {!c.hidePrice && (
+                  <Group gap="xs">
+                    <ThemeIcon size="xs" variant="transparent" color="green">
+                      <IconSchool size={13} />
+                    </ThemeIcon>
+                    <Text size="sm" fw={600} c="green">
+                      ${c.pricePerPerson.toLocaleString("es-CO")} / persona
+                    </Text>
+                  </Group>
+                )}
 
                 {c.groupDiscount?.enabled && (
                   <Group gap="xs" mt={2}>

@@ -127,7 +127,7 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
             </Text>
           </Group>
         </Card>
-      ) : (
+      ) : classDoc.hidePrice ? null : (
         <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
           <Stack gap={6}>
             <Group justify="space-between">

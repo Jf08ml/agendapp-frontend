@@ -231,12 +231,14 @@ export default function ProgramDetailPage() {
         <Title order={2}>{classDoc.name}</Title>
 
         <Group gap="lg" align="center">
-          <Text fw={700} fz={rem(28)} c={isFree ? "green" : primary}>
-            {isFree ? "Gratis" : formatCurrency(classDoc.pricePerPerson, organization.currency || "COP")}
-            <Text span fz="sm" c="dimmed" fw={400}>
-              {" "}/ persona
+          {!classDoc.hidePrice && (
+            <Text fw={700} fz={rem(28)} c={isFree ? "green" : primary}>
+              {isFree ? "Gratis" : formatCurrency(classDoc.pricePerPerson, organization.currency || "COP")}
+              <Text span fz="sm" c="dimmed" fw={400}>
+                {" "}/ persona
+              </Text>
             </Text>
-          </Text>
+          )}
           <Group gap={6} align="center">
             <IconClock size={16} color={theme.colors.gray[6]} />
             <Text c="dimmed">{classDoc.duration} min</Text>

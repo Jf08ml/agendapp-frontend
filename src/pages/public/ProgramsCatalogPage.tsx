@@ -201,12 +201,14 @@ function ProgramCard({
         )}
 
         <Group justify="space-between" align="center" gap={6}>
-          <Text fw={700} fz="sm" c={isFree ? "green" : primaryColor}>
-            {isFree ? "Gratis" : formatCurrency(classDoc.pricePerPerson, currency || "COP")}{" "}
-            <Text span fz="xs" c="dimmed" fw={400}>
-              / persona
+          {!classDoc.hidePrice && (
+            <Text fw={700} fz="sm" c={isFree ? "green" : primaryColor}>
+              {isFree ? "Gratis" : formatCurrency(classDoc.pricePerPerson, currency || "COP")}{" "}
+              <Text span fz="xs" c="dimmed" fw={400}>
+                / persona
+              </Text>
             </Text>
-          </Text>
+          )}
           <Group gap={4} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
             <BiTime size={12} color="var(--mantine-color-gray-5)" />
             <Text fz="xs" c="dimmed">

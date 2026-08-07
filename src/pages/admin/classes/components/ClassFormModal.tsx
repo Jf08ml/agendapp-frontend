@@ -35,6 +35,7 @@ interface FormValues {
   duration: number;
   defaultCapacity: number;
   pricePerPerson: number;
+  hidePrice: boolean;
   color: string;
   isActive: boolean;
   isPublic: boolean;
@@ -65,6 +66,7 @@ export default function ClassFormModal({
       duration: 60,
       defaultCapacity: 10,
       pricePerPerson: 0,
+      hidePrice: false,
       color: "#4C6EF5",
       isActive: true,
       isPublic: true,
@@ -101,6 +103,7 @@ export default function ClassFormModal({
         duration: editing.duration,
         defaultCapacity: editing.defaultCapacity,
         pricePerPerson: editing.pricePerPerson,
+        hidePrice: editing.hidePrice ?? false,
         color: editing.color || "#4C6EF5",
         isActive: editing.isActive,
         isPublic: editing.isPublic ?? true,
@@ -198,6 +201,12 @@ export default function ClassFormModal({
               {...form.getInputProps("color")}
             />
           </SimpleGrid>
+
+          <Switch
+            label="Ocultar precio al cliente"
+            description="El precio no será visible en la vista pública (landing, catálogo, detalle ni reserva)"
+            {...form.getInputProps("hidePrice", { type: "checkbox" })}
+          />
 
           <Divider label="Descuento grupal" labelPosition="left" />
 

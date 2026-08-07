@@ -30,6 +30,7 @@ export interface ClassType {
   duration: number;
   defaultCapacity: number;
   pricePerPerson: number;
+  hidePrice?: boolean; // 🙈 Oculta el precio en la vista pública
   groupDiscount: GroupDiscount;
   color?: string | null;
   isActive: boolean;

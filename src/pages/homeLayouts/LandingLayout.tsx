@@ -910,7 +910,7 @@ export function LandingLayout({
                         )}
 
                         <Group justify="space-between" align="center" mt={4}>
-                          {classDoc && (
+                          {classDoc && !classDoc.hidePrice && (
                             <Text fw={600} fz="sm" c={primary}>
                               {classDoc.pricePerPerson === 0
                                 ? "Gratis"

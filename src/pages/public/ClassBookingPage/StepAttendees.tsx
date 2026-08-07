@@ -409,7 +409,7 @@ export default function StepAttendees({
       )}
 
       {/* ── Resumen de precio ───────────────────────────── */}
-      {classDoc && (
+      {classDoc && !classDoc.hidePrice && (
         <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
           <Stack gap={4}>
             <Group justify="space-between">
