@@ -216,6 +216,30 @@ const templateInfo = {
       { name: "{{organization}}", desc: "Nombre del negocio" },
     ],
   },
+  loyaltyServiceProgress: {
+    title: "Progreso de Fidelidad (Servicios)",
+    shortTitle: "Progreso servicios",
+    description: "Mensaje cuando se registra un servicio, sin completar la meta aún",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{currentCount}}", desc: "Servicios acumulados hasta ahora" },
+      { name: "{{remaining}}", desc: "Cuántos faltan para el próximo premio" },
+      { name: "{{nextReward}}", desc: "Descripción del próximo premio" },
+    ],
+  },
+  loyaltyReferralProgress: {
+    title: "Progreso de Referidos",
+    shortTitle: "Progreso referidos",
+    description: "Mensaje cuando se registra un referido, sin completar la meta aún",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{currentCount}}", desc: "Referidos acumulados hasta ahora" },
+      { name: "{{remaining}}", desc: "Cuántos faltan para el próximo premio" },
+      { name: "{{nextReward}}", desc: "Descripción del próximo premio" },
+    ],
+  },
   birthdayGreeting: {
     title: "Saludo de Cumpleaños",
     shortTitle: "Cumpleaños",
@@ -283,7 +307,7 @@ const SIDEBAR_GROUPS = [
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
   { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
   { label: "Tienda", keys: ["paymentReceived"] },
-  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward"] },
+  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
   { label: "Seguimiento", keys: ["followUpReminder"] },
   { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
@@ -303,6 +327,8 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   clientNoShowAck: "aviso_no_asistencia",
   loyaltyServiceReward: "premio_fidelidad",
   loyaltyReferralReward: "premio_referidos",
+  loyaltyServiceProgress: "progreso_fidelidad",
+  loyaltyReferralProgress: "progreso_referidos",
   birthdayGreeting: "cumpleanos_cliente",
   followUpReminder: "recordatorio_seguimiento",
   paymentReceived: "pago_recibido",
@@ -353,6 +379,8 @@ export default function WhatsappTemplateEditor() {
     clientNoShowAck: true,
     loyaltyServiceReward: true,
     loyaltyReferralReward: true,
+    loyaltyServiceProgress: false,
+    loyaltyReferralProgress: false,
     birthdayGreeting: false,
     followUpReminder: false,
     paymentReceived: true,
@@ -457,6 +485,9 @@ export default function WhatsappTemplateEditor() {
         clientNoShowAck: templateSettings.clientNoShowAck,
         loyaltyServiceReward: templateSettings.loyaltyServiceReward,
         loyaltyReferralReward: templateSettings.loyaltyReferralReward,
+        // 📊 Progreso de fidelidad — nuevo, default false; siempre en el payload por el mismo motivo que paymentReceived
+        loyaltyServiceProgress: templateSettings.loyaltyServiceProgress ?? false,
+        loyaltyReferralProgress: templateSettings.loyaltyReferralProgress ?? false,
         birthdayGreeting: templateSettings.birthdayGreeting,
         followUpReminder: templateSettings.followUpReminder,
         // 🛍️ Pago recibido (tienda) — el backend REEMPLAZA todo enabledTypes,
@@ -836,6 +867,8 @@ export default function WhatsappTemplateEditor() {
                             {[
                               { key: "loyaltyServiceReward", label: "Premio de fidelidad (servicios)", desc: "Al completar meta de servicios" },
                               { key: "loyaltyReferralReward", label: "Premio de referidos", desc: "Al completar meta de referidos" },
+                              { key: "loyaltyServiceProgress", label: "Progreso de fidelidad (servicios)", desc: "Al registrar un servicio, antes de completar la meta" },
+                              { key: "loyaltyReferralProgress", label: "Progreso de referidos", desc: "Al registrar un referido, antes de completar la meta" },
                             ].map(({ key, label, desc }) => (
                               <Paper key={key} withBorder p="sm" radius="md">
                                 <Group justify="space-between">

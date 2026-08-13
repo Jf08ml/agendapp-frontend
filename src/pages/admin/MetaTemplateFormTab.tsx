@@ -54,6 +54,7 @@ export interface MetaTemplateStatus {
 // {{employee}}→{{profesional}}, {{cancellationLink}}→{{enlace_cancelacion}},
 // {{manage_block}}→{{enlace_gestion}}, {{appointments_list}}/{{appointmentsList}}→{{lista_citas}},
 // {{reward}}→{{premio}}, {{count}}→{{cantidad_citas}},
+// {{currentCount}}→{{cantidad_actual}}, {{remaining}}→{{faltantes}}, {{nextReward}}→{{proximo_premio}},
 // {{cita_pal}}→{{cita_o_citas}}, {{agendada_pal}}→{{agendada_o_agendadas}},
 // {{recommendations}}→{{recomendaciones}}
 
@@ -166,6 +167,24 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "🎉 ¡Felicitaciones, {{nombre_cliente}}!\n\nHas alcanzado tu meta de referidos en *{{nombre_negocio}}*.\n\n🎁 Tu recompensa: *{{premio}}*\n\nPreséntate en tu próxima visita y reclama tu beneficio. ¡Gracias por recomendar nuestros servicios!",
     footerText: "",
   },
+  loyaltyServiceProgress: {
+    name: "progreso_fidelidad",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Servicio registrado",
+    bodyText:
+      "✅ ¡Hola, {{nombre_cliente}}!\n\nSe registró tu servicio en *{{nombre_negocio}}*.\n\n📊 Llevas *{{cantidad_actual}}* — te faltan *{{faltantes}}* para tu próximo premio: *{{proximo_premio}}*.\n\n¡Gracias por tu preferencia! 💖",
+    footerText: "",
+  },
+  loyaltyReferralProgress: {
+    name: "progreso_referidos",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Referido registrado",
+    bodyText:
+      "✅ ¡Hola, {{nombre_cliente}}!\n\nSe registró tu referido en *{{nombre_negocio}}*.\n\n📊 Llevas *{{cantidad_actual}}* — te faltan *{{faltantes}}* para tu próximo premio: *{{proximo_premio}}*.\n\n¡Gracias por recomendarnos! 🎁",
+    footerText: "",
+  },
   // 📚 Módulo de Clases
   classEnrollmentConfirmed: {
     name: "clase_confirmada",
@@ -269,6 +288,9 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   lista_citas: "Pestañas - lunes 13/01 a las 10:00 AM",
   servicio: "Pestañas pelo a pelo",
   premio: "Servicio gratuito",
+  cantidad_actual: "3",
+  faltantes: "2",
+  proximo_premio: "Servicio gratuito",
   recomendaciones: "Evita mojar las pestañas las primeras 24h.",
   cantidad_citas: "2",
   cita_o_citas: "citas",

@@ -87,6 +87,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
       : [],
   },
   autoMarkAttended: response.autoMarkAttended ?? true,
+  autoRegisterServiceOnAttendance: response.autoRegisterServiceOnAttendance ?? true,
   currency: response.currency ?? "COP",
   timeFormat: response.timeFormat ?? "12h",
   aiAssistantName: response.aiAssistantName ?? "Roxi",

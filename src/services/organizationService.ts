@@ -186,6 +186,7 @@ export interface Organization {
   homeLayout?: "modern" | "minimal" | "cards" | "landing" | "academy";
   reminderSettings?: ReminderSettings;
   autoMarkAttended?: boolean;
+  autoRegisterServiceOnAttendance?: boolean;
   cancellationPolicy?: CancellationPolicy;
   termsAndConditions?: {
     enabled?: boolean;

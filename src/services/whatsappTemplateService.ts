@@ -20,6 +20,8 @@ export interface WhatsappTemplates {
   clientNoShowAck: WhatsappTemplate;
   loyaltyServiceReward: WhatsappTemplate;
   loyaltyReferralReward: WhatsappTemplate;
+  loyaltyServiceProgress: WhatsappTemplate;
+  loyaltyReferralProgress: WhatsappTemplate;
   // 📚 Módulo de Clases (opcionales: el editor de clases las consume)
   classEnrollmentConfirmed?: WhatsappTemplate;
   classEnrollmentPending?: WhatsappTemplate;
@@ -54,6 +56,8 @@ export interface TemplatesResponse {
     clientNoShowAck: string;
     loyaltyServiceReward: string;
     loyaltyReferralReward: string;
+    loyaltyServiceProgress: string;
+    loyaltyReferralProgress: string;
     classEnrollmentConfirmed?: string;
     classEnrollmentPending?: string;
     classEnrollmentCancelled?: string;
@@ -80,6 +84,8 @@ export interface WhatsappTemplateSettings {
   clientNoShowAck?: boolean;
   loyaltyServiceReward?: boolean;
   loyaltyReferralReward?: boolean;
+  loyaltyServiceProgress?: boolean;
+  loyaltyReferralProgress?: boolean;
   // 📚 Módulo de Clases
   classEnrollmentConfirmed?: boolean;
   classEnrollmentPending?: boolean;

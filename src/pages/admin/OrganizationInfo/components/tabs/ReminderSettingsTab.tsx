@@ -209,6 +209,12 @@ export default function ReminderSettingsTab({
               Si desactivas esta opción, deberás marcar manualmente cada cita para que cuente en los reportes.
             </Text>
           </Alert>
+          <Switch
+            label="Registrar servicio de fidelidad automáticamente"
+            description='Cuando el proceso nocturno marca una cita como "Asistió", registra también el servicio en el plan de fidelidad del cliente. Si está desactivado, el registro de fidelidad debe hacerse manualmente en Gestión de clientes.'
+            {...form.getInputProps("autoRegisterServiceOnAttendance", { type: "checkbox" })}
+            disabled={!isEditing || !form.values.autoMarkAttended}
+          />
         </Stack>
       </SectionCard>
     </Stack>
