@@ -39,7 +39,16 @@ import {
 } from "@tabler/icons-react";
 import { RootState } from "../../../app/store";
 import { selectOrganization } from "../../../features/organization/sliceOrganization";
-import { Client, RewardHistoryEntry, redeemReward } from "../../../services/clientService";
+import {
+  Client,
+  RewardHistoryEntry,
+  redeemReward,
+  ClientFollowUpStatus,
+  FollowUpPendingEntry,
+  FollowUpProcessedEntry,
+  FollowUpOutcome,
+  getClientFollowUpStatus,
+} from "../../../services/clientService";
 import {
   Appointment,
   getAppointmentsByClient,
@@ -90,6 +99,28 @@ const getStatusBadge = (status: string) => {
     default:
       return { label: status, color: "gray" };
   }
+};
+
+const getFollowUpOutcomeBadge = (outcome: FollowUpOutcome | null) => {
+  switch (outcome) {
+    case "sent":
+      return { label: "Enviado", color: "teal" };
+    case "skipped_already_returned":
+      return { label: "No enviado — ya volvió", color: "blue" };
+    case "skipped_no_phone":
+      return { label: "No enviado — sin teléfono", color: "gray" };
+    case "skipped_superseded":
+      return { label: "No enviado — otra cita tuvo prioridad", color: "gray" };
+    default:
+      return { label: "Desconocido (histórico)", color: "gray" };
+  }
+};
+
+const getFollowUpPendingBadge = (entry: FollowUpPendingEntry) => {
+  if (entry.windowState === "expired") return { label: "Vencido sin procesar", color: "red" };
+  if (entry.windowState === "upcoming") return { label: "Programado", color: "yellow" };
+  if (entry.preview?.wouldSend) return { label: "Se enviará hoy", color: "green" };
+  return { label: "No se enviará", color: "gray" };
 };
 
 function confirmAction(action: () => void, title: string, message: string, color: string) {
@@ -182,12 +213,19 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
   // ── Premios ────────────────────────────────────────────────────────────
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
 
+  // ── Seguimientos ───────────────────────────────────────────────────────
+  const [followUpStatus, setFollowUpStatus] = useState<ClientFollowUpStatus | null>(null);
+  const [loadingFollowUp, setLoadingFollowUp] = useState(false);
+  const [followUpLoadedForClientId, setFollowUpLoadedForClientId] = useState<string | null>(null);
+
   // Reset lo efímero cada vez que cambia el cliente mostrado (o se cierra)
   useEffect(() => {
     setActiveTab("resumen");
     setAppointments([]);
     setCitasLoadedForClientId(null);
     setStatusFilter("");
+    setFollowUpStatus(null);
+    setFollowUpLoadedForClientId(null);
   }, [client?._id]);
 
   const fetchAppointments = async (clientId: string, status: string) => {
@@ -217,6 +255,28 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     setStatusFilter(next);
     if (client) void fetchAppointments(client._id, next);
   };
+
+  const fetchFollowUpStatus = async (clientId: string) => {
+    setLoadingFollowUp(true);
+    try {
+      const res = await getClientFollowUpStatus(clientId);
+      setFollowUpStatus(res ?? null);
+      setFollowUpLoadedForClientId(clientId);
+    } catch (err) {
+      console.error("Error obteniendo el estado de recordatorios de seguimiento:", err);
+      setFollowUpStatus(null);
+    } finally {
+      setLoadingFollowUp(false);
+    }
+  };
+
+  // Fetch perezoso: solo la primera vez que se activa la pestaña Seguimientos
+  useEffect(() => {
+    if (activeTab === "seguimientos" && client && followUpLoadedForClientId !== client._id) {
+      void fetchFollowUpStatus(client._id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, client?._id]);
 
   const getMostTakenServiceType = () => {
     if (appointments.length === 0) return "—";
@@ -364,6 +424,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           <Tabs.List mb="md">
             <Tabs.Tab value="resumen">Resumen</Tabs.Tab>
             <Tabs.Tab value="citas">Citas</Tabs.Tab>
+            <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
             <Tabs.Tab value="premios">Premios</Tabs.Tab>
           </Tabs.List>
 
@@ -531,6 +592,64 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             )}
           </Tabs.Panel>
 
+          {/* ── Seguimientos ── */}
+          <Tabs.Panel value="seguimientos">
+            {loadingFollowUp ? (
+              <Center py="xl"><Loader size="md" /></Center>
+            ) : !followUpStatus || !followUpStatus.organizationHasRules ? (
+              <Text c="dimmed" ta="center" py="md">
+                Tu organización no tiene ningún servicio con recordatorio de seguimiento configurado.
+              </Text>
+            ) : followUpStatus.pending.length === 0 && followUpStatus.processed.length === 0 ? (
+              <Text c="dimmed" ta="center" py="md">
+                Este cliente no tiene citas asociadas a un servicio con seguimiento configurado.
+              </Text>
+            ) : (
+              <Stack gap="md">
+                {followUpStatus.pending.length > 0 && (
+                  <Paper withBorder radius="md" p="md">
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Próximos</Text>
+                    <Stack gap="sm">
+                      {followUpStatus.pending.map((entry) => (
+                        <PendingFollowUpCard
+                          key={entry.appointmentId}
+                          entry={entry}
+                          timezone={timezone}
+                        />
+                      ))}
+                    </Stack>
+                  </Paper>
+                )}
+
+                {followUpStatus.processed.filter((p) => p.outcome === "sent").length > 0 && (
+                  <Paper withBorder radius="md" p="md">
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Enviados</Text>
+                    <Stack gap="sm">
+                      {followUpStatus.processed
+                        .filter((p) => p.outcome === "sent")
+                        .map((entry) => (
+                          <ProcessedFollowUpCard key={entry.appointmentId} entry={entry} timezone={timezone} />
+                        ))}
+                    </Stack>
+                  </Paper>
+                )}
+
+                {followUpStatus.processed.filter((p) => p.outcome !== "sent").length > 0 && (
+                  <Paper withBorder radius="md" p="md">
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">No enviados</Text>
+                    <Stack gap="sm">
+                      {followUpStatus.processed
+                        .filter((p) => p.outcome !== "sent")
+                        .map((entry) => (
+                          <ProcessedFollowUpCard key={entry.appointmentId} entry={entry} timezone={timezone} />
+                        ))}
+                    </Stack>
+                  </Paper>
+                )}
+              </Stack>
+            )}
+          </Tabs.Panel>
+
           {/* ── Premios ── */}
           <Tabs.Panel value="premios">
             {rewardsList.length === 0 ? (
@@ -633,6 +752,57 @@ function RewardCard({
             Canjear
           </Button>
         )}
+      </Group>
+    </Paper>
+  );
+}
+
+// ── Tarjeta de recordatorio de seguimiento pendiente/programado ──────────
+function PendingFollowUpCard({ entry, timezone }: { entry: FollowUpPendingEntry; timezone: string }) {
+  const badge = getFollowUpPendingBadge(entry);
+  const fmt = (d: string) => new Date(d).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric", timeZone: timezone });
+
+  return (
+    <Paper withBorder radius="md" p="sm">
+      <Group justify="space-between" wrap="nowrap" align="flex-start">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" fw={500}>
+            🔁 {entry.triggerService.name} → {entry.followUpService?.name ?? "—"}
+          </Text>
+          <Text size="xs" c="dimmed">
+            Cita del {fmt(entry.startDate)} · seguimiento a los {entry.followUpDays} días
+          </Text>
+          <Text size="xs" c="dimmed">
+            Fecha proyectada: {fmt(entry.projectedDate)}
+          </Text>
+          {entry.preview && (
+            <Text size="xs" c="dimmed" mt={2}>{entry.preview.reason}</Text>
+          )}
+        </Box>
+        <Badge size="xs" color={badge.color} variant="filled">{badge.label}</Badge>
+      </Group>
+    </Paper>
+  );
+}
+
+// ── Tarjeta de recordatorio de seguimiento ya procesado (enviado o no) ───
+function ProcessedFollowUpCard({ entry, timezone }: { entry: FollowUpProcessedEntry; timezone: string }) {
+  const badge = getFollowUpOutcomeBadge(entry.outcome);
+  const fmt = (d: string) => new Date(d).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric", timeZone: timezone });
+
+  return (
+    <Paper withBorder radius="md" p="sm">
+      <Group justify="space-between" wrap="nowrap" align="flex-start">
+        <Box style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" fw={500}>
+            🔁 {entry.triggerService.name} → {entry.followUpService?.name ?? "—"}
+          </Text>
+          <Text size="xs" c="dimmed">Cita del {fmt(entry.startDate)}</Text>
+          <Text size="xs" c="dimmed">
+            {entry.processedAt ? `Procesado el ${fmt(entry.processedAt)}` : "Procesado antes de que se registrara la fecha"}
+          </Text>
+        </Box>
+        <Badge size="xs" color={badge.color} variant="filled">{badge.label}</Badge>
       </Group>
     </Paper>
   );

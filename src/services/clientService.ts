@@ -47,6 +47,40 @@ interface Response<T> {
   message: string;
 }
 
+// 🔁 Estado de recordatorios de seguimiento entre servicios (ver GET /clients/:id/follow-up-status)
+export interface FollowUpServiceRef {
+  _id: string;
+  name: string;
+}
+
+export interface FollowUpPendingEntry {
+  appointmentId: string;
+  triggerService: FollowUpServiceRef;
+  followUpService: FollowUpServiceRef | null;
+  followUpDays: number;
+  startDate: string;
+  projectedDate: string;
+  windowState: 'upcoming' | 'due' | 'expired';
+  preview: { wouldSend: boolean; reason: string } | null;
+}
+
+export type FollowUpOutcome = 'sent' | 'skipped_already_returned' | 'skipped_no_phone' | 'skipped_superseded';
+
+export interface FollowUpProcessedEntry {
+  appointmentId: string;
+  triggerService: FollowUpServiceRef;
+  followUpService: FollowUpServiceRef | null;
+  startDate: string;
+  outcome: FollowUpOutcome | null;
+  processedAt: string | null;
+}
+
+export interface ClientFollowUpStatus {
+  organizationHasRules: boolean;
+  pending: FollowUpPendingEntry[];
+  processed: FollowUpProcessedEntry[];
+}
+
 // Obtener todos los clientes
 export const getClients = async (): Promise<Client[]> => {
   try {
@@ -102,6 +136,20 @@ export const getClientById = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al obtener el cliente");
+  }
+};
+
+// Obtener el estado de recordatorios de seguimiento de un cliente (próximos/enviados/no enviados)
+export const getClientFollowUpStatus = async (
+  clientId: string
+): Promise<ClientFollowUpStatus | undefined> => {
+  try {
+    const response = await apiClient.get<Response<ClientFollowUpStatus>>(
+      `/${clientId}/follow-up-status`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener el estado de recordatorios de seguimiento");
   }
 };
 
