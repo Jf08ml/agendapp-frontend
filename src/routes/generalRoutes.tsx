@@ -38,13 +38,14 @@ import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
 import SuperadminAnnouncements from "../pages/superadmin/SuperadminAnnouncements";
+import SuperadminFeatureRequests from "../pages/superadmin/SuperadminFeatureRequests";
 import SuperadminAnalytics from "../pages/superadmin/SuperadminAnalytics";
 import SuperadminChatbots from "../pages/superadmin/SuperadminChatbots";
 import SuperadminOnboarding from "../pages/superadmin/SuperadminOnboarding";
 import SuperadminImpactReports from "../pages/superadmin/SuperadminImpactReports";
 import SuperadminWaInbox from "../pages/superadmin/SuperadminWaInbox";
 import AuditLogPage from "../pages/admin/auditLog";
-import SystemUpdates from "../pages/admin/SystemUpdates";
+import NovedadesTabs from "../pages/admin/SystemUpdates/NovedadesTabs";
 import ManageClasses from "../pages/admin/classes";
 import InventoryPage from "../pages/admin/inventory";
 import ClassBookingWizard from "../pages/public/ClassBookingPage";
@@ -515,7 +516,7 @@ const generalRoutes = [
     path: "/novedades",
     component: (props: JSX.IntrinsicAttributes) => (
       <ProtectedRoute>
-        <SystemUpdates {...props} />
+        <NovedadesTabs {...props} />
       </ProtectedRoute>
     ),
     MediaMetadata: {
@@ -573,6 +574,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Anuncios del sistema",
       description: "Gestiona las novedades visibles para los administradores",
+    },
+  },
+  {
+    path: "/superadmin/solicitudes",
+    component: SuperadminFeatureRequests,
+    MediaMetadata: {
+      title: "Solicitudes de mejora",
+      description: "Triage de pedidos de mejora enviados por las organizaciones",
     },
   },
   {

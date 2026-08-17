@@ -10,6 +10,7 @@ import {
   IconBell,
   IconTrophy,
   IconBrandWhatsapp,
+  IconBulb,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -27,6 +28,7 @@ const NAV_ITEMS: { label: string; to: string; icon: React.ReactNode }[] = [
   { label: "Activación", to: "/superadmin/activacion", icon: <IconRocket size={16} /> },
   { label: "Impacto", to: "/superadmin/impacto", icon: <IconTrophy size={16} /> },
   { label: "Anuncios", to: "/superadmin/anuncios", icon: <IconBell size={16} /> },
+  { label: "Solicitudes", to: "/superadmin/solicitudes", icon: <IconBulb size={16} /> },
 ];
 
 export default function SuperadminNav() {
