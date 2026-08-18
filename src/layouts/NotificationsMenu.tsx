@@ -28,9 +28,10 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import { FaBell, FaCalendarAlt, FaTrash, FaCheckSquare } from "react-icons/fa";
+import { FaBell, FaCalendarAlt, FaTrash, FaCheckSquare, FaClock } from "react-icons/fa";
 import { MdCardMembership, MdCancel } from "react-icons/md";
 import NotificationToggle from "./NotificationToggle";
+import EmployeeReminderPreference from "./EmployeeReminderPreference";
 
 type NotificationsMenuProps = {
   /** Si se pasa, esto será el botón/trigger del menú.
@@ -280,6 +281,8 @@ export default function NotificationsMenu({
         return <MdCardMembership color="#ff6b6b" />;
       case "cancellation":
         return <MdCancel color="#e74c3c" />;
+      case "reminder":
+        return <FaClock color="#f39c12" />;
       default:
         return <FaBell color="#0984e3" />;
     }
@@ -355,7 +358,10 @@ export default function NotificationsMenu({
 
       <Menu.Dropdown>
         <Flex justify="space-between" align="center" mb="xs">
-          <NotificationToggle userId={auth.userId ?? ""} />
+          <Flex direction="column" gap={6}>
+            <NotificationToggle userId={auth.userId ?? ""} />
+            {auth.role !== "admin" && <EmployeeReminderPreference />}
+          </Flex>
           <Flex gap="xs">
             <Tooltip label="Modo selección (eliminar múltiples)">
               <ActionIcon

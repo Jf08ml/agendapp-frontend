@@ -53,6 +53,12 @@ interface CreateEmployeePayload {
   commissionValue?: number;
 }
 
+// Preferencia de recordatorio de cita del propio profesional (in-app + push)
+export interface EmployeeReminderPreferences {
+  enabled: boolean;
+  hoursBefore: 1 | 2 | 6 | 24;
+}
+
 interface Response<T> {
   code: number;
   status: string;
@@ -137,5 +143,34 @@ export const deleteEmployee = async (employeeId: string): Promise<void> => {
     await apiEmployee.delete<Response<void>>(`/${employeeId}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar el profesional");
+  }
+};
+
+// Obtener la preferencia de recordatorio de cita del profesional autenticado
+export const getMyReminderPreferences = async (): Promise<
+  EmployeeReminderPreferences | undefined
+> => {
+  try {
+    const response = await apiEmployee.get<Response<EmployeeReminderPreferences>>(
+      "/me/reminder-preferences"
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener la preferencia de recordatorio");
+  }
+};
+
+// Actualizar la preferencia de recordatorio de cita del profesional autenticado
+export const updateMyReminderPreferences = async (
+  data: Partial<EmployeeReminderPreferences>
+): Promise<EmployeeReminderPreferences | undefined> => {
+  try {
+    const response = await apiEmployee.put<Response<EmployeeReminderPreferences>>(
+      "/me/reminder-preferences",
+      data
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al actualizar la preferencia de recordatorio");
   }
 };

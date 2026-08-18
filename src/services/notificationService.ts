@@ -9,7 +9,7 @@ export interface Notification {
   employeeId?: string;
   organizationId: string;
   status: "unread" | "read";
-  type: "reservation" | "membership";
+  type: "reservation" | "membership" | "system" | "cancellation" | "confirmation" | "payment" | "reminder";
   frontendRoute: string;
   createdAt: Date;
   updatedAt: Date;
