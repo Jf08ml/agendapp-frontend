@@ -14,7 +14,7 @@ import {
   ThemeIcon,
   Paper,
 } from "@mantine/core";
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { showNotification } from "@mantine/notifications";
 import { IconShoppingCart, IconTrash, IconPlus } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
@@ -73,6 +73,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
     (state: RootState) => state.organization.organization
   );
   const currency = organization?.currency || "COP";
+  const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const [loadedProducts, setLoadedProducts] = useState<Product[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -236,6 +237,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
       centered
       radius="md"
       overlayProps={{ blur: 2 }}
+      fullScreen={isMobile}
     >
       <Stack gap="md">
         <Stack gap="xs">
@@ -243,53 +245,75 @@ const SaleModal: React.FC<SaleModalProps> = ({
             Productos
           </Text>
           {items.map((row, idx) => (
-            <Group key={idx} gap="xs" align="flex-end" wrap="nowrap">
-              <Select
-                placeholder="Selecciona un producto"
-                data={productSelectData}
-                value={row.productId}
-                onChange={(v) => handleProductChange(idx, v)}
-                searchable
-                style={{ flex: 1 }}
-                nothingFoundMessage="Sin productos"
-              />
-              <NumberInput
-                placeholder="Cant."
-                value={row.quantity}
-                onChange={(v) =>
-                  updateItem(idx, {
-                    quantity: typeof v === "number" ? v : 1,
-                  })
-                }
-                min={1}
-                w={80}
-              />
-              <NumberInput
-                placeholder="Precio"
-                prefix="$ "
-                thousandSeparator="."
-                decimalSeparator=","
-                value={row.unitPrice}
-                onChange={(v) =>
-                  updateItem(idx, {
-                    unitPrice: typeof v === "number" ? v : 0,
-                  })
-                }
-                min={0}
-                w={130}
-              />
-              {items.length > 1 && (
-                <ActionIcon
-                  color="red"
-                  variant="light"
-                  onClick={() =>
-                    setItems((prev) => prev.filter((_, i) => i !== idx))
+            <Stack key={idx} gap={6}>
+              <Group gap="xs" align="flex-end" wrap="nowrap">
+                <Select
+                  placeholder="Selecciona un producto"
+                  data={productSelectData}
+                  value={row.productId}
+                  onChange={(v) => handleProductChange(idx, v)}
+                  searchable
+                  style={{ flex: 1 }}
+                  nothingFoundMessage="Sin productos"
+                />
+                {!isMobile && items.length > 1 && (
+                  <ActionIcon
+                    color="red"
+                    variant="light"
+                    onClick={() =>
+                      setItems((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                )}
+              </Group>
+              <Group gap="xs" align="flex-end" wrap="nowrap">
+                <NumberInput
+                  label={isMobile ? "Cantidad" : undefined}
+                  placeholder="Cant."
+                  value={row.quantity}
+                  onChange={(v) =>
+                    updateItem(idx, {
+                      quantity: typeof v === "number" ? v : 1,
+                    })
                   }
-                >
-                  <IconTrash size={16} />
-                </ActionIcon>
+                  min={1}
+                  w={isMobile ? undefined : 80}
+                  style={isMobile ? { flex: 1 } : undefined}
+                />
+                <NumberInput
+                  label={isMobile ? "Precio" : undefined}
+                  placeholder="Precio"
+                  prefix="$ "
+                  thousandSeparator="."
+                  decimalSeparator=","
+                  value={row.unitPrice}
+                  onChange={(v) =>
+                    updateItem(idx, {
+                      unitPrice: typeof v === "number" ? v : 0,
+                    })
+                  }
+                  min={0}
+                  w={isMobile ? undefined : 130}
+                  style={isMobile ? { flex: 1.3 } : undefined}
+                />
+                {isMobile && items.length > 1 && (
+                  <ActionIcon
+                    color="red"
+                    variant="light"
+                    onClick={() =>
+                      setItems((prev) => prev.filter((_, i) => i !== idx))
+                    }
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                )}
+              </Group>
+              {isMobile && items.length > 1 && idx < items.length - 1 && (
+                <Divider variant="dashed" my={2} />
               )}
-            </Group>
+            </Stack>
           ))}
           <Button
             size="xs"
