@@ -1,6 +1,9 @@
 import React from "react";
+import { useSelector } from "react-redux";
 import { Avatar, Badge, Box, Group, Paper, Text, Tooltip, ActionIcon } from "@mantine/core";
 import { IconChevronRight, IconGift, IconUserPlus, IconCirclePlus } from "@tabler/icons-react";
+import { RootState } from "../../../app/store";
+import { selectOrganization } from "../../../features/organization/sliceOrganization";
 import { Client } from "../../../services/clientService";
 import { getCountryFlag } from "../../../utils/countryHelper";
 
@@ -14,7 +17,9 @@ interface ClientListItemProps {
 
 const ClientListItem: React.FC<ClientListItemProps> = React.memo(
   ({ client, isMobile, onOpenDetail, onRegisterService, onReferral }) => {
-    const rewardReady = !!(client.hasServiceDiscount || client.hasReferralBenefit);
+    const organization = useSelector((state: RootState) => selectOrganization(state));
+    const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
+    const rewardReady = loyaltyEnabled && !!(client.hasServiceDiscount || client.hasReferralBenefit);
     const iconSize = isMobile ? "lg" : "md";
 
     return (
@@ -51,7 +56,7 @@ const ClientListItem: React.FC<ClientListItemProps> = React.memo(
             </Box>
           </Group>
 
-          {!isMobile && (
+          {!isMobile && loyaltyEnabled && (
             <Group gap={6} wrap="nowrap">
               <Badge variant="light" color="dark" size="sm">
                 {client.servicesTaken} servicios
@@ -78,7 +83,7 @@ const ClientListItem: React.FC<ClientListItemProps> = React.memo(
           <IconChevronRight size={16} color="var(--mantine-color-gray-5)" style={{ flexShrink: 0 }} />
         </Group>
 
-        {isMobile && (
+        {isMobile && loyaltyEnabled && (
           <Group gap={6} mt="xs">
             <Badge variant="light" color="dark" size="sm">
               {client.servicesTaken} servicios

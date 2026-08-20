@@ -431,27 +431,29 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
           {/* ── Resumen ── */}
           <Tabs.Panel value="resumen">
             <Stack gap="md">
-              <Paper withBorder radius="md" p="md">
-                <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Fidelidad</Text>
-                <Stack gap="md">
-                  <CompactLoyaltyCard
-                    label="Servicios tomados"
-                    color="blue"
-                    count={client.servicesTaken}
-                    tiers={organization?.serviceTiers}
-                    legacyThreshold={organization?.serviceCount}
-                    legacyReward={organization?.serviceReward}
-                  />
-                  <CompactLoyaltyCard
-                    label="Referidos hechos"
-                    color="grape"
-                    count={client.referralsMade}
-                    tiers={organization?.referralTiers}
-                    legacyThreshold={organization?.referredCount}
-                    legacyReward={organization?.referredReward}
-                  />
-                </Stack>
-              </Paper>
+              {organization?.showLoyaltyProgram !== false && (
+                <Paper withBorder radius="md" p="md">
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Fidelidad</Text>
+                  <Stack gap="md">
+                    <CompactLoyaltyCard
+                      label="Servicios tomados"
+                      color="blue"
+                      count={client.servicesTaken}
+                      tiers={organization?.serviceTiers}
+                      legacyThreshold={organization?.serviceCount}
+                      legacyReward={organization?.serviceReward}
+                    />
+                    <CompactLoyaltyCard
+                      label="Referidos hechos"
+                      color="grape"
+                      count={client.referralsMade}
+                      tiers={organization?.referralTiers}
+                      legacyThreshold={organization?.referredCount}
+                      legacyReward={organization?.referredReward}
+                    />
+                  </Stack>
+                </Paper>
+              )}
 
               <SimpleGrid cols={2} spacing="sm">
                 <Button
