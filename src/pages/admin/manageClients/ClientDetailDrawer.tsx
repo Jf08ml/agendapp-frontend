@@ -111,6 +111,8 @@ const getFollowUpOutcomeBadge = (outcome: FollowUpOutcome | null) => {
       return { label: "No enviado — sin teléfono", color: "gray" };
     case "skipped_superseded":
       return { label: "No enviado — otra cita tuvo prioridad", color: "gray" };
+    case "failed_max_retries":
+      return { label: "No enviado — sin confirmación tras varios intentos", color: "red" };
     default:
       return { label: "Desconocido (histórico)", color: "gray" };
   }

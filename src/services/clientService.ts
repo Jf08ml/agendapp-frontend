@@ -64,7 +64,12 @@ export interface FollowUpPendingEntry {
   preview: { wouldSend: boolean; reason: string } | null;
 }
 
-export type FollowUpOutcome = 'sent' | 'skipped_already_returned' | 'skipped_no_phone' | 'skipped_superseded';
+export type FollowUpOutcome =
+  | 'sent'
+  | 'skipped_already_returned'
+  | 'skipped_no_phone'
+  | 'skipped_superseded'
+  | 'failed_max_retries';
 
 export interface FollowUpProcessedEntry {
   appointmentId: string;
