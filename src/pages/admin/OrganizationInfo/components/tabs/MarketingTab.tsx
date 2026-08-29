@@ -1,5 +1,5 @@
 import { SimpleGrid, Stack, TextInput, Text, Alert, Accordion, List, Anchor } from "@mantine/core";
-import { IconBrandGoogle, IconTarget, IconInfoCircle, IconHelpCircle } from "@tabler/icons-react";
+import { IconBrandGoogle, IconTarget, IconInfoCircle, IconHelpCircle, IconCircleCheck } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -125,6 +125,32 @@ export default function MarketingTab({
             </Accordion.Item>
           </Accordion>
         </Stack>
+      </SectionCard>
+
+      <SectionCard
+        title="¿Cómo confirmo que quedó funcionando?"
+        icon={<IconCircleCheck size={16} />}
+        iconColor="teal"
+      >
+        <List size="sm" spacing={6}>
+          <List.Item>
+            Después de guardar, prueba en una <b>pestaña nueva o en modo incógnito</b> — no te
+            quedes probando dentro del panel de administración donde acabas de guardar. El tag se
+            registra una sola vez por carga de página, así que si no abres tu enlace de reserva
+            desde cero puede parecer que no funcionó aunque sí haya quedado bien guardado.
+          </List.Item>
+          <List.Item>
+            <b>Google Analytics:</b> entra a tu propiedad → Informes → <b>Tiempo real</b>, y navega
+            tu página de reserva desde la otra pestaña. Deberías verte como usuario activo en
+            cuestión de segundos.
+          </List.Item>
+          <List.Item>
+            <b>Google Ads:</b> ve a Herramientas → Conversiones. El estado suele decir "Sin
+            conversiones recientes" hasta que se registre una reserva real, y puede tardar algunas
+            horas en actualizarse a "Registrando conversiones" — no es instantáneo, así que no
+            asumas que está mal configurado solo por no verlo cambiar de inmediato.
+          </List.Item>
+        </List>
       </SectionCard>
 
       <Alert color="gray" variant="light" icon={<IconInfoCircle size={16} />}>
