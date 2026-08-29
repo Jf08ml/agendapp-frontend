@@ -295,6 +295,7 @@ export default function OrganizationInfo() {
             form={form}
             isEditing={true}
             domains={org.domains || []}
+            slug={org.slug}
           />
         </Tabs.Panel>
 

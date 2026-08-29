@@ -1,6 +1,8 @@
-import { SimpleGrid, Stack, TextInput, Textarea, Select, Text } from "@mantine/core";
-import { useMemo } from "react";
+import { SimpleGrid, Stack, TextInput, Textarea, Select, Text, Group, Button, Alert } from "@mantine/core";
+import { useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
+import { QRCodeCanvas } from "qrcode.react";
+import { showNotification } from "@mantine/notifications";
 import { RootState } from "../../../../../app/store";
 import {
   IconBuilding,
@@ -14,21 +16,53 @@ import {
   IconWriting,
   IconClockHour3,
   IconRobot,
+  IconQrcode,
+  IconCopy,
+  IconDownload,
+  IconAlertCircle,
 } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../../../../utils/geoData";
+import { getOrgUrl } from "../../../../../utils/domainUtils";
 
 export default function ContactTab({
   form,
   isEditing,
   domains,
+  slug,
 }: {
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
   domains: string[];
+  slug?: string;
 }) {
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const bookingUrl = useMemo(() => {
+    const base = getOrgUrl({ slug, domains });
+    return base ? `${base}/online-reservation` : null;
+  }, [slug, domains]);
+
+  const handleCopyLink = async () => {
+    if (!bookingUrl) return;
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      showNotification({ color: "green", message: "Enlace copiado" });
+    } catch {
+      showNotification({ color: "red", message: "No se pudo copiar el enlace" });
+    }
+  };
+
+  const handleDownloadQr = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `qr-reserva-online${slug ? `-${slug}` : ""}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
   // Listas completas memoizadas (ya están memoizadas en geoData, pero useMemo
   // evita recalcular el .map() del Select en cada render).
   const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
@@ -125,6 +159,62 @@ export default function ContactTab({
             disabled
           />
         </SimpleGrid>
+      </SectionCard>
+
+      <SectionCard
+        title="Reserva en línea: enlace y código QR"
+        description="Comparte este enlace o el código QR para que tus clientes agenden citas directamente, sin pasar por tu página de inicio."
+        icon={<IconQrcode size={16} />}
+        iconColor="grape"
+      >
+        {bookingUrl ? (
+          <Stack gap="md">
+            <Group align="flex-start" gap="xl" wrap="wrap">
+              <QRCodeCanvas
+                ref={qrCanvasRef}
+                value={bookingUrl}
+                size={180}
+                level="Q"
+                marginSize={2}
+              />
+              <Stack gap="xs" style={{ flex: 1, minWidth: 240 }}>
+                <TextInput
+                  label="Enlace de reserva en línea"
+                  value={bookingUrl}
+                  readOnly
+                  leftSection={<IconLink size={16} />}
+                />
+                <Group gap="xs">
+                  <Button
+                    variant="light"
+                    size="xs"
+                    leftSection={<IconCopy size={14} />}
+                    onClick={handleCopyLink}
+                  >
+                    Copiar enlace
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="xs"
+                    leftSection={<IconDownload size={14} />}
+                    onClick={handleDownloadQr}
+                  >
+                    Descargar QR (PNG)
+                  </Button>
+                </Group>
+                <Text size="xs" c="dimmed">
+                  Este código no cambia mientras no cambie tu dominio o subdominio: puedes
+                  imprimirlo una sola vez y reutilizarlo indefinidamente.
+                </Text>
+              </Stack>
+            </Group>
+          </Stack>
+        ) : (
+          <Alert color="yellow" icon={<IconAlertCircle size={16} />}>
+            No se pudo determinar el enlace público de tu negocio. Contacta a soporte para
+            configurar tu subdominio.
+          </Alert>
+        )}
       </SectionCard>
 
       <SectionCard

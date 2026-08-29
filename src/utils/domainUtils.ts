@@ -50,6 +50,21 @@ export function extractTenantFromHost(
 }
 
 /**
+ * Enlace público de la organización: prioriza su dominio propio (domains[0]);
+ * si no tiene, cae al subdominio {slug}.agenditapp.com. null si no tiene ninguno.
+ */
+export function getOrgUrl(org: { slug?: string; domains?: string[] }): string | null {
+  if (Array.isArray(org.domains) && org.domains.length > 0 && org.domains[0]) {
+    const domain = org.domains[0].replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return `https://${domain}`;
+  }
+  if (org.slug) {
+    return `https://${org.slug}.${MAIN_DOMAIN}`;
+  }
+  return null;
+}
+
+/**
  * Genera la URL de redirect post-signup.
  * En producción: https://{slug}.agenditapp.com/exchange?code={code}
  * En dev: http://localhost:{port}/exchange?code={code}&slug={slug}

@@ -40,20 +40,7 @@ import {
 import { uploadImage } from "../../services/imageService";
 import { TimeInput } from "@mantine/dates";
 import { apiGeneral } from "../../services/axiosConfig";
-import { MAIN_DOMAIN } from "../../utils/domainUtils";
-
-// Enlace público de la organización: prioriza su primer dominio propio;
-// si no tiene, cae al subdominio {slug}.agenditapp.com.
-const getOrgUrl = (org: Organization): string | null => {
-  if (Array.isArray(org.domains) && org.domains.length > 0 && org.domains[0]) {
-    const domain = org.domains[0].replace(/^https?:\/\//, "").replace(/\/$/, "");
-    return `https://${domain}`;
-  }
-  if (org.slug) {
-    return `https://${org.slug}.${MAIN_DOMAIN}`;
-  }
-  return null;
-};
+import { getOrgUrl } from "../../utils/domainUtils";
 
 type ActivityStatus = "unconfigured" | "no_appointments" | "active" | "inactive";
 
