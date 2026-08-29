@@ -153,6 +153,20 @@ export const schema = z.object({
   welcomeDescription: optionalString,
   homeLayout: z.enum(["modern", "minimal", "cards", "landing", "academy"]).optional(),
 
+  analyticsConfig: z
+    .object({
+      gaMeasurementId: z
+        .union([z.string().regex(/^G-[A-Za-z0-9]+$/, "Formato inválido (ej: G-ABC1234567)"), z.literal("")])
+        .optional(),
+      googleAdsId: z
+        .union([z.string().regex(/^AW-\d+$/, "Formato inválido (ej: AW-123456789)"), z.literal("")])
+        .optional(),
+      googleAdsConversionLabel: z
+        .union([z.string().regex(/^[A-Za-z0-9_-]+$/, "Solo letras, números, guiones y guion bajo"), z.literal("")])
+        .optional(),
+    })
+    .optional(),
+
   reminderSettings: z
     .object({
       enabled: z.boolean().optional(),

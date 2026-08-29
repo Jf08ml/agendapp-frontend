@@ -184,6 +184,13 @@ export interface Organization {
   welcomeTitle?: string;
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards" | "landing" | "academy";
+  // 📊 Tags de Google que la propia organización configura (GA4 + Google Ads),
+  // independientes del gtag propio de AgenditApp. No son secretos.
+  analyticsConfig?: {
+    gaMeasurementId?: string;
+    googleAdsId?: string;
+    googleAdsConversionLabel?: string;
+  };
   reminderSettings?: ReminderSettings;
   autoMarkAttended?: boolean;
   autoRegisterServiceOnAttendance?: boolean;

@@ -29,11 +29,14 @@ import {
   IconCircleX,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 import {
   submitReceipt,
   getOrderStatus,
   type ReceiptPaymentMethod,
 } from "../../services/collectionService";
+import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 // Pantalla de pago por transferencia + comprobante. El flujo de reserva/clase/
 // paquete navega aquí (react-router state) tras crear el Order manual; el cliente
@@ -99,6 +102,7 @@ export default function PublicReceiptPaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as ReceiptPaymentState | null;
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const [file, setFile] = useState<FileWithPath | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -168,6 +172,9 @@ export default function PublicReceiptPaymentPage() {
       setError(message);
       setView("upload");
       return;
+    }
+    if (result.autoApproved && (state.orderType ?? "reservation") === "reservation") {
+      trackReservationConversion(organization?.analyticsConfig);
     }
     setView(result.autoApproved ? "paid" : "review");
   };

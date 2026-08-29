@@ -11,6 +11,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
 import { extractTenantFromHost } from "./utils/domainUtils";
+import { registerOrgGoogleTags } from "./utils/orgGoogleTags";
 
 declare global {
   interface Window {
@@ -129,6 +130,10 @@ export default function AppWithBranding() {
     document.title = organization.name;
 
     if (!hasSentInitialPageView.current && window.gtag) {
+      // Registrar los tags propios de la org ANTES del page_view: gtag envía
+      // los eventos a todos los destinos ya configurados en el dataLayer.
+      registerOrgGoogleTags(organization.analyticsConfig);
+
       window.gtag("event", "page_view", {
         page_title: organization.name,
         page_location: window.location.href,
@@ -136,7 +141,7 @@ export default function AppWithBranding() {
       });
       hasSentInitialPageView.current = true;
     }
-  }, [organization?.name]);
+  }, [organization?.name, organization?.analyticsConfig]);
 
   useEffect(() => {
     if (organization?.branding?.themeColor) {

@@ -54,6 +54,7 @@ import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
+import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 type BookingMode = "choice" | "chat" | "manual";
 
@@ -301,6 +302,8 @@ export default function MultiBookingWizard() {
       }
 
       const result = await createMultipleReservations({ ...payload, source: "manual_booking" });
+
+      trackReservationConversion(organization?.analyticsConfig);
 
       let reservationIds: string[] = [];
       if (result && Array.isArray(result)) {

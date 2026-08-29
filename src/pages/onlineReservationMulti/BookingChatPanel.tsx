@@ -46,6 +46,7 @@ import { createMultipleReservations, createReservationCheckout } from "../../ser
 import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
 import { useNavigate } from "react-router-dom";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
+import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 interface BookingChatPanelProps {
   onBack: () => void;
@@ -209,6 +210,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         source: "ai_chatbot",
         chatSessionId: sessionId.current, // el backend marca la conversión server-side
       });
+      trackReservationConversion(org?.analyticsConfig);
       // Complemento (best-effort): el backend ya marcó la conversión en la misma
       // request, esto solo cubre el caso de que el endpoint server-side cambie.
       markBookingConverted(sessionId.current).catch(() => {});

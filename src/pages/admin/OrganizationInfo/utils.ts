@@ -49,6 +49,11 @@ export const normalizeOrg = (response: Organization): Organization => ({
     response.welcomeDescription ??
     "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
   homeLayout: response.homeLayout ?? "modern",
+  analyticsConfig: {
+    gaMeasurementId: response.analyticsConfig?.gaMeasurementId ?? "",
+    googleAdsId: response.analyticsConfig?.googleAdsId ?? "",
+    googleAdsConversionLabel: response.analyticsConfig?.googleAdsConversionLabel ?? "",
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   paymentMethods: ensureArray(response.paymentMethods as any, []),
   requireReservationDeposit: response.requireReservationDeposit ?? false,

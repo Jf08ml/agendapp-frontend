@@ -17,7 +17,10 @@ import {
   IconCircleX,
 } from "@tabler/icons-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
 import { getOrderStatus, type OrderStatus } from "../../services/collectionService";
+import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 // Pantalla de retorno tras pagar en Mercado Pago (reserva, clase o paquete).
 // MP redirige aquí (back_urls) con ?status=success|failure|pending&ref=<externalReference>.
@@ -68,6 +71,8 @@ export default function PublicReservationPaymentPage() {
   const [orderType, setOrderType] = useState<OrderType>("reservation");
   const [attempts, setAttempts] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const conversionFired = useRef(false);
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const copy = COPY[orderType];
 
@@ -129,6 +134,15 @@ export default function PublicReservationPaymentPage() {
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref]);
+
+  // Reserva con depósito confirmada (webhook de MP ya procesó el pago): dispara
+  // la conversión de Google Ads de la org, igual que en los flujos sin depósito.
+  useEffect(() => {
+    if (pageStatus !== "paid" || orderType !== "reservation" || conversionFired.current) return;
+    if (!organization) return; // esperar a que cargue la org antes de marcar como disparado
+    conversionFired.current = true;
+    trackReservationConversion(organization.analyticsConfig);
+  }, [pageStatus, orderType, organization]);
 
   const progressValue = Math.min(100, (attempts / MAX_ATTEMPTS) * 100);
 
