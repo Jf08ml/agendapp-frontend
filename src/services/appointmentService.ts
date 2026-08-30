@@ -40,10 +40,20 @@ export interface Appointment {
   clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
   sessionNotes?: string; // 📝 Registro de lo hecho en la sesión (concepto genérico)
   reminderSent?: boolean;
+  // 📶 Entrega real reportada por WhatsApp (ack de Baileys) — independiente
+  // de reminderSent, que solo dice "se intentó enviar"
+  reminderDeliveryStatus?: "sent" | "delivered" | "failed";
+  reminderDeliveryUpdatedAt?: Date;
+  secondReminderDeliveryStatus?: "sent" | "delivered" | "failed";
+  secondReminderDeliveryUpdatedAt?: Date;
   // 📨 Resultado del envío de la confirmación de agendamiento por WhatsApp
   waConfirmationStatus?: "sent" | "failed" | "blocked" | "skipped";
   waConfirmationSentAt?: Date;
   waConfirmationError?: string;
+  waConfirmationMessageId?: string;
+  // 📶 Entrega real reportada por WhatsApp (ack de Baileys)
+  waConfirmationDeliveryStatus?: "sent" | "delivered" | "failed";
+  waConfirmationDeliveryUpdatedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
   // 🔁 Campos para citas recurrentes

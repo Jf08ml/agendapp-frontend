@@ -25,6 +25,7 @@ import {
   BiTrash,
   BiCheck,
   BiCheckCircle,
+  BiXCircle,
   BiCopy,
   BiPlus,
   BiTimeFive,
@@ -324,9 +325,22 @@ ${clientServices}`;
     blocked: { color: "#f08c00", shortLabel: "Bloqueada", fullLabel: "Confirmación de WhatsApp bloqueada (plan o plantilla deshabilitada)" },
     skipped: { color: "#868e96", shortLabel: "Omitida", fullLabel: "Confirmación de WhatsApp omitida (sin teléfono utilizable)" },
   };
-  const waConfirmation = appointment.waConfirmationStatus
-    ? waConfirmationConfig[appointment.waConfirmationStatus]
-    : null;
+  // 📶 Entrega real reportada por WhatsApp (ack de Baileys) — refina "sent"
+  // (que solo significa "el envío no lanzó error") cuando ya sabemos si
+  // WhatsApp la aceptó (✓), la entregó (✓✓) o la rechazó. blocked/skipped/
+  // failed en waConfirmationStatus ya son definitivos y no llevan ack.
+  const waDeliveryConfig: Record<string, { color: string; shortLabel: string; fullLabel: string }> = {
+    sent: { color: "#25D366", shortLabel: "Enviada (✓)", fullLabel: "Confirmación de WhatsApp enviada — WhatsApp la aceptó, esperando confirmación de entrega" },
+    delivered: { color: "#25D366", shortLabel: "Entregada (✓✓)", fullLabel: "Confirmación de WhatsApp entregada" },
+    failed: { color: "#e03131", shortLabel: "No entregada", fullLabel: "Confirmación de WhatsApp: WhatsApp no pudo entregarla (revisar el número del cliente)" },
+  };
+  const waConfirmationDelivery =
+    appointment.waConfirmationStatus === "sent" && appointment.waConfirmationDeliveryStatus
+      ? waDeliveryConfig[appointment.waConfirmationDeliveryStatus]
+      : null;
+  const waConfirmation =
+    waConfirmationDelivery ??
+    (appointment.waConfirmationStatus ? waConfirmationConfig[appointment.waConfirmationStatus] : null);
   const waConfirmationColor = waConfirmation?.color || "#868e96";
   const waConfirmationTooltip = waConfirmation ? (
     <>
@@ -347,6 +361,19 @@ ${clientServices}`;
   ) : (
     ""
   );
+
+  // 🔔 Recordatorio: misma idea que la confirmación — reminderSent solo dice
+  // "se intentó enviar"; reminderDeliveryStatus/secondReminderDeliveryStatus
+  // (el que aplique según la última etapa enviada) dice si WhatsApp lo aceptó,
+  // lo entregó, o lo rechazó.
+  const reminderDeliveryStatus =
+    appointment.secondReminderDeliveryStatus || appointment.reminderDeliveryStatus;
+  const reminderDeliveryConfig: Record<string, { color: string; label: string }> = {
+    sent: { color: "teal", label: "✓ WhatsApp lo aceptó, esperando confirmación de entrega" },
+    delivered: { color: "#25D366", label: "✓✓ Entregado" },
+    failed: { color: "#e03131", label: "❌ WhatsApp no lo entregó" },
+  };
+  const reminderDelivery = reminderDeliveryStatus ? reminderDeliveryConfig[reminderDeliveryStatus] : null;
 
   // 🕒 Hora de inicio/fin — se muestra en una esquina fija (position absolute) para
   // no agregar una fila al flujo del contenido y evitar que desborde cards chicas.
@@ -1366,7 +1393,9 @@ ${clientServices}`;
             updatingReminder
               ? "Actualizando..."
               : appointment.reminderSent
-              ? "Recordatorio enviado - Click para marcar como pendiente"
+              ? reminderDelivery
+                ? `Recordatorio ${reminderDelivery.label} — Click para marcar como pendiente`
+                : "Recordatorio enviado - Click para marcar como pendiente"
               : "Recordatorio pendiente"
           }
           withArrow
@@ -1430,7 +1459,11 @@ ${clientServices}`;
             }
           >
             {appointment.reminderSent ? (
-              <BiCheckCircle size={12} color="teal" />
+              reminderDeliveryStatus === "failed" ? (
+                <BiXCircle size={12} color={reminderDelivery?.color} />
+              ) : (
+                <BiCheckCircle size={12} color={reminderDelivery?.color || "teal"} />
+              )
             ) : (
               <BiTimeFive size={12} color="gray" />
             )}
