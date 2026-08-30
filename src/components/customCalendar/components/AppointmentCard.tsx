@@ -369,9 +369,9 @@ ${clientServices}`;
   const reminderDeliveryStatus =
     appointment.secondReminderDeliveryStatus || appointment.reminderDeliveryStatus;
   const reminderDeliveryConfig: Record<string, { color: string; label: string }> = {
-    sent: { color: "teal", label: "✓ WhatsApp lo aceptó, esperando confirmación de entrega" },
-    delivered: { color: "#25D366", label: "✓✓ Entregado" },
-    failed: { color: "#e03131", label: "❌ WhatsApp no lo entregó" },
+    sent: { color: "teal", label: "Recordatorio enviado (✓), esperando confirmación de entrega" },
+    delivered: { color: "#25D366", label: "Recordatorio entregado (✓✓)" },
+    failed: { color: "#e03131", label: "WhatsApp no pudo entregar el recordatorio (❌)" },
   };
   const reminderDelivery = reminderDeliveryStatus ? reminderDeliveryConfig[reminderDeliveryStatus] : null;
 
@@ -1394,7 +1394,7 @@ ${clientServices}`;
               ? "Actualizando..."
               : appointment.reminderSent
               ? reminderDelivery
-                ? `Recordatorio ${reminderDelivery.label} — Click para marcar como pendiente`
+                ? `${reminderDelivery.label} — Click para marcar como pendiente`
                 : "Recordatorio enviado - Click para marcar como pendiente"
               : "Recordatorio pendiente"
           }
