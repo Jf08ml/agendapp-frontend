@@ -200,7 +200,8 @@ export default function MetaTemplatesPanel({ organizationId }: { organizationId:
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      setTemplates((await listMetaTemplates(organizationId)) || []);
+      const { templates } = await listMetaTemplates(organizationId);
+      setTemplates((templates as MetaTemplate[]) || []);
     } catch (err: unknown) {
       notifications.show({ color: "red", message: err instanceof Error ? err.message : "Error al cargar plantillas" });
     } finally {

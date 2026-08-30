@@ -166,8 +166,8 @@ export default function ClassWhatsappTemplates() {
   const loadMetaTemplates = useCallback(async () => {
     if (!organization?._id || organization.waConnectionType !== "meta") return;
     try {
-      const list = await listMetaTemplates(organization._id);
-      setMetaTemplates(list);
+      const { templates } = await listMetaTemplates(organization._id);
+      setMetaTemplates(templates as MetaTemplateStatus[]);
     } catch {
       setMetaTemplates([]);
     }

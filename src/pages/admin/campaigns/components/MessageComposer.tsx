@@ -88,8 +88,8 @@ export default function MessageComposer({
     if (!isMeta || !orgId) return;
     setLoadingTemplates(true);
     listMetaTemplates(orgId)
-      .then((all: MetaTemplate[]) => {
-        const approved = all.filter((t) => t.status === "APPROVED");
+      .then(({ templates }) => {
+        const approved = (templates as MetaTemplate[]).filter((t) => t.status === "APPROVED");
         setMetaTemplates(approved);
         // Restaurar selección si ya había una en el wizard state
         if (templateName) {
