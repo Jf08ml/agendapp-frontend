@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
   Alert,
@@ -22,7 +22,9 @@ import { BiCheckCircle, BiError, BiTime, BiRefresh } from "react-icons/bi";
 import { IconSend, IconEye, IconEyeOff } from "@tabler/icons-react";
 import {
   createMetaTemplate,
+  updateMetaTemplate,
   syncMetaTemplates,
+  MetaTemplateDraftSaved,
 } from "../../services/organizationService";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -373,6 +375,14 @@ interface Props {
   organizationId: string;
   /** Lista de plantillas Meta ya cargada por el padre — undefined = cargando */
   metaTemplates?: MetaTemplateStatus[];
+  /**
+   * Borrador real (con nombres de variable) que el admin guardó la última vez
+   * que envió esta plantilla a revisión, indexado por el NOMBRE real de la
+   * plantilla en Meta (ej. "confirmacion_cita") — no por templateKey, porque
+   * más de un templateKey puede compartir el mismo nombre de plantilla.
+   * undefined = cargando, {} = cargado pero nada guardado aún.
+   */
+  metaTemplateDrafts?: Record<string, MetaTemplateDraftSaved>;
   onRefreshMetaTemplates?: () => void;
 }
 
@@ -380,13 +390,15 @@ const MetaTemplateFormTab: React.FC<Props> = ({
   templateKey,
   organizationId,
   metaTemplates,
+  metaTemplateDrafts,
   onRefreshMetaTemplates,
 }) => {
   const defaults = META_TEMPLATE_DEFAULTS[templateKey];
+  const metaTemplateName = defaults?.name ?? templateKey.toLowerCase().replace(/[^a-z0-9]/g, "_");
 
   const [form, setForm] = useState<MetaTemplateDraft>(
     defaults ?? {
-      name: templateKey.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+      name: metaTemplateName,
       category: "UTILITY",
       language: "es",
       headerText: "",
@@ -394,6 +406,28 @@ const MetaTemplateFormTab: React.FC<Props> = ({
       footerText: "",
     }
   );
+
+  // El padre remonta este componente al cambiar de pestaña (key={selectedKey}),
+  // pero metaTemplateDrafts puede llegar en un render posterior al montaje
+  // (fetch async). Se hidrata el formulario UNA sola vez, la primera vez que
+  // deja de estar "cargando" — para no pisar ediciones del usuario en renders
+  // posteriores (ej. después de guardar, cuando el padre refresca la lista).
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || metaTemplateDrafts === undefined) return;
+    hydratedRef.current = true;
+    const draft = metaTemplateDrafts[metaTemplateName];
+    if (draft) {
+      setForm((f) => ({
+        ...f,
+        headerText: draft.headerText,
+        bodyText: draft.bodyText,
+        footerText: draft.footerText,
+        category: draft.category || f.category,
+        language: draft.language || f.language,
+      }));
+    }
+  }, [metaTemplateDrafts, metaTemplateName]);
 
   const [submitting, setSubmitting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -454,17 +488,46 @@ const MetaTemplateFormTab: React.FC<Props> = ({
         components.push({ type: "FOOTER", text: convertedFooter.trim() });
       }
 
-      await createMetaTemplate(organizationId, {
-        name: form.name.trim().toLowerCase().replace(/\s+/g, "_"),
-        category: form.category,
-        language: form.language,
-        components,
-      });
+      // 📌 namedDraft/bodyVariableOrder se guardan aparte (no los usa Meta) para
+      // poder re-mostrar el borrador real y armar el envío con el orden de
+      // variables correcto — ver metaTemplateController.js.
+      const draftPayload = {
+        metaTemplateName,
+        namedDraft: {
+          headerText: form.headerText,
+          bodyText: form.bodyText,
+          footerText: form.footerText,
+        },
+        bodyVariableOrder: bodyMapping.map(({ name }) => name),
+      };
 
-      notifications.show({
-        color: "green",
-        message: "Plantilla enviada a revisión de Meta. Puede tardar hasta 24h.",
-      });
+      if (existing) {
+        // La plantilla ya existe en Meta (aprobada, pendiente o rechazada) —
+        // hay que EDITARLA (dispara nueva revisión), no crear una duplicada:
+        // Meta rechaza un nombre repetido en la misma WABA.
+        await updateMetaTemplate(organizationId, existing.id, {
+          components,
+          category: form.category,
+          language: form.language,
+          ...draftPayload,
+        });
+        notifications.show({
+          color: "green",
+          message: "Plantilla actualizada — Meta la revisará de nuevo (puede tardar hasta 24h).",
+        });
+      } else {
+        await createMetaTemplate(organizationId, {
+          name: form.name.trim().toLowerCase().replace(/\s+/g, "_"),
+          category: form.category,
+          language: form.language,
+          components,
+          ...draftPayload,
+        });
+        notifications.show({
+          color: "green",
+          message: "Plantilla enviada a revisión de Meta. Puede tardar hasta 24h.",
+        });
+      }
       onRefreshMetaTemplates?.();
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {

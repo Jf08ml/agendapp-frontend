@@ -51,7 +51,7 @@ import whatsappTemplateService, {
 import { handleAxiosError } from "../../utils/handleAxiosError";
 import MetaTemplateFormTab, { MetaTemplateStatus } from "./MetaTemplateFormTab";
 import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
-import { listMetaTemplates } from "../../services/organizationService";
+import { listMetaTemplates, MetaTemplateDraftSaved } from "../../services/organizationService";
 
 // ─── Metadata de plantillas ───────────────────────────────────────────────────
 
@@ -357,6 +357,7 @@ export default function WhatsappTemplateEditor() {
 
   const [templates, setTemplates] = useState<WhatsappTemplates | null>(null);
   const [metaTemplates, setMetaTemplates] = useState<MetaTemplateStatus[] | undefined>(undefined);
+  const [metaDrafts, setMetaDrafts] = useState<Record<string, MetaTemplateDraftSaved>>({});
   const [defaultTemplates, setDefaultTemplates] = useState<Record<string, string>>({});
   const [editedTemplates, setEditedTemplates] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string>("");
@@ -417,10 +418,12 @@ export default function WhatsappTemplateEditor() {
   const loadMetaTemplates = useCallback(async () => {
     if (!organization?._id || organization.waConnectionType !== "meta") return;
     try {
-      const list = await listMetaTemplates(organization._id);
-      setMetaTemplates(list);
+      const { templates, drafts } = await listMetaTemplates(organization._id);
+      setMetaTemplates(templates as MetaTemplateStatus[]);
+      setMetaDrafts(drafts);
     } catch {
       setMetaTemplates([]);
+      setMetaDrafts({});
     }
   }, [organization?._id, organization?.waConnectionType]);
 
@@ -981,6 +984,7 @@ export default function WhatsappTemplateEditor() {
                           templateKey={selectedKey}
                           organizationId={organization._id}
                           metaTemplates={metaTemplates}
+                          metaTemplateDrafts={metaTemplates === undefined ? undefined : metaDrafts}
                           onRefreshMetaTemplates={loadMetaTemplates}
                         />
 

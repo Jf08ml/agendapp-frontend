@@ -404,7 +404,18 @@ export const getMetaStatus = async (
 
 // ── Meta Templates ───────────────────────────────────────────────────────────
 
-export const listMetaTemplates = async (organizationId: string) => {
+export interface MetaTemplateDraftSaved {
+  headerText: string;
+  bodyText: string;
+  footerText: string;
+  category: string;
+  language: string;
+  bodyVariableOrder: string[];
+}
+
+export const listMetaTemplates = async (
+  organizationId: string
+): Promise<{ templates: unknown[]; drafts: Record<string, MetaTemplateDraftSaved> }> => {
   const response = await apiOrganization.get(`/${organizationId}/meta-templates`);
   return response.data.data;
 };
@@ -414,8 +425,8 @@ export const createMetaTemplate = async (organizationId: string, template: objec
   return response.data.data;
 };
 
-export const updateMetaTemplate = async (organizationId: string, templateId: string, components: object[]) => {
-  const response = await apiOrganization.patch(`/${organizationId}/meta-templates/${templateId}`, { components });
+export const updateMetaTemplate = async (organizationId: string, templateId: string, payload: object) => {
+  const response = await apiOrganization.patch(`/${organizationId}/meta-templates/${templateId}`, payload);
   return response.data.data;
 };
 
