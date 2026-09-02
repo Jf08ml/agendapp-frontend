@@ -29,13 +29,16 @@ import {
   RingProgress,
   SimpleGrid,
   ThemeIcon,
+  Pagination,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
+import { useMediaQuery, useDebouncedValue } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import {
   Reservation,
+  ReservationStats,
   getReservationsByOrganization,
+  getReservationStats,
   updateReservation,
   deleteReservation,
   cancelReservation,
@@ -44,6 +47,10 @@ import {
   getEmployeesByOrganizationId,
   Employee,
 } from "../../../services/employeeService";
+import {
+  getServicesByOrganizationId,
+  Service,
+} from "../../../services/serviceService";
 import type { ReservationPolicy } from "../../../services/organizationService";
 import { showNotification } from "@mantine/notifications";
 import dayjs from "dayjs";
@@ -77,7 +84,19 @@ const ReservationsList: React.FC = () => {
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [stats, setStats] = useState<ReservationStats>({
+    total: 0,
+    ai: 0,
+    manual: 0,
+    hasApprovedWithoutAppointment: false,
+  });
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+
+  // ------- PAGINACIÓN (servidor) -------
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [initialLoading, setInitialLoading] = useState(false);
   const [rowLoading, setRowLoading] = useState<
@@ -127,6 +146,7 @@ const ReservationsList: React.FC = () => {
   const [employeeFilter, setEmployeeFilter] = useState<string | "all">("all");
   const [serviceFilter, setServiceFilter] = useState<string | "all">("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm] = useDebouncedValue(searchTerm, 400);
   const [showOnlyFuture, setShowOnlyFuture] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -190,28 +210,69 @@ const ReservationsList: React.FC = () => {
   };
 
   // ------- FETCH DATA -------
+  // Datos que no dependen de filtros/página: se cargan una sola vez por organización
+  useEffect(() => {
+    if (organization?._id) {
+      void fetchEmployees(organization._id);
+      void fetchServices(organization._id);
+      void loadStats(organization._id);
+    }
+  }, [organization?._id]);
+
+  // Listado paginado: se recarga cuando cambia la organización, la página o cualquier filtro
   useEffect(() => {
     if (organization?._id) {
       void loadPage(organization._id);
-      void fetchEmployees(organization._id);
     }
-  }, [organization?._id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    organization?._id,
+    page,
+    statusFilter,
+    employeeFilter,
+    serviceFilter,
+    debouncedSearchTerm,
+    showOnlyFuture,
+  ]);
 
   const loadPage = async (organizationId: string) => {
     setInitialLoading(true);
     setError(null);
     try {
-      const data = await getReservationsByOrganization(organizationId);
-      const sorted = data.sort(
-        (a, b) =>
-          new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-      );
-      setReservations(sorted);
+      const result = await getReservationsByOrganization(organizationId, {
+        page,
+        limit: PAGE_SIZE,
+        status: statusFilter,
+        employeeId: employeeFilter,
+        serviceId: serviceFilter,
+        search: debouncedSearchTerm,
+        onlyFuture: showOnlyFuture,
+      });
+      setReservations(result.reservations);
+      setTotalPages(result.pages);
+      // Si el filtro dejó la página actual fuera de rango, volvemos a la última válida
+      if (result.page > 1 && result.page > result.pages) {
+        setPage(result.pages);
+      }
     } catch (err) {
       console.error(err);
       setError("Error al cargar las reservas. Intenta nuevamente.");
     } finally {
       setInitialLoading(false);
+    }
+  };
+
+  const loadStats = async (organizationId: string) => {
+    const data = await getReservationStats(organizationId);
+    setStats(data);
+  };
+
+  const fetchServices = async (organizationId: string) => {
+    try {
+      const data = await getServicesByOrganizationId(organizationId);
+      setServices(data);
+    } catch (err) {
+      console.error("Error al cargar los servicios:", err);
     }
   };
 
@@ -283,21 +344,11 @@ const ReservationsList: React.FC = () => {
     [employees]
   );
 
-  // Servicios únicos para el filtro
-  const serviceSelectData = useMemo(() => {
-    const map = new Map<string, string>();
-    reservations.forEach((r) => {
-      const serviceObj = typeof r.serviceId === "object" ? r.serviceId : null;
-      if (serviceObj?._id && serviceObj?.name) {
-        map.set(serviceObj._id, serviceObj.name);
-      }
-    });
-
-    return Array.from(map.entries()).map(([value, label]) => ({
-      value,
-      label,
-    }));
-  }, [reservations]);
+  // Servicios de la organización para el filtro (independiente de la página cargada)
+  const serviceSelectData = useMemo(
+    () => services.map((s) => ({ value: s._id, label: s.name })),
+    [services]
+  );
 
   const policyBadge = useMemo(() => {
     return orgPolicy === "auto_if_available" ? (
@@ -316,74 +367,12 @@ const ReservationsList: React.FC = () => {
       ? "Las reservas se confirman y crean la cita automáticamente si hay disponibilidad inmediata. Si no hay cupo, la reserva queda pendiente."
       : "Las reservas requieren aprobación manual. No se crean citas automáticamente.";
 
-  // ------- LISTA FILTRADA + ORDENADA -------
-  const filteredReservations = useMemo(() => {
-    const now = dayjs();
-    const statusPriority: Record<string, number> = {
-      pending: 0,
-      auto_approved: 1,
-      approved: 2,
-      rejected: 3,
-    };
-
-    let list = [...reservations];
-
-    // 1) Solo futuras
-    if (showOnlyFuture) {
-      list = list.filter((r) =>
-        dayjs(r.startDate).isAfter(now.subtract(1, "minute"))
-      );
-    }
-
-    // 2) Filtro por estado
-    if (statusFilter !== "all") {
-      list = list.filter((r) => r.status === statusFilter);
-    }
-
-    // 3) Filtro por profesional
-    if (employeeFilter !== "all") {
-      list = list.filter((r) => r.employeeId === employeeFilter);
-    }
-
-    // 4) Filtro por servicio
-    if (serviceFilter !== "all") {
-      list = list.filter((r) => {
-        const serviceObj = typeof r.serviceId === "object" ? r.serviceId : null;
-        return serviceObj?._id === serviceFilter;
-      });
-    }
-
-    // 5) Búsqueda por cliente (nombre / teléfono / email)
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      list = list.filter((r) => {
-        const name = r.customerDetails?.name?.toLowerCase() ?? "";
-        const phone = (r.customerDetails as any)?.phone?.toLowerCase?.() ?? "";
-        const email = (r.customerDetails as any)?.email?.toLowerCase?.() ?? "";
-        return (
-          name.includes(term) || phone.includes(term) || email.includes(term)
-        );
-      });
-    }
-
-    // 6) Orden: estado (pendiente primero) + fecha ascendente
-    list.sort((a, b) => {
-      const statusDiff =
-        (statusPriority[a.status] ?? 99) - (statusPriority[b.status] ?? 99);
-      if (statusDiff !== 0) return statusDiff;
-
-      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-    });
-
-    return list;
-  }, [
-    reservations,
-    showOnlyFuture,
-    statusFilter,
-    employeeFilter,
-    serviceFilter,
-    searchTerm,
-  ]);
+  // ------- LISTA DE LA PÁGINA ACTUAL -------
+  // El filtrado (estado, profesional, servicio, búsqueda, solo futuras), el orden
+  // y la paginación ahora se resuelven en el servidor (ver loadPage). `reservations`
+  // ya llega lista para mostrar — se mantiene este alias para minimizar cambios
+  // en el resto del componente (agrupación por groupId, render de la tabla, etc.)
+  const filteredReservations = reservations;
 
   // 👥 Crear un mapa de groupId para identificar grupos rápidamente
   const groupsMap = useMemo(() => {
@@ -399,29 +388,14 @@ const ReservationsList: React.FC = () => {
     return map;
   }, [filteredReservations]);
 
-  const hasReservations = reservations.length > 0;
+  // "¿La organización tiene reservas?" viene de las estadísticas globales (todo el
+  // historial, no solo la página actual) para distinguir "sin reservas" de
+  // "sin resultados para estos filtros" en el mensaje vacío de la tabla.
+  const hasReservations = stats.total > 0;
 
-  const sourceStats = useMemo(() => {
-    const nonCancelled = reservations.filter(
-      (r) => r.status !== "cancelled_by_customer" && r.status !== "cancelled_by_admin"
-    );
-    const uniqueGroups = new Set<string>();
-    const counted: Reservation[] = [];
-    for (const r of nonCancelled) {
-      if (r.groupId) {
-        if (!uniqueGroups.has(r.groupId)) {
-          uniqueGroups.add(r.groupId);
-          counted.push(r);
-        }
-      } else {
-        counted.push(r);
-      }
-    }
-    const total = counted.length;
-    const ai = counted.filter((r) => r.source === "ai_chatbot").length;
-    const manual = counted.filter((r) => r.source !== "ai_chatbot").length;
-    return { total, ai, manual };
-  }, [reservations]);
+  // Tarjetas de origen (Total / IA / Manual): estadísticas globales calculadas
+  // en el servidor, independientes de filtros y de la página cargada.
+  const sourceStats = stats;
 
   // ------- ACTIONS -------
   const handleUpdateStatus = async (
@@ -459,7 +433,10 @@ const ReservationsList: React.FC = () => {
         } correctamente`,
         color: "green",
       });
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "success";
     } catch (err: any) {
       console.error(err);
@@ -505,7 +482,10 @@ const ReservationsList: React.FC = () => {
       setAssignModalOpen(false);
       setSelectedEmployee(null);
       setAssigningReservationId(null);
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
     } catch (err) {
       console.error(err);
       showNotification({
@@ -548,7 +528,10 @@ const ReservationsList: React.FC = () => {
       });
       setDeleteConfirmOpen(false);
       setDeletingReservationId(null);
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
     } catch (err) {
       console.error(err);
       showNotification({
@@ -592,7 +575,10 @@ const ReservationsList: React.FC = () => {
       });
       setCancelConfirmOpen(false);
       setCancellingReservationId(null);
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
     } catch (err) {
       console.error(err);
       showNotification({
@@ -639,7 +625,10 @@ const ReservationsList: React.FC = () => {
         autoClose: 3000,
       });
 
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "success";
     } catch (err: any) {
       console.error(err);
@@ -651,7 +640,10 @@ const ReservationsList: React.FC = () => {
           groupId,
           conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
         return "concurrency";
       }
 
@@ -667,7 +659,10 @@ const ReservationsList: React.FC = () => {
       });
 
       // Recargar para mostrar el estado revertido
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "error";
     } finally {
       group.forEach(r => {
@@ -693,7 +688,10 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 3000,
       });
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "success";
     } catch (err: any) {
       console.error(err);
@@ -704,7 +702,10 @@ const ReservationsList: React.FC = () => {
           groupId,
           conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
         return "concurrency";
       }
       showNotification({
@@ -714,7 +715,10 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 4000,
       });
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "error";
     } finally {
       group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
@@ -739,7 +743,10 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 3000,
       });
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "success";
     } catch (err: any) {
       console.error(err);
@@ -750,7 +757,10 @@ const ReservationsList: React.FC = () => {
           groupId,
           conflictingAppointments: err.response.data.data.conflictingAppointments || [],
         });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
         return "concurrency";
       }
       showNotification({
@@ -760,7 +770,10 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 4000,
       });
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
       return "error";
     } finally {
       group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
@@ -788,10 +801,16 @@ const ReservationsList: React.FC = () => {
           } as any);
         }
         showNotification({ title: "Grupo Aprobado", message: "Reservas aprobadas correctamente", color: "green", position: "top-right" });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
       } catch (err: any) {
         showNotification({ title: "Error", message: err?.response?.data?.message || err?.message, color: "red", position: "top-right" });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
       } finally {
         group.forEach(r => { if (r._id) setRowBusy(r._id, null); });
       }
@@ -800,7 +819,10 @@ const ReservationsList: React.FC = () => {
         setRowBusy(warning.reservationId, "approve");
         await updateReservation(warning.reservationId, { status: "approved", forceApprove: true } as any);
         showNotification({ title: "Aprobada", message: "Cita creada correctamente", color: "green" });
-        if (organization?._id) await loadPage(organization._id);
+        if (organization?._id) {
+          await loadPage(organization._id);
+          void loadStats(organization._id);
+        }
       } catch (err: any) {
         showNotification({ title: "Error", message: err?.response?.data?.message || err?.message, color: "red" });
       } finally {
@@ -834,7 +856,10 @@ const ReservationsList: React.FC = () => {
         autoClose: 3000,
       });
 
-      if (organization?._id) await loadPage(organization._id);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
     } catch (err) {
       console.error(err);
       showNotification({
@@ -1717,9 +1742,10 @@ const ReservationsList: React.FC = () => {
                   label="Estado"
                   placeholder="Todos"
                   value={statusFilter}
-                  onChange={(val) =>
-                    setStatusFilter((val as typeof statusFilter) || "all")
-                  }
+                  onChange={(val) => {
+                    setStatusFilter((val as typeof statusFilter) || "all");
+                    setPage(1);
+                  }}
                   data={[
                     { value: "all", label: "Todos" },
                     { value: "pending", label: "Pendiente" },
@@ -1737,9 +1763,10 @@ const ReservationsList: React.FC = () => {
                   label="Profesional"
                   placeholder="Todos"
                   value={employeeFilter}
-                  onChange={(val) =>
-                    setEmployeeFilter((val as string) || "all")
-                  }
+                  onChange={(val) => {
+                    setEmployeeFilter((val as string) || "all");
+                    setPage(1);
+                  }}
                   data={[
                     { value: "all", label: "Todos" },
                     ...employeesSelectData,
@@ -1752,7 +1779,10 @@ const ReservationsList: React.FC = () => {
                   label="Servicio"
                   placeholder="Todos"
                   value={serviceFilter}
-                  onChange={(val) => setServiceFilter((val as string) || "all")}
+                  onChange={(val) => {
+                    setServiceFilter((val as string) || "all");
+                    setPage(1);
+                  }}
                   data={[
                     { value: "all", label: "Todos" },
                     ...serviceSelectData,
@@ -1767,16 +1797,20 @@ const ReservationsList: React.FC = () => {
                   label="Buscar cliente"
                   placeholder="Nombre, teléfono o email"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.currentTarget.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.currentTarget.value);
+                    setPage(1);
+                  }}
                   w={220}
                 />
 
                 <Switch
                   size="sm"
                   checked={showOnlyFuture}
-                  onChange={(event) =>
-                    setShowOnlyFuture(event.currentTarget.checked)
-                  }
+                  onChange={(event) => {
+                    setShowOnlyFuture(event.currentTarget.checked);
+                    setPage(1);
+                  }}
                   label="Solo futuras"
                 />
 
@@ -1789,6 +1823,7 @@ const ReservationsList: React.FC = () => {
                     setServiceFilter("all");
                     setSearchTerm("");
                     setShowOnlyFuture(true);
+                    setPage(1);
                   }}
                 >
                   Limpiar filtros
@@ -1820,8 +1855,8 @@ const ReservationsList: React.FC = () => {
           )}
         </Alert>
 
-        {/* Banner: reservas aprobadas sin cita válida */}
-        {!initialLoading && reservations.some(isApprovedWithoutAppointment) && (
+        {/* Banner: reservas aprobadas sin cita válida (global, no solo la página actual) */}
+        {!initialLoading && stats.hasApprovedWithoutAppointment && (
           <Alert color="orange" variant="light" icon={<BiInfoCircle />} mb="md">
             <Text size="sm">
               Hay reservas <strong>aprobadas sin cita creada</strong>. Pueden haber ocurrido por un error al aprobar o porque la cita fue eliminada manualmente. Se muestran con el indicador <strong>⚠ Sin cita</strong>.
@@ -2009,6 +2044,12 @@ const ReservationsList: React.FC = () => {
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
+        )}
+
+        {!initialLoading && totalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination value={page} onChange={setPage} total={totalPages} />
+          </Group>
         )}
       </Card>
     </>

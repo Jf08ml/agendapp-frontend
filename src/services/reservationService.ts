@@ -103,18 +103,59 @@ export const createReservationCheckout = async (
   }
 };
 
-// Obtener todas las reservas de una organización
+export interface ReservationListFilters {
+  page?: number;
+  limit?: number;
+  status?: string; // "all" | Reservation["status"]
+  employeeId?: string; // "all" | id
+  serviceId?: string; // "all" | id
+  search?: string;
+  onlyFuture?: boolean;
+}
+
+export interface ReservationListResult {
+  reservations: Reservation[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+export interface ReservationStats {
+  total: number;
+  ai: number;
+  manual: number;
+  hasApprovedWithoutAppointment: boolean;
+}
+
+// Obtener las reservas de una organización (paginado + filtrado en el servidor)
 export const getReservationsByOrganization = async (
-  organizationId: string
-): Promise<Reservation[]> => {
+  organizationId: string,
+  filters: ReservationListFilters = {}
+): Promise<ReservationListResult> => {
   try {
-    const response = await apiReservation.get<Response<Reservation[]>>(
-      `/${organizationId}`
+    const response = await apiReservation.get<Response<ReservationListResult>>(
+      `/${organizationId}`,
+      { params: filters }
     );
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al obtener las reservas");
-    return [];
+    return { reservations: [], total: 0, page: 1, pages: 1 };
+  }
+};
+
+// Estadísticas globales de reservas (independientes de filtros/página)
+export const getReservationStats = async (
+  organizationId: string
+): Promise<ReservationStats> => {
+  try {
+    const response = await apiReservation.get<Response<ReservationStats>>(
+      `/${organizationId}/stats`
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener las estadísticas de reservas");
+    return { total: 0, ai: 0, manual: 0, hasApprovedWithoutAppointment: false };
   }
 };
 
