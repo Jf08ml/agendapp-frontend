@@ -37,6 +37,7 @@ export interface CheckSlugResponse {
 
 export interface ExchangeResponse {
   token: string;
+  sessionId?: string; // id de la sesión/dispositivo (ver sessionModel.js) — ausente en impersonación
   userId: string;
   userType: string;
   organizationId: string;

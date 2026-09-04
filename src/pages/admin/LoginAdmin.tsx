@@ -78,6 +78,7 @@ const LoginAdmin: React.FC = () => {
             userId: data.userId,
             organizationId,
             token: data.token,
+            sessionId: data.sessionId,
             role: data.userType,
             permissions: data.userPermissions || [],
             expiresAt: data.expiresAt, // Agregar el timestamp de expiración

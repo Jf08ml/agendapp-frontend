@@ -5,6 +5,7 @@ interface AuthState {
   userId: string | null;
   organizationId: string | null;
   token: string | null;
+  sessionId: string | null; // id de la sesión/dispositivo actual (ver sessionModel.js)
   role: string | null;
   permissions: string[];
   expiresAt: string | null; // ISO timestamp de expiración del token
@@ -22,6 +23,7 @@ const removeStorageItem = (key: string) =>
 // Comprueba si hay datos en localStorage
 const storedUserId = getStorageItem("userId");
 const storedToken = getStorageItem("token");
+const storedSessionId = getStorageItem("sessionId");
 const storedRole = getStorageItem("role");
 const storedExpiresAt = getStorageItem("token_expires_at");
 
@@ -30,6 +32,7 @@ const initialState: AuthState = {
   userId: storedUserId,
   organizationId: null,
   token: storedToken,
+  sessionId: storedSessionId,
   role: storedRole,
   permissions: [],
   expiresAt: storedExpiresAt,
@@ -45,6 +48,7 @@ const authSlice = createSlice({
         userId: string;
         organizationId: string;
         token: string;
+        sessionId?: string;
         role: string;
         permissions: string[];
         expiresAt?: string;
@@ -54,6 +58,7 @@ const authSlice = createSlice({
       state.userId = action.payload.userId;
       state.organizationId = action.payload.organizationId;
       state.token = action.payload.token;
+      state.sessionId = action.payload.sessionId || null;
       state.role = action.payload.role;
       state.permissions = action.payload.permissions;
       state.expiresAt = action.payload.expiresAt || null;
@@ -62,6 +67,9 @@ const authSlice = createSlice({
       setStorageItem("userId", action.payload.userId);
       setStorageItem("token", action.payload.token);
       setStorageItem("role", action.payload.role);
+      if (action.payload.sessionId) {
+        setStorageItem("sessionId", action.payload.sessionId);
+      }
       if (action.payload.expiresAt) {
         setStorageItem("token_expires_at", action.payload.expiresAt);
       }
@@ -93,6 +101,7 @@ const authSlice = createSlice({
       state.userId = null;
       state.organizationId = null;
       state.token = null;
+      state.sessionId = null;
       state.role = null;
       state.permissions = [];
       state.expiresAt = null;
@@ -100,6 +109,7 @@ const authSlice = createSlice({
       // Eliminar datos de localStorage
       removeStorageItem("userId");
       removeStorageItem("token");
+      removeStorageItem("sessionId");
       removeStorageItem("role");
       removeStorageItem("token_expires_at");
       // Limpiar slug de dev para no quedar pegado a una org

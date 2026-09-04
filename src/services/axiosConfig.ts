@@ -90,6 +90,9 @@ const addAuthHeader = (api: AxiosInstance) => {
                 const data = response.data?.data;
                 if (data?.token) {
                   localStorage.setItem("app_token", data.token);
+                  if (data.sessionId) {
+                    localStorage.setItem("app_sessionId", data.sessionId);
+                  }
                   if (data.expiresAt) {
                     localStorage.setItem("app_token_expires_at", data.expiresAt);
                   }
@@ -157,6 +160,7 @@ const forceLogout = () => {
 
   localStorage.removeItem("app_token");
   localStorage.removeItem("app_userId");
+  localStorage.removeItem("app_sessionId");
   localStorage.removeItem("app_role");
   localStorage.removeItem("app_token_expires_at");
   localStorage.removeItem("app_dev_slug");
@@ -228,6 +232,9 @@ const addMembershipInterceptor = (api: AxiosInstance) => {
             const data = res.data?.data;
             if (data?.token) {
               localStorage.setItem("app_token", data.token);
+              if (data.sessionId) {
+                localStorage.setItem("app_sessionId", data.sessionId);
+              }
               if (data.expiresAt) {
                 localStorage.setItem("app_token_expires_at", data.expiresAt);
               }

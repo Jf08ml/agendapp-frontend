@@ -6,6 +6,7 @@ interface LoginResponse {
   userId: string;
   organizationId?: string;
   token: string;
+  sessionId?: string; // id de la sesión/dispositivo (ver sessionModel.js)
   userType: string;
   userPermissions?: string[];
   expiresAt?: string; // ISO timestamp de expiración

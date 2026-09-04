@@ -20,6 +20,7 @@ import {
   IconForms,
   IconBuildingStore,
   IconChartLine,
+  IconDevices,
 } from "@tabler/icons-react";
 
 import { RootState } from "../../../app/store";
@@ -48,6 +49,7 @@ import ReminderSettingsTab from "./components/tabs/ReminderSettingsTab";
 import ClientFormTab from "./components/tabs/ClientFormTab";
 import StoreFormTab from "./components/tabs/StoreFormTab";
 import MarketingTab from "./components/tabs/MarketingTab";
+import SessionsTab from "./components/tabs/SessionsTab";
 
 import { schema, FormValues } from "./schema";
 import { normalizeOrg } from "./utils";
@@ -292,6 +294,9 @@ export default function OrganizationInfo() {
             <Tabs.Tab value="marketing" leftSection={<IconChartLine size={14} />}>
               Marketing
             </Tabs.Tab>
+            <Tabs.Tab value="sessions" leftSection={<IconDevices size={14} />}>
+              Sesiones activas
+            </Tabs.Tab>
           </Tabs.List>
         </ScrollArea>
 
@@ -355,6 +360,10 @@ export default function OrganizationInfo() {
 
         <Tabs.Panel value="marketing" pt="md">
           <MarketingTab form={form} isEditing={true} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="sessions" pt="md">
+          <SessionsTab organizationId={organizationId} />
         </Tabs.Panel>
       </Tabs>
 

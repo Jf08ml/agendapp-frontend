@@ -40,6 +40,7 @@ export default function ExchangePage() {
           loginSuccess({
             token: result.token,
             userId: result.userId,
+            sessionId: result.sessionId,
             role: result.userType,
             organizationId: result.organizationId,
             permissions: result.userPermissions,
