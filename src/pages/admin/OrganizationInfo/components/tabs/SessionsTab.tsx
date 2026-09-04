@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   ScrollArea,
@@ -17,8 +18,9 @@ import { showNotification } from "@mantine/notifications";
 import { IconInfoCircle, IconLogout } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { RootState } from "../../../../../app/store";
+import { RootState, AppDispatch } from "../../../../../app/store";
 import { getSessions, revokeSession, ActiveSession } from "../../../../../services/sessionService";
+import { logout } from "../../../../../features/auth/sliceAuth";
 
 interface Props {
   organizationId: string | null;
@@ -27,6 +29,8 @@ interface Props {
 const formatDate = (iso: string) => format(new Date(iso), "d MMM yyyy, HH:mm", { locale: es });
 
 export default function SessionsTab({ organizationId }: Props) {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const currentSessionId = useSelector((s: RootState) => s.auth.sessionId);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,9 +81,19 @@ export default function SessionsTab({ organizationId }: Props) {
           if (ok) {
             showNotification({
               title: "Sesión cerrada",
-              message: `Se cerró la sesión de "${session.displayName}"`,
+              message: isCurrent
+                ? "Se cerró tu sesión en este dispositivo."
+                : `Se cerró la sesión de "${session.displayName}"`,
               color: "green",
             });
+            if (isCurrent) {
+              // Es la sesión de este mismo dispositivo: no esperar a que la
+              // próxima request 401ee (o al chequeo de fondo de useSessionExpiry)
+              // para notarlo — cerrarla ahora mismo.
+              dispatch(logout());
+              navigate("/login-admin");
+              return;
+            }
             setSessions((prev) => prev.filter((s) => s._id !== session._id));
           }
         } catch (e) {

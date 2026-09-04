@@ -45,3 +45,25 @@ export const revokeSession = async (
     return false;
   }
 };
+
+export interface SessionCheckResult {
+  hasSid: boolean;
+}
+
+// Ping liviano y silencioso de la sesión actual (usado por useSessionExpiry
+// para detectar revocación en pestañas idle / PWA en background). No usa
+// handleAxiosError a propósito — es una verificación de fondo, no debe mostrar
+// notificaciones de error; si el 401 confirma revocación, el interceptor de
+// axios ya se encarga de cerrar la sesión (intenta /refresh y hace logout).
+export const checkCurrentSession = async (
+  organizationId: string
+): Promise<SessionCheckResult | null> => {
+  try {
+    const response = await apiOrganization.get<Response<SessionCheckResult>>(
+      `/${organizationId}/sessions/current`
+    );
+    return response.data.data;
+  } catch {
+    return null;
+  }
+};
