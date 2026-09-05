@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import axios from "axios";
 import { apiAppointment } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
@@ -145,6 +146,8 @@ export interface CreateMultiEmployeeBatchPayload {
   advancePayment?: number;
   employeeRequestedByClient?: boolean;
   blocks: MultiEmployeeBlockPayload[];
+  /** Omite la validación de solapamiento — usar SOLO tras confirmación explícita del admin sobre un conflicto ya informado */
+  skipConcurrencyCheck?: boolean;
 }
 
 /** Payload para el endpoint BATCH RECOMENDADO */
@@ -167,6 +170,8 @@ export interface CreateAppointmentsBatchPayload {
   clientPackageId?: string | null;
   /** { [serviceId]: clientPackageId } - mapeo servicio → paquete */
   usePackageForServices?: Record<string, string>;
+  /** Omite la validación de solapamiento — usar SOLO tras confirmación explícita del admin sobre un conflicto ya informado */
+  skipConcurrencyCheck?: boolean;
 }
 
 interface Response<T> {
@@ -360,6 +365,7 @@ export const createAppointmentsBatch = async (
       ...(data.customDurations && { customDurations: data.customDurations }), // 🕐 Duraciones personalizadas por servicio
       ...(data.clientPackageId && { clientPackageId: data.clientPackageId }),
       ...(data.usePackageForServices && { usePackageForServices: data.usePackageForServices }),
+      ...(data.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
     };
     const res = await apiAppointment.post<Response<Appointment[]>>(
       "/batch",
@@ -367,6 +373,11 @@ export const createAppointmentsBatch = async (
     );
     return res.data.data;
   } catch (err) {
+    // Re-lanzar el error original (con response.data intacto) cuando es un conflicto
+    // de disponibilidad, para que el caller pueda ofrecer "continuar de todas formas"
+    if (axios.isAxiosError(err) && err.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+      throw err;
+    }
     handleAxiosError(err, "Error al crear las citas en lote");
   }
 };
@@ -382,6 +393,9 @@ export const createMultiEmployeeBatch = async (
     );
     return res.data.data;
   } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+      throw err;
+    }
     handleAxiosError(err, "Error al crear las citas multi-profesional");
   }
 };
@@ -389,7 +403,7 @@ export const createMultiEmployeeBatch = async (
 // Actualizar una cita
 export const updateAppointment = async (
   appointmentId: string,
-  updatedData: Partial<Appointment>
+  updatedData: Partial<Appointment> & { skipConcurrencyCheck?: boolean }
 ): Promise<Appointment | undefined> => {
   try {
     // Transformar fechas al formato correcto sin timezone
@@ -400,13 +414,18 @@ export const updateAppointment = async (
     if (payload.endDate) {
       payload.endDate = asISO(payload.endDate) as any;
     }
-    
+
     const response = await apiAppointment.put<Response<Appointment>>(
       `/${appointmentId}`,
       payload
     );
     return response.data.data;
   } catch (error) {
+    // Re-lanzar el error original (con response.data intacto) cuando es un conflicto
+    // de disponibilidad, para que el caller pueda ofrecer "continuar de todas formas"
+    if (axios.isAxiosError(error) && error.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+      throw error;
+    }
     handleAxiosError(error, "Error al actualizar la cita");
   }
 };

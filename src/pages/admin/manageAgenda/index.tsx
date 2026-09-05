@@ -910,7 +910,7 @@ const ScheduleView: React.FC = () => {
   /**
    * CREAR O ACTUALIZAR CITA
    */
-  const addOrUpdateAppointment = async () => {
+  const addOrUpdateAppointment = async (options?: { skipConcurrencyCheck?: boolean }) => {
     setCreatingAppointment(true);
     try {
       const {
@@ -947,6 +947,7 @@ const ScheduleView: React.FC = () => {
             status: status || "pending",
             organizationId: organizationId as string,
             advancePayment,
+            ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
           await updateAppointment(selectedAppointment._id, payload);
@@ -974,6 +975,7 @@ const ScheduleView: React.FC = () => {
             // Paquete de sesiones (si el admin eligió usar paquete)
             clientPackageId,
             usePackageForServices,
+            ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
           await createAppointmentsBatch(payload);
@@ -991,10 +993,29 @@ const ScheduleView: React.FC = () => {
         closeModal();
         fetchAppointmentsForMonth(currentDate);
       }
-    } catch (error) {
+    } catch (error: any) {
+      const conflictData = error?.response?.data?.data;
+      if (conflictData?.code === "CONCURRENCY_LIMIT_REACHED") {
+        setCreatingAppointment(false);
+        openConfirmModal({
+          title: "Conflicto de horario",
+          children: (
+            <Stack gap="xs">
+              <Text size="sm">{error.response.data.message}</Text>
+              <Text size="sm" c="dimmed">
+                ¿Deseas crear la cita de todas formas? El profesional quedará con dos citas al mismo tiempo.
+              </Text>
+            </Stack>
+          ),
+          labels: { confirm: "Crear de todas formas", cancel: "Cancelar" },
+          confirmProps: { color: "orange" },
+          onConfirm: () => addOrUpdateAppointment({ skipConcurrencyCheck: true }),
+        });
+        return;
+      }
       showNotification({
         title: "Error",
-        message: (error as Error).message,
+        message: error?.response?.data?.message || (error as Error).message,
         color: "red",
         autoClose: 3000,
         position: "top-right",
@@ -1008,7 +1029,7 @@ const ScheduleView: React.FC = () => {
    * CREAR CITAS MULTI-PROFESIONAL
    */
   const handleMultiSave = useCallback(
-    async (blocks: EmployeeBlockData[]) => {
+    async (blocks: EmployeeBlockData[], options?: { skipConcurrencyCheck?: boolean }) => {
       if (!organizationId || !newAppointment.client) return;
       setCreatingAppointment(true);
       try {
@@ -1032,6 +1053,7 @@ const ScheduleView: React.FC = () => {
             })(),
             customDurations: b.customDurations,
           })),
+          ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
         });
         showNotification({
           title: "Éxito",
@@ -1042,16 +1064,34 @@ const ScheduleView: React.FC = () => {
         });
         closeModal();
         fetchAppointmentsForMonth(currentDate);
-      } catch (error) {
+        setCreatingAppointment(false);
+      } catch (error: any) {
+        setCreatingAppointment(false);
+        const conflictData = error?.response?.data?.data;
+        if (conflictData?.code === "CONCURRENCY_LIMIT_REACHED") {
+          openConfirmModal({
+            title: "Conflicto de horario",
+            children: (
+              <Stack gap="xs">
+                <Text size="sm">{error.response.data.message}</Text>
+                <Text size="sm" c="dimmed">
+                  ¿Deseas crear las citas de todas formas? Alguno de los profesionales quedará con dos citas al mismo tiempo.
+                </Text>
+              </Stack>
+            ),
+            labels: { confirm: "Crear de todas formas", cancel: "Cancelar" },
+            confirmProps: { color: "orange" },
+            onConfirm: () => handleMultiSave(blocks, { skipConcurrencyCheck: true }),
+          });
+          return;
+        }
         showNotification({
           title: "Error",
-          message: (error as Error).message,
+          message: error?.response?.data?.message || (error as Error).message,
           color: "red",
           autoClose: 3000,
           position: "top-right",
         });
-      } finally {
-        setCreatingAppointment(false);
       }
     },
     [organizationId, newAppointment, currentDate, fetchAppointmentsForMonth, closeModal],
