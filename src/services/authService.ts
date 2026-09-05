@@ -54,11 +54,16 @@ export const loginSuperadmin = async (
 };
 
 // Función para renovar el token
+// ⚠️ Usa apiGeneral (baseURL = /api), NO apiAuth (baseURL = /api/login):
+// el endpoint real es POST /api/refresh, montado aparte de /api/login.
+// Pegarle a /api/login/refresh (bug anterior) daba 404 y además caía bajo el
+// rate limiter de login (5 req/15min), pensado para fuerza bruta, no para
+// renovaciones silenciosas de sesión.
 export const refreshToken = async (
   currentToken: string
 ): Promise<LoginResponse | null> => {
   try {
-    const response: AxiosResponse<{ data: LoginResponse }> = await apiAuth.post(
+    const response: AxiosResponse<{ data: LoginResponse }> = await apiGeneral.post(
       "/refresh",
       {},
       {
