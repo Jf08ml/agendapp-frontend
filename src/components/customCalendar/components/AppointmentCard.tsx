@@ -560,7 +560,7 @@ ${clientServices}`;
                           </Text>
 
                           <CopyButton
-                            value={appointment.client.phoneNumber}
+                            value={appointment.client.phoneNumber || ""}
                             timeout={2000}
                           >
                             {({ copied, copy }) => (

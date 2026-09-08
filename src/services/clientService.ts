@@ -15,7 +15,7 @@ export interface RewardHistoryEntry {
 export interface Client {
   _id: string;
   name: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   phone_e164?: string;
   phone_country?: string;
   email?: string;

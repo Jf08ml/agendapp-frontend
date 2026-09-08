@@ -15,7 +15,10 @@ import {
   ClassType, ClassSession,
   getClassesByOrganization, getAvailableSessions, createPublicEnrollment,
 } from "../../../services/classService";
-import { checkClientClassPackagesByIdentifier } from "../../../services/packageService";
+import {
+  checkClientClassPackagesByIdentifier,
+  ClientPackage,
+} from "../../../services/packageService";
 import { createClassCheckout, createReceiptClassCheckout } from "../../../services/collectionService";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -23,6 +26,8 @@ import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
 import StepAttendees, { AttendeeForm, emptyAttendee } from "./StepAttendees";
 import StepSummary from "./StepSummary";
+import StepBookingMode, { BookingMode } from "./StepBookingMode";
+import StepPackageLookup from "./StepPackageLookup";
 
 const STEPS = [
   { label: "Clase" },
@@ -48,6 +53,16 @@ export default function ClassBookingWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 🔀 Paso previo opcional (configurable por organización): elegir entre
+  // pagar una clase individual o usar un paquete ya comprado, antes de
+  // elegir la clase. Cuando la org no lo activa, arranca directo en "wizard"
+  // = comportamiento histórico, sin cambios.
+  const [phase, setPhase] = useState<"mode" | "lookup" | "wizard">(
+    organization?.enablePackageChoiceStep ? "mode" : "wizard"
+  );
+  const [bookingMode, setBookingMode] = useState<BookingMode | null>(null);
+  const [packageClassIds, setPackageClassIds] = useState<string[]>([]);
 
   // Datos
   const [classes, setClasses] = useState<ClassType[]>([]);
@@ -170,6 +185,43 @@ export default function ClassBookingWizard() {
       </Center>
     );
   }
+
+  // ── Paso previo: elegir clase paga vs. paquete ─────
+  const handleSelectBookingMode = (mode: BookingMode) => {
+    setBookingMode(mode);
+    setPackageClassIds([]);
+    setPhase(mode === "package" ? "lookup" : "wizard");
+  };
+
+  const handleFallbackToSingle = () => {
+    setBookingMode("single");
+    setPackageClassIds([]);
+    setPhase("wizard");
+  };
+
+  const handlePackageFound = (identifierValue: string, packages: ClientPackage[]) => {
+    const coveredIds = new Set<string>();
+    for (const pkg of packages) {
+      for (const c of pkg.classes || []) {
+        if (c.sessionsRemaining > 0) {
+          coveredIds.add(typeof c.classId === "object" ? c.classId._id : c.classId);
+        }
+      }
+    }
+    setPackageClassIds(Array.from(coveredIds));
+    if (identifierField === "phone") {
+      setAttendee((prev) => ({ ...prev, phone_e164: identifierValue, phone: identifierValue }));
+    } else if (identifierField === "email") {
+      setAttendee((prev) => ({ ...prev, email: identifierValue }));
+    } else {
+      setAttendee((prev) => ({ ...prev, documentId: identifierValue }));
+    }
+    setPhase("wizard");
+  };
+
+  const visibleClasses = bookingMode === "package" && packageClassIds.length > 0
+    ? classes.filter((c) => packageClassIds.includes(c._id))
+    : classes;
 
   const attendeeHasIdentifier = (a: typeof attendee) => {
     if (identifierField === "phone") return !!(a.phone_e164 || a.phone);
@@ -297,6 +349,9 @@ export default function ClassBookingWizard() {
     setAttendee(emptyAttendee());
     setCompanion(null);
     setFinishName("");
+    setBookingMode(null);
+    setPackageClassIds([]);
+    setPhase(organization?.enablePackageChoiceStep ? "mode" : "wizard");
   };
 
   // ── Contenido de cada paso ─────────────────────────
@@ -305,7 +360,7 @@ export default function ClassBookingWizard() {
       case 0:
         return (
           <StepSelectClass
-            classes={classes}
+            classes={visibleClasses}
             loading={loadingClasses}
             selected={selectedClass}
             onSelect={(c) => { setSelectedClass(c); setCurrentStep(1); }}
@@ -359,6 +414,34 @@ export default function ClassBookingWizard() {
   };
 
   const progressValue = Math.min((currentStep / STEPS.length) * 100, 100);
+
+  // ── Fases previas al wizard (paso "clase paga vs. paquete") ──
+  if (phase === "mode") {
+    return (
+      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+        <div ref={contentTopRef} />
+        <StepBookingMode onSelect={handleSelectBookingMode} />
+      </Card>
+    );
+  }
+
+  if (phase === "lookup") {
+    return (
+      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+        <div ref={contentTopRef} />
+        <StepPackageLookup
+          identifierField={identifierField}
+          organizationCountry={(organization as any)?.default_country || "CO"}
+          organizationId={organization._id}
+          classes={classes}
+          loadingClasses={loadingClasses}
+          onBack={() => setPhase("mode")}
+          onFallbackSingle={handleFallbackToSingle}
+          onFound={handlePackageFound}
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card

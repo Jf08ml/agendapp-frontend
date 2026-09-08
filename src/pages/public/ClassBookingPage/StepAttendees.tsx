@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Stack, TextInput, Textarea, Switch, Divider, Text, Alert,
   Badge, Card, Group, ThemeIcon, Loader,
@@ -134,6 +134,21 @@ export default function StepAttendees({
     const val = attendee.documentId.trim();
     if (val) await runLookup("documentId", val);
   };
+
+  // Si llegamos a este paso con el identificador ya cargado (ej. desde la
+  // búsqueda de paquete previa) y sin nombre, consultamos de una vez — de lo
+  // contrario el cliente solo se busca cuando el usuario toca/pierde el foco
+  // del campo, y aquí nadie lo tocó porque ya venía lleno.
+  useEffect(() => {
+    const idValue =
+      identifierField === "phone" ? (attendee.phone_e164 || attendee.phone)
+      : identifierField === "email" ? attendee.email
+      : attendee.documentId;
+    if (!attendee.name.trim() && idValue?.trim()) {
+      runLookup(identifierField, idValue);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const LookupFeedback = () => (
     <>

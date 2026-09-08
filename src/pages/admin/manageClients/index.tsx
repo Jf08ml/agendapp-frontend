@@ -101,7 +101,7 @@ const ClientsDashboard = () => {
     return clients.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
-        c.phoneNumber.toLowerCase().includes(q)
+        (c.phone_e164 || c.phoneNumber || "").toLowerCase().includes(q)
     );
   }, [debounced, clients]);
 

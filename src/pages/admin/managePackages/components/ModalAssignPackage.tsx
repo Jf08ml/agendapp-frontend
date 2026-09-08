@@ -23,7 +23,8 @@ import { formatCurrency } from "../../../../utils/formatCurrency";
 interface Client {
   _id: string;
   name: string;
-  phoneNumber: string;
+  phoneNumber?: string;
+  phone_e164?: string;
 }
 
 interface ModalAssignPackageProps {
@@ -87,12 +88,12 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
     return clients
       .filter(
         (c) =>
-          !q || c.name.toLowerCase().includes(q) || c.phoneNumber.includes(q)
+          !q || c.name.toLowerCase().includes(q) || (c.phone_e164 || c.phoneNumber || "").toLowerCase().includes(q)
       )
       .slice(0, 50)
       .map((c) => ({
         value: c._id,
-        label: `${c.name} - ${c.phoneNumber}`,
+        label: `${c.name} - ${c.phone_e164 || c.phoneNumber || "sin teléfono"}`,
       }));
   }, [clients, debouncedClientSearch]);
 

@@ -18,6 +18,8 @@ import {
   Center,
   Image,
   Badge,
+  List,
+  ThemeIcon,
 } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
@@ -38,9 +40,16 @@ import {
   IconUserCircle,
   IconSchool,
   IconBrandWhatsapp,
+  IconCheck,
+  IconShoppingCart,
+  IconTicket,
 } from "@tabler/icons-react";
 
 const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+const hasTiers = (pkg: PublicPackageItem) => (pkg.tiers?.length ?? 0) > 0;
+const minTierPrice = (pkg: PublicPackageItem) =>
+  Math.min(...(pkg.tiers || []).map((t) => t.price));
 
 interface Feature {
   title: string;
@@ -209,7 +218,7 @@ export function AcademyLandingLayout({
     })();
   }, [organizationId]);
 
-  // Teaser: destacados primero, máximo 6 programas / 4 servicios.
+  // Teaser: destacados primero, máximo 6 programas / 6 servicios.
   const teaserClasses = useMemo(() => {
     const featured = classes.filter((c) => c.featured);
     const rest = classes.filter((c) => !c.featured);
@@ -219,7 +228,7 @@ export function AcademyLandingLayout({
   const teaserServices = useMemo(() => {
     const featured = services.filter((s) => s.featured);
     const rest = services.filter((s) => !s.featured);
-    return [...featured, ...rest].slice(0, 4);
+    return [...featured, ...rest].slice(0, 6);
   }, [services]);
 
   const showLoyalty = org?.showLoyaltyProgram !== false;
@@ -331,6 +340,19 @@ export function AcademyLandingLayout({
                   >
                     Ver servicios
                   </Button>
+                  {packages.length > 0 && (
+                    <Button
+                      component="a"
+                      href="#paquetes"
+                      size="md"
+                      radius="md"
+                      variant="outline"
+                      leftSection={<IconTicket size={16} />}
+                      style={{ borderColor: "rgba(255,255,255,0.4)", color: "white", fontWeight: 500 }}
+                    >
+                      Ver paquetes
+                    </Button>
+                  )}
                 </Group>
               </Stack>
             </Grid.Col>
@@ -718,7 +740,7 @@ export function AcademyLandingLayout({
             {loadingServices ? (
               <Text ta="center" c="dimmed" py="xl">Cargando servicios...</Text>
             ) : teaserServices.length > 0 ? (
-              <SimpleGrid cols={{ base: 2, sm: 2, md: 4 }} spacing="md">
+              <SimpleGrid cols={{ base: 2, sm: 2, md: 3 }} spacing="md">
                 {teaserServices.map((service) => (
                   <Card key={service._id} shadow="xs" padding={0} radius="lg" withBorder style={{ overflow: "hidden", borderColor: theme.colors.gray[2] }}>
                     <AspectRatio ratio={4 / 3}>
@@ -792,6 +814,92 @@ export function AcademyLandingLayout({
           </Stack>
         </Container>
       </Box>
+
+      {/* ─── Comprar paquetes ─────────────────────────────────────────────── */}
+      {packages.length > 0 && (
+        <Container id="paquetes" size="lg" py={{ base: rem(64), sm: rem(88) }}>
+          <Stack gap="xl">
+            <Box>
+              <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }} mb="xs">
+                Paquetes
+              </Text>
+              <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
+                Comprar paquetes.
+              </Title>
+              <Text c={theme.colors.gray[6]} fz={{ base: "md", sm: "lg" }} mt="xs">
+                Ahorra comprando varias sesiones de una vez, con tarifa preferencial.
+              </Text>
+            </Box>
+
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+              {packages.map((pkg) => {
+                const tiered = hasTiers(pkg);
+                return (
+                  <Card key={pkg._id} withBorder radius="lg" p="lg" style={{ borderColor: theme.colors.gray[2] }}>
+                    <Stack gap="sm" h="100%">
+                      <Group gap="xs" wrap="nowrap">
+                        <ThemeIcon size={32} radius="xl" variant="light" color={theme.primaryColor}>
+                          <IconTicket size={18} />
+                        </ThemeIcon>
+                        <Text fw={600} fz="md" c={theme.colors.gray[9]} style={{ flex: 1 }}>
+                          {pkg.name}
+                        </Text>
+                      </Group>
+
+                      {pkg.description && (
+                        <Text size="sm" c={theme.colors.gray[6]} lineClamp={2}>
+                          {pkg.description}
+                        </Text>
+                      )}
+
+                      <Text fw={700} fz="lg" c={primary}>
+                        {tiered
+                          ? `Desde ${formatCurrency(minTierPrice(pkg), org?.currency || "COP")}`
+                          : formatCurrency(pkg.price ?? 0, org?.currency || "COP")}
+                      </Text>
+
+                      {tiered && (
+                        <Group gap={6}>
+                          {pkg.tiers!.map((t) => (
+                            <Badge key={t._id} variant="outline" color={theme.primaryColor} size="sm">
+                              {t.label}
+                            </Badge>
+                          ))}
+                        </Group>
+                      )}
+
+                      <List
+                        spacing={4}
+                        size="sm"
+                        icon={<ThemeIcon color="teal" size={16} radius="xl"><IconCheck size={11} /></ThemeIcon>}
+                      >
+                        {(pkg.services || []).map((s, i) => (
+                          <List.Item key={`s-${i}`}>{s.serviceId?.name || "Servicio"}</List.Item>
+                        ))}
+                        {(pkg.classes || []).map((c, i) => (
+                          <List.Item key={`c-${i}`}>{c.classId?.name || "Clase"}</List.Item>
+                        ))}
+                      </List>
+
+                      <Button
+                        mt="auto"
+                        component={Link}
+                        to={buildPackageBuyLink(pkg._id)}
+                        fullWidth
+                        radius="md"
+                        color={theme.primaryColor}
+                        leftSection={<IconShoppingCart size={16} />}
+                      >
+                        Comprar
+                      </Button>
+                    </Stack>
+                  </Card>
+                );
+              })}
+            </SimpleGrid>
+          </Stack>
+        </Container>
+      )}
 
       {/* ─── Equipo ───────────────────────────────────────────────────────── */}
       {(loadingEmployees || employees.length > 0) && (

@@ -129,6 +129,28 @@ export default function ManageClasses() {
     }
   };
 
+  const packageChoiceStepEnabled = !!organization?.enablePackageChoiceStep;
+  const [savingPackageChoiceToggle, setSavingPackageChoiceToggle] = useState(false);
+
+  const handleTogglePackageChoiceStep = async (checked: boolean) => {
+    if (!organization?._id) return;
+    setSavingPackageChoiceToggle(true);
+    try {
+      await updateOrganization(organization._id, { enablePackageChoiceStep: checked });
+      await dispatch(fetchOrganizationConfig());
+      showNotification({
+        message: checked
+          ? "El cliente elegirá primero entre clase paga o paquete al reservar."
+          : "Se quitó el paso de elegir clase paga o paquete al reservar.",
+        color: "green",
+      });
+    } catch {
+      showNotification({ message: "No se pudo actualizar la configuración", color: "red" });
+    } finally {
+      setSavingPackageChoiceToggle(false);
+    }
+  };
+
   // Datos
   const [rooms, setRooms] = useState<Room[]>([]);
   const [classes, setClasses] = useState<ClassType[]>([]);
@@ -736,6 +758,13 @@ export default function ManageClasses() {
                   checked={allowCompanion}
                   onChange={(e) => handleToggleAllowCompanion(e.currentTarget.checked)}
                   disabled={!organization?._id || savingCompanionToggle}
+                />
+                <Switch
+                  label={packageChoiceStepEnabled ? "Elección clase paga/paquete activa" : "Elección clase paga/paquete inactiva"}
+                  description="Pedir al cliente elegir si paga una clase o usa un paquete, antes de elegir la clase"
+                  checked={packageChoiceStepEnabled}
+                  onChange={(e) => handleTogglePackageChoiceStep(e.currentTarget.checked)}
+                  disabled={!organization?._id || savingPackageChoiceToggle}
                 />
               </Group>
             </Group>
