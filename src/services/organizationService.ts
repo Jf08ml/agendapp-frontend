@@ -154,6 +154,11 @@ export interface Organization {
   showLoyaltyProgram?: boolean;
   enableOnlineBooking?: boolean;
   enableClassBooking?: boolean;
+  // Visibilidad de las tarjetas de acceso rápido "Nuestros Servicios" y "Ubicación"
+  // en los layouts modern/minimal/cards. Sin equivalente hasta ahora (a diferencia
+  // de las otras tarjetas, que ya tenían su propio flag).
+  showServicesCard?: boolean;
+  showLocationCard?: boolean;
   setupCompleted?: boolean;
   onboardingMilestones?: {
     setupCompletedAt?: string | null;

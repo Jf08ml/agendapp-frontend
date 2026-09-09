@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack, TextInput, Textarea, Select, Text, Group, Button, Alert } from "@mantine/core";
+import { SimpleGrid, Stack, TextInput, Textarea, Select, Text, Group, Button, Alert, Switch } from "@mantine/core";
 import { useMemo, useRef } from "react";
 import { useSelector } from "react-redux";
 import { QRCodeCanvas } from "qrcode.react";
@@ -20,6 +20,7 @@ import {
   IconCopy,
   IconDownload,
   IconAlertCircle,
+  IconApps,
 } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
@@ -282,6 +283,28 @@ export default function ContactTab({
             {...form.getInputProps("welcomeDescription")}
             disabled={!isEditing}
             minRows={3}
+          />
+        </Stack>
+      </SectionCard>
+
+      <SectionCard
+        title="Tarjetas de acceso rápido"
+        description="Controla qué tarjetas de acceso rápido ven tus clientes en la página de inicio (diseños Moderno, Minimalista y Tarjetas)."
+        icon={<IconApps size={16} />}
+        iconColor="teal"
+      >
+        <Stack gap="md">
+          <Switch
+            label="Mostrar tarjeta 'Nuestros Servicios'"
+            description="Enlaza al catálogo de precios y servicios"
+            {...form.getInputProps("showServicesCard", { type: "checkbox" })}
+            disabled={!isEditing}
+          />
+          <Switch
+            label="Mostrar tarjeta 'Ubicación'"
+            description="Enlaza a la dirección, mapa y horarios del negocio"
+            {...form.getInputProps("showLocationCard", { type: "checkbox" })}
+            disabled={!isEditing}
           />
         </Stack>
       </SectionCard>

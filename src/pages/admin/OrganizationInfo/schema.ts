@@ -141,6 +141,8 @@ export const schema = z.object({
   enableOnlineBooking: z.boolean().optional(),
   reservationPolicy: z.enum(["manual", "auto_if_available"]).optional(),
   enableClassBooking: z.boolean().optional(),
+  showServicesCard: z.boolean().optional(),
+  showLocationCard: z.boolean().optional(),
   blockHolidaysForReservations: z.boolean().optional(),
   allowedHolidayDates: z.array(z.string()).optional(),
   termsAndConditions: z

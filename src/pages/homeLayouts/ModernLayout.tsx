@@ -5,7 +5,7 @@ import {
   Text,
   Card,
   Box,
-  SimpleGrid,
+  Flex,
   useMantineTheme,
   rem,
   Stack,
@@ -61,7 +61,7 @@ export function ModernLayout({
         </Stack>
 
         {/* Features Grid */}
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" verticalSpacing="md">
+        <Flex wrap="wrap" justify="center" gap="md">
           {features.map((f) => (
             <Card
               key={f.link}
@@ -74,6 +74,8 @@ export function ModernLayout({
                 transition: "all 200ms ease",
                 backgroundColor: theme.white,
                 borderColor: theme.colors.gray[2],
+                flex: "1 1 260px",
+                maxWidth: rem(320),
               }}
               className="feature-card"
             >
@@ -111,7 +113,7 @@ export function ModernLayout({
               </Group>
             </Card>
           ))}
-        </SimpleGrid>
+        </Flex>
       </Container>
 
       <style>

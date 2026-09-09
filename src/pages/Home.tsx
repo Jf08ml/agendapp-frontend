@@ -26,6 +26,7 @@ export default function Home() {
       title: "Nuestros Servicios",
       icon: <GiPriceTag size={28} />,
       link: "/servicios-precios",
+      show: organization?.showServicesCard ?? true,
     },
     {
       title: "Reservar clase",
@@ -61,6 +62,7 @@ export default function Home() {
       title: "Ubicación",
       icon: <GrLocation size={28} />,
       link: "/location",
+      show: organization?.showLocationCard ?? true,
     },
   ];
 

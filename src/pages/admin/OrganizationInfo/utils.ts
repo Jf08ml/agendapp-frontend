@@ -39,6 +39,8 @@ export const normalizeOrg = (response: Organization): Organization => ({
   enableOnlineBooking: response.enableOnlineBooking ?? true,
   reservationPolicy: response.reservationPolicy ?? "manual",
   enableClassBooking: response.enableClassBooking ?? false,
+  showServicesCard: response.showServicesCard ?? true,
+  showLocationCard: response.showLocationCard ?? true,
   setupCompleted: response.setupCompleted ?? false,
   blockHolidaysForReservations: response.blockHolidaysForReservations ?? false,
   allowedHolidayDates: Array.isArray(response.allowedHolidayDates)

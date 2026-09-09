@@ -5,7 +5,7 @@ import {
   Text,
   Card,
   Box,
-  SimpleGrid,
+  Flex,
   useMantineTheme,
   rem,
   Stack,
@@ -58,7 +58,7 @@ export function CardsLayout({
         </Stack>
 
         {/* Features Grid */}
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 2 }} spacing={{ base: "md", sm: "lg" }}>
+        <Flex wrap="wrap" justify="center" gap={{ base: "md", sm: "lg" }}>
           {features.map((f) => (
             <Card
               key={f.link}
@@ -71,6 +71,8 @@ export function CardsLayout({
                 transition: "all 200ms ease",
                 backgroundColor: theme.white,
                 borderColor: theme.colors.gray[2],
+                flex: "1 1 280px",
+                maxWidth: rem(360),
               }}
               className="cards-card"
             >
@@ -102,7 +104,7 @@ export function CardsLayout({
               </Stack>
             </Card>
           ))}
-        </SimpleGrid>
+        </Flex>
       </Container>
 
       <style>
