@@ -170,7 +170,7 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
         <MpDepositNotice
           percentage={deposit.percentage}
           currency={deposit.currency}
-          amount={Math.round((total * deposit.percentage) / 100)}
+          amount={classDoc.hidePrice ? undefined : Math.round((total * deposit.percentage) / 100)}
           objectLabel="tu inscripción"
         />
       )}

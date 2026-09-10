@@ -16,6 +16,8 @@ interface ReservationDepositAlertProps {
   servicePrice?: number;
   appointmentDate?: string;
   appointmentTime?: string;
+  /** Si algún servicio de la reserva tiene el precio oculto, no se muestra el monto exacto del abono. */
+  hidePrice?: boolean;
 }
 
 export function ReservationDepositAlert({
@@ -25,6 +27,7 @@ export function ReservationDepositAlert({
   servicePrice = 0,
   appointmentDate,
   appointmentTime,
+  hidePrice = false,
 }: ReservationDepositAlertProps) {
   const organization = useSelector((state: RootState) => state.organization.organization);
   const [opened, { open, close }] = useDisclosure(false);
@@ -90,7 +93,9 @@ export function ReservationDepositAlert({
       `Hora: ${appointmentTime || "N/A"}\n` +
       `Servicio: ${serviceName || "N/A"}\n` +
       `Cliente: ${clientName || "N/A"}\n` +
-      `Abono: ${formatCurrency(depositAmount, currency)} (${depositPercentage}%)\n` +
+      (hidePrice
+        ? `Abono: ${depositPercentage}%\n`
+        : `Abono: ${formatCurrency(depositAmount, currency)} (${depositPercentage}%)\n`) +
       `ID Reserva: ${reservationId || "N/A"}\n\n` +
       `Espero confirmacion de la reserva. Gracias!`
     );
@@ -121,33 +126,35 @@ export function ReservationDepositAlert({
           </Text>
         </div>
 
-        {/* Monto a abonar */}
-        <Card withBorder padding="sm" style={{ backgroundColor: "#fff3e0" }}>
-          <Group justify="space-between" wrap="nowrap">
-            <div>
-              <Text size="xs" c="dimmed">
-                Monto a abonar:
-              </Text>
-              <Text size={isMobile ? "md" : "lg"} fw={700} c="orange">
-                {formatCurrency(depositAmount, currency)}
-              </Text>
-            </div>
-            <CopyButton value={depositAmount.toString()}>
-              {({ copied, copy }) => (
-                <Tooltip label={copied ? "¡Copiado!" : "Copiar monto"}>
-                  <ActionIcon
-                    color={copied ? "teal" : "gray"}
-                    variant="light"
-                    onClick={copy}
-                    size={isMobile ? "md" : "lg"}
-                  >
-                    {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </CopyButton>
-          </Group>
-        </Card>
+        {/* Monto a abonar (oculto si el servicio tiene el precio oculto) */}
+        {!hidePrice && (
+          <Card withBorder padding="sm" style={{ backgroundColor: "#fff3e0" }}>
+            <Group justify="space-between" wrap="nowrap">
+              <div>
+                <Text size="xs" c="dimmed">
+                  Monto a abonar:
+                </Text>
+                <Text size={isMobile ? "md" : "lg"} fw={700} c="orange">
+                  {formatCurrency(depositAmount, currency)}
+                </Text>
+              </div>
+              <CopyButton value={depositAmount.toString()}>
+                {({ copied, copy }) => (
+                  <Tooltip label={copied ? "¡Copiado!" : "Copiar monto"}>
+                    <ActionIcon
+                      color={copied ? "teal" : "gray"}
+                      variant="light"
+                      onClick={copy}
+                      size={isMobile ? "md" : "lg"}
+                    >
+                      {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
+                    </ActionIcon>
+                  </Tooltip>
+                )}
+              </CopyButton>
+            </Group>
+          </Card>
+        )}
 
         {/* Métodos de pago */}
         {paymentMethods.length > 0 && (

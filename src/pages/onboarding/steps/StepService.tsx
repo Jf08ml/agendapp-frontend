@@ -49,7 +49,7 @@ export default function StepService({ onDone }: Props) {
   const canSave =
     name.trim().length > 1 &&
     type.trim().length > 1 &&
-    (isFreeService || price > 0) &&
+    (price ?? 0) >= 0 &&
     duration > 0;
 
   const handleDrop = (files: File[]) => setImageFiles((prev) => [...prev, ...files]);
@@ -89,7 +89,7 @@ export default function StepService({ onDone }: Props) {
         recommendations,
         price: isFreeService ? 0 : price,
         duration,
-        hidePrice: isFreeService ? false : hidePrice,
+        hidePrice,
         maxConcurrentAppointments: maxConcurrent,
         images: finalImages as any,
         costs: finalCosts,
@@ -167,7 +167,7 @@ export default function StepService({ onDone }: Props) {
               checked={isFreeService}
               onChange={(e) => {
                 setIsFreeService(e.currentTarget.checked);
-                if (e.currentTarget.checked) { setPrice(0); setHidePrice(false); }
+                if (e.currentTarget.checked) { setPrice(0); }
               }}
             />
             {!isFreeService && (
@@ -181,7 +181,7 @@ export default function StepService({ onDone }: Props) {
                 onChange={(v) => setPrice(typeof v === "number" ? v : 0)}
                 required
                 withAsterisk
-                min={1}
+                min={0}
               />
             )}
 
@@ -223,14 +223,16 @@ export default function StepService({ onDone }: Props) {
               autosize
             />
 
-            {!isFreeService && (
-              <Switch
-                label="Ocultar precio al cliente"
-                description="El precio no será visible en la vista pública"
-                checked={hidePrice}
-                onChange={(e) => setHidePrice(e.currentTarget.checked)}
-              />
-            )}
+            <Switch
+              label="Ocultar precio al cliente"
+              description={
+                isFreeService
+                  ? "En vez de mostrar \"Gratis\", se mostrará \"Consultar\" — útil si no quieres anunciar públicamente que es gratuito"
+                  : "El precio no será visible en la vista pública (se mostrará \"Consultar\")"
+              }
+              checked={hidePrice}
+              onChange={(e) => setHidePrice(e.currentTarget.checked)}
+            />
 
             <Box>
               <NumberInput

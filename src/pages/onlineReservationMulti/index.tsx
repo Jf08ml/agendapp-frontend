@@ -487,6 +487,9 @@ export default function MultiBookingWizard() {
           const service = services.find((s) => s._id === date.serviceId);
           return total + (service?.price || 0);
         }, 0);
+        const anyHidePrice = dates.some(
+          (date) => services.find((s) => s._id === date.serviceId)?.hidePrice
+        );
         return (
           <Stack gap={isMobile ? "md" : "lg"}>
             <StepMultiServiceSummary
@@ -504,7 +507,7 @@ export default function MultiBookingWizard() {
               <MpDepositNotice
                 percentage={depositPct}
                 currency={organization?.currency ?? "COP"}
-                amount={Math.round((depositSubtotal * depositPct) / 100)}
+                amount={anyHidePrice ? undefined : Math.round((depositSubtotal * depositPct) / 100)}
                 objectLabel="tu reserva"
               />
             )}
@@ -632,6 +635,9 @@ export default function MultiBookingWizard() {
                     );
                     return total + (service?.price || 0);
                   }, 0)}
+                  hidePrice={dates.some(
+                    (date) => services.find((s) => s._id === date.serviceId)?.hidePrice
+                  )}
                   appointmentDate={
                     dates[0]?.date
                       ? dayjs(dates[0].date).format("DD/MM/YYYY")

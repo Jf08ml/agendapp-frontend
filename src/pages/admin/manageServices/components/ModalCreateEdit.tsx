@@ -123,7 +123,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   const canSave =
     editingService.name.trim().length > 1 &&
     (editingService.type ?? "").trim().length > 1 &&
-    (isFreeService || (editingService.price ?? 0) > 0) &&
+    (editingService.price ?? 0) >= 0 &&
     (editingService.duration ?? 0) > 0;
 
   const handleSave = async () => {
@@ -194,7 +194,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   const checked = e.currentTarget.checked;
                   setIsFreeService(checked);
                   if (checked) {
-                    setEditingService({ ...editingService, price: 0, hidePrice: false });
+                    setEditingService({ ...editingService, price: 0 });
                   }
                 }}
               />
@@ -209,7 +209,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   onChange={(value) => setEditingService({ ...editingService, price: typeof value === "number" ? value : 0 })}
                   required
                   withAsterisk
-                  min={1}
+                  min={0}
                 />
               )}
               <Box>
@@ -253,14 +253,16 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 minRows={2}
                 autosize
               />
-              {!isFreeService && (
-                <Switch
-                  label="Ocultar precio al cliente"
-                  description="El precio no será visible en la vista pública"
-                  checked={editingService.hidePrice ?? false}
-                  onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
-                />
-              )}
+              <Switch
+                label="Ocultar precio al cliente"
+                description={
+                  isFreeService
+                    ? "En vez de mostrar \"Gratis\", se mostrará \"Consultar\" — útil si no quieres anunciar públicamente que es gratuito"
+                    : "El precio no será visible en la vista pública (se mostrará \"Consultar\")"
+                }
+                checked={editingService.hidePrice ?? false}
+                onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
+              />
               <Switch
                 label="⭐ Servicio destacado"
                 description="Se muestra de primero en la página pública, la reserva en línea y el asistente IA"

@@ -32,6 +32,7 @@ import {
   BsDownload,
   BsStar,
   BsStarFill,
+  BsEyeSlash,
 } from "react-icons/bs";
 import { IconFileUpload } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
@@ -320,9 +321,23 @@ const AdminServices: React.FC = () => {
         <Text size="sm">{service.duration} min</Text>
       </Table.Td>
       <Table.Td>
-        <Text size="sm" fw={600}>
-          {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
-        </Text>
+        <Group gap={6} wrap="nowrap">
+          <Text size="sm" fw={600}>
+            {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
+          </Text>
+          {service.hidePrice && (
+            <Tooltip label="El precio no se muestra a los clientes (aparece 'Consultar')" withArrow>
+              <Badge
+                variant="light"
+                color="gray"
+                size="xs"
+                leftSection={<BsEyeSlash size={9} />}
+              >
+                Oculto
+              </Badge>
+            </Tooltip>
+          )}
+        </Group>
       </Table.Td>
       <Table.Td>
         <Group gap={6} wrap="nowrap">
@@ -497,15 +512,6 @@ const AdminServices: React.FC = () => {
           </Table.ScrollContainer>
         </Card>
       )}
-
-      <ModalCreateEdit
-        isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setEditingService(null); }}
-        onSave={handleSaveService}
-        allTypes={allTypes}
-        allServices={services}
-        service={editingService}
-      />
 
       <BulkUploadModal
         opened={isBulkUploadModalOpen}
