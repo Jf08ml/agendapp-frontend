@@ -40,6 +40,8 @@ export interface Appointment {
   paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'free';
   clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
   sessionNotes?: string; // 📝 Registro de lo hecho en la sesión (concepto genérico)
+  /** Valores de campos personalizados con scope "booking" (clientFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
   reminderSent?: boolean;
   // 📶 Entrega real reportada por WhatsApp (ack de Baileys) — independiente
   // de reminderSent, que solo dice "se intentó enviar"
@@ -148,6 +150,8 @@ export interface CreateMultiEmployeeBatchPayload {
   blocks: MultiEmployeeBlockPayload[];
   /** Omite la validación de solapamiento — usar SOLO tras confirmación explícita del admin sobre un conflicto ya informado */
   skipConcurrencyCheck?: boolean;
+  /** Valores de campos personalizados con scope "booking" (Organization.clientFormConfig.fields) */
+  customFieldValues?: Record<string, unknown>;
 }
 
 /** Payload para el endpoint BATCH RECOMENDADO */
@@ -172,6 +176,8 @@ export interface CreateAppointmentsBatchPayload {
   usePackageForServices?: Record<string, string>;
   /** Omite la validación de solapamiento — usar SOLO tras confirmación explícita del admin sobre un conflicto ya informado */
   skipConcurrencyCheck?: boolean;
+  /** Valores de campos personalizados con scope "booking" (Organization.clientFormConfig.fields) */
+  customFieldValues?: Record<string, unknown>;
 }
 
 interface Response<T> {
@@ -366,6 +372,9 @@ export const createAppointmentsBatch = async (
       ...(data.clientPackageId && { clientPackageId: data.clientPackageId }),
       ...(data.usePackageForServices && { usePackageForServices: data.usePackageForServices }),
       ...(data.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
+      ...(data.customFieldValues && Object.keys(data.customFieldValues).length > 0
+        ? { customFieldValues: data.customFieldValues }
+        : {}),
     };
     const res = await apiAppointment.post<Response<Appointment[]>>(
       "/batch",

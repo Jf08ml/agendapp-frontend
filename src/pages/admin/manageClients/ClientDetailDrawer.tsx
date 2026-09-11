@@ -36,6 +36,7 @@ import {
   IconTrash,
   IconUserPlus,
   IconCirclePlus,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import { RootState } from "../../../app/store";
 import { selectOrganization } from "../../../features/organization/sliceOrganization";
@@ -55,6 +56,7 @@ import {
   updateAppointmentNotes,
 } from "../../../services/appointmentService";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
+import { formatCurrency } from "../../../utils/formatCurrency";
 import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 import { getLoyaltyProgress } from "./utils/loyaltyProgress";
 
@@ -209,6 +211,8 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
   const [noteModalOpened, setNoteModalOpened] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
+  const [summaryModalOpened, setSummaryModalOpened] = useState(false);
+  const [summaryAppointment, setSummaryAppointment] = useState<Appointment | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
@@ -298,6 +302,11 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     setEditingAppointment(appointment);
     setNoteDraft(appointment.sessionNotes || "");
     setNoteModalOpened(true);
+  };
+
+  const handleOpenSummary = (appointment: Appointment) => {
+    setSummaryAppointment(appointment);
+    setSummaryModalOpened(true);
   };
 
   const handleSaveNote = async () => {
@@ -515,7 +524,24 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                       <Text size="sm">{client.notes}</Text>
                     </Box>
                   )}
-                  {!client.email && !client.documentId && !client.birthDate && !client.notes && (
+                  {client.customFieldValues &&
+                    Object.entries(client.customFieldValues).map(([key, value]) => {
+                      if (value === undefined || value === null || value === "") return null;
+                      const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                      const label = def?.label || key;
+                      const displayValue =
+                        def?.type === "date" && value
+                          ? new Date(value as string).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" })
+                          : String(value);
+                      return (
+                        <Group key={key} justify="space-between">
+                          <Text size="sm" c="dimmed">{label}</Text>
+                          <Text size="sm">{displayValue}</Text>
+                        </Group>
+                      );
+                    })}
+                  {!client.email && !client.documentId && !client.birthDate && !client.notes &&
+                    !(client.customFieldValues && Object.keys(client.customFieldValues).length > 0) && (
                     <Text size="xs" c="dimmed">Sin información adicional registrada.</Text>
                   )}
                 </Stack>
@@ -557,6 +583,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                         <Table.Th>Fecha</Table.Th>
                         <Table.Th>Estado</Table.Th>
                         <Table.Th>Notas</Table.Th>
+                        <Table.Th></Table.Th>
                       </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
@@ -581,6 +608,13 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                                   </ActionIcon>
                                 </Tooltip>
                               </Group>
+                            </Table.Td>
+                            <Table.Td>
+                              <Tooltip label="Ver resumen de la cita">
+                                <ActionIcon variant="subtle" size="sm" onClick={() => handleOpenSummary(a)}>
+                                  <IconInfoCircle size={14} />
+                                </ActionIcon>
+                              </Tooltip>
                             </Table.Td>
                           </Table.Tr>
                         );
@@ -705,6 +739,91 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                 Guardar
               </Button>
             </Group>
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Modal resumen de la cita */}
+      <Modal
+        opened={summaryModalOpened}
+        onClose={() => setSummaryModalOpened(false)}
+        title={
+          <Group gap={6}>
+            <IconInfoCircle size={16} />
+            <Text fw={600}>Resumen de la cita</Text>
+          </Group>
+        }
+        centered
+        size="md"
+        zIndex={1000}
+      >
+        {summaryAppointment && (
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">Servicio</Text>
+              <Text size="sm" fw={500}>{summaryAppointment.service?.name ?? "—"}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">Profesional</Text>
+              <Text size="sm" fw={500}>{(summaryAppointment.employee as any)?.names ?? "—"}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">Fecha y hora</Text>
+              <Text size="sm" fw={500}>
+                {formatInTimezone(summaryAppointment.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
+              </Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">Estado</Text>
+              <Badge color={getStatusBadge(summaryAppointment.status).color} variant="light">
+                {getStatusBadge(summaryAppointment.status).label}
+              </Badge>
+            </Group>
+            {typeof summaryAppointment.totalPrice === "number" && (
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">Precio</Text>
+                <Text size="sm" fw={500}>
+                  {formatCurrency(summaryAppointment.totalPrice, organization?.currency || "COP")}
+                </Text>
+              </Group>
+            )}
+            {!!summaryAppointment.advancePayment && (
+              <Group justify="space-between">
+                <Text size="sm" c="dimmed">Abono</Text>
+                <Text size="sm" fw={500}>
+                  {formatCurrency(summaryAppointment.advancePayment, organization?.currency || "COP")}
+                </Text>
+              </Group>
+            )}
+
+            {summaryAppointment.customFieldValues &&
+              Object.keys(summaryAppointment.customFieldValues).length > 0 && (
+                <>
+                  <Text size="sm" fw={600} c="dimmed" mt="xs">Campos personalizados</Text>
+                  {Object.entries(summaryAppointment.customFieldValues).map(([key, value]) => {
+                    if (value === undefined || value === null || value === "") return null;
+                    const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                    const label = def?.label || key;
+                    const displayValue =
+                      def?.type === "date" && value
+                        ? formatInTimezone(value as string, timezone, "DD/MM/YYYY")
+                        : String(value);
+                    return (
+                      <Group key={key} justify="space-between">
+                        <Text size="sm" c="dimmed">{label}</Text>
+                        <Text size="sm" fw={500}>{displayValue}</Text>
+                      </Group>
+                    );
+                  })}
+                </>
+              )}
+
+            {summaryAppointment.sessionNotes && (
+              <>
+                <Text size="sm" fw={600} c="dimmed" mt="xs">Notas de la sesión</Text>
+                <Text size="sm">{summaryAppointment.sessionNotes}</Text>
+              </>
+            )}
           </Stack>
         )}
       </Modal>

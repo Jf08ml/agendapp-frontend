@@ -11,8 +11,10 @@ import InternationalPhoneInput from "../../../components/InternationalPhoneInput
 import { CountryCode } from "libphonenumber-js";
 import {
   DEFAULT_CLIENT_FORM_CONFIG,
+  BUILT_IN_FIELD_KEYS,
   type ClientFieldConfig,
 } from "../../../services/organizationService";
+import DynamicFormFields from "../../../components/DynamicFormFields";
 
 interface ClientFormModalProps {
   opened: boolean;
@@ -46,6 +48,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [documentId, setDocumentId] = useState("");
   const [notes, setNotes] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
 
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
@@ -66,6 +69,11 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
   const documentIdCfg = fieldCfg("documentId");
   const notesCfg      = fieldCfg("notes");
 
+  // Campos personalizados con scope "client" (persisten en el perfil del cliente)
+  const clientScopeCustomFields = configFields.filter(
+    (f) => !(BUILT_IN_FIELD_KEYS as readonly string[]).includes(f.key) && f.enabled && f.scope === "client"
+  );
+
   const resetForm = () => {
     setName("");
     setPhoneNumber("");
@@ -78,6 +86,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
     setBirthDate(null);
     setDocumentId("");
     setNotes("");
+    setCustomFieldValues({});
     setClient?.(null);
   };
 
@@ -95,6 +104,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
       setBirthDate(client.birthDate ? new Date(client.birthDate) : null);
       setDocumentId((client as any).documentId?.trim() || "");
       setNotes((client as any).notes?.trim() || "");
+      setCustomFieldValues(client.customFieldValues || {});
     } else {
       resetForm();
     }
@@ -152,6 +162,7 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
         birthDate: birthDate || null,
         documentId: documentId.trim() || undefined,
         notes: notes.trim() || undefined,
+        ...(Object.keys(customFieldValues).length > 0 ? { customFieldValues } : {}),
       };
 
       let savedClient: Client | undefined;
@@ -298,6 +309,16 @@ const ClientFormModal: React.FC<ClientFormModalProps> = ({
             minRows={2}
             autosize
           />
+        )}
+
+        {clientScopeCustomFields.length > 0 && (
+          <Box mt="sm">
+            <DynamicFormFields
+              fields={clientScopeCustomFields}
+              values={customFieldValues}
+              onChange={(key, value) => setCustomFieldValues((prev) => ({ ...prev, [key]: value }))}
+            />
+          </Box>
         )}
 
         <Box mt="md" style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>

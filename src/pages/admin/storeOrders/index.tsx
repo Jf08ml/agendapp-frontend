@@ -1,6 +1,8 @@
 // Bandeja admin de pedidos de la tienda pública (/pedidos).
 // Clon estructural de pages/admin/payments/ReceiptReviewPage.tsx.
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 import {
   Container,
   Title,
@@ -89,6 +91,7 @@ export default function StoreOrdersPage() {
   const { hasPermission } = usePermissions();
   const canRead = hasPermission("inventory:read");
   const canManage = hasPermission("inventory:manage");
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const [orders, setOrders] = useState<StoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -403,6 +406,17 @@ export default function StoreOrdersPage() {
                       Notas: {delivery.notes}
                     </Text>
                   )}
+                  {order.store?.customFieldValues &&
+                    Object.entries(order.store.customFieldValues).map(([key, value]) => {
+                      if (value === undefined || value === null || value === "") return null;
+                      const def = organization?.storeFormConfig?.fields?.find((f) => f.key === key);
+                      const label = def?.label || key;
+                      return (
+                        <Text key={key} size="xs" c="dimmed">
+                          {label}: {String(value)}
+                        </Text>
+                      );
+                    })}
                 </Stack>
 
                 {(canDeliver || canCollect || canCancel || canDelete) && (

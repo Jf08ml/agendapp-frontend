@@ -58,8 +58,10 @@ import { useStoreCart } from "../../hooks/useStoreCart";
 import { getClientByIdentifier } from "../../services/clientService";
 import {
   DEFAULT_STORE_FORM_CONFIG,
+  BUILT_IN_FIELD_KEYS,
   type ClientFieldConfig,
 } from "../../services/organizationService";
+import DynamicFormFields from "../../components/DynamicFormFields";
 import { type ReceiptPaymentMethod } from "../../services/collectionService";
 import {
   getCatalog,
@@ -227,6 +229,15 @@ export default function PublicStorePage() {
   const phoneCfg = fieldCfg("phone");
   const emailCfg = fieldCfg("email");
   const documentIdCfg = fieldCfg("documentId");
+  // Campos personalizados (fuera del set built-in), habilitados — la tienda no
+  // crea Client, así que todos se tratan como "booking" (ligados al pedido).
+  const customFields = configFields.filter(
+    (f) => !(BUILT_IN_FIELD_KEYS as readonly string[]).includes(f.key) && f.enabled
+  );
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
+  const handleCustomFieldChange = (key: string, value: string | number | Date | null) => {
+    setCustomFieldValues((prev) => ({ ...prev, [key]: value }));
+  };
 
   // ── Modal de checkout ──────────────────────────────────────────────────────
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -476,6 +487,7 @@ export default function PublicStorePage() {
             ? { lat: deliveryLat, lng: deliveryLng }
             : {}),
         },
+        ...(Object.keys(customFieldValues).length > 0 ? { customFieldValues } : {}),
       };
 
       if (payMethod === "mp") {
@@ -1266,6 +1278,14 @@ export default function PublicStorePage() {
               required={emailCfg.required}
             />
           )}
+
+          {/* Campos personalizados de la organización */}
+          <DynamicFormFields
+            fields={customFields}
+            values={customFieldValues}
+            onChange={handleCustomFieldChange}
+            disabled={isLookingUp}
+          />
 
           <Divider label="Entrega" labelPosition="left" />
 

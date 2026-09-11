@@ -28,6 +28,8 @@ export interface Client {
   rewardHistory?: RewardHistoryEntry[];
   organizationId: string;
   birthDate: Date | null;
+  /** Valores de campos personalizados con scope "client" (clientFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
 }
 
 interface CreateClientPayload {
@@ -38,6 +40,7 @@ interface CreateClientPayload {
   email?: string;
   organizationId: string;
   birthDate: Date | null;
+  customFieldValues?: Record<string, unknown>;
 }
 
 interface Response<T> {

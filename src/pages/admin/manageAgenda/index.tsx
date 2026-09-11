@@ -99,6 +99,8 @@ export interface CreateAppointmentPayload {
   // Paquete de sesiones del cliente (si aplica)
   clientPackageId?: string | null;
   usePackageForServices?: Record<string, string>; // serviceId -> clientPackageId
+  // Valores de campos personalizados con scope "booking" (Organization.clientFormConfig.fields)
+  customFieldValues?: Record<string, unknown>;
 }
 
 const ScheduleView: React.FC = () => {
@@ -522,6 +524,7 @@ const ScheduleView: React.FC = () => {
       endDate: new Date(appointment.endDate),
       status: appointment.status,
       advancePayment: appointment.advancePayment,
+      customFieldValues: appointment.customFieldValues,
     });
     setModalOpenedAppointment(true);
   }, []);
@@ -925,6 +928,7 @@ const ScheduleView: React.FC = () => {
         customDurations,
         clientPackageId,
         usePackageForServices,
+        customFieldValues,
       } = newAppointment;
 
       if (
@@ -947,6 +951,7 @@ const ScheduleView: React.FC = () => {
             status: status || "pending",
             organizationId: organizationId as string,
             advancePayment,
+            customFieldValues,
             ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
@@ -975,6 +980,7 @@ const ScheduleView: React.FC = () => {
             // Paquete de sesiones (si el admin eligió usar paquete)
             clientPackageId,
             usePackageForServices,
+            customFieldValues,
             ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
@@ -1053,6 +1059,7 @@ const ScheduleView: React.FC = () => {
             })(),
             customDurations: b.customDurations,
           })),
+          customFieldValues: newAppointment.customFieldValues,
           ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
         });
         showNotification({

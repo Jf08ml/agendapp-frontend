@@ -43,7 +43,9 @@ import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
-import { IconPackage, IconX, IconNotes } from "@tabler/icons-react";
+import { IconPackage, IconX, IconNotes, IconListDetails } from "@tabler/icons-react";
+import { BUILT_IN_FIELD_KEYS } from "../../../../services/organizationService";
+import DynamicFormFields from "../../../../components/DynamicFormFields";
 
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
@@ -1772,6 +1774,44 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               />
             </Box>
           )}
+
+          {/* Sección: Campos personalizados (Organization.clientFormConfig.fields, scope "booking")
+              — visible tanto al crear como al editar, no solo cuando ya hay valores guardados. */}
+          {(() => {
+            const bookingCustomFields = (organization?.clientFormConfig?.fields ?? []).filter(
+              (f) =>
+                f.enabled &&
+                f.scope === "booking" &&
+                !(BUILT_IN_FIELD_KEYS as readonly string[]).includes(f.key)
+            );
+            if (bookingCustomFields.length === 0) return null;
+            return (
+              <Box
+                mb="xl"
+                p="md"
+                style={{
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: 8,
+                  border: "1px solid #e9ecef",
+                }}
+              >
+                <Text size="sm" fw={600} c="dimmed" tt="uppercase" mb="md">
+                  <IconListDetails size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  Campos personalizados
+                </Text>
+                <DynamicFormFields
+                  fields={bookingCustomFields}
+                  values={newAppointment.customFieldValues ?? {}}
+                  onChange={(key, value) =>
+                    setNewAppointment((prev) => ({
+                      ...prev,
+                      customFieldValues: { ...(prev.customFieldValues ?? {}), [key]: value },
+                    }))
+                  }
+                />
+              </Box>
+            );
+          })()}
 
           {/* Botones de acción */}
           <Group

@@ -30,6 +30,7 @@ import {
   SimpleGrid,
   ThemeIcon,
   Pagination,
+  ActionIcon,
 } from "@mantine/core";
 import { useMediaQuery, useDebouncedValue } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
@@ -195,6 +196,22 @@ const ReservationsList: React.FC = () => {
 
   const hasEmployeeAssigned = (reservation: Reservation) =>
     Boolean((reservation as any)?.employee?._id || reservation.employeeId);
+
+  // Nombre(s) de profesional a mostrar en la columna "Profesional" — para un
+  // grupo, puede haber más de un profesional distinto (uno por servicio).
+  const getProfessionalNames = (
+    reservation: Reservation,
+    groupReservations?: Reservation[] | null
+  ): string[] => {
+    const list =
+      groupReservations && groupReservations.length > 1
+        ? groupReservations
+        : [reservation];
+    const names = list.map((r) =>
+      hasEmployeeAssigned(r) ? getEmployeeName(r) ?? "Asignado" : "Sin asignar"
+    );
+    return Array.from(new Set(names));
+  };
 
   // ------- MODAL DETALLE -------
   const handleOpenDetail = (reservation: Reservation, groupReservations?: Reservation[]) => {
@@ -914,13 +931,89 @@ const ReservationsList: React.FC = () => {
           <Skeleton height={12} radius="sm" />
         </Table.Td>
         <Table.Td>
+          <Skeleton height={20} radius="xl" />
+        </Table.Td>
+        <Table.Td>
           <Skeleton height={12} radius="sm" />
         </Table.Td>
         <Table.Td>
           <Skeleton height={24} radius="xl" />
         </Table.Td>
+        <Table.Td>
+          <Skeleton height={20} radius="sm" />
+        </Table.Td>
       </Table.Tr>
     ));
+
+  const renderProfessionalCell = (names: string[]) => {
+    if (names.length === 1) {
+      const isUnassigned = names[0] === "Sin asignar";
+      return (
+        <Badge variant="light" color={isUnassigned ? "red" : "grape"} size="sm">
+          {names[0]}
+        </Badge>
+      );
+    }
+    return (
+      <Text size="xs" c="dimmed">
+        {names.join(", ")}
+      </Text>
+    );
+  };
+
+  // Acciones rápidas (aprobar/rechazar) directamente en la fila/tarjeta, sin
+  // necesidad de abrir el modal de detalle — solo cuando todo está "pending".
+  const renderQuickActions = (
+    reservation: Reservation,
+    groupReservations?: Reservation[] | null
+  ) => {
+    const isGroup = !!groupReservations && groupReservations.length > 1;
+    const allPending = isGroup
+      ? groupReservations!.every((r) => r.status === "pending")
+      : reservation.status === "pending";
+
+    if (!allPending) {
+      return (
+        <Text size="xs" c="dimmed">
+          —
+        </Text>
+      );
+    }
+
+    const busy = isGroup
+      ? groupReservations!.some((r) => r._id && isRowBusy(r._id))
+      : Boolean(reservation._id && isRowBusy(reservation._id));
+
+    const onApprove = async () => {
+      if (isGroup && reservation.groupId) {
+        await handleApproveGroup(reservation.groupId);
+      } else if (reservation._id) {
+        await handleUpdateStatus(reservation._id, "approved");
+      }
+    };
+    const onReject = async () => {
+      if (isGroup && reservation.groupId) {
+        await handleRejectGroup(reservation.groupId);
+      } else if (reservation._id) {
+        await handleUpdateStatus(reservation._id, "rejected");
+      }
+    };
+
+    return (
+      <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
+        <Tooltip label={isGroup ? "Aprobar todas" : "Aprobar"}>
+          <ActionIcon color="green" variant="light" loading={busy} onClick={onApprove}>
+            <BiCheck />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label={isGroup ? "Rechazar todas" : "Rechazar"}>
+          <ActionIcon color="red" variant="light" loading={busy} onClick={onReject}>
+            <BiXCircle />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+    );
+  };
 
   const renderMobileReservationCard = (reservation: Reservation, groupReservations?: Reservation[]) => {
     const serviceObj =
@@ -987,6 +1080,15 @@ const ReservationsList: React.FC = () => {
               {reservation.customerDetails?.name ?? "—"}
             </Text>
           </Text>
+
+          <Group gap={6} align="center">
+            <Text size="xs" c="dimmed">Profesional:</Text>
+            {renderProfessionalCell(getProfessionalNames(reservation, groupReservations))}
+          </Group>
+
+          <Group justify="flex-end">
+            {renderQuickActions(reservation, groupReservations)}
+          </Group>
         </Stack>
       </Card>
     );
@@ -1185,7 +1287,6 @@ const ReservationsList: React.FC = () => {
         centered
       >
         <div style={{ position: "relative" }}>
-          <p>{selectedReservation?._id}</p>
           <LoadingOverlay visible={detailModalLoading} zIndex={1000} />
           {selectedReservation ? (
           <Stack gap="md">
@@ -1202,7 +1303,57 @@ const ReservationsList: React.FC = () => {
                   {selectedReservation.customerDetails.phone}
                 </Text>
               )}
+              {selectedReservation.customerDetails?.email && (
+                <Text size="sm" c="dimmed">
+                  {selectedReservation.customerDetails.email}
+                </Text>
+              )}
+              {selectedReservation.customerDetails?.documentId && (
+                <Text size="sm" c="dimmed">
+                  Documento: {selectedReservation.customerDetails.documentId}
+                </Text>
+              )}
+              {selectedReservation.customerDetails?.birthDate && (
+                <Text size="sm" c="dimmed">
+                  Nacimiento: {dayjs(selectedReservation.customerDetails.birthDate).format("DD/MM/YYYY")}
+                </Text>
+              )}
+              {selectedReservation.customerDetails?.notes && (
+                <Text size="sm" c="dimmed" mt={4}>
+                  Notas: {selectedReservation.customerDetails.notes}
+                </Text>
+              )}
             </Box>
+
+            {/* Campos personalizados (Organization.clientFormConfig.fields, scope "booking") */}
+            {selectedReservation.customFieldValues &&
+              Object.keys(selectedReservation.customFieldValues).length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Text size="sm" fw={600} c="dimmed" mb={4}>
+                      Campos personalizados
+                    </Text>
+                    <Stack gap={4}>
+                      {Object.entries(selectedReservation.customFieldValues).map(([key, value]) => {
+                        if (value === undefined || value === null || value === "") return null;
+                        const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                        const label = def?.label || key;
+                        const displayValue =
+                          def?.type === "date" && value
+                            ? dayjs(value as string).format("DD/MM/YYYY")
+                            : String(value);
+                        return (
+                          <Group key={key} justify="space-between">
+                            <Text size="sm" c="dimmed">{label}</Text>
+                            <Text size="sm" fw={500}>{displayValue}</Text>
+                          </Group>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                </>
+              )}
 
             <Divider />
 
@@ -1900,8 +2051,10 @@ const ReservationsList: React.FC = () => {
                   <Table.Tr>
                     <Table.Th>Fecha</Table.Th>
                     <Table.Th>Servicios</Table.Th>
+                    <Table.Th>Profesional</Table.Th>
                     <Table.Th>Cliente</Table.Th>
                     <Table.Th>Estado</Table.Th>
+                    <Table.Th>Acciones</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>{renderSkeletonRows()}</Table.Tbody>
@@ -1954,8 +2107,10 @@ const ReservationsList: React.FC = () => {
                 <Table.Tr>
                   <Table.Th>Fecha</Table.Th>
                   <Table.Th>Servicios</Table.Th>
+                  <Table.Th>Profesional</Table.Th>
                   <Table.Th>Cliente</Table.Th>
                   <Table.Th>Estado</Table.Th>
+                  <Table.Th>Acciones</Table.Th>
                 </Table.Tr>
               </Table.Thead>
 
@@ -2017,6 +2172,12 @@ const ReservationsList: React.FC = () => {
                         </Table.Td>
 
                         <Table.Td>
+                          {renderProfessionalCell(
+                            getProfessionalNames(reservation, groupReservations || undefined)
+                          )}
+                        </Table.Td>
+
+                        <Table.Td>
                           {reservation.customerDetails?.name ?? "—"}
                         </Table.Td>
 
@@ -2036,6 +2197,10 @@ const ReservationsList: React.FC = () => {
                               </Badge>
                             )}
                           </Stack>
+                        </Table.Td>
+
+                        <Table.Td>
+                          {renderQuickActions(reservation, groupReservations || undefined)}
                         </Table.Td>
                       </Table.Tr>
                     </React.Fragment>

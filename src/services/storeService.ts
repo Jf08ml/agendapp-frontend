@@ -96,6 +96,8 @@ export interface StoreOrderPayload {
   items: { productId: string; quantity: number }[];
   customer: StoreCustomer;
   delivery: StoreDelivery;
+  /** Valores de campos personalizados (Organization.storeFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
 }
 
 // Checkout online con Mercado Pago → redirect a checkoutUrl; el webhook

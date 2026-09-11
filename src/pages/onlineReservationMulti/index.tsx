@@ -83,6 +83,8 @@ export default function MultiBookingWizard() {
     documentId: "",
     notes: "",
   });
+  // Valores de campos personalizados (Organization.clientFormConfig.fields)
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
 
   // 🔁 Recurrencia
   const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>({
@@ -231,6 +233,7 @@ export default function MultiBookingWizard() {
       startDate: startDateStr,
       customerDetails,
       organizationId: orgId,
+      ...(Object.keys(customFieldValues).length > 0 ? { customFieldValues } : {}),
       ...(clientPackageId ? { clientPackageId } : {}),
       ...(recurrencePattern.type === 'weekly' ? { recurrencePattern } : {}),
     } satisfies CreateMultipleReservationsPayload;
@@ -449,11 +452,12 @@ export default function MultiBookingWizard() {
         return (
           <StepCustomerData
             bookingData={
-              { customerDetails, organizationId: orgId } as Partial<Reservation>
+              { customerDetails, customFieldValues, organizationId: orgId } as Partial<Reservation>
             }
             setBookingData={(updater) => {
               const base: Partial<Reservation> = {
                 customerDetails,
+                customFieldValues,
                 organizationId: orgId,
               };
               const next =
@@ -464,6 +468,9 @@ export default function MultiBookingWizard() {
                 setCustomerDetails(
                   next.customerDetails as typeof customerDetails
                 );
+              }
+              if (next?.customFieldValues) {
+                setCustomFieldValues(next.customFieldValues as Record<string, unknown>);
               }
             }}
             onClientUpdateReady={(updateFn) => {

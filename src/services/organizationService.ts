@@ -80,11 +80,27 @@ export interface WeeklySchedule {
   stepMinutes?: number;
 }
 
+// Los 6 campos "built-in" siguen su propio manejo hardcodeado (sin type/options/
+// scope). Un campo personalizado (key fuera de este set) usa type/options/scope
+// — ver CustomFieldBuilder.tsx / DynamicFormFields.tsx.
+export const BUILT_IN_FIELD_KEYS = ['name', 'phone', 'email', 'birthDate', 'documentId', 'notes'] as const;
+
 export interface ClientFieldConfig {
-  key: 'name' | 'phone' | 'email' | 'birthDate' | 'documentId' | 'notes';
+  key: string;
   enabled: boolean;
   required: boolean;
   label?: string;
+  /** Solo relevante para campos personalizados (key fuera de BUILT_IN_FIELD_KEYS). */
+  type?: 'text' | 'number' | 'date' | 'select';
+  /** Solo si type === 'select'. */
+  options?: string[];
+  /**
+   * 'client': el valor persiste en Client.customFieldValues (se reutiliza entre
+   * reservas del mismo cliente). 'booking': el valor queda ligado a esa reserva/
+   * pedido puntual. storeFormConfig no crea Client, así que sus campos siempre
+   * se tratan como "booking" sin importar lo guardado aquí.
+   */
+  scope?: 'client' | 'booking';
 }
 
 export interface ClientFormConfig {

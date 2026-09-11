@@ -44,6 +44,8 @@ export interface StoreOrder {
     items?: StoreOrderItem[];
     customer?: { name?: string; phone?: string; email?: string; documentId?: string };
     delivery?: { mode?: "pickup" | "delivery"; address?: string; notes?: string; lat?: number; lng?: number };
+    /** Valores de campos personalizados (Organization.storeFormConfig.fields). */
+    customFieldValues?: Record<string, unknown>;
     fulfillmentStatus?: StoreFulfillmentStatus;
     fulfilledAt?: string;
     saleId?: string;

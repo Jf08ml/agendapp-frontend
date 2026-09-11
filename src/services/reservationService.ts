@@ -25,6 +25,8 @@ export interface Reservation {
   appointmentId?: string | { _id: string; [key: string]: unknown } | null;
   errorMessage?: string;
   source?: "ai_chatbot" | "manual_booking" | "admin";
+  /** Valores de campos personalizados (Organization.clientFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
 }
 
 export interface CreateReservationPayload {
@@ -42,6 +44,8 @@ export interface CreateReservationPayload {
   };
   organizationId: string | undefined;
   status: "pending" | "approved" | "rejected";
+  /** Valores de campos personalizados (Organization.clientFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
 }
 
 interface Response<T> {
@@ -76,6 +80,8 @@ export interface CreateMultipleReservationsPayload {
   // sessionId del chatbot de reserva: permite al backend marcar la conversión
   // (prepare → reserva real) de forma confiable, en la misma request.
   chatSessionId?: string;
+  /** Valores de campos personalizados (Organization.clientFormConfig.fields). */
+  customFieldValues?: Record<string, unknown>;
 }
 
 // Respuesta del checkout de depósito (pay-to-confirm con Mercado Pago)

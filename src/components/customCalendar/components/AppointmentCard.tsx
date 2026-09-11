@@ -53,7 +53,7 @@ import { RootState } from "../../../app/store";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { showNotification } from "@mantine/notifications";
 import { IoSettings } from "react-icons/io5";
-import { IconUserCheck, IconUserX } from "@tabler/icons-react";
+import { IconUserCheck, IconUserX, IconListDetails } from "@tabler/icons-react";
 
 dayjs.extend(localizedFormat);
 dayjs.locale("es");
@@ -601,6 +601,39 @@ ${clientServices}`;
                       )}
                     </Flex>
                   </Box>
+
+                  {/* CAMPOS PERSONALIZADOS (Organization.clientFormConfig.fields, scope "booking") */}
+                  {appointment.customFieldValues &&
+                    Object.keys(appointment.customFieldValues).length > 0 && (
+                      <Box
+                        style={{
+                          border: "1px solid var(--mantine-color-gray-2)",
+                          borderRadius: 12,
+                          padding: 12,
+                        }}
+                      >
+                        <Text fw={700} size="sm" mb={6}>
+                          Campos personalizados
+                        </Text>
+                        <Flex direction="column" gap={4}>
+                          {Object.entries(appointment.customFieldValues).map(([key, value]) => {
+                            if (value === undefined || value === null || value === "") return null;
+                            const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                            const label = def?.label || key;
+                            const displayValue =
+                              def?.type === "date" && value
+                                ? dayjs(value as string).format("DD/MM/YYYY")
+                                : String(value);
+                            return (
+                              <Flex key={key} justify="space-between">
+                                <Text size="sm" c="dimmed">{label}</Text>
+                                <Text size="sm" fw={600}>{displayValue}</Text>
+                              </Flex>
+                            );
+                          })}
+                        </Flex>
+                      </Box>
+                    )}
 
                   {/* HISTORIAL */}
                   <Box>
@@ -1376,16 +1409,47 @@ ${clientServices}`;
         </Text>
 
         {/* Cliente */}
-        <Text
-          style={{
-            color: isPastAppointment ? "#8B92A6" : textColor,
-            fontSize: 10,
-          }}
-        >
-          {isBirthday
-            ? `🎉 ${appointment.client.name} 🎉`
-            : appointment.client.name}
-        </Text>
+        <Flex align="center" gap={3} wrap="nowrap">
+          <Text
+            style={{
+              color: isPastAppointment ? "#8B92A6" : textColor,
+              fontSize: 10,
+            }}
+          >
+            {isBirthday
+              ? `🎉 ${appointment.client.name} 🎉`
+              : appointment.client.name}
+          </Text>
+          {appointment.customFieldValues &&
+            Object.keys(appointment.customFieldValues).length > 0 && (
+              <Tooltip
+                withArrow
+                multiline
+                w={220}
+                label={
+                  <>
+                    {Object.entries(appointment.customFieldValues).map(([key, value]) => {
+                      if (value === undefined || value === null || value === "") return null;
+                      const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                      const label = def?.label || key;
+                      return (
+                        <div key={key}>
+                          {label}: {String(value)}
+                        </div>
+                      );
+                    })}
+                  </>
+                }
+              >
+                <Box style={{ display: "inline-flex" }}>
+                  <IconListDetails
+                    size={10}
+                    color={isPastAppointment ? "#8B92A6" : textColor}
+                  />
+                </Box>
+              </Tooltip>
+            )}
+        </Flex>
 
         {/* Ícono de recordatorio (esquina fija, clickeable) */}
         <Tooltip

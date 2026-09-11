@@ -28,8 +28,10 @@ import { Paper, Checkbox, Anchor } from "@mantine/core";
 import { IconPackage } from "@tabler/icons-react";
 import {
   DEFAULT_CLIENT_FORM_CONFIG,
+  BUILT_IN_FIELD_KEYS,
   type ClientFieldConfig,
 } from "../../services/organizationService";
+import DynamicFormFields from "../../components/DynamicFormFields";
 
 interface StepCustomerDataProps {
   bookingData: Partial<Reservation>;
@@ -74,6 +76,21 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
   const fieldCfg = (key: ClientFieldConfig['key']) =>
     configFields.find((f) => f.key === key) ?? { key, enabled: false, required: false };
+
+  // Campos personalizados (fuera del set built-in), habilitados
+  const customFields = configFields.filter(
+    (f) => !(BUILT_IN_FIELD_KEYS as readonly string[]).includes(f.key) && f.enabled
+  );
+  const customFieldValues = bookingData.customFieldValues || {};
+  const handleCustomFieldChange = (key: string, value: string | number | Date | null) => {
+    setBookingData((prev) => ({
+      ...prev,
+      customFieldValues: {
+        ...(prev.customFieldValues || {}),
+        [key]: value,
+      },
+    }));
+  };
 
   const customerDetails = bookingData.customerDetails || {
     name: "",
@@ -165,6 +182,10 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         setClientId(client._id);
         setBookingData((prev) => {
           const prevDetails = prev.customerDetails || customerDetails;
+          // Precargar valores de campos personalizados con scope "client" ya
+          // guardados en el cliente — sin pisar lo que el usuario ya escribió.
+          const prevCustomFieldValues = prev.customFieldValues || {};
+          const mergedCustomFieldValues = { ...(client.customFieldValues || {}), ...prevCustomFieldValues };
           return {
             ...prev,
             customerDetails: {
@@ -176,6 +197,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
               documentId: prevDetails.documentId?.trim() ? prevDetails.documentId : client.documentId || "",
               notes: prevDetails.notes?.trim() ? prevDetails.notes : client.notes || "",
             },
+            customFieldValues: mergedCustomFieldValues,
           };
         });
         if (client.name) setFoundName(client.name);
@@ -262,6 +284,17 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         updates.phoneNumber = phoneE164;
         updates.phone_country = phoneCountry || undefined;
       }
+      // Persistir valores de campos personalizados con scope "client" (se
+      // reutilizan en futuras reservas de este mismo cliente).
+      const clientScopeValues: Record<string, unknown> = {};
+      customFields
+        .filter((f) => f.scope === "client")
+        .forEach((f) => {
+          const v = customFieldValues[f.key];
+          if (v !== undefined && v !== null && v !== "") clientScopeValues[f.key] = v;
+        });
+      if (Object.keys(clientScopeValues).length > 0) updates.customFieldValues = clientScopeValues;
+
       if (Object.keys(updates).length > 0) await updateClient(clientId, updates);
       return true;
     } catch {
@@ -271,7 +304,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
   useEffect(() => {
     if (onClientUpdateReady) onClientUpdateReady(updateClientIfNeeded);
-  }, [clientId, customerDetails, phoneE164, phoneCountry, onClientUpdateReady]);
+  }, [clientId, customerDetails, phoneE164, phoneCountry, onClientUpdateReady, customFieldValues]);
 
   const phoneCfg       = fieldCfg("phone");
   const emailCfg       = fieldCfg("email");
@@ -444,6 +477,14 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           autosize
         />
       )}
+
+      {/* Campos personalizados de la organización */}
+      <DynamicFormFields
+        fields={customFields}
+        values={customFieldValues}
+        onChange={handleCustomFieldChange}
+        disabled={isLookingUp}
+      />
 
       {/* Términos y condiciones */}
       {termsEnabled && (

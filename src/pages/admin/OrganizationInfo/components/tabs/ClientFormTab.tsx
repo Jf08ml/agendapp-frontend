@@ -14,6 +14,7 @@ import { IconInfoCircle, IconId } from "@tabler/icons-react";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
 import SectionCard from "../SectionCard";
+import CustomFieldBuilder from "../CustomFieldBuilder";
 import { DEFAULT_CLIENT_FORM_CONFIG } from "../../../../../services/organizationService";
 
 const FIELD_META: Record<string, { label: string; description: string }> = {
@@ -198,6 +199,8 @@ export default function ClientFormTab({
             </Table.Tbody>
           </Table>
         </Stack>
+
+        <CustomFieldBuilder form={form} configPath="clientFormConfig" isEditing={isEditing} allowClientScope />
       </Stack>
     </SectionCard>
   );
