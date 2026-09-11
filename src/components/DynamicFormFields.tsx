@@ -5,7 +5,8 @@ import type { ClientFieldConfig } from "../services/organizationService";
 interface DynamicFormFieldsProps {
   /** Campos personalizados ya filtrados (excluyendo built-in) y habilitados. */
   fields: ClientFieldConfig[];
-  values: Record<string, string | number | Date | null | undefined>;
+  /** Los valores llegan como `unknown` (vienen de un `Mixed` en Mongo, o de un JSON.parse) — el componente los estrecha con `typeof`/`instanceof` antes de usarlos en cada input. */
+  values: Record<string, unknown>;
   onChange: (key: string, value: string | number | Date | null) => void;
   disabled?: boolean;
 }
