@@ -17,6 +17,7 @@ import {
   BiPlus,
   BiSort,
   BiCalendarX,
+  BiTime,
 } from "react-icons/bi";
 import { IoNotificationsOutline } from "react-icons/io5";
 
@@ -28,6 +29,7 @@ export interface SchedulerQuickActionsMenuProps {
   onReorderEmployees: () => void;
   onSendReminders: () => void;
   onBlockSchedule?: () => void;
+  onOpenAvailability: () => void;
 
   // estado/flags
   isWhatsappReady: boolean;
@@ -40,6 +42,7 @@ export interface SchedulerQuickActionsMenuProps {
   canSendReminders: boolean;
   canReorderEmployees: boolean;
   canBlockSchedule?: boolean;
+  canViewAvailability: boolean;
 
   // fecha de recordatorios
   reminderDate: Date | null;
@@ -56,6 +59,7 @@ const SchedulerQuickActionsMenu: React.FC<SchedulerQuickActionsMenuProps> = ({
   onReorderEmployees,
   onSendReminders,
   onBlockSchedule,
+  onOpenAvailability,
   isWhatsappReady,
   sendingReminders,
   reasonForDisabled,
@@ -64,6 +68,7 @@ const SchedulerQuickActionsMenu: React.FC<SchedulerQuickActionsMenuProps> = ({
   canSendReminders,
   canReorderEmployees,
   canBlockSchedule,
+  canViewAvailability,
   reminderDate,
   onChangeReminderDate,
   ariaLabel = "Más acciones",
@@ -125,6 +130,14 @@ const SchedulerQuickActionsMenu: React.FC<SchedulerQuickActionsMenuProps> = ({
           disabled={!canReorderEmployees}
         >
           Reordenar profesionales
+        </Menu.Item>
+
+        <Menu.Item
+          leftSection={<BiTime size={16} />}
+          onClick={onOpenAvailability}
+          disabled={!canViewAvailability}
+        >
+          Ver disponibilidad
         </Menu.Item>
 
         {onBlockSchedule && (

@@ -81,6 +81,7 @@ const ReorderEmployeesModal = lazy(
   () => import("./components/ReorderEmployeesModal"),
 );
 const AgendaBlockModal = lazy(() => import("./components/AgendaBlockModal"));
+const AvailabilityModal = lazy(() => import("./components/AvailabilityModal"));
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -127,6 +128,7 @@ const ScheduleView: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [reorderModalOpened, setReorderModalOpened] = useState(false);
   const [blockModalOpened, setBlockModalOpened] = useState(false);
+  const [availabilityModalOpened, setAvailabilityModalOpened] = useState(false);
   // Se incrementa al crear un bloqueo → fuerza recálculo de disponibilidad mensual
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
 
@@ -1311,6 +1313,7 @@ const ScheduleView: React.FC = () => {
             onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
             onAddAppointment={() => openModal(new Date(), new Date())}
             onReorderEmployees={() => setReorderModalOpened(true)}
+            onOpenAvailability={() => setAvailabilityModalOpened(true)}
             onSendReminders={handleSendDailyReminders}
             isWhatsappReady={isWhatsAppReady}
             sendingReminders={sendingReminders}
@@ -1319,6 +1322,7 @@ const ScheduleView: React.FC = () => {
             canCreate={hasPermission("appointments:create")}
             canSendReminders={hasPermission("appointments:send_reminders")}
             canReorderEmployees={hasPermission("appointments:reorderemployees")}
+            canViewAvailability={hasPermission("appointments:search_schedule")}
             reminderDate={reminderDate}
             onChangeReminderDate={setReminderDate}
           />
@@ -1414,6 +1418,17 @@ const ScheduleView: React.FC = () => {
             opened={showSearchModal}
             onClose={() => setShowSearchModal(false)}
             appointments={appointments}
+          />
+        )}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {availabilityModalOpened && (
+          <AvailabilityModal
+            opened={availabilityModalOpened}
+            onClose={() => setAvailabilityModalOpened(false)}
+            employees={employees}
+            organizationId={organizationId}
           />
         )}
       </Suspense>
