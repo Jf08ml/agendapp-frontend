@@ -48,12 +48,14 @@ interface PayrollSummary {
   totalAppointments: number;
   totalEarnings: number;
   totalAdvances: number;
+  totalIncomes: number;
   finalEarnings: number;
 }
 
 const EmployeeInfo: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
+  const [incomes, setIncomes] = useState<Advance[]>([]);
   const [payroll, setPayroll] = useState<PayrollSummary | null>(null);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingAdvances, setLoadingAdvances] = useState(false);
@@ -91,10 +93,16 @@ const EmployeeInfo: React.FC = () => {
     const confirmedAppointments = appointments.filter(
       (a) => a.status === "confirmed" || a.status === "attended"
     );
-    const totalRevenue = confirmedAppointments.reduce(
+    const appointmentsRevenue = confirmedAppointments.reduce(
       (total, appointment) => total + (appointment.service?.price || 0),
       0
     );
+
+    // Los ingresos manuales (citas realizadas pero no registradas en el
+    // sistema) se tratan igual que una cita atendida para efectos de nómina.
+    const totalIncomes = incomes.reduce((total, income) => total + income.amount, 0);
+    const totalRevenue = appointmentsRevenue + totalIncomes;
+    const commissionUnits = confirmedAppointments.length + incomes.length;
 
     const commissionType = employeeData?.commissionType ?? "percentage";
     const commissionValue = employeeData?.commissionValue ?? 0;
@@ -102,7 +110,7 @@ const EmployeeInfo: React.FC = () => {
     const totalEarnings =
       commissionType === "percentage"
         ? (totalRevenue * commissionValue) / 100
-        : confirmedAppointments.length * commissionValue;
+        : commissionUnits * commissionValue;
 
     const totalAdvances = advances.reduce(
       (total, advance) => total + advance.amount,
@@ -113,9 +121,10 @@ const EmployeeInfo: React.FC = () => {
       totalAppointments: appointments.length,
       totalEarnings,
       totalAdvances,
+      totalIncomes,
       finalEarnings: totalEarnings - totalAdvances,
     });
-  }, [appointments, advances, employeeData]);
+  }, [appointments, advances, incomes, employeeData]);
 
   const calculateDates = (interval: string) => {
     const now = new Date();
@@ -177,14 +186,13 @@ const EmployeeInfo: React.FC = () => {
   const fetchAdvances = async () => {
     setLoadingAdvances(true);
     try {
-      const employeeAdvances = await getAdvancesByEmployee(userId!);
-      const filteredAdvances = employeeAdvances.filter((advance) => {
-        const advanceDate = new Date(advance.date);
-        return (
-          advanceDate >= (startDate as Date) && advanceDate <= (endDate as Date)
-        );
+      const employeeAdvancesAndIncomes = await getAdvancesByEmployee(userId!);
+      const inRange = employeeAdvancesAndIncomes.filter((a) => {
+        const date = new Date(a.date);
+        return date >= (startDate as Date) && date <= (endDate as Date);
       });
-      setAdvances(filteredAdvances);
+      setAdvances(inRange.filter((a) => a.type !== "income"));
+      setIncomes(inRange.filter((a) => a.type === "income"));
     } catch (error) {
       console.error("Error al cargar avances del profesional", error);
     } finally {
@@ -306,7 +314,10 @@ const EmployeeInfo: React.FC = () => {
             <Box>
               <Text size="xs" c="dimmed" fw={500}>Citas confirmadas</Text>
               <Text fw={700} size="lg" lh={1.2}>{confirmedCount}</Text>
-              <Text size="xs" c="dimmed">de {payroll?.totalAppointments ?? 0} en período</Text>
+              <Text size="xs" c="dimmed">
+                de {payroll?.totalAppointments ?? 0} en período
+                {incomes.length > 0 && ` + ${incomes.length} ingreso${incomes.length !== 1 ? "s" : ""} manual${incomes.length !== 1 ? "es" : ""}`}
+              </Text>
             </Box>
           </Group>
         </Paper>
@@ -477,6 +488,43 @@ const EmployeeInfo: React.FC = () => {
           )}
         </ScrollArea>
       </Card>
+
+      {/* Tabla de ingresos manuales */}
+      {incomes.length > 0 && (
+        <Card shadow="sm" radius="md" withBorder mt="md">
+          <Title order={5} mb="sm">Ingresos manuales</Title>
+          <Divider mb="sm" />
+          <ScrollArea style={{ height: 160 }} scrollbarSize={6}>
+            <Table highlightOnHover verticalSpacing="xs" fz="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Fecha</Table.Th>
+                  <Table.Th>Monto</Table.Th>
+                  <Table.Th>Descripción</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {incomes.map((income) => (
+                  <Table.Tr key={income._id}>
+                    <Table.Td>
+                      {new Date(income.date).toLocaleDateString("es-CO", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </Table.Td>
+                    <Table.Td>
+                      <Text c="teal" fw={500}>
+                        +{formatCurrency(income.amount)}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>{income.description || "Sin descripción"}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Card>
+      )}
     </Container>
   );
 };

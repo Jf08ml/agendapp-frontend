@@ -31,51 +31,50 @@ import { formatCurrency } from "../../../../utils/formatCurrency";
 import { useSelector } from "react-redux";
 import { selectOrganization } from "../../../../features/organization/sliceOrganization";
 
-interface AdvanceModalProps {
+interface IncomeModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
 }
 
-const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
-  const [advances, setAdvances] = useState<Advance[]>([]);
+const IncomeModal = ({ isOpen, onClose, employee }: IncomeModalProps) => {
+  const [incomes, setIncomes] = useState<Advance[]>([]);
   const org = useSelector(selectOrganization);
-  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
-  const [advanceDescription, setAdvanceDescription] = useState<string>("");
-  const [advanceDate, setAdvanceDate] = useState<Date | null>(new Date());
-  const [editingAdvance, setEditingAdvance] = useState<Advance | null>(null);
+  const [incomeAmount, setIncomeAmount] = useState<number>(0);
+  const [incomeDescription, setIncomeDescription] = useState<string>("");
+  const [incomeDate, setIncomeDate] = useState<Date | null>(new Date());
+  const [editingIncome, setEditingIncome] = useState<Advance | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (employee) {
-      fetchAdvances();
+      fetchIncomes();
     }
   }, [employee]);
 
-  const fetchAdvances = async () => {
+  const fetchIncomes = async () => {
     if (!employee) return;
 
     try {
       setLoading(true);
       const employeeAdvances = await getAdvancesByEmployee(employee._id);
-      // Excluir ingresos manuales (se gestionan aparte, en "Ingresos")
-      const onlyAdvances = employeeAdvances.filter((a) => a.type !== "income");
+      const onlyIncomes = employeeAdvances.filter((a) => a.type === "income");
       // Ordenar descendente por fecha
-      const sorted = [...onlyAdvances].sort(
+      const sorted = [...onlyIncomes].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
-      setAdvances(sorted);
+      setIncomes(sorted);
     } catch (error) {
-      console.error("Error al cargar los adelantos", error);
+      console.error("Error al cargar los ingresos", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateOrUpdateAdvance = async () => {
+  const handleCreateOrUpdateIncome = async () => {
     if (!employee) return;
 
-    if (advanceAmount <= 0) {
+    if (incomeAmount <= 0) {
       showNotification({
         title: "Monto no válido",
         message: "Ingresa un monto mayor a 0",
@@ -85,80 +84,81 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
     }
 
     try {
-      if (editingAdvance) {
-        if (editingAdvance._id) {
-          await updateAdvance(editingAdvance._id, {
-            ...editingAdvance,
-            amount: advanceAmount,
-            description: advanceDescription,
-            date: advanceDate || new Date(),
+      if (editingIncome) {
+        if (editingIncome._id) {
+          await updateAdvance(editingIncome._id, {
+            ...editingIncome,
+            type: "income",
+            amount: incomeAmount,
+            description: incomeDescription,
+            date: incomeDate || new Date(),
           });
         }
         showNotification({
-          title: "Adelanto actualizado",
-          message: "El adelanto ha sido actualizado exitosamente",
+          title: "Ingreso actualizado",
+          message: "El ingreso ha sido actualizado exitosamente",
           color: "green",
         });
       } else {
         await createAdvance({
           employee: employee._id,
-          type: "advance",
-          amount: advanceAmount,
-          description: advanceDescription,
-          date: advanceDate || new Date(),
+          type: "income",
+          amount: incomeAmount,
+          description: incomeDescription,
+          date: incomeDate || new Date(),
         });
         showNotification({
-          title: "Adelanto creado",
-          message: "El adelanto ha sido creado exitosamente",
+          title: "Ingreso creado",
+          message: "El ingreso ha sido registrado exitosamente",
           color: "green",
         });
       }
-      setAdvanceAmount(0);
-      setAdvanceDescription("");
-      setAdvanceDate(new Date());
-      setEditingAdvance(null);
-      fetchAdvances();
+      setIncomeAmount(0);
+      setIncomeDescription("");
+      setIncomeDate(new Date());
+      setEditingIncome(null);
+      fetchIncomes();
     } catch (error) {
-      console.error("Error al guardar adelanto", error);
+      console.error("Error al guardar ingreso", error);
       showNotification({
         title: "Error",
-        message: "Error al guardar el adelanto",
+        message: "Error al guardar el ingreso",
         color: "red",
       });
     }
   };
 
-  const handleEditAdvance = (advance: Advance) => {
-    setAdvanceAmount(advance.amount);
-    setAdvanceDescription(advance.description);
-    setAdvanceDate(new Date(advance.date));
-    setEditingAdvance(advance);
+  const handleEditIncome = (income: Advance) => {
+    setIncomeAmount(income.amount);
+    setIncomeDescription(income.description);
+    setIncomeDate(new Date(income.date));
+    setEditingIncome(income);
   };
 
-  const handleDeleteAdvance = async (advanceId: string) => {
+  const handleDeleteIncome = async (incomeId: string) => {
     try {
-      await deleteAdvance(advanceId);
+      await deleteAdvance(incomeId);
       showNotification({
-        title: "Adelanto eliminado",
-        message: "El adelanto ha sido eliminado correctamente",
+        title: "Ingreso eliminado",
+        message: "El ingreso ha sido eliminado correctamente",
         color: "green",
       });
-      fetchAdvances();
+      fetchIncomes();
     } catch (error) {
-      console.error("Error al eliminar adelanto", error);
+      console.error("Error al eliminar ingreso", error);
       showNotification({
         title: "Error",
-        message: "Error al eliminar el adelanto",
+        message: "Error al eliminar el ingreso",
         color: "red",
       });
     }
   };
 
   const clearForm = () => {
-    setAdvanceAmount(0);
-    setAdvanceDescription("");
-    setAdvanceDate(new Date());
-    setEditingAdvance(null);
+    setIncomeAmount(0);
+    setIncomeDescription("");
+    setIncomeDate(new Date());
+    setEditingIncome(null);
   };
 
   return (
@@ -168,47 +168,53 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
         clearForm();
         onClose();
       }}
-      title="Gestionar Adelantos"
+      title="Gestionar Ingresos"
     >
       <Stack gap="md">
         <Paper withBorder radius="md" p="md">
           <Group justify="space-between" align="center" mb="sm">
-            <Text fw={700}>Nuevo adelanto</Text>
-            {editingAdvance && <Badge color="blue">Editando</Badge>}
+            <Text fw={700}>Nuevo ingreso</Text>
+            {editingIncome && <Badge color="blue">Editando</Badge>}
           </Group>
+
+          <Text size="xs" c="dimmed" mb="sm">
+            Úsalo para registrar rápidamente lo que ganó el profesional en una
+            cita que ya se realizó pero que no vas a registrar en el sistema.
+            Suma directo a su nómina, igual que una cita atendida.
+          </Text>
 
           <Stack gap="sm">
             <NumberInput
-              label="Monto del adelanto"
+              label="Monto del ingreso"
               prefix="$ "
               thousandSeparator
-              value={advanceAmount}
-              onChange={(value) => setAdvanceAmount(Number(value) || 0)}
+              value={incomeAmount}
+              onChange={(value) => setIncomeAmount(Number(value) || 0)}
               min={0}
             />
 
             <DateInput
               label="Fecha"
-              value={advanceDate}
-              onChange={setAdvanceDate}
+              value={incomeDate}
+              onChange={setIncomeDate}
               locale="es"
             />
 
             <Textarea
               label="Descripción"
-              placeholder="Motivo del adelanto"
-              value={advanceDescription}
-              onChange={(e) => setAdvanceDescription(e.currentTarget.value)}
+              placeholder="Ej: Corte a domicilio, no registrado en el sistema"
+              value={incomeDescription}
+              onChange={(e) => setIncomeDescription(e.currentTarget.value)}
             />
 
             <Group justify="flex-end" gap="sm" mt="sm">
-              {editingAdvance && (
+              {editingIncome && (
                 <Button variant="subtle" onClick={clearForm}>
                   Cancelar edición
                 </Button>
               )}
-              <Button onClick={handleCreateOrUpdateAdvance}>
-                {editingAdvance ? "Actualizar adelanto" : "Crear adelanto"}
+              <Button onClick={handleCreateOrUpdateIncome}>
+                {editingIncome ? "Actualizar ingreso" : "Crear ingreso"}
               </Button>
             </Group>
           </Stack>
@@ -216,9 +222,9 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
 
         <Paper withBorder radius="md" p="md">
           <Group justify="space-between" align="center" mb="sm">
-            <Text fw={700}>Historial de adelantos</Text>
+            <Text fw={700}>Historial de ingresos</Text>
             <Text c="dimmed" size="sm">
-              Total: {formatCurrency(advances.reduce((a, b) => a + b.amount, 0), org?.currency || "COP")}
+              Total: {formatCurrency(incomes.reduce((a, b) => a + b.amount, 0), org?.currency || "COP")}
             </Text>
           </Group>
 
@@ -237,21 +243,21 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {advances.length > 0 ? (
-                  advances.map((advance) => (
-                    <Table.Tr key={advance._id}>
+                {incomes.length > 0 ? (
+                  incomes.map((income) => (
+                    <Table.Tr key={income._id}>
                       <Table.Td>
-                        {new Date(advance.date).toLocaleDateString()}
+                        {new Date(income.date).toLocaleDateString()}
                       </Table.Td>
-                      <Table.Td>{formatCurrency(advance.amount, org?.currency || "COP")}</Table.Td>
-                      <Table.Td>{advance.description || "Sin descripción"}</Table.Td>
+                      <Table.Td>{formatCurrency(income.amount, org?.currency || "COP")}</Table.Td>
+                      <Table.Td>{income.description || "Sin descripción"}</Table.Td>
                       <Table.Td>
                         <Group gap={4}>
                           <ActionIcon
                             radius="lg"
                             color="blue"
-                            onClick={() => handleEditAdvance(advance)}
-                            aria-label="Editar adelanto"
+                            onClick={() => handleEditIncome(income)}
+                            aria-label="Editar ingreso"
                           >
                             <FaEdit />
                           </ActionIcon>
@@ -259,11 +265,11 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
                             radius="lg"
                             color="red"
                             onClick={() =>
-                              advance._id &&
-                              window.confirm("¿Eliminar adelanto?") &&
-                              handleDeleteAdvance(advance._id)
+                              income._id &&
+                              window.confirm("¿Eliminar ingreso?") &&
+                              handleDeleteIncome(income._id)
                             }
-                            aria-label="Eliminar adelanto"
+                            aria-label="Eliminar ingreso"
                           >
                             <FaTrash />
                           </ActionIcon>
@@ -275,7 +281,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
                   <Table.Tr>
                     <Table.Td colSpan={4}>
                       <Text c="dimmed" ta="center">
-                        No hay adelantos registrados
+                        No hay ingresos registrados
                       </Text>
                     </Table.Td>
                   </Table.Tr>
@@ -289,4 +295,4 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
   );
 };
 
-export default AdvanceModal;
+export default IncomeModal;

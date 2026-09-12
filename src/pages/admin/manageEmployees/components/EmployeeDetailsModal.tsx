@@ -49,6 +49,7 @@ interface PayrollSummary {
   commissionValue: number;
   commissionAmount: number;
   totalAdvances: number;
+  totalIncomes: number;
   finalEarnings: number;
 }
 
@@ -59,6 +60,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
 }) => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
+  const [incomes, setIncomes] = useState<Advance[]>([]);
   const [payroll, setPayroll] = useState<PayrollSummary | null>(null);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingAdvances, setLoadingAdvances] = useState(false);
@@ -81,10 +83,10 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   }, [employee, startDate, endDate]);
 
   useEffect(() => {
-    if (appointments.length > 0 || advances.length > 0) {
-      calculatePayroll(appointments, advances);
+    if (appointments.length > 0 || advances.length > 0 || incomes.length > 0) {
+      calculatePayroll(appointments, advances, incomes);
     }
-  }, [customCommissionValue, appointments, advances]);
+  }, [customCommissionValue, appointments, advances, incomes]);
 
   const calculateDates = (interval: string) => {
     const now = new Date();
@@ -147,7 +149,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       );
 
       setAppointments(filteredAppointments);
-      calculatePayroll(filteredAppointments, advances);
+      calculatePayroll(filteredAppointments, advances, incomes);
     } catch (error) {
       console.error("Error al cargar citas del profesional", error);
     } finally {
@@ -160,15 +162,16 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
 
     setLoadingAdvances(true);
     try {
-      const employeeAdvances = await getAdvancesByEmployee(employee._id);
-      const filteredAdvances = employeeAdvances.filter(
-        (advance) =>
-          new Date(advance.date) >= startDate &&
-          new Date(advance.date) <= endDate
+      const employeeAdvancesAndIncomes = await getAdvancesByEmployee(employee._id);
+      const inRange = employeeAdvancesAndIncomes.filter(
+        (a) => new Date(a.date) >= startDate && new Date(a.date) <= endDate
       );
+      const filteredAdvances = inRange.filter((a) => a.type !== "income");
+      const filteredIncomes = inRange.filter((a) => a.type === "income");
 
       setAdvances(filteredAdvances);
-      calculatePayroll(appointments, filteredAdvances);
+      setIncomes(filteredIncomes);
+      calculatePayroll(appointments, filteredAdvances, filteredIncomes);
     } catch (error) {
       console.error("Error al cargar avances del profesional", error);
     } finally {
@@ -178,13 +181,20 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
 
   const calculatePayroll = (
     appointments: Appointment[],
-    advances: Advance[]
+    advances: Advance[],
+    incomes: Advance[]
   ) => {
     const confirmedAppointments = appointments.filter((a) => a.status === "attended");
-    const totalRevenue = confirmedAppointments.reduce(
+    const appointmentsRevenue = confirmedAppointments.reduce(
       (total, appointment) => total + (appointment.totalPrice || 0),
       0
     );
+
+    // Los ingresos manuales (citas realizadas pero no registradas en el
+    // sistema) se tratan igual que una cita atendida para efectos de nómina.
+    const totalIncomes = incomes.reduce((total, income) => total + income.amount, 0);
+    const totalRevenue = appointmentsRevenue + totalIncomes;
+    const commissionUnits = confirmedAppointments.length + incomes.length;
 
     const commissionType = employee?.commissionType ?? "percentage";
     const commissionValue = customCommissionValue ?? employee?.commissionValue ?? 0;
@@ -192,7 +202,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
     const commissionAmount =
       commissionType === "percentage"
         ? (totalRevenue * commissionValue) / 100
-        : confirmedAppointments.length * commissionValue;
+        : commissionUnits * commissionValue;
 
     const totalAdvances = advances.reduce(
       (total, advance) => total + advance.amount,
@@ -206,6 +216,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       commissionValue,
       commissionAmount,
       totalAdvances,
+      totalIncomes,
       finalEarnings: commissionAmount - totalAdvances,
     });
   };
@@ -334,6 +345,8 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                     </Group>
                     <Text size="xs" c="dimmed">
                       {payroll?.totalAppointments || 0} citas confirmadas
+                      {(payroll?.totalIncomes || 0) > 0 &&
+                        ` + ${incomes.length} ingreso${incomes.length !== 1 ? "s" : ""} manual${incomes.length !== 1 ? "es" : ""} (${formatCurrency(payroll?.totalIncomes || 0)})`}
                     </Text>
                   </Paper>
                 </Grid.Col>
@@ -489,6 +502,47 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                             <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
                             <Table.Td>
                               {advance.description || "Sin descripción"}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  )}
+                </ScrollArea>
+              </Card>
+
+              {/* Tabla de ingresos manuales */}
+              <Card shadow="sm" radius="md" p="md" withBorder>
+                <Title order={4} mb="md">
+                  Ingresos Manuales del Período
+                </Title>
+                <ScrollArea style={{ height: "200px" }}>
+                  {loadingAdvances ? (
+                    <Box ta="center" py="xl">
+                      <Loader />
+                    </Box>
+                  ) : incomes.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="xl">
+                      No hay ingresos manuales en este período
+                    </Text>
+                  ) : (
+                    <Table striped highlightOnHover>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Fecha</Table.Th>
+                          <Table.Th>Monto</Table.Th>
+                          <Table.Th>Descripción</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {incomes.map((income) => (
+                          <Table.Tr key={income._id}>
+                            <Table.Td>
+                              {new Date(income.date).toLocaleDateString()}
+                            </Table.Td>
+                            <Table.Td>{formatCurrency(income.amount)}</Table.Td>
+                            <Table.Td>
+                              {income.description || "Sin descripción"}
                             </Table.Td>
                           </Table.Tr>
                         ))}

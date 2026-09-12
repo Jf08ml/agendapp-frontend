@@ -13,7 +13,7 @@ import {
   Menu,
 } from "@mantine/core";
 import { BsPencil, BsTrash, BsThreeDotsVertical } from "react-icons/bs";
-import { FaMoneyBillTransfer } from "react-icons/fa6";
+import { FaMoneyBillTransfer, FaMoneyBillTrendUp } from "react-icons/fa6";
 import { RiUserReceivedFill } from "react-icons/ri";
 import { FaUserCheck } from "react-icons/fa";
 import { Employee } from "../../../../services/employeeService";
@@ -25,6 +25,7 @@ interface Props {
   onActive: (employeeId: string) => void;
   onViewDetails: (employee: Employee) => void;
   onShowAdvanceModal: (employee: Employee) => void;
+  onShowIncomeModal: (employee: Employee) => void;
 }
 
 const EmployeeCard: React.FC<Props> = ({
@@ -34,6 +35,7 @@ const EmployeeCard: React.FC<Props> = ({
   onActive,
   onViewDetails,
   onShowAdvanceModal,
+  onShowIncomeModal,
 }) => {
   const accent = employee.color || "#e2e8f0";
 
@@ -60,6 +62,9 @@ const EmployeeCard: React.FC<Props> = ({
           </Menu.Item>
           <Menu.Item leftSection={<FaMoneyBillTransfer />} onClick={() => onShowAdvanceModal(employee)}>
             Adelantos
+          </Menu.Item>
+          <Menu.Item leftSection={<FaMoneyBillTrendUp />} onClick={() => onShowIncomeModal(employee)}>
+            Ingresos
           </Menu.Item>
           <Menu.Item leftSection={<BsPencil />} onClick={() => onEdit(employee)}>
             Editar
@@ -126,6 +131,9 @@ const EmployeeCard: React.FC<Props> = ({
         <Flex justify="flex-end" gap="xs" mt="sm" visibleFrom="md">
           <ActionIcon variant="light" onClick={() => onShowAdvanceModal(employee)} title="Adelantos">
             <FaMoneyBillTransfer />
+          </ActionIcon>
+          <ActionIcon variant="light" onClick={() => onShowIncomeModal(employee)} title="Ingresos">
+            <FaMoneyBillTrendUp />
           </ActionIcon>
           <ActionIcon variant="light" onClick={() => onViewDetails(employee)} title="Detalles">
             <RiUserReceivedFill />

@@ -2,10 +2,14 @@ import { apiAdvance } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Employee } from "./employeeService";
 
-// Definir la estructura de un avance
+// Definir la estructura de un avance (o ingreso manual, según `type`)
 export interface Advance {
   _id?: string | null | undefined;
   employee: string | Employee;
+  // "advance" (adelanto, resta de la nómina) | "income" (ingreso manual de
+  // una cita realizada pero no registrada en el sistema, suma a la nómina).
+  // Ausente en registros antiguos → se trata como "advance".
+  type?: "advance" | "income";
   description: string;
   amount: number;
   date: Date;
@@ -52,29 +56,6 @@ export const deleteAdvance = async (advanceId: string) => {
     await apiAdvance.delete(`/${advanceId}`);
   } catch (error) {
     handleAxiosError(error, "Error al eliminar el avance");
-  }
-};
-
-// Obtener todos los avances
-export const getAdvances = async (): Promise<Advance[]> => {
-  try {
-    const response = await apiAdvance.get<Response<Advance[]>>("/");
-    return response.data.data;
-  } catch (error) {
-    handleAxiosError(error, "Error al obtener los avances");
-    return [];
-  }
-};
-
-// Obtener un avance por ID
-export const getAdvanceById = async (
-  advanceId: string
-): Promise<Advance | undefined> => {
-  try {
-    const response = await apiAdvance.get<Response<Advance>>(`/${advanceId}`);
-    return response.data.data;
-  } catch (error) {
-    handleAxiosError(error, "Error al obtener el avance");
   }
 };
 

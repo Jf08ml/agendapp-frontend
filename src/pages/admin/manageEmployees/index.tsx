@@ -36,6 +36,7 @@ import {
 import EmployeeCard from "./components/EmployeeCard";
 import EmployeeDetailsModal from "./components/EmployeeDetailsModal";
 import AdvanceModal from "./components/AdvanceModal";
+import IncomeModal from "./components/IncomeModal";
 import ScheduleOverview from "./components/ScheduleOverview";
 import { openConfirmModal } from "@mantine/modals";
 import { useSelector } from "react-redux";
@@ -60,6 +61,7 @@ const AdminEmployees: React.FC = () => {
   );
 
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -297,6 +299,11 @@ const AdminEmployees: React.FC = () => {
     setSelectedEmployee(employee);
   };
 
+  const handleShowIncomeModal = (employee: Employee) => {
+    setShowIncomeModal(true);
+    setSelectedEmployee(employee);
+  };
+
   if (loading && !initialLoaded) return <CustomLoader />;
 
   return (
@@ -405,6 +412,7 @@ const AdminEmployees: React.FC = () => {
                       onActive={(id) => handleActiveEmployee(id, true)}
                       onViewDetails={showEmployeeDetailsModal}
                       onShowAdvanceModal={handleShowAdvanceModal}
+                      onShowIncomeModal={handleShowIncomeModal}
                     />
                   </Grid.Col>
                 ))}
@@ -444,6 +452,12 @@ const AdminEmployees: React.FC = () => {
       <AdvanceModal
         isOpen={showAdvanceModal}
         onClose={() => setShowAdvanceModal(false)}
+        employee={selectedEmployee}
+      />
+
+      <IncomeModal
+        isOpen={showIncomeModal}
+        onClose={() => setShowIncomeModal(false)}
         employee={selectedEmployee}
       />
     </Container>

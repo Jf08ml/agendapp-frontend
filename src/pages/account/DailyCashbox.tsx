@@ -71,6 +71,7 @@ import {
   IconCreditCard,
   IconBuildingBank,
   IconCoin,
+  IconUsersGroup,
 } from "@tabler/icons-react";
 
 import {
@@ -99,6 +100,9 @@ import {
   deleteSale as deleteProductSaleApi,
 } from "../../services/productService";
 import SaleModal from "../admin/inventory/components/SaleModal";
+import AdvanceModal from "../admin/manageEmployees/components/AdvanceModal";
+import IncomeModal from "../admin/manageEmployees/components/IncomeModal";
+import { Employee, getEmployeesByOrganizationId } from "../../services/employeeService";
 
 const IconArrowRight = IconChevronRight;
 
@@ -328,6 +332,12 @@ const DailyCashbox: React.FC = () => {
   const [productSales, setProductSales] = useState<ProductSale[]>([]);
   const [saleModalOpened, setSaleModalOpened] = useState(false);
 
+  // Adelantos e ingresos manuales por profesional (nómina)
+  const [payrollEmployees, setPayrollEmployees] = useState<Employee[]>([]);
+  const [payrollEmployeeId, setPayrollEmployeeId] = useState<string | null>(null);
+  const [showPayrollAdvanceModal, setShowPayrollAdvanceModal] = useState(false);
+  const [showPayrollIncomeModal, setShowPayrollIncomeModal] = useState(false);
+
   const organizationId = useSelector(
     (state: RootState) => state.auth.organizationId
   );
@@ -337,6 +347,7 @@ const DailyCashbox: React.FC = () => {
     hasPermission("packages:view") && org?.planLimits?.servicePackages !== false;
   const canSellProducts =
     hasPermission("inventory:sell") || hasPermission("inventory:manage");
+  const canManagePayroll = hasPermission("employees:read");
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const currency = org?.currency || "COP";
@@ -437,6 +448,15 @@ const DailyCashbox: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, canManagePackagePayments]);
+
+  // Trae profesionales de la org para el selector de adelantos/ingresos (nómina)
+  useEffect(() => {
+    if (organizationId && canManagePayroll) {
+      getEmployeesByOrganizationId(organizationId)
+        .then((emps) => setPayrollEmployees(emps.filter((e) => e.isActive)))
+        .catch(() => setPayrollEmployees([]));
+    }
+  }, [organizationId, canManagePayroll]);
 
   useEffect(() => {
     // UX: si el usuario elige "Personalizado" en mobile, abre filtros automáticamente
@@ -1208,9 +1228,12 @@ const DailyCashbox: React.FC = () => {
       });
   }, [clientPackages, packageSearch]);
 
-  // Tab efectivo: si el tab guardado es "paquetes" pero el usuario no puede gestionarlos, cae a "citas"
+  // Tab efectivo: si el tab guardado es "paquetes"/"nomina" pero el usuario no puede gestionarlos, cae a "citas"
   const effectiveTab =
-    activeTab === "paquetes" && !canManagePackagePayments ? "citas" : activeTab;
+    (activeTab === "paquetes" && !canManagePackagePayments) ||
+    (activeTab === "nomina" && !canManagePayroll)
+      ? "citas"
+      : activeTab;
 
   const formattedRangeLabel =
     startDate && endDate
@@ -1752,6 +1775,18 @@ const DailyCashbox: React.FC = () => {
         onSaleCreated={() => fetchProductSales()}
       />
 
+      {/* ---- Modales de adelantos/ingresos por profesional ---- */}
+      <AdvanceModal
+        isOpen={showPayrollAdvanceModal}
+        onClose={() => setShowPayrollAdvanceModal(false)}
+        employee={payrollEmployees.find((e) => e._id === payrollEmployeeId) || null}
+      />
+      <IncomeModal
+        isOpen={showPayrollIncomeModal}
+        onClose={() => setShowPayrollIncomeModal(false)}
+        employee={payrollEmployees.find((e) => e._id === payrollEmployeeId) || null}
+      />
+
       <Stack gap="md" mt="xs">
         {/* ── Barra de control ── */}
         <Card shadow="sm" radius="md" withBorder p="md">
@@ -2027,6 +2062,11 @@ const DailyCashbox: React.FC = () => {
             >
               Movimientos
             </Tabs.Tab>
+            {canManagePayroll && (
+              <Tabs.Tab value="nomina" leftSection={<IconUsersGroup size={15} />}>
+                Adelantos/Ingresos
+              </Tabs.Tab>
+            )}
           </Tabs.List>
 
           {/* ── Tab: Citas ── */}
@@ -2404,6 +2444,56 @@ const DailyCashbox: React.FC = () => {
           )}
         </Card>
           </Tabs.Panel>
+
+          {/* ── Tab: Adelantos/Ingresos por profesional ── */}
+          {canManagePayroll && (
+          <Tabs.Panel value="nomina" pt="md">
+        <Card shadow="sm" radius="md" withBorder>
+          <Group gap="xs" mb="sm">
+            <IconUsersGroup size={18} />
+            <Title order={4}>Adelantos e Ingresos por Profesional</Title>
+          </Group>
+          <Text size="sm" c="dimmed" mb="md">
+            Registra un adelanto (se resta de la nómina) o un ingreso manual — una
+            cita realizada pero que no se va a registrar en el sistema — que suma
+            directo a la nómina del profesional, igual que una cita atendida.
+          </Text>
+
+          <Select
+            label="Profesional"
+            placeholder="Selecciona un profesional"
+            data={payrollEmployees.map((e) => ({ value: e._id, label: e.names }))}
+            value={payrollEmployeeId}
+            onChange={setPayrollEmployeeId}
+            searchable
+            clearable
+            mb="md"
+            style={{ maxWidth: 360 }}
+          />
+
+          {payrollEmployeeId && (
+            <Group gap="sm">
+              <Button
+                variant="light"
+                color="orange"
+                leftSection={<IconCoin size={16} />}
+                onClick={() => setShowPayrollAdvanceModal(true)}
+              >
+                Gestionar adelantos
+              </Button>
+              <Button
+                variant="light"
+                color="teal"
+                leftSection={<IconCash size={16} />}
+                onClick={() => setShowPayrollIncomeModal(true)}
+              >
+                Gestionar ingresos
+              </Button>
+            </Group>
+          )}
+        </Card>
+          </Tabs.Panel>
+          )}
         </Tabs>
       </Stack>
     </Container>
