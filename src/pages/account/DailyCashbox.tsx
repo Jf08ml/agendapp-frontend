@@ -1037,6 +1037,11 @@ const DailyCashbox: React.FC = () => {
       let completedIncome = 0;
 
       for (const appt of filteredAppointments) {
+        // Una cita cancelada (por admin o por cliente) no representa dinero
+        // pendiente por cobrar: el servicio nunca se prestó. Lo que ya se
+        // hubiera cobrado de ella (abono/pagos) sí se mantiene como recibido.
+        const isCancelled = (appt.status || "").includes("cancelled");
+
         const basePrice = appt.service?.price || 0;
         const additionalTotal =
           appt.additionalItems?.reduce(
@@ -1052,7 +1057,9 @@ const DailyCashbox: React.FC = () => {
             : basePrice;
 
         const lineTotal = usedPrice + additionalTotal;
-        total += lineTotal;
+        if (!isCancelled) {
+          total += lineTotal;
+        }
 
         const advance = appt.advancePayment || 0;
         const paymentsSum = (appt.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
@@ -1067,7 +1074,9 @@ const DailyCashbox: React.FC = () => {
         if (!summary[serviceName])
           summary[serviceName] = { count: 0, total: 0, costs: 0 };
         summary[serviceName].count += 1;
-        summary[serviceName].total += lineTotal;
+        if (!isCancelled) {
+          summary[serviceName].total += lineTotal;
+        }
 
         // Gastos: solo para citas confirmadas o asistidas
         const isCompleted = appt.status === "confirmed" || appt.status === "attended";
