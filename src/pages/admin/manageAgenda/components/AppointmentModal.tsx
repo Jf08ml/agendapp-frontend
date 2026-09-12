@@ -18,6 +18,13 @@ import {
   Badge,
   ActionIcon,
   Textarea,
+  Tabs,
+  ScrollArea,
+  Flex,
+  CopyButton,
+  Tooltip,
+  Table,
+  TextInput,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
@@ -26,7 +33,14 @@ import { addMinutes } from "date-fns";
 import { Service } from "../../../../services/serviceService";
 import { Employee } from "../../../../services/employeeService";
 import { Client, searchClients } from "../../../../services/clientService";
-import { Appointment, updateAppointmentNotes } from "../../../../services/appointmentService";
+import {
+  Appointment,
+  PaymentRecord,
+  updateAppointment,
+  updateAppointmentNotes,
+  addAppointmentPayment,
+  removeAppointmentPayment,
+} from "../../../../services/appointmentService";
 import ClientFormModal from "../../manageClients/ClientFormModal";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
@@ -44,6 +58,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
 import { IconPackage, IconX, IconNotes, IconListDetails } from "@tabler/icons-react";
+import { BiCopy, BiCheckCircle, BiPlus, BiTrash, BiX } from "react-icons/bi";
+import { FaWhatsapp } from "react-icons/fa";
 import { BUILT_IN_FIELD_KEYS } from "../../../../services/organizationService";
 import DynamicFormFields from "../../../../components/DynamicFormFields";
 
@@ -210,6 +226,11 @@ interface AppointmentModalProps {
   creatingAppointment: boolean;
   fetchAppointmentsForMonth?: (date: Date) => Promise<void>;
   onSaveMulti?: (blocks: EmployeeBlockData[]) => void;
+  /** Lista completa de citas (para historial + tabla de facturación del cliente en la pestaña Cobro). */
+  appoinments?: Appointment[];
+  setAppointments?: React.Dispatch<React.SetStateAction<Appointment[]>>;
+  /** Pestaña con la que abrir el modal en modo edición ("detalle" por defecto). */
+  initialTab?: string;
 }
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
@@ -228,6 +249,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   creatingAppointment,
   fetchAppointmentsForMonth,
   onSaveMulti,
+  appoinments = [],
+  setAppointments,
+  initialTab,
 }) => {
   const [createClientModalOpened, setCreateClientModalOpened] =
     useState<boolean>(false);
@@ -277,33 +301,312 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     setLastSavedNotes(appointment?.sessionNotes || "");
   }, [appointment?._id, appointment?.sessionNotes]);
 
-  const handleSaveNotes = async () => {
+  // 🗂️ Pestañas del modal (solo aplica en modo edición/consulta, cuando ya existe `appointment`)
+  const [activeTab, setActiveTab] = useState<string>(initialTab || "detalle");
+
+  // 💰 Cobro: precio personalizado + adicionales + pagos (migrado desde el
+  // antiguo modal propio de AppointmentCard.tsx, ahora unificado aquí)
+  const [customPrice, setCustomPrice] = useState<number | null>(
+    appointment?.customPrice ?? null,
+  );
+  const [additionalItems, setAdditionalItems] = useState(
+    appointment?.additionalItems || [],
+  );
+  const [newItem, setNewItem] = useState({ name: "", price: 0 });
+  const [savingCobro, setSavingCobro] = useState(false);
+  const [payments, setPayments] = useState<PaymentRecord[]>(
+    appointment?.payments || [],
+  );
+  const [paymentStatus, setPaymentStatus] = useState(
+    appointment?.paymentStatus || "unpaid",
+  );
+  const [newPayment, setNewPayment] = useState({
+    amount: 0,
+    method: "cash",
+    note: "",
+    otherLabel: "",
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  const customFieldsChanged =
+    JSON.stringify(newAppointment.customFieldValues ?? {}) !==
+    JSON.stringify(appointment?.customFieldValues ?? {});
+
+  const handleSaveNotesAndFields = async () => {
     if (!appointment) return;
     setSavingNotes(true);
     try {
-      const updated = await updateAppointmentNotes(appointment._id, sessionNotesDraft);
-      if (updated) {
-        setLastSavedNotes(sessionNotesDraft);
-        // Refresca la lista de citas del mes para que, si se vuelve a abrir
-        // esta misma cita más tarde, ya venga con la nota actualizada.
-        await fetchAppointmentsForMonth?.(appointment.startDate);
-        notifications.show({
-          title: "Notas guardadas",
-          message: "El registro de la sesión se actualizó correctamente",
-          color: "green",
-          autoClose: 2500,
+      const notesChanged = sessionNotesDraft !== lastSavedNotes;
+      if (notesChanged) {
+        await updateAppointmentNotes(appointment._id, sessionNotesDraft);
+      }
+      if (customFieldsChanged) {
+        await updateAppointment(appointment._id, {
+          customFieldValues: newAppointment.customFieldValues ?? {},
         });
       }
+      setLastSavedNotes(sessionNotesDraft);
+      // Refresca la lista de citas del mes para que, si se vuelve a abrir
+      // esta misma cita más tarde, ya venga con la nota/campos actualizados.
+      await fetchAppointmentsForMonth?.(appointment.startDate);
+      setAppointments?.((prev) =>
+        prev.map((a) =>
+          a._id === appointment._id
+            ? {
+                ...a,
+                sessionNotes: sessionNotesDraft,
+                customFieldValues: newAppointment.customFieldValues,
+              }
+            : a,
+        ),
+      );
+      notifications.show({
+        title: "Guardado",
+        message: "Las notas y los campos personalizados se actualizaron correctamente",
+        color: "green",
+        autoClose: 2500,
+      });
     } catch (error: unknown) {
       notifications.show({
         title: "Error",
-        message: error instanceof Error ? error.message : "No se pudieron guardar las notas",
+        message: error instanceof Error ? error.message : "No se pudo guardar",
         color: "red",
         autoClose: 4000,
       });
     } finally {
       setSavingNotes(false);
     }
+  };
+
+  const handleAddItem = () => {
+    if (newItem.name && newItem.price > 0) {
+      setAdditionalItems([...additionalItems, newItem]);
+      setNewItem({ name: "", price: 0 });
+    }
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const updatedItems = [...additionalItems];
+    updatedItems.splice(index, 1);
+    setAdditionalItems(updatedItems);
+  };
+
+  const handleSaveCobro = async () => {
+    if (!appointment) return;
+    setSavingCobro(true);
+    try {
+      const updated = await updateAppointment(appointment._id, {
+        customPrice,
+        additionalItems,
+      });
+      if (updated) {
+        notifications.show({
+          title: "Éxito",
+          message: "Cita actualizada correctamente",
+          color: "green",
+          autoClose: 3000,
+        });
+        setAppointments?.((prev) =>
+          prev.map((a) =>
+            a._id === appointment._id ? { ...a, customPrice, additionalItems } : a,
+          ),
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      notifications.show({
+        title: "Error",
+        message: "No se pudo actualizar la cita",
+        color: "red",
+        autoClose: 3000,
+      });
+    } finally {
+      setSavingCobro(false);
+    }
+  };
+
+  const handleFullPayment = async () => {
+    if (!appointment || pending <= 0) return;
+    setSavingPayment(true);
+    try {
+      const updated = await addAppointmentPayment(appointment._id, {
+        amount: pending,
+        method: newPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: newPayment.method === "other" && newPayment.otherLabel ? newPayment.otherLabel : "",
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments?.((prev) =>
+          prev.map((a) =>
+            a._id === appointment._id
+              ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+              : a,
+          ),
+        );
+        notifications.show({
+          title: "Pago completo registrado",
+          message: "Se registró el saldo pendiente como pagado",
+          color: "green",
+          autoClose: 3000,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      notifications.show({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000 });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleAddPayment = async () => {
+    if (!appointment || !newPayment.amount || newPayment.amount <= 0) return;
+    setSavingPayment(true);
+    try {
+      const noteValue = newPayment.method === "other" && newPayment.otherLabel
+        ? newPayment.otherLabel + (newPayment.note ? ` - ${newPayment.note}` : "")
+        : newPayment.note;
+      const updated = await addAppointmentPayment(appointment._id, {
+        amount: newPayment.amount,
+        method: newPayment.method as PaymentRecord["method"],
+        date: new Date().toISOString(),
+        note: noteValue,
+      });
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments?.((prev) =>
+          prev.map((a) =>
+            a._id === appointment._id
+              ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+              : a,
+          ),
+        );
+        setNewPayment({ amount: 0, method: "cash", note: "", otherLabel: "" });
+        notifications.show({ title: "Pago registrado", message: "El pago fue registrado correctamente", color: "green", autoClose: 3000 });
+      }
+    } catch (err) {
+      console.error(err);
+      notifications.show({ title: "Error", message: "No se pudo registrar el pago", color: "red", autoClose: 3000 });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const handleRemovePayment = async (paymentId: string) => {
+    if (!appointment) return;
+    try {
+      const updated = await removeAppointmentPayment(appointment._id, paymentId);
+      if (updated) {
+        setPayments(updated.payments || []);
+        setPaymentStatus(updated.paymentStatus || "unpaid");
+        setAppointments?.((prev) =>
+          prev.map((a) =>
+            a._id === appointment._id
+              ? { ...a, payments: updated.payments, paymentStatus: updated.paymentStatus }
+              : a,
+          ),
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      notifications.show({ title: "Error", message: "No se pudo eliminar el pago", color: "red", autoClose: 3000 });
+    }
+  };
+
+  const getIsBirthday = (
+    birthDate: string | number | dayjs.Dayjs | Date | null | undefined,
+  ): boolean => {
+    if (!birthDate) return false;
+    const todayD = dayjs();
+    const birthDateClient = dayjs(birthDate);
+    if (!birthDateClient.isValid()) return false;
+    return (
+      birthDateClient.month() === todayD.month() &&
+      birthDateClient.date() === todayD.date()
+    );
+  };
+
+  const generateAppointmentDetails = (
+    appt: Appointment,
+    allAppointments: Appointment[],
+  ) => {
+    const clientServices = allAppointments
+      .filter((a) => a.client._id === appt.client._id)
+      .map((a) =>
+        a.service
+          ? `⭐ *Servicio:* ${a.service.name}\n👤 *Profesional:* ${a.employee.names}`
+          : `⭐ *Servicio:* [Eliminado]\n👤 *Profesional:* ${a.employee.names}`,
+      )
+      .join("\n\n");
+
+    return `*DETALLES DE LA CITA*
+👩‍🦰 *Cliente:* ${appt.client.name}
+📅 *Horario:* ${formatFullDateInTimezone(
+      appt.startDate,
+      timezone,
+      `dddd, D MMMM YYYY, ${timeFormat === "24h" ? "HH:mm" : "h:mm A"}`,
+    )} - ${formatInTimezone(appt.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+💵 *Abono:* ${appt.advancePayment}
+
+${clientServices}`;
+  };
+
+  // 📨 Confirmación de WhatsApp del agendamiento (mismo criterio que la tarjeta de la agenda)
+  const waConfirmationConfig: Record<string, { color: string; shortLabel: string; fullLabel: string }> = {
+    sent: { color: "#25D366", shortLabel: "Enviada", fullLabel: "Confirmación de WhatsApp enviada" },
+    failed: { color: "#e03131", shortLabel: "Falló el envío", fullLabel: "Confirmación de WhatsApp: falló el envío" },
+    blocked: { color: "#f08c00", shortLabel: "Bloqueada", fullLabel: "Confirmación de WhatsApp bloqueada (plan o plantilla deshabilitada)" },
+    skipped: { color: "#868e96", shortLabel: "Omitida", fullLabel: "Confirmación de WhatsApp omitida (sin teléfono utilizable)" },
+  };
+  const waDeliveryConfig: Record<string, { color: string; shortLabel: string; fullLabel: string }> = {
+    sent: { color: "#25D366", shortLabel: "Enviada (✓)", fullLabel: "Confirmación de WhatsApp enviada — WhatsApp la aceptó, esperando confirmación de entrega" },
+    delivered: { color: "#25D366", shortLabel: "Entregada (✓✓)", fullLabel: "Confirmación de WhatsApp entregada" },
+    failed: { color: "#e03131", shortLabel: "No entregada", fullLabel: "Confirmación de WhatsApp: WhatsApp no pudo entregarla (revisar el número del cliente)" },
+  };
+  const waConfirmationDelivery =
+    appointment?.waConfirmationStatus === "sent" && appointment?.waConfirmationDeliveryStatus
+      ? waDeliveryConfig[appointment.waConfirmationDeliveryStatus]
+      : null;
+  const waConfirmation =
+    waConfirmationDelivery ??
+    (appointment?.waConfirmationStatus ? waConfirmationConfig[appointment.waConfirmationStatus] : null);
+  const waConfirmationColor = waConfirmation?.color || "#868e96";
+
+  const appointmentStatusConfig: Record<string, { color: string; label: string }> = {
+    pending: { color: "yellow", label: "Pendiente" },
+    confirmed: { color: "blue", label: "Confirmada" },
+    attended: { color: "teal", label: "Asistió" },
+    no_show: { color: "pink", label: "No asistió" },
+    cancelled: { color: "red", label: "Cancelada" },
+    cancelled_by_admin: { color: "red", label: "Cancelada por el negocio" },
+    cancelled_by_customer: { color: "red", label: "Cancelada por el cliente" },
+  };
+  const statusInfo = appointment
+    ? appointmentStatusConfig[appointment.status] ?? { color: "gray", label: appointment.status }
+    : null;
+
+  const isBirthdayDetalle = appointment ? getIsBirthday(appointment.client.birthDate) : false;
+  const whatsappURL = appointment ? `https://wa.me/${appointment.client.phoneNumber}` : "";
+
+  // 💰 Cálculos de cobro para esta cita (pestaña Cobro)
+  const thisTotal = (customPrice ?? appointment?.totalPrice ?? 0) +
+    additionalItems.reduce((s, i) => s + (i.price || 0), 0);
+  const totalPaid = (appointment?.advancePayment || 0) +
+    payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = Math.max(0, thisTotal - totalPaid);
+
+  const paymentStatusConfig = {
+    paid:    { color: "green",  label: "Pagado" },
+    partial: { color: "yellow", label: "Abono" },
+    unpaid:  { color: "red",    label: "Sin pagar" },
+    free:    { color: "blue",   label: appointment?.clientPackageId ? "Incluido en paquete" : "Gratis" },
+  };
+  const psConfig = paymentStatusConfig[paymentStatus as keyof typeof paymentStatusConfig] ?? paymentStatusConfig.unpaid;
+
+  const methodLabels: Record<string, string> = {
+    cash: "Efectivo", card: "Tarjeta", transfer: "Transferencia", other: "Otro",
   };
 
   const today = dayjs();
@@ -621,35 +924,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     newAppointment.services,
   ]);
 
-  return (
+  const schedulingForm = (
     <>
-      <Modal
-        opened={opened}
-        onClose={onClose}
-        title={
-          <Text size="xl" fw={700}>
-            {appointment ? "✏️ Editar Cita" : "📅 Nueva Cita"}
-          </Text>
-        }
-        zIndex={300}
-        centered
-        size="xl"
-        radius="md"
-        overlayProps={{
-          opacity: 0.3,
-          blur: 3,
-        }}
-        styles={{
-          body: {
-            padding: "1.5rem",
-          },
-          header: {
-            borderBottom: "1px solid #e9ecef",
-            paddingBottom: "1rem",
-          },
-        }}
-      >
-        <Box>
           {/* Sección: Cliente y Profesional */}
           <Box
             mb="xl"
@@ -1736,48 +2012,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
               </Box>
             )}
           </Box>
+    </>
+  );
 
-          {/* Sección: Notas de la sesión (solo al editar una cita ya existente) */}
-          {appointment && (
-            <Box
-              mb="xl"
-              p="md"
-              style={{
-                backgroundColor: "#f8f9fa",
-                borderRadius: 8,
-                border: "1px solid #e9ecef",
-              }}
-            >
-              <Group justify="space-between" mb="md">
-                <Text size="sm" fw={600} c="dimmed" tt="uppercase">
-                  <IconNotes size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
-                  Notas de la sesión
-                </Text>
-                <Button
-                  size="xs"
-                  variant="light"
-                  onClick={handleSaveNotes}
-                  loading={savingNotes}
-                  disabled={sessionNotesDraft === lastSavedNotes}
-                >
-                  Guardar notas
-                </Button>
-              </Group>
-              <Textarea
-                placeholder="¿Qué se hizo en esta sesión? Observaciones, seguimiento, próximos pasos..."
-                value={sessionNotesDraft}
-                onChange={(e) => setSessionNotesDraft(e.currentTarget.value)}
-                minRows={3}
-                autosize
-                maxRows={8}
-                styles={{ input: { borderRadius: 8 } }}
-              />
-            </Box>
-          )}
-
-          {/* Sección: Campos personalizados (Organization.clientFormConfig.fields, scope "booking")
-              — visible tanto al crear como al editar, no solo cuando ya hay valores guardados. */}
-          {(() => {
+  const customFieldsBox = (() => {
             const bookingCustomFields = (organization?.clientFormConfig?.fields ?? []).filter(
               (f) =>
                 f.enabled &&
@@ -1811,8 +2049,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 />
               </Box>
             );
-          })()}
+          })();
 
+  const actionButtons = (
+    <>
           {/* Botones de acción */}
           <Group
             mt="xl"
@@ -1979,6 +2219,551 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     : "Crear Cita"}
             </Button>
           </Group>
+    </>
+  );
+
+  return (
+    <>
+      <Modal
+        opened={opened}
+        onClose={onClose}
+        title={
+          <Text size="xl" fw={700}>
+            {appointment ? "✏️ Editar Cita" : "📅 Nueva Cita"}
+          </Text>
+        }
+        zIndex={300}
+        centered
+        size="xl"
+        radius="md"
+        overlayProps={{
+          opacity: 0.3,
+          blur: 3,
+        }}
+        styles={{
+          body: {
+            padding: "1.5rem",
+          },
+          header: {
+            borderBottom: "1px solid #e9ecef",
+            paddingBottom: "1rem",
+          },
+        }}
+      >
+        <Box>
+          {appointment ? (
+            <>
+              {/* Acciones rápidas */}
+              <Flex
+                justify="space-between"
+                align="center"
+                mb="md"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: "#f8f9fa",
+                  border: "1px solid #e9ecef",
+                }}
+              >
+                <Flex direction="column" gap={2}>
+                  <Text size="xs" c="dimmed">Acciones rápidas</Text>
+                  <Text size="sm" fw={600}>Copiar / WhatsApp</Text>
+                </Flex>
+                <Group gap="xs">
+                  <Tooltip label="Copiar detalle de la cita" withArrow>
+                    <ActionIcon
+                      color="blue"
+                      size="lg"
+                      variant="filled"
+                      onClick={() =>
+                        navigator.clipboard.writeText(
+                          generateAppointmentDetails(appointment, appoinments),
+                        )
+                      }
+                    >
+                      <BiCopy size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                  {auth.role === "admin" && (
+                    <Tooltip label="Abrir chat de WhatsApp" withArrow>
+                      <ActionIcon
+                        color="green"
+                        size="lg"
+                        variant="filled"
+                        onClick={() => window.open(whatsappURL, "_blank")}
+                      >
+                        <FaWhatsapp size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Group>
+              </Flex>
+
+              <Tabs
+                value={activeTab}
+                onChange={(v) => setActiveTab(v || "detalle")}
+                variant="pills"
+                radius="xl"
+              >
+                <Tabs.List mb="md">
+                  <Tabs.Tab value="detalle">Detalle</Tabs.Tab>
+                  <Tabs.Tab value="edicion">Edición</Tabs.Tab>
+                  <Tabs.Tab value="notas">Notas y campos</Tabs.Tab>
+                  <Tabs.Tab value="cobro">Cobro</Tabs.Tab>
+                </Tabs.List>
+
+                {/* -------- PESTAÑA: Detalle -------- */}
+                <Tabs.Panel value="detalle">
+                  <Flex direction="column" gap="md">
+                    <Box style={{ border: "1px solid #e9ecef", borderRadius: 12, padding: 12 }}>
+                      <Group justify="space-between" mb={6}>
+                        <Text fw={700} size="sm">Resumen</Text>
+                        {isBirthdayDetalle && (
+                          <Text size="xs" c="orange" fw={700}>🎉 Cumpleaños hoy</Text>
+                        )}
+                      </Group>
+                      <Flex direction="column" gap={6}>
+                        <Text size="sm">
+                          <strong>Servicio:</strong>{" "}
+                          {appointment.service ? appointment.service.name : "Sin servicio"}
+                        </Text>
+                        <Text size="sm">
+                          <strong>Profesional:</strong> {appointment.employee.names}
+                          {appointment.employeeRequestedByClient && (
+                            <Text span c="violet" fw={600}> (solicitado)</Text>
+                          )}
+                        </Text>
+                        <Text size="sm">
+                          <strong>Fecha:</strong>{" "}
+                          {formatFullDateInTimezone(appointment.startDate, timezone, "dddd, D MMMM YYYY")}
+                        </Text>
+                        <Text size="sm">
+                          <strong>Hora:</strong>{" "}
+                          {formatInTimezone(appointment.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                          {" - "}
+                          {formatInTimezone(appointment.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                        </Text>
+                        <Group gap={6}>
+                          <Text size="sm"><strong>Estado:</strong></Text>
+                          {statusInfo && (
+                            <Badge color={statusInfo.color} size="sm">{statusInfo.label}</Badge>
+                          )}
+                        </Group>
+                        <Text size="sm">
+                          <strong>Abono:</strong>{" "}
+                          {formatCurrency(appointment.advancePayment, organization?.currency || "COP")}
+                        </Text>
+
+                        {auth.role === "admin" && (
+                          <Flex align="center" gap={6} wrap="wrap">
+                            <Text size="sm">
+                              <strong>Tel:</strong> {appointment.client.phoneNumber}
+                            </Text>
+                            <CopyButton value={appointment.client.phoneNumber || ""} timeout={2000}>
+                              {({ copied, copy }) => (
+                                <Tooltip label={copied ? "Copiado" : "Copiar"} withArrow>
+                                  <ActionIcon
+                                    color={copied ? "green" : "blue"}
+                                    onClick={copy}
+                                    size="sm"
+                                    variant="subtle"
+                                  >
+                                    {copied ? <BiCheckCircle size={14} /> : <BiCopy size={14} />}
+                                  </ActionIcon>
+                                </Tooltip>
+                              )}
+                            </CopyButton>
+                          </Flex>
+                        )}
+
+                        {auth.role === "admin" && waConfirmation && (
+                          <Flex align="center" gap={6} wrap="wrap">
+                            <FaWhatsapp size={13} color={waConfirmationColor} />
+                            <Text size="sm">
+                              <strong>Confirmación WhatsApp:</strong> {waConfirmation.shortLabel}
+                            </Text>
+                          </Flex>
+                        )}
+                        {auth.role === "admin" &&
+                          appointment.waConfirmationStatus === "failed" &&
+                          appointment.waConfirmationError && (
+                            <Text size="xs" c="red" ml={19}>{appointment.waConfirmationError}</Text>
+                          )}
+                      </Flex>
+                    </Box>
+
+                    <Box>
+                      <Group justify="space-between" mb={6}>
+                        <Text fw={700} size="sm">Historial de citas</Text>
+                        <Text size="xs" c="dimmed">Mismo cliente</Text>
+                      </Group>
+                      <ScrollArea h={220} offsetScrollbars>
+                        <Flex direction="column" gap="xs">
+                          {appoinments
+                            .filter((appt) => appt.client._id === appointment.client._id)
+                            .map((appt, index) => {
+                              const isCurrentAppointment = appt._id === appointment._id;
+                              return (
+                                <Flex
+                                  key={index}
+                                  justify="space-between"
+                                  align="center"
+                                  py={8}
+                                  px={10}
+                                  style={{
+                                    borderRadius: 10,
+                                    border: isCurrentAppointment ? "1px solid #4dabf7" : "1px solid #e9ecef",
+                                    background: isCurrentAppointment ? "#e7f5ff" : "#f8f9fa",
+                                  }}
+                                >
+                                  <Box>
+                                    <Text size="sm" fw={600}>
+                                      {appt.service ? (
+                                        appt.service.name
+                                      ) : (
+                                        <Text component="span" c="red" fw={800} size="sm">
+                                          Sin servicio
+                                        </Text>
+                                      )}
+                                    </Text>
+                                    <Text size="xs" c="dimmed">
+                                      Profesional:{" "}
+                                      {appt.employeeRequestedByClient ? (
+                                        <strong style={{ color: "purple" }}>
+                                          {appt.employee.names} (solicitado)
+                                        </strong>
+                                      ) : (
+                                        appt.employee.names
+                                      )}
+                                    </Text>
+                                  </Box>
+                                  {isCurrentAppointment && (
+                                    <Text size="xs" fw={800} c="blue">ACTUAL</Text>
+                                  )}
+                                </Flex>
+                              );
+                            })}
+                        </Flex>
+                      </ScrollArea>
+                    </Box>
+                  </Flex>
+                </Tabs.Panel>
+
+                {/* -------- PESTAÑA: Edición -------- */}
+                <Tabs.Panel value="edicion">
+                  {schedulingForm}
+                  {actionButtons}
+                </Tabs.Panel>
+
+                {/* -------- PESTAÑA: Notas y campos personalizados -------- */}
+                <Tabs.Panel value="notas">
+                  <Box mt="md">
+                    <Group justify="space-between" mb="md">
+                      <Text size="sm" fw={600} c="dimmed" tt="uppercase">
+                        <IconNotes size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                        Notas y campos personalizados
+                      </Text>
+                      <Button
+                        size="xs"
+                        variant="light"
+                        onClick={handleSaveNotesAndFields}
+                        loading={savingNotes}
+                        disabled={sessionNotesDraft === lastSavedNotes && !customFieldsChanged}
+                      >
+                        Guardar
+                      </Button>
+                    </Group>
+                    <Textarea
+                      placeholder="¿Qué se hizo en esta sesión? Observaciones, seguimiento, próximos pasos..."
+                      value={sessionNotesDraft}
+                      onChange={(e) => setSessionNotesDraft(e.currentTarget.value)}
+                      minRows={3}
+                      autosize
+                      maxRows={8}
+                      styles={{ input: { borderRadius: 8 } }}
+                    />
+                    {customFieldsBox && <Box mt="md">{customFieldsBox}</Box>}
+                  </Box>
+                </Tabs.Panel>
+
+                {/* -------- PESTAÑA: Cobro -------- */}
+                <Tabs.Panel value="cobro">
+                  <Flex direction="column" gap="md" mt="md">
+                    <Box style={{ border: "1px solid #e9ecef", borderRadius: 12, padding: 12 }}>
+                      <Text fw={700} size="sm" mb={8}>Precio del servicio</Text>
+                      <NumberInput
+                        label="Cambiar precio"
+                        description="Déjalo vacío para usar el precio del servicio. Escribe 0 para una cita gratuita."
+                        prefix="$ "
+                        thousandSeparator=","
+                        min={0}
+                        placeholder={String(appointment.totalPrice ?? 0)}
+                        value={customPrice ?? ""}
+                        onChange={(value) => setCustomPrice(value === "" ? null : Number(value))}
+                      />
+                    </Box>
+
+                    <Box style={{ border: "1px solid #e9ecef", borderRadius: 12, padding: 12 }}>
+                      <Text fw={700} size="sm" mb={8}>Adicionales</Text>
+                      <Flex align="flex-end" gap="xs">
+                        <TextInput
+                          label="Nombre"
+                          value={newItem.name}
+                          onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                          style={{ flex: 2 }}
+                        />
+                        <NumberInput
+                          label="Precio"
+                          prefix="$ "
+                          thousandSeparator=","
+                          value={newItem.price}
+                          onChange={(value) => setNewItem({ ...newItem, price: (value as number) || 0 })}
+                          style={{ flex: 1 }}
+                        />
+                        <ActionIcon color="green" onClick={handleAddItem} mt="lg" variant="filled">
+                          <BiPlus size={18} />
+                        </ActionIcon>
+                      </Flex>
+                      <Box mt="md">
+                        <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="xs">
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th>Nombre</Table.Th>
+                              <Table.Th>Precio</Table.Th>
+                              <Table.Th style={{ width: 70 }}>Acción</Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {additionalItems.map((item, index) => (
+                              <Table.Tr key={index}>
+                                <Table.Td>{item.name}</Table.Td>
+                                <Table.Td>{formatCurrency(item.price, organization?.currency || "COP")}</Table.Td>
+                                <Table.Td>
+                                  <ActionIcon color="red" onClick={() => handleRemoveItem(index)} variant="subtle">
+                                    <BiTrash size={16} />
+                                  </ActionIcon>
+                                </Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      </Box>
+                      <Button fullWidth mt="md" onClick={handleSaveCobro} loading={savingCobro}>
+                        Guardar cambios
+                      </Button>
+                    </Box>
+
+                    <Text fw={800} size="md">Resumen de facturación</Text>
+                    <Table.ScrollContainer minWidth={520}>
+                      <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="xs">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Servicio</Table.Th>
+                            <Table.Th>Base</Table.Th>
+                            <Table.Th>Usado</Table.Th>
+                            <Table.Th>Adic.</Table.Th>
+                            <Table.Th>Total</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {appoinments
+                            .filter((appt) => appt.client._id === appointment.client._id)
+                            .map((appt, index) => {
+                              const additionalTotal =
+                                appt.additionalItems?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
+                              const usedPrice = appt.customPrice ?? appt.totalPrice ?? 0;
+                              const total = usedPrice + additionalTotal;
+                              return (
+                                <Table.Tr key={index}>
+                                  <Table.Td>
+                                    {appt.service ? (
+                                      appt.service.name
+                                    ) : (
+                                      <Text c="red" fw={800} size="sm">Sin servicio</Text>
+                                    )}
+                                  </Table.Td>
+                                  <Table.Td>
+                                    <Text>{formatCurrency(appt.totalPrice || 0, organization?.currency || "COP")}</Text>
+                                    {appt.customPrice != null && <Text size="xs" c="dimmed">No usado</Text>}
+                                  </Table.Td>
+                                  <Table.Td>
+                                    <Text fw={800}>{formatCurrency(usedPrice, organization?.currency || "COP")}</Text>
+                                    {appt.customPrice != null && <Text size="xs" c="green">Personalizado</Text>}
+                                  </Table.Td>
+                                  <Table.Td>{formatCurrency(additionalTotal, organization?.currency || "COP")}</Table.Td>
+                                  <Table.Td>
+                                    <Text fw={800}>{formatCurrency(total, organization?.currency || "COP")}</Text>
+                                  </Table.Td>
+                                </Table.Tr>
+                              );
+                            })}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
+
+                    <Flex
+                      justify="space-between"
+                      align="center"
+                      mt="xs"
+                      style={{ background: "#e7f5ff", borderRadius: 12, padding: "12px 14px", border: "1px solid #a5d8ff" }}
+                    >
+                      <Text fw={900} size="sm">Total general</Text>
+                      <Text fw={900} size="lg">
+                        {formatCurrency(
+                          appoinments
+                            .filter((appt) => appt.client._id === appointment.client._id)
+                            .reduce((acc, appt) => {
+                              const additionalTotal =
+                                appt.additionalItems?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
+                              const total = (appt.customPrice ?? appt.totalPrice ?? 0) + additionalTotal;
+                              return acc + total;
+                            }, 0),
+                          organization?.currency || "COP",
+                        )}
+                      </Text>
+                    </Flex>
+
+                    <Divider my="sm" label="Cobro de esta cita" labelPosition="center" />
+
+                    <Flex align="center" justify="space-between">
+                      <Text size="sm" fw={700}>Estado de cobro</Text>
+                      <Badge color={psConfig.color} size="md" variant="filled">{psConfig.label}</Badge>
+                    </Flex>
+
+                    <Box style={{ border: "1px solid #e9ecef", borderRadius: 10, padding: "10px 12px", background: "#f8f9fa" }}>
+                      <Flex justify="space-between" mb={2}>
+                        <Text size="sm" c="dimmed">Total esta cita</Text>
+                        <Text size="sm" fw={600}>{formatCurrency(thisTotal, organization?.currency || "COP")}</Text>
+                      </Flex>
+                      <Flex justify="space-between" mb={2}>
+                        <Text size="sm" c="dimmed">Abono inicial</Text>
+                        <Text size="sm">{formatCurrency(appointment.advancePayment || 0, organization?.currency || "COP")}</Text>
+                      </Flex>
+                      {payments.length > 0 && (
+                        <Flex justify="space-between" mb={2}>
+                          <Text size="sm" c="dimmed">Pagos adicionales</Text>
+                          <Text size="sm">
+                            {formatCurrency(payments.reduce((s, p) => s + (p.amount || 0), 0), organization?.currency || "COP")}
+                          </Text>
+                        </Flex>
+                      )}
+                      <Flex justify="space-between" pt={4} style={{ borderTop: "1px solid #dee2e6" }}>
+                        <Text size="sm" fw={700}>Saldo pendiente</Text>
+                        <Text size="sm" fw={700} c={pending > 0 ? "red" : "green"}>
+                          {formatCurrency(pending, organization?.currency || "COP")}
+                        </Text>
+                      </Flex>
+                    </Box>
+
+                    {payments.length > 0 && (
+                      <Box>
+                        <Text size="sm" fw={700} mb={6}>Historial de pagos</Text>
+                        <Flex direction="column" gap={4}>
+                          {payments.map((p) => (
+                            <Flex
+                              key={p._id}
+                              justify="space-between"
+                              align="center"
+                              px={10}
+                              py={6}
+                              style={{ borderRadius: 8, border: "1px solid #e9ecef", background: "#f8f9fa" }}
+                            >
+                              <Box>
+                                <Text size="sm" fw={600}>
+                                  {formatCurrency(p.amount, organization?.currency || "COP")}
+                                  {" · "}{methodLabels[p.method] || p.method}
+                                </Text>
+                                {p.note && <Text size="xs" c="dimmed">{p.note}</Text>}
+                                <Text size="xs" c="dimmed">{dayjs(p.date).locale("es").format("D MMM YYYY")}</Text>
+                              </Box>
+                              <ActionIcon color="red" variant="subtle" size="sm" onClick={() => handleRemovePayment(p._id)}>
+                                <BiX size={14} />
+                              </ActionIcon>
+                            </Flex>
+                          ))}
+                        </Flex>
+                      </Box>
+                    )}
+
+                    {paymentStatus !== "paid" && paymentStatus !== "free" && (
+                      <Box style={{ border: "1px solid #e9ecef", borderRadius: 10, padding: "10px 12px" }}>
+                        <Text size="sm" fw={700} mb={8}>Registrar pago</Text>
+                        <Flex gap="xs" align="flex-end" mb="sm">
+                          <Select
+                            label="Método de pago"
+                            value={newPayment.method}
+                            onChange={(v) => setNewPayment({ ...newPayment, method: v || "cash", otherLabel: "" })}
+                            data={[
+                              { value: "cash", label: "Efectivo" },
+                              { value: "card", label: "Tarjeta" },
+                              { value: "transfer", label: "Transferencia" },
+                              { value: "other", label: "Otro" },
+                            ]}
+                            style={{ flex: 1 }}
+                          />
+                          {newPayment.method === "other" && (
+                            <TextInput
+                              label="¿Cuál? (opcional)"
+                              placeholder="Ej: Nequi, Daviplata..."
+                              value={newPayment.otherLabel}
+                              onChange={(e) => setNewPayment({ ...newPayment, otherLabel: e.target.value })}
+                              style={{ flex: 1 }}
+                            />
+                          )}
+                          <Button
+                            size="sm"
+                            color="teal"
+                            variant="filled"
+                            loading={savingPayment}
+                            disabled={pending <= 0}
+                            onClick={handleFullPayment}
+                            style={{ flex: 1 }}
+                          >
+                            Pago completo ({formatCurrency(pending, organization?.currency || "COP")})
+                          </Button>
+                        </Flex>
+                        <Divider label="o ingresa un monto parcial" labelPosition="center" mb="sm" />
+                        <Flex gap="xs" align="flex-end">
+                          <NumberInput
+                            label="Monto parcial"
+                            prefix="$ "
+                            thousandSeparator=","
+                            value={newPayment.amount || ""}
+                            onChange={(v) => setNewPayment({ ...newPayment, amount: Number(v) || 0 })}
+                            style={{ flex: 1 }}
+                            min={0}
+                          />
+                        </Flex>
+                        <TextInput
+                          label="Nota (opcional)"
+                          value={newPayment.note}
+                          onChange={(e) => setNewPayment({ ...newPayment, note: e.target.value })}
+                          mt="xs"
+                        />
+                        <Button
+                          fullWidth
+                          mt="sm"
+                          size="sm"
+                          variant="light"
+                          loading={savingPayment}
+                          disabled={!newPayment.amount || newPayment.amount <= 0}
+                          onClick={handleAddPayment}
+                        >
+                          Registrar monto parcial
+                        </Button>
+                      </Box>
+                    )}
+                  </Flex>
+                </Tabs.Panel>
+              </Tabs>
+            </>
+          ) : (
+            <>
+              {schedulingForm}
+              {customFieldsBox}
+              {actionButtons}
+            </>
+          )}
         </Box>
       </Modal>
 

@@ -118,6 +118,9 @@ const ScheduleView: React.FC = () => {
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
+  const [editModalInitialTab, setEditModalInitialTab] = useState<
+    string | undefined
+  >(undefined);
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
@@ -507,27 +510,32 @@ const ScheduleView: React.FC = () => {
     setModalOpenedAppointment(false);
     setSelectedAppointment(null);
     setFilteredServices([]);
+    setEditModalInitialTab(undefined);
   }, []);
 
   /**
    * EDITAR CITA
    */
-  const handleEditAppointment = useCallback((appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-    setNewAppointment({
-      service: appointment.service,
-      services: appointment.service ? [appointment.service] : [],
-      client: appointment.client,
-      employee: appointment.employee,
-      employeeRequestedByClient: appointment.employeeRequestedByClient,
-      startDate: new Date(appointment.startDate),
-      endDate: new Date(appointment.endDate),
-      status: appointment.status,
-      advancePayment: appointment.advancePayment,
-      customFieldValues: appointment.customFieldValues,
-    });
-    setModalOpenedAppointment(true);
-  }, []);
+  const handleEditAppointment = useCallback(
+    (appointment: Appointment, initialTab?: string) => {
+      setSelectedAppointment(appointment);
+      setNewAppointment({
+        service: appointment.service,
+        services: appointment.service ? [appointment.service] : [],
+        client: appointment.client,
+        employee: appointment.employee,
+        employeeRequestedByClient: appointment.employeeRequestedByClient,
+        startDate: new Date(appointment.startDate),
+        endDate: new Date(appointment.endDate),
+        status: appointment.status,
+        advancePayment: appointment.advancePayment,
+        customFieldValues: appointment.customFieldValues,
+      });
+      setEditModalInitialTab(initialTab);
+      setModalOpenedAppointment(true);
+    },
+    [],
+  );
 
   /**
    * ELIMINAR CITA - Elimina definitivamente una cita (útil para citas canceladas)
@@ -1393,6 +1401,9 @@ const ScheduleView: React.FC = () => {
             onSaveMulti={handleMultiSave}
             creatingAppointment={creatingAppointment}
             fetchAppointmentsForMonth={fetchAppointmentsForMonth}
+            appoinments={appointments}
+            setAppointments={setAppointments}
+            initialTab={editModalInitialTab}
           />
         )}
       </Suspense>

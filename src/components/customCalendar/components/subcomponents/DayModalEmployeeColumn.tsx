@@ -69,7 +69,7 @@ interface EmployeeColumnProps {
   selectedDay: Date;
   isExpanded: (appointment: Appointment) => boolean;
   handleToggleExpand: (appointmentId: string) => void;
-  onEditAppointment: (appointment: Appointment) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
@@ -164,7 +164,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         endDate: newEndDate,
       };
 
-      onEditAppointment(updatedAppointment);
+      onEditAppointment(updatedAppointment, "edicion");
     },
     [columnRef, allAppointments, employee, onEditAppointment, selectedDay, startHour]
   );
