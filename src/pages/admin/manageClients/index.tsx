@@ -16,11 +16,13 @@ import {
   Alert,
   Menu,
   ActionIcon,
+  Tabs,
 } from "@mantine/core";
 import { useState, useEffect, useMemo } from "react";
 import ClientFormModal from "./ClientFormModal";
 import BulkUploadModal from "./BulkUploadModal";
 import ClientList from "./ClientList";
+import FollowUpsTab from "./FollowUpsTab";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
 import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical } from "@tabler/icons-react";
@@ -42,6 +44,7 @@ import { RootState } from "../../../app/store";
 import { useDebouncedValue, useDisclosure, useMediaQuery } from "@mantine/hooks";
 
 const ClientsDashboard = () => {
+  const [activeTab, setActiveTab] = useState<string>("clientes");
   const [openModal, setOpenModal] = useState(false);
   const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -298,99 +301,112 @@ const ClientsDashboard = () => {
 
   return (
     <Box>
-      <Card
-        withBorder
-        radius="md"
-        p="md"
-        mb="md"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 5,
-          background: "var(--mantine-color-body)",
-        }}
-      >
-        <Flex
-          gap="sm"
-          justify="space-between"
-          align={isMobile ? "stretch" : "center"}
-          direction={isMobile ? "column" : "row"}
-          wrap="wrap"
-        >
-          <Group gap="sm">
-            <Title order={2}>Clientes</Title>
-            <Badge variant="light" size="sm">
-              {filteredClients.length} de {clients.length}
-            </Badge>
-          </Group>
+      <Tabs value={activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
+        <Tabs.List mb="md">
+          <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
+          <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
+        </Tabs.List>
 
-          <Group gap="sm" w={isMobile ? "100%" : "auto"}>
-            <TextInput
-              leftSection={<BsSearch />}
-              placeholder="Buscar por nombre o teléfono…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.currentTarget.value)}
-              w={isMobile ? "100%" : 320}
-              radius="md"
-            />
-            <Tooltip label="Crear nuevo cliente">
-              <Button
-                leftSection={<IoAddCircleOutline />}
-                onClick={() => handleOpenModal(null)}
-              >
-                {isMobile ? "Crear" : "Crear cliente"}
-              </Button>
-            </Tooltip>
-            <Menu shadow="sm" width={240} withinPortal>
-              <Menu.Target>
-                <ActionIcon variant="default" size="lg" radius="md">
-                  <IconDotsVertical size={18} />
-                </ActionIcon>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Label>Acciones administrativas</Menu.Label>
-                <Menu.Item
-                  leftSection={<IconRefresh size={16} />}
-                  color="orange"
-                  onClick={handleResetAllLoyalty}
-                >
-                  Restablecer todo
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconFileUpload size={16} />}
-                  color="blue"
-                  onClick={() => setOpenBulkUploadModal(true)}
-                >
-                  Carga masiva
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </Group>
-        </Flex>
-      </Card>
+        <Tabs.Panel value="clientes">
+          <Card
+            withBorder
+            radius="md"
+            p="md"
+            mb="md"
+            style={{
+              position: "sticky",
+              top: 0,
+              zIndex: 5,
+              background: "var(--mantine-color-body)",
+            }}
+          >
+            <Flex
+              gap="sm"
+              justify="space-between"
+              align={isMobile ? "stretch" : "center"}
+              direction={isMobile ? "column" : "row"}
+              wrap="wrap"
+            >
+              <Group gap="sm">
+                <Title order={2}>Clientes</Title>
+                <Badge variant="light" size="sm">
+                  {filteredClients.length} de {clients.length}
+                </Badge>
+              </Group>
 
-      {isLoading ? (
-        <Card withBorder radius="md" p="md">
-          <Skeleton height={36} mb="sm" />
-          <Skeleton height={36} mb="sm" />
-          <Skeleton height={36} />
-        </Card>
-      ) : (
-        <Card withBorder radius="md" p="md">
-          <ClientList
-            clients={filteredClients}
-            onDeleteClient={handleDeleteClient}
-            onForceDeleteClient={handleForceDeleteClient}
-            onMergeClient={handleOpenMerge}
-            onResetClientLoyalty={handleResetClientLoyalty}
-            onRegisterService={handleRegisterService}
-            onReferral={handleReferral}
-            onEditClient={handleOpenModal}
-            onClientUpdated={handleClientUpdated}
-            error={error}
-          />
-        </Card>
-      )}
+              <Group gap="sm" w={isMobile ? "100%" : "auto"}>
+                <TextInput
+                  leftSection={<BsSearch />}
+                  placeholder="Buscar por nombre o teléfono…"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.currentTarget.value)}
+                  w={isMobile ? "100%" : 320}
+                  radius="md"
+                />
+                <Tooltip label="Crear nuevo cliente">
+                  <Button
+                    leftSection={<IoAddCircleOutline />}
+                    onClick={() => handleOpenModal(null)}
+                  >
+                    {isMobile ? "Crear" : "Crear cliente"}
+                  </Button>
+                </Tooltip>
+                <Menu shadow="sm" width={240} withinPortal>
+                  <Menu.Target>
+                    <ActionIcon variant="default" size="lg" radius="md">
+                      <IconDotsVertical size={18} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Acciones administrativas</Menu.Label>
+                    <Menu.Item
+                      leftSection={<IconRefresh size={16} />}
+                      color="orange"
+                      onClick={handleResetAllLoyalty}
+                    >
+                      Restablecer todo
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<IconFileUpload size={16} />}
+                      color="blue"
+                      onClick={() => setOpenBulkUploadModal(true)}
+                    >
+                      Carga masiva
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
+            </Flex>
+          </Card>
+
+          {isLoading ? (
+            <Card withBorder radius="md" p="md">
+              <Skeleton height={36} mb="sm" />
+              <Skeleton height={36} mb="sm" />
+              <Skeleton height={36} />
+            </Card>
+          ) : (
+            <Card withBorder radius="md" p="md">
+              <ClientList
+                clients={filteredClients}
+                onDeleteClient={handleDeleteClient}
+                onForceDeleteClient={handleForceDeleteClient}
+                onMergeClient={handleOpenMerge}
+                onResetClientLoyalty={handleResetClientLoyalty}
+                onRegisterService={handleRegisterService}
+                onReferral={handleReferral}
+                onEditClient={handleOpenModal}
+                onClientUpdated={handleClientUpdated}
+                error={error}
+              />
+            </Card>
+          )}
+        </Tabs.Panel>
+
+        <Tabs.Panel value="seguimientos">
+          <FollowUpsTab />
+        </Tabs.Panel>
+      </Tabs>
 
       <ClientFormModal
         opened={openModal}

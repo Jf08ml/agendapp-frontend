@@ -45,9 +45,6 @@ import {
   RewardHistoryEntry,
   redeemReward,
   ClientFollowUpStatus,
-  FollowUpPendingEntry,
-  FollowUpProcessedEntry,
-  FollowUpOutcome,
   getClientFollowUpStatus,
 } from "../../../services/clientService";
 import {
@@ -59,6 +56,7 @@ import { formatInTimezone } from "../../../utils/timezoneUtils";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 import { getLoyaltyProgress } from "./utils/loyaltyProgress";
+import { PendingFollowUpCard, ProcessedFollowUpCard } from "./FollowUpCards";
 
 interface ClientDetailDrawerProps {
   opened: boolean;
@@ -101,30 +99,6 @@ const getStatusBadge = (status: string) => {
     default:
       return { label: status, color: "gray" };
   }
-};
-
-const getFollowUpOutcomeBadge = (outcome: FollowUpOutcome | null) => {
-  switch (outcome) {
-    case "sent":
-      return { label: "Enviado", color: "teal" };
-    case "skipped_already_returned":
-      return { label: "No enviado — ya volvió", color: "blue" };
-    case "skipped_no_phone":
-      return { label: "No enviado — sin teléfono", color: "gray" };
-    case "skipped_superseded":
-      return { label: "No enviado — otra cita tuvo prioridad", color: "gray" };
-    case "failed_max_retries":
-      return { label: "No enviado — sin confirmación tras varios intentos", color: "red" };
-    default:
-      return { label: "Desconocido (histórico)", color: "gray" };
-  }
-};
-
-const getFollowUpPendingBadge = (entry: FollowUpPendingEntry) => {
-  if (entry.windowState === "expired") return { label: "Vencido sin procesar", color: "red" };
-  if (entry.windowState === "upcoming") return { label: "Programado", color: "yellow" };
-  if (entry.preview?.wouldSend) return { label: "Se enviará hoy", color: "green" };
-  return { label: "No se enviará", color: "gray" };
 };
 
 function confirmAction(action: () => void, title: string, message: string, color: string) {
@@ -875,57 +849,6 @@ function RewardCard({
             Canjear
           </Button>
         )}
-      </Group>
-    </Paper>
-  );
-}
-
-// ── Tarjeta de recordatorio de seguimiento pendiente/programado ──────────
-function PendingFollowUpCard({ entry, timezone }: { entry: FollowUpPendingEntry; timezone: string }) {
-  const badge = getFollowUpPendingBadge(entry);
-  const fmt = (d: string) => new Date(d).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric", timeZone: timezone });
-
-  return (
-    <Paper withBorder radius="md" p="sm">
-      <Group justify="space-between" wrap="nowrap" align="flex-start">
-        <Box style={{ flex: 1, minWidth: 0 }}>
-          <Text size="sm" fw={500}>
-            🔁 {entry.triggerService.name} → {entry.followUpService?.name ?? "—"}
-          </Text>
-          <Text size="xs" c="dimmed">
-            Cita del {fmt(entry.startDate)} · seguimiento a los {entry.followUpDays} días
-          </Text>
-          <Text size="xs" c="dimmed">
-            Fecha proyectada: {fmt(entry.projectedDate)}
-          </Text>
-          {entry.preview && (
-            <Text size="xs" c="dimmed" mt={2}>{entry.preview.reason}</Text>
-          )}
-        </Box>
-        <Badge size="xs" color={badge.color} variant="filled">{badge.label}</Badge>
-      </Group>
-    </Paper>
-  );
-}
-
-// ── Tarjeta de recordatorio de seguimiento ya procesado (enviado o no) ───
-function ProcessedFollowUpCard({ entry, timezone }: { entry: FollowUpProcessedEntry; timezone: string }) {
-  const badge = getFollowUpOutcomeBadge(entry.outcome);
-  const fmt = (d: string) => new Date(d).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric", timeZone: timezone });
-
-  return (
-    <Paper withBorder radius="md" p="sm">
-      <Group justify="space-between" wrap="nowrap" align="flex-start">
-        <Box style={{ flex: 1, minWidth: 0 }}>
-          <Text size="sm" fw={500}>
-            🔁 {entry.triggerService.name} → {entry.followUpService?.name ?? "—"}
-          </Text>
-          <Text size="xs" c="dimmed">Cita del {fmt(entry.startDate)}</Text>
-          <Text size="xs" c="dimmed">
-            {entry.processedAt ? `Procesado el ${fmt(entry.processedAt)}` : "Procesado antes de que se registrara la fecha"}
-          </Text>
-        </Box>
-        <Badge size="xs" color={badge.color} variant="filled">{badge.label}</Badge>
       </Group>
     </Paper>
   );

@@ -198,6 +198,43 @@ export const getAvailableSlots = async (
   }
 };
 
+// ============ DISPONIBILIDAD SEMANAL ============
+
+export interface FreeWindow {
+  start: string; // "HH:mm"
+  end: string; // "HH:mm" — fin de la última cita posible en la ventana
+}
+
+export interface WeekAvailabilityDay {
+  date: string; // "YYYY-MM-DD"
+  isPast: boolean;
+  isToday: boolean;
+  windows: FreeWindow[]; // rangos en que al menos un profesional puede iniciar una cita
+  employeeIds: string[]; // profesionales con algún espacio libre ese día
+}
+
+export interface WeekAvailability {
+  startDate: string;
+  days: WeekAvailabilityDay[];
+}
+
+// Ventanas libres del conjunto de profesionales para 7 días desde startDate (un solo request)
+export const getWeekAvailability = async (
+  startDate: string,
+  employeeIds: string[],
+  duration: number
+): Promise<WeekAvailability | undefined> => {
+  try {
+    const response = await apiGeneral.post<Response<WeekAvailability>>(
+      `/schedule/availability-week`,
+      { startDate, employeeIds, duration }
+    );
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener la disponibilidad semanal");
+  }
+};
+
 // ============ MULTI-SERVICE ============
 
 export interface ServiceInterval {

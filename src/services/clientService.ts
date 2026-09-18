@@ -89,6 +89,41 @@ export interface ClientFollowUpStatus {
   processed: FollowUpProcessedEntry[];
 }
 
+// 🔁 Lista general (toda la organización) de recordatorios de seguimiento (ver GET /clients/follow-ups)
+export interface FollowUpClientRef {
+  _id: string;
+  name: string;
+  phone: string | null;
+}
+
+export type OrgFollowUpPendingEntry = FollowUpPendingEntry & { client: FollowUpClientRef | null };
+export type OrgFollowUpProcessedEntry = FollowUpProcessedEntry & { client: FollowUpClientRef | null };
+
+export type OrgFollowUpView = 'pending' | 'sent' | 'not_sent';
+
+export interface OrgFollowUpsParams {
+  view: OrgFollowUpView;
+  serviceId?: string | null;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface OrgFollowUps {
+  organizationHasRules: boolean;
+  view: OrgFollowUpView;
+  /** Servicios con regla de seguimiento activa (para el filtro). */
+  services: FollowUpServiceRef[];
+  /** Totales de las 3 vistas con los mismos filtros; `legacy` = procesados antiguos sin motivo (no se listan). */
+  counts: { pending: number; sent: number; notSent: number; legacy: number };
+  page: number;
+  limit: number;
+  /** Total de la vista pedida (para paginar). Solo se llena `pending` o `processed`, según la vista. */
+  total: number;
+  pending: OrgFollowUpPendingEntry[];
+  processed: OrgFollowUpProcessedEntry[];
+}
+
 // Obtener todos los clientes
 export const getClients = async (): Promise<Client[]> => {
   try {
@@ -158,6 +193,26 @@ export const getClientFollowUpStatus = async (
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al obtener el estado de recordatorios de seguimiento");
+  }
+};
+
+// Obtener la lista general de recordatorios de seguimiento de la organización (programados/enviados/no enviados)
+export const getOrgFollowUps = async (
+  params: OrgFollowUpsParams
+): Promise<OrgFollowUps | undefined> => {
+  try {
+    const response = await apiClient.get<Response<OrgFollowUps>>("/follow-ups", {
+      params: {
+        view: params.view,
+        serviceId: params.serviceId || undefined,
+        search: params.search || undefined,
+        page: params.page,
+        limit: params.limit,
+      },
+    });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al obtener los recordatorios de seguimiento");
   }
 };
 
