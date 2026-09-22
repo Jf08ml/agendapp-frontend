@@ -39,6 +39,7 @@ const SOURCE_LABEL: Record<PlatformWaMessage["source"], string> = {
   retargeting: "Plantilla",
   ai_agent: "Bot IA",
   manual: "Manual",
+  alert: "Alerta",
 };
 
 const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
@@ -46,6 +47,7 @@ const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
   retargeting: "orange",
   ai_agent: "grape",
   manual: "blue",
+  alert: "red",
 };
 
 function conversationLabel(c: PlatformConversation) {

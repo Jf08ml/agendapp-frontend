@@ -23,7 +23,7 @@ export interface PlatformWaMessage {
   phone: string;
   organizationId: string | null;
   direction: "inbound" | "outbound";
-  source: "inbound" | "retargeting" | "ai_agent" | "manual";
+  source: "inbound" | "retargeting" | "ai_agent" | "manual" | "alert";
   body: string;
   templateName?: string | null;
   read: boolean;
