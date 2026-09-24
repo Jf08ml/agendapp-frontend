@@ -3,6 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { setOrganizationId, setPermissions } from "../features/auth/sliceAuth";
 import { getEmployeeById } from "../services/employeeService";
 import { RootState, AppDispatch } from "../app/store";
+import {
+  OFFLINE_FETCH_TIMEOUT_MS,
+  fetchWithOfflineFallback,
+} from "../utils/offlineCache";
 
 const useAuthInitializer = () => {
   const dispatch: AppDispatch = useDispatch();
@@ -29,14 +33,28 @@ const useAuthInitializer = () => {
               dispatch(setPermissions(organization.role.permissions ?? []));
             }
           } else if (role === "employee" && userId) {
-            const employeeData = await getEmployeeById(userId);
-            if (employeeData) {
-              const permissions = [
-                ...employeeData.role.permissions,
-                ...employeeData.customPermissions,
-              ];
-              dispatch(setOrganizationId(employeeData.organizationId));
-              dispatch(setPermissions(permissions));
+            // Solo se guarda lo mínimo (org + permisos) para que, sin conexión, el
+            // profesional pueda abrir su agenda guardada; el admin no lo necesita
+            // porque sus permisos vienen en la config de la org (también en caché).
+            const { data: authContext } = await fetchWithOfflineFallback(
+              `auth-context:${userId}`,
+              async () => {
+                const employeeData = await getEmployeeById(userId, {
+                  timeoutMs: OFFLINE_FETCH_TIMEOUT_MS,
+                });
+                if (!employeeData) return null;
+                return {
+                  organizationId: employeeData.organizationId,
+                  permissions: [
+                    ...employeeData.role.permissions,
+                    ...employeeData.customPermissions,
+                  ],
+                };
+              }
+            );
+            if (authContext) {
+              dispatch(setOrganizationId(authContext.organizationId));
+              dispatch(setPermissions(authContext.permissions));
             }
           }
         } catch (error) {

@@ -1,5 +1,6 @@
 import { apiAuth, apiGeneral } from "./axiosConfig";
 import { AxiosResponse } from "axios";
+import { OFFLINE_FETCH_TIMEOUT_MS, isNetworkError } from "../utils/offlineCache";
 
 // Definir el tipo de respuesta para el inicio de sesión
 interface LoginResponse {
@@ -59,9 +60,13 @@ export const loginSuperadmin = async (
 // Pegarle a /api/login/refresh (bug anterior) daba 404 y además caía bajo el
 // rate limiter de login (5 req/15min), pensado para fuerza bruta, no para
 // renovaciones silenciosas de sesión.
-export const refreshToken = async (
+//
+// `networkError` distingue "no hay red" de "el servidor rechazó el token": con
+// red caída no se puede renovar, pero eso NO significa que la sesión expiró, y
+// cerrarla dejaría al usuario sin poder ver su agenda guardada (ver offlineCache.ts).
+export const refreshTokenDetailed = async (
   currentToken: string
-): Promise<LoginResponse | null> => {
+): Promise<{ result: LoginResponse | null; networkError: boolean }> => {
   try {
     const response: AxiosResponse<{ data: LoginResponse }> = await apiGeneral.post(
       "/refresh",
@@ -69,15 +74,21 @@ export const refreshToken = async (
       {
         headers: {
           Authorization: `Bearer ${currentToken}`
-        }
+        },
+        timeout: OFFLINE_FETCH_TIMEOUT_MS,
       }
     );
-    return response.data.data;
+    return { result: response.data.data, networkError: false };
   } catch (error) {
     console.error("Error al renovar el token:", error);
-    return null;
+    return { result: null, networkError: isNetworkError(error) };
   }
 };
+
+export const refreshToken = async (
+  currentToken: string
+): Promise<LoginResponse | null> =>
+  (await refreshTokenDetailed(currentToken)).result;
 
 // Función para guardar el token en localStorage
 export const saveToken = (token: string) => {

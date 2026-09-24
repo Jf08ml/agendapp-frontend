@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { clearOfflineCache } from "../utils/offlineCache";
 
 const API_BASE_URL: string =
   import.meta.env.VITE_NODE_ENV === "production"
@@ -164,6 +165,8 @@ const forceLogout = () => {
   localStorage.removeItem("app_role");
   localStorage.removeItem("app_token_expires_at");
   localStorage.removeItem("app_dev_slug");
+  // La página se recarga sin pasar por el store: borrar la copia offline aquí
+  void clearOfflineCache();
 
   if (!isPublic && !currentPath.includes("/login")) {
     window.dispatchEvent(

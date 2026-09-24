@@ -20,6 +20,7 @@ import NavbarLinks from "./layouts/NavbarLinks";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
+import { useOfflineRecovery } from "./hooks/useOfflineRecovery";
 import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
@@ -134,6 +135,9 @@ function AppContent() {
 
   // Detecta proactivamente sesión expirada (idle + PWA en segundo plano)
   useSessionExpiry();
+
+  // Modo sin conexión: detecta cuándo vuelve la red para refrescar lo guardado
+  useOfflineRecovery();
 
   // Sistema de actualización automática del Service Worker
   const { currentVersion } = useServiceWorkerUpdate();
