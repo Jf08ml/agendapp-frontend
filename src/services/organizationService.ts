@@ -491,13 +491,18 @@ export const cacheOrganizationConfig = (organization: Organization) =>
 // Obtener organización según el dominio actual (branding automático).
 // Sin conexión devuelve la última copia guardada, para que la app pueda arrancar
 // y mostrar la agenda guardada en vez de quedarse en "Cargando organización…".
-export const getOrganizationConfig = async (): Promise<Organization | null> => {
+// Si el servidor tarda y se arranca con la copia, `onFresh` recibe la config
+// actualizada cuando por fin llega.
+export const getOrganizationConfig = async (
+  onFresh?: (organization: Organization) => void
+): Promise<Organization | null> => {
   try {
-    const { data } = await fetchWithOfflineFallback(
+    const { data, pending } = await fetchWithOfflineFallback(
       orgConfigCacheKey(),
       fetchOrganizationConfigLive,
       "public"
     );
+    pending?.then((fresh) => onFresh?.(fresh)).catch(() => undefined);
     return data;
   } catch (error) {
     console.error("Error al obtener la organización por dominio:", error);

@@ -1,6 +1,9 @@
 import { apiAuth, apiGeneral } from "./axiosConfig";
 import { AxiosResponse } from "axios";
-import { OFFLINE_FETCH_TIMEOUT_MS, isNetworkError } from "../utils/offlineCache";
+import { isNetworkError } from "../utils/offlineCache";
+
+// La renovación del token no debe colgarse con señal muerta (ver useSessionExpiry)
+const REFRESH_TIMEOUT_MS = 10_000;
 
 // Definir el tipo de respuesta para el inicio de sesión
 interface LoginResponse {
@@ -75,7 +78,7 @@ export const refreshTokenDetailed = async (
         headers: {
           Authorization: `Bearer ${currentToken}`
         },
-        timeout: OFFLINE_FETCH_TIMEOUT_MS,
+        timeout: REFRESH_TIMEOUT_MS,
       }
     );
     return { result: response.data.data, networkError: false };

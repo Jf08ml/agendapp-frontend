@@ -1,18 +1,25 @@
-import { Button, Group, Paper, Text } from "@mantine/core";
+import { Button, Group, Loader, Paper, Text } from "@mantine/core";
 import { IconWifiOff } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-export type OfflineBannerStatus = "cache" | "missing" | "offline";
+export type OfflineBannerStatus = "updating" | "cache" | "missing" | "offline";
 
 interface OfflineBannerProps {
   /**
-   * cache:   se muestra la copia guardada de la agenda.
-   * missing: sin conexión y este mes nunca se guardó.
-   * offline: sin conexión, pero lo que hay en pantalla se cargó en vivo.
+   * updating: se ve la copia guardada mientras llega la respuesta (servidor lento).
+   * cache:    se ve la copia guardada porque la petición en vivo falló.
+   * missing:  la petición falló y este mes nunca se guardó.
+   * offline:  sin conexión, pero lo que hay en pantalla se cargó en vivo.
    */
   status: OfflineBannerStatus;
-  /** Cuándo se guardó la copia mostrada (solo status "cache") */
+  /**
+   * ¿Realmente sin conexión? Solo si es true se dice "Sin conexión": una consulta
+   * sin respuesta con la red funcionando (servidor lento o caído) no lo es, y
+   * decirlo confundía a quien sí tenía internet.
+   */
+  offline: boolean;
+  /** Cuándo se guardó la copia mostrada (status "updating" y "cache") */
   cachedAt?: number | null;
   timeFormat?: "12h" | "24h";
   onRetry: () => void;
@@ -21,6 +28,7 @@ interface OfflineBannerProps {
 
 const OfflineBanner = ({
   status,
+  offline,
   cachedAt,
   timeFormat = "12h",
   onRetry,
@@ -34,13 +42,30 @@ const OfflineBanner = ({
           { locale: es },
         )
       : null;
+  const savedAtText = savedAt ? ` el ${savedAt}` : "";
 
-  const message =
-    status === "cache"
-      ? `Estás viendo la agenda guardada${savedAt ? ` el ${savedAt}` : ""}. Solo puedes consultarla; los cambios se habilitan al reconectar.`
-      : status === "missing"
-        ? "No hay datos guardados de este mes. Puedes ver los meses que abriste antes con conexión."
-        : "Puedes consultar lo que ya está cargado; los cambios se habilitan al reconectar.";
+  let title: string;
+  let message: string;
+  if (status === "updating") {
+    title = "Actualizando la agenda…";
+    message = `Mientras tanto ves la copia guardada${savedAtText}.`;
+  } else if (status === "cache") {
+    title = offline ? "Sin conexión." : "No se pudo actualizar.";
+    message = offline
+      ? `Estás viendo la agenda guardada${savedAtText}. Solo puedes consultarla; los cambios se habilitan al reconectar.`
+      : `Estás viendo la agenda guardada${savedAtText}: el servidor no respondió. Reintenta en un momento.`;
+  } else if (status === "missing") {
+    title = offline ? "Sin conexión." : "No se pudo cargar este mes.";
+    message = offline
+      ? "No hay datos guardados de este mes. Puedes ver los meses que abriste antes con conexión."
+      : "No hay una copia guardada de este mes. Reintenta en un momento.";
+  } else {
+    title = "Sin conexión.";
+    message =
+      "Puedes consultar lo que ya está cargado; los cambios se habilitan al reconectar.";
+  }
+
+  const updating = status === "updating";
 
   return (
     <Paper
@@ -49,30 +74,41 @@ const OfflineBanner = ({
       radius="md"
       px="sm"
       py={6}
-      bg="var(--mantine-color-yellow-0)"
-      style={{ flexShrink: 0, borderColor: "var(--mantine-color-yellow-4)" }}
+      bg={updating ? "var(--mantine-color-blue-0)" : "var(--mantine-color-yellow-0)"}
+      style={{
+        flexShrink: 0,
+        borderColor: updating
+          ? "var(--mantine-color-blue-3)"
+          : "var(--mantine-color-yellow-4)",
+      }}
     >
       <Group gap="xs" wrap="nowrap" justify="space-between" align="center">
         <Group gap={8} wrap="nowrap" align="flex-start" style={{ minWidth: 0 }}>
-          <IconWifiOff
-            size={18}
-            color="var(--mantine-color-yellow-9)"
-            style={{ flexShrink: 0, marginTop: 1 }}
-          />
+          {updating ? (
+            <Loader size={16} color="blue" style={{ flexShrink: 0, marginTop: 2 }} />
+          ) : (
+            <IconWifiOff
+              size={18}
+              color="var(--mantine-color-yellow-9)"
+              style={{ flexShrink: 0, marginTop: 1 }}
+            />
+          )}
           <Text size="xs" c="dark.8" lh={1.4}>
-            <strong>Sin conexión.</strong> {message}
+            <strong>{title}</strong> {message}
           </Text>
         </Group>
-        <Button
-          size="compact-xs"
-          variant="outline"
-          color="yellow.9"
-          onClick={onRetry}
-          loading={retrying}
-          style={{ flexShrink: 0 }}
-        >
-          Reintentar
-        </Button>
+        {!updating && (
+          <Button
+            size="compact-xs"
+            variant="outline"
+            color="yellow.9"
+            onClick={onRetry}
+            loading={retrying}
+            style={{ flexShrink: 0 }}
+          >
+            Reintentar
+          </Button>
+        )}
       </Group>
     </Paper>
   );

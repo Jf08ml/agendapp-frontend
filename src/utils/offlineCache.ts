@@ -1,5 +1,10 @@
 import axios from "axios";
-import { getOfflineSnapshot, markLive, markOffline } from "./offlineMode";
+import {
+  getOfflineSnapshot,
+  isServerReachable,
+  markLive,
+  markOffline,
+} from "./offlineMode";
 
 /**
  * Caché local (IndexedDB) para poder consultar la agenda sin conexión. Es de SOLO
@@ -17,11 +22,13 @@ const STORE = "cache";
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 
 /**
- * Tope de espera para las peticiones que tienen caché de respaldo. Sin él, con
- * señal "muerta" (wifi sin internet) axios espera lo que tarde el navegador en
- * rendirse y el usuario ve un loader eterno en vez de su agenda guardada.
+ * Tope de espera de la petición en vivo. Sin él, con señal "muerta" (wifi sin
+ * internet) axios espera lo que tarde el navegador en rendirse. Es generoso a
+ * propósito: con copia guardada el usuario ya ve su agenda mucho antes (ver
+ * SHOW_COPY_AFTER_MS), así que esto solo decide cuánto se espera una consulta
+ * lenta antes de darla por fallida.
  */
-export const OFFLINE_FETCH_TIMEOUT_MS = 10_000;
+export const OFFLINE_FETCH_TIMEOUT_MS = 20_000;
 
 /** "user": solo el usuario que lo guardó. "public": datos públicos del dominio. */
 type Scope = "user" | "public";
@@ -36,6 +43,11 @@ export interface OfflineResult<T> {
   data: T;
   /** null = datos en vivo; número = timestamp en que se guardó la copia servida */
   cachedAt: number | null;
+  /**
+   * Solo si se sirvió la copia porque la respuesta en vivo tardaba: esa petición,
+   * todavía en curso. Resuelve con los datos frescos (o rechaza si falla).
+   */
+  pending?: Promise<T>;
 }
 
 const ownerFor = (scope: Scope): string => {
@@ -191,26 +203,54 @@ export const clearOfflineCache = async (): Promise<void> => {
 
 /**
  * Con copia guardada, cuánto esperar la respuesta en vivo antes de mostrar la
- * copia. Con señal "muerta" la petición ni falla ni responde, y esperar su
- * timeout completo (10s) en cada paso de la carga inicial serían ~20s de loader.
+ * copia mientras tanto. Sirve para señal "muerta" (la petición ni falla ni
+ * responde) y para servidores lentos: en ambos casos el usuario ve su agenda ya,
+ * no un loader. Mostrar la copia NO significa "sin conexión": la petición viva
+ * sigue corriendo y su resultado llega en `pending`.
  * Si ya sabemos que estamos offline se espera menos: la red probablemente sigue caída.
  */
-const FALLBACK_AFTER_MS = 4_000;
-const FALLBACK_AFTER_KNOWN_OFFLINE_MS = 1_500;
+const SHOW_COPY_AFTER_MS = 4_000;
+const SHOW_COPY_AFTER_KNOWN_OFFLINE_MS = 1_500;
+
+export interface FetchOfflineOptions {
+  /**
+   * No mostrar la copia por tardanza: esperar la respuesta en vivo (hasta el
+   * timeout de la petición). Para acciones del usuario como "Reintentar", donde
+   * adelantarse con la copia haría imposible que la acción llegue a funcionar.
+   */
+  waitForLive?: boolean;
+}
 
 /**
- * Intenta la petición en vivo; si falla por red, sirve la última copia guardada.
+ * Tras un fallo de la petición viva: ¿estamos realmente sin conexión? Solo si es
+ * un fallo "sin respuesta" Y la sonda tampoco alcanza al servidor se marca
+ * offline (ver offlineMode.ts). Devuelve true si quedó offline.
+ */
+export const reportLiveFailure = async (error: unknown): Promise<boolean> => {
+  if (!isNetworkError(error)) return false;
+  const reachable = await isServerReachable();
+  if (!reachable) markOffline();
+  return !reachable;
+};
+
+const STILL_WAITING = Symbol("still-waiting");
+
+/**
+ * Intenta la petición en vivo; si no llega, sirve la última copia guardada.
  * - Éxito: guarda la respuesta y marca "en línea".
- * - Falla de red (o silencio prolongado) con copia: la devuelve (cachedAt = cuándo
- *   se guardó). Si la petición viva responde después, igual se guarda y marca
- *   "en línea", lo que hace que las pantallas se refresquen solas.
- * - Falla de red sin copia: relanza el error (el llamador decide qué mostrar).
+ * - Con copia y sin respuesta tras unos segundos: devuelve la copia + `pending`
+ *   (la petición viva, sin marcar offline). Quien la muestre debe reemplazarla
+ *   cuando `pending` resuelva, o avisar si falla.
+ * - Falla por red con copia: la devuelve; queda offline solo si la sonda confirma
+ *   que no se alcanza al servidor (reportLiveFailure).
+ * - Falla por red sin copia: relanza el error (el llamador decide qué mostrar).
  * - Errores del servidor (401/403/500…): se relanzan tal cual, sin usar la copia.
  */
 export const fetchWithOfflineFallback = async <T>(
   key: string,
   fetcher: () => Promise<T>,
-  scope: Scope = "user"
+  scope: Scope = "user",
+  options: FetchOfflineOptions = {}
 ): Promise<OfflineResult<T>> => {
   const cachePromise = cacheGet<T>(key, scope); // en paralelo a la petición
 
@@ -219,33 +259,46 @@ export const fetchWithOfflineFallback = async <T>(
     markLive();
     return data;
   });
+  // Si nadie consume `pending`, que su rechazo no quede como "unhandled"
+  live.catch(() => undefined);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const staleGuard = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      async () => {
-        // Solo se adelanta a la petición si hay algo que mostrar en su lugar
-        if (await cachePromise) {
-          reject(
-            Object.assign(new Error("Sin respuesta del servidor"), {
-              isNetworkError: true,
-            })
-          );
-        }
-      },
-      getOfflineSnapshot().offline
-        ? FALLBACK_AFTER_KNOWN_OFFLINE_MS
-        : FALLBACK_AFTER_MS
+  const raced: Array<Promise<T | typeof STILL_WAITING>> = [live];
+  if (!options.waitForLive) {
+    raced.push(
+      new Promise<typeof STILL_WAITING>((resolve) => {
+        timer = setTimeout(
+          async () => {
+            // Solo se adelanta a la petición si hay algo que mostrar en su lugar
+            if (await cachePromise) resolve(STILL_WAITING);
+          },
+          getOfflineSnapshot().offline
+            ? SHOW_COPY_AFTER_KNOWN_OFFLINE_MS
+            : SHOW_COPY_AFTER_MS
+        );
+      })
     );
-  });
+  }
 
   try {
-    const data = await Promise.race([live, staleGuard]);
-    return { data, cachedAt: null };
+    const result = await Promise.race(raced);
+    if (result !== STILL_WAITING) return { data: result, cachedAt: null };
+    const entry = await cachePromise;
+    if (entry) {
+      // ¿Servidor lento o sin red? La petición viva no lo dice (en ambos casos
+      // solo "no responde"), así que se pregunta con una sonda liviana en
+      // paralelo: si el servidor contesta es lentitud y se sigue esperando; si
+      // no, se declara offline ya, sin esperar el timeout completo.
+      void isServerReachable().then((reachable) => {
+        if (!reachable) markOffline();
+      });
+      return { data: entry.data, cachedAt: entry.cachedAt, pending: live };
+    }
+    return { data: await live, cachedAt: null };
   } catch (error) {
     if (!isNetworkError(error)) throw error;
-    markOffline();
     const entry = await cachePromise;
+    await reportLiveFailure(error);
     if (entry) return { data: entry.data, cachedAt: entry.cachedAt };
     throw error;
   } finally {

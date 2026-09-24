@@ -77,8 +77,10 @@ import {
   cacheSet,
   fetchWithOfflineFallback,
   isNetworkError,
+  reportLiveFailure,
 } from "../../../utils/offlineCache";
-import { markLive, markOffline, useOfflineMode } from "../../../utils/offlineMode";
+import type { FetchOfflineOptions } from "../../../utils/offlineCache";
+import { markLive, useOfflineMode } from "../../../utils/offlineMode";
 import { IconShieldCog, IconCalendarOff } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
@@ -98,12 +100,19 @@ const AvailabilityModal = lazy(() => import("./components/AvailabilityModal"));
 // guardada tiene menos de esto (evita pegarle al endpoint de citas en cada visita)
 const PREFETCH_MIN_AGE_MS = 10 * 60 * 1000;
 const PREFETCH_DELAY_MS = 2_000;
+// Si la consulta del mes tardó más que esto, el servidor va justo para esa org:
+// no se le suma una segunda consulta pesada solo por precargar
+const PREFETCH_MAX_QUERY_MS = 3_000;
 
 // De dónde salen las citas que se ven en pantalla
 type AgendaSource =
   | { status: "live"; cachedAt: null }
-  | { status: "cache"; cachedAt: number } // copia guardada (sin conexión)
-  | { status: "missing"; cachedAt: null }; // sin conexión y ese mes nunca se guardó
+  // copia guardada mientras llega la respuesta (el servidor responde, pero lento)
+  | { status: "updating"; cachedAt: number }
+  // copia guardada porque la petición en vivo falló (sin conexión o sin respuesta)
+  | { status: "cache"; cachedAt: number }
+  // la petición falló y ese mes nunca se guardó
+  | { status: "missing"; cachedAt: null };
 const LIVE_SOURCE: AgendaSource = { status: "live", cachedAt: null };
 
 export interface CreateAppointmentPayload {
@@ -164,6 +173,9 @@ const ScheduleView: React.FC = () => {
   const [agendaSource, setAgendaSource] = useState<AgendaSource>(LIVE_SOURCE);
   const [retrying, setRetrying] = useState(false);
   const skipRecoveryRef = useRef(false);
+  // Identifica la carga de mes más reciente: la respuesta tardía de una carga
+  // anterior (otro mes) no debe pisar lo que se está viendo
+  const monthRequestRef = useRef(0);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [reminderDate, setReminderDate] = useState<Date | null>(null);
@@ -379,28 +391,38 @@ const ScheduleView: React.FC = () => {
   };
 
   // ---------- DATA: Profesionales/Citas ----------
-  const fetchEmployees = useCallback(async () => {
-    if (!readyForScopedFetch) return;
-    try {
-      // Sin conexión se usa la última lista guardada (ver utils/offlineCache.ts)
-      const { data: response } = await fetchWithOfflineFallback(
-        `agenda-employees:${organizationId}`,
-        () =>
-          getEmployeesByOrganizationId(organizationId as string, {
-            timeoutMs: OFFLINE_FETCH_TIMEOUT_MS,
-          }),
-      );
-      let activeEmployees = response.filter((e) => e.isActive);
+  const fetchEmployees = useCallback(
+    async (options?: FetchOfflineOptions) => {
+      if (!readyForScopedFetch) return;
+      const applyEmployees = (list: Employee[]) => {
+        let activeEmployees = list.filter((e) => e.isActive);
 
-      if (!canViewAll) {
-        if (!userId) return;
-        activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
+        if (!canViewAll) {
+          if (!userId) return;
+          activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
+        }
+        setEmployees(activeEmployees);
+      };
+      try {
+        // Si la respuesta falla o tarda se usa la última lista guardada (ver
+        // utils/offlineCache.ts); si llega tarde, reemplaza a la copia
+        const { data, pending } = await fetchWithOfflineFallback(
+          `agenda-employees:${organizationId}`,
+          () =>
+            getEmployeesByOrganizationId(organizationId as string, {
+              timeoutMs: OFFLINE_FETCH_TIMEOUT_MS,
+            }),
+          "user",
+          { waitForLive: options?.waitForLive === true },
+        );
+        applyEmployees(data);
+        pending?.then(applyEmployees).catch(() => undefined);
+      } catch (error) {
+        console.error(error);
       }
-      setEmployees(activeEmployees);
-    } catch (error) {
-      console.error(error);
-    }
-  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
+    },
+    [readyForScopedFetch, organizationId, canViewAll, userId],
+  );
 
   // Un profesional sin "ver todas" solo ve (y solo guarda offline) sus citas
   const scopeAppointments = useCallback(
@@ -451,15 +473,17 @@ const ScheduleView: React.FC = () => {
   );
 
   const fetchAppointmentsForMonth = useCallback(
-    async (date: Date) => {
+    async (date: Date, options?: FetchOfflineOptions) => {
       if (!readyForScopedFetch) return;
+      const requestId = ++monthRequestRef.current;
+      const startedAt = Date.now();
       setLoadingMonth(true);
       try {
         const start = startOfMonthInTimezone(date, organizationTimezone);
         const end = endOfMonthInTimezone(date, organizationTimezone);
-        // Sin conexión se sirve la última copia guardada de ESTE mes (ya filtrada
-        // por permisos: eso es lo que se guarda)
-        const { data, cachedAt } = await fetchWithOfflineFallback(
+        // Si la petición falla o tarda se sirve la última copia guardada de ESTE
+        // mes (ya filtrada por permisos: eso es lo que se guarda)
+        const { data, cachedAt, pending } = await fetchWithOfflineFallback(
           agendaMonthKey(organizationId as string, start),
           async () =>
             scopeAppointments(
@@ -470,19 +494,42 @@ const ScheduleView: React.FC = () => {
                 { timeoutMs: OFFLINE_FETCH_TIMEOUT_MS },
               ),
             ),
+          "user",
+          { waitForLive: options?.waitForLive === true },
         );
 
         setAppointments(normalizeAppointmentDates(data));
-        setAgendaSource(
-          cachedAt === null ? LIVE_SOURCE : { status: "cache", cachedAt },
-        );
-        if (cachedAt === null && isSameMonth(date, new Date())) {
-          prefetchNextMonth(date);
+
+        if (cachedAt === null) {
+          setAgendaSource(LIVE_SOURCE);
+          if (
+            Date.now() - startedAt < PREFETCH_MAX_QUERY_MS &&
+            isSameMonth(date, new Date())
+          ) {
+            prefetchNextMonth(date);
+          }
+        } else if (pending) {
+          // El servidor responde pero tarda: se ve la copia mientras tanto y se
+          // reemplaza cuando llegue (esto NO es "sin conexión")
+          setAgendaSource({ status: "updating", cachedAt });
+          pending
+            .then((fresh) => {
+              if (requestId !== monthRequestRef.current) return; // ya cambió de mes
+              setAppointments(normalizeAppointmentDates(fresh));
+              setAgendaSource(LIVE_SOURCE);
+            })
+            .catch(async (error) => {
+              if (requestId !== monthRequestRef.current) return;
+              await reportLiveFailure(error);
+              setAgendaSource({ status: "cache", cachedAt });
+            });
+        } else {
+          setAgendaSource({ status: "cache", cachedAt });
         }
       } catch (error) {
         if (!isNetworkError(error)) throw error;
-        // Sin conexión y ese mes nunca se guardó: no dejar en pantalla las citas
-        // del mes anterior bajo el título del mes nuevo
+        // La petición falló y ese mes nunca se guardó: no dejar en pantalla las
+        // citas del mes anterior bajo el título del mes nuevo
         setAppointments([]);
         setAgendaSource({ status: "missing", cachedAt: null });
       } finally {
@@ -514,9 +561,9 @@ const ScheduleView: React.FC = () => {
         return normalizeAppointmentDates(scopeAppointments(response));
       } catch (error) {
         if (isNetworkError(error)) {
-          // Día fuera del mes cargado y sin conexión: sacarlo de la copia
+          // Día fuera del mes cargado y sin respuesta: sacarlo de la copia
           // guardada del mes que lo contiene (si existe)
-          markOffline();
+          void reportLiveFailure(error);
           const monthStart = startOfMonthInTimezone(date, organizationTimezone);
           const entry = await cacheGet<Appointment[]>(
             agendaMonthKey(organizationId as string, monthStart),
@@ -543,7 +590,14 @@ const ScheduleView: React.FC = () => {
   useEffect(() => {
     if (offlineMode.recoveries === lastRecoveriesRef.current) return;
     lastRecoveriesRef.current = offlineMode.recoveries;
-    if (skipRecoveryRef.current || agendaSource.status === "live") return;
+    // Solo si se estaba viendo una copia por falla; en "updating" la respuesta
+    // pendiente ya se encarga de reemplazarla
+    if (
+      skipRecoveryRef.current ||
+      (agendaSource.status !== "cache" && agendaSource.status !== "missing")
+    ) {
+      return;
+    }
     void fetchEmployees();
     void fetchAppointmentsForMonth(currentDate);
   }, [offlineMode.recoveries]);
@@ -552,9 +606,12 @@ const ScheduleView: React.FC = () => {
     setRetrying(true);
     skipRecoveryRef.current = true; // esta recarga ya es la que haría el efecto de arriba
     try {
+      // Acción del usuario: esperar de verdad la respuesta en vez de adelantarse
+      // con la copia (con un servidor lento eso haría imposible que "Reintentar"
+      // llegue a funcionar)
       await Promise.all([
-        fetchEmployees(),
-        fetchAppointmentsForMonth(currentDate),
+        fetchEmployees({ waitForLive: true }),
+        fetchAppointmentsForMonth(currentDate, { waitForLive: true }),
       ]);
     } finally {
       skipRecoveryRef.current = false;
@@ -1490,8 +1547,14 @@ const ScheduleView: React.FC = () => {
       {(isOffline || agendaSource.status !== "live") && (
         <OfflineBanner
           status={
-            agendaSource.status === "live" ? "offline" : agendaSource.status
+            agendaSource.status === "live"
+              ? "offline"
+              : // Esperando respuesta, pero la sonda ya confirmó que no hay red
+                agendaSource.status === "updating" && isOffline
+                ? "cache"
+                : agendaSource.status
           }
+          offline={isOffline}
           cachedAt={agendaSource.cachedAt}
           timeFormat={organization?.timeFormat === "24h" ? "24h" : "12h"}
           onRetry={handleRetryOffline}

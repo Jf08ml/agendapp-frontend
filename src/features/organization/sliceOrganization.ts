@@ -78,9 +78,13 @@ export const fetchOrganization = createAsyncThunk(
 // 2) Por dominio (branding)
 export const fetchOrganizationConfig = createAsyncThunk(
   "organization/fetchOrganizationConfig",
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, dispatch }) => {
     try {
-      const organization = await getOrganizationConfig();
+      // Si el servidor tarda y se arranca con la copia guardada, la config
+      // actualizada se aplica cuando llegue (sin volver a cargar la app)
+      const organization = await getOrganizationConfig((fresh) =>
+        dispatch(organizationSlice.actions.updateOrganizationState(fresh))
+      );
       return organization;
     } catch (error) {
       console.error("Error fetching organization by domain:", error);
