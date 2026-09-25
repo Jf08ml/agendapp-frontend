@@ -382,13 +382,19 @@ export const addEmployeeException = async (
   }
 };
 
+/**
+ * Elimina un bloqueo del profesional. Sin `date` elimina el bloqueo completo (todo su
+ * rango); con `date` ("YYYY-MM-DD") elimina solo ese día de un bloqueo multi-día.
+ */
 export const removeEmployeeException = async (
   employeeId: string,
-  exceptionId: string
+  exceptionId: string,
+  date?: string
 ): Promise<ScheduleException[] | undefined> => {
   try {
     const response = await apiGeneral.delete<Response<ScheduleException[]>>(
-      `/schedule/employee/${employeeId}/exceptions/${exceptionId}`
+      `/schedule/employee/${employeeId}/exceptions/${exceptionId}`,
+      date ? { params: { date } } : undefined
     );
     return response.data.data;
   } catch (error) {

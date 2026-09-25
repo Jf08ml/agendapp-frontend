@@ -18,6 +18,9 @@ interface DayBlock {
   height: number;
   label: string;
   allDay: boolean;
+  /** Rango completo del bloqueo (puede abarcar varios días, más allá del día visible) */
+  startDate: string;
+  endDate: string;
 }
 
 // Calcula los bloqueos (excepciones) del profesional que aplican al día visible,
@@ -43,8 +46,10 @@ function computeDayBlocks(
     // ¿La excepción cubre este día? (comparación de strings ISO YYYY-MM-DD)
     if (!(ex.startDate <= dayStr && dayStr <= ex.endDate)) continue;
 
+    const range = { startDate: ex.startDate, endDate: ex.endDate };
+
     if (ex.allDay || !ex.startTime || !ex.endTime) {
-      blocks.push({ id: ex._id, top: 0, height: totalHeight, label: ex.reason || "Bloqueado", allDay: true });
+      blocks.push({ id: ex._id, top: 0, height: totalHeight, label: ex.reason || "Bloqueado", allDay: true, ...range });
       continue;
     }
 
@@ -53,7 +58,7 @@ function computeDayBlocks(
     const top = Math.max(0, startMin * MINUTE_HEIGHT);
     const bottom = Math.min(totalHeight, endMin * MINUTE_HEIGHT);
     if (bottom <= top) continue;
-    blocks.push({ id: ex._id, top, height: bottom - top, label: ex.reason || "Bloqueado", allDay: false });
+    blocks.push({ id: ex._id, top, height: bottom - top, label: ex.reason || "Bloqueado", allDay: false, ...range });
   }
   return blocks;
 }
@@ -197,10 +202,21 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   };
 
   const handleDeleteBlock = useCallback(
-    (exceptionId: string) => {
+    (block: DayBlock) => {
+      const exceptionId = block.id!;
+      const dayStr = format(selectedDay, "yyyy-MM-dd");
+      // Un bloqueo multi-día se quita solo del día que se está viendo; los demás días se mantienen
+      const isMultiDay = block.startDate !== block.endDate;
+
       modals.openConfirmModal({
-        title: "Eliminar bloqueo",
-        children: (
+        title: isMultiDay ? "Eliminar bloqueo de este día" : "Eliminar bloqueo",
+        children: isMultiDay ? (
+          <Text size="sm">
+            Este bloqueo de {employee.names.trim()} abarca del {block.startDate} al {block.endDate}.
+            Solo se eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar
+            todo el rango, hazlo desde el horario del profesional.
+          </Text>
+        ) : (
           <Text size="sm">
             ¿Eliminar este bloqueo de horario de {employee.names.trim()}? Esta acción no se puede
             deshacer.
@@ -211,7 +227,11 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         zIndex: 2000,
         onConfirm: async () => {
           try {
-            const updated = await removeEmployeeException(employee._id, exceptionId);
+            const updated = await removeEmployeeException(
+              employee._id,
+              exceptionId,
+              isMultiDay ? dayStr : undefined
+            );
             showNotification({ title: "Éxito", message: "Bloqueo eliminado", color: "green" });
             onExceptionDeleted?.(employee._id, updated ?? []);
           } catch {
@@ -224,7 +244,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
         },
       });
     },
-    [employee._id, employee.names, onExceptionDeleted]
+    [employee._id, employee.names, selectedDay, onExceptionDeleted]
   );
 
   const renderAppointments = () => {
@@ -439,7 +459,7 @@ const renderGuides = () => {
                 title="Eliminar bloqueo"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteBlock(block.id!);
+                  handleDeleteBlock(block);
                 }}
                 style={{
                   position: "absolute",

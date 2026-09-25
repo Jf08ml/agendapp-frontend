@@ -21,9 +21,10 @@ import {
   Loader,
   Modal,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import { TimeInput, DatePickerInput } from "@mantine/dates";
-import { BiPlus, BiTrash, BiSave } from "react-icons/bi";
+import { BiPlus, BiTrash, BiSave, BiChevronDown, BiChevronUp } from "react-icons/bi";
 import { IoInformationCircleOutline } from "react-icons/io5";
 import { showNotification } from "@mantine/notifications";
 import {
@@ -97,6 +98,26 @@ const DEFAULT_SCHEDULE: DaySchedule[] = [
   { day: 6, isAvailable: false, start: "08:00", end: "18:00", breaks: [] },
 ];
 
+// Fecha local → "YYYY-MM-DD"
+const formatDateStr = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// Cada día ("YYYY-MM-DD") comprendido entre startDate y endDate, ambos inclusive
+const listDaysInRange = (startDate: string, endDate: string): string[] => {
+  const [y, m, d] = startDate.split("-").map(Number);
+  const days: string[] = [];
+  for (let i = 0; ; i++) {
+    const day = formatDateStr(new Date(y, m - 1, d + i));
+    if (day > endDate) break;
+    days.push(day);
+  }
+  return days;
+};
+
 export default function EmployeeScheduleSection({
   employeeId,
   employeeName,
@@ -114,6 +135,8 @@ export default function EmployeeScheduleSection({
   const [exceptionModalOpen, setExceptionModalOpen] = useState(false);
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(DEFAULT_EXCEPTION_FORM);
   const [savingException, setSavingException] = useState(false);
+  // Bloqueos multi-día con el detalle de días desplegado (por _id)
+  const [expandedExceptions, setExpandedExceptions] = useState<Set<string>>(new Set());
 
   // Cargar horario del profesional
   const loadSchedule = async () => {
@@ -155,11 +178,27 @@ export default function EmployeeScheduleSection({
     });
   };
 
-  const toDateStr = (date: Date): string => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+  // Igual que formatDisplayDate pero con día de la semana, para la lista de días de un bloqueo
+  const formatDayWithWeekday = (dateStr: string): string => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    const label = new Date(year, month - 1, day).toLocaleDateString("es-CO", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
+  const toDateStr = formatDateStr;
+
+  const toggleExceptionExpanded = (exceptionId: string) => {
+    setExpandedExceptions((prev) => {
+      const next = new Set(prev);
+      if (next.has(exceptionId)) next.delete(exceptionId);
+      else next.add(exceptionId);
+      return next;
+    });
   };
 
   const loadExceptions = async () => {
@@ -222,13 +261,14 @@ export default function EmployeeScheduleSection({
     }
   };
 
-  const handleRemoveException = async (exceptionId: string) => {
+  // Sin `date` elimina el bloqueo completo; con `date` solo ese día de un bloqueo multi-día
+  const handleRemoveException = async (exceptionId: string, date?: string) => {
     try {
-      const updated = await removeEmployeeException(employeeId, exceptionId);
+      const updated = await removeEmployeeException(employeeId, exceptionId, date);
       if (updated) setExceptions(updated);
       showNotification({
         title: "Éxito",
-        message: "Bloqueo eliminado",
+        message: date ? "Día eliminado del bloqueo" : "Bloqueo eliminado",
         color: "green",
       });
     } catch (error: any) {
@@ -597,42 +637,94 @@ export default function EmployeeScheduleSection({
           </Text>
         ) : (
           <Stack gap="xs">
-            {exceptions.map((exc) => (
-              <Paper key={exc._id} p="sm" withBorder>
-                <Group justify="space-between">
-                  <div>
-                    <Group gap="xs">
-                      <Text size="sm" fw={500}>
-                        {exc.startDate === exc.endDate
-                          ? formatDisplayDate(exc.startDate)
-                          : `${formatDisplayDate(exc.startDate)} → ${formatDisplayDate(exc.endDate)}`}
-                      </Text>
-                      {exc.allDay ? (
-                        <Badge size="xs" color="red" variant="light">
-                          Todo el día
-                        </Badge>
-                      ) : (
-                        <Badge size="xs" color="orange" variant="light">
-                          {exc.startTime} - {exc.endTime}
-                        </Badge>
+            {exceptions.map((exc) => {
+              const isMultiDay = exc.startDate !== exc.endDate;
+              const daysExpanded = isMultiDay && expandedExceptions.has(exc._id!);
+              return (
+                <Paper key={exc._id} p="sm" withBorder>
+                  <Group justify="space-between" wrap="nowrap" align="flex-start">
+                    <div>
+                      <Group gap="xs">
+                        <Text size="sm" fw={500}>
+                          {isMultiDay
+                            ? `${formatDisplayDate(exc.startDate)} → ${formatDisplayDate(exc.endDate)}`
+                            : formatDisplayDate(exc.startDate)}
+                        </Text>
+                        {exc.allDay ? (
+                          <Badge size="xs" color="red" variant="light">
+                            Todo el día
+                          </Badge>
+                        ) : (
+                          <Badge size="xs" color="orange" variant="light">
+                            {exc.startTime} - {exc.endTime}
+                          </Badge>
+                        )}
+                      </Group>
+                      {exc.reason && (
+                        <Text size="xs" c="dimmed" mt={2}>
+                          {exc.reason}
+                        </Text>
                       )}
-                    </Group>
-                    {exc.reason && (
-                      <Text size="xs" c="dimmed" mt={2}>
-                        {exc.reason}
-                      </Text>
-                    )}
-                  </div>
-                  <ActionIcon
-                    color="red"
-                    variant="light"
-                    onClick={() => handleRemoveException(exc._id!)}
-                  >
-                    <BiTrash size={16} />
-                  </ActionIcon>
-                </Group>
-              </Paper>
-            ))}
+                      {isMultiDay && (
+                        <Button
+                          variant="subtle"
+                          size="compact-xs"
+                          mt={4}
+                          px={0}
+                          rightSection={
+                            daysExpanded ? <BiChevronUp size={14} /> : <BiChevronDown size={14} />
+                          }
+                          onClick={() => toggleExceptionExpanded(exc._id!)}
+                        >
+                          {daysExpanded ? "Ocultar días" : "Ver y quitar días"}
+                        </Button>
+                      )}
+                    </div>
+                    <Tooltip label={isMultiDay ? "Eliminar todo el bloqueo" : "Eliminar bloqueo"}>
+                      <ActionIcon
+                        color="red"
+                        variant="light"
+                        onClick={() => handleRemoveException(exc._id!)}
+                      >
+                        <BiTrash size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+
+                  {isMultiDay && (
+                    <Collapse in={daysExpanded}>
+                      {daysExpanded && (
+                        <Stack
+                          gap={4}
+                          mt="xs"
+                          pt="xs"
+                          style={{
+                            borderTop: "1px solid var(--mantine-color-gray-3)",
+                            maxHeight: 240,
+                            overflowY: "auto",
+                          }}
+                        >
+                          {listDaysInRange(exc.startDate, exc.endDate).map((day) => (
+                            <Group key={day} justify="space-between" wrap="nowrap">
+                              <Text size="sm">{formatDayWithWeekday(day)}</Text>
+                              <Tooltip label="Eliminar solo este día">
+                                <ActionIcon
+                                  color="red"
+                                  variant="subtle"
+                                  onClick={() => handleRemoveException(exc._id!, day)}
+                                >
+                                  <BiTrash size={14} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Group>
+                          ))}
+                        </Stack>
+                      )}
+                    </Collapse>
+                  )}
+                </Paper>
+              );
+            })}
           </Stack>
         )}
       </Box>
