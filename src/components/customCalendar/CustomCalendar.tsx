@@ -71,7 +71,7 @@ interface CustomCalendarProps {
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
   timezone?: string;
   /** Se llama tras eliminar un bloqueo desde el calendario */
-  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
+  onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -560,6 +560,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
             setAppointments={setAppointments}
             loadingMonth={loadingMonth}
             timezone={timezone}
+            onExceptionDeleted={onExceptionDeleted}
           />
         )}
       </div>

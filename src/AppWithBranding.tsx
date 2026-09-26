@@ -3,6 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 import { AppDispatch, RootState } from "./app/store";
 import { createTheme, MantineProvider } from "@mantine/core";
+import { DatesProvider } from "@mantine/dates";
+import dayjs from "dayjs";
+import "dayjs/locale/es";
 import { ModalsProvider } from "@mantine/modals";
 import { Notifications } from "@mantine/notifications";
 import GoogleMapsProvider from "./utils/GoogleMapsProvider";
@@ -12,6 +15,11 @@ import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
 import { extractTenantFromHost } from "./utils/domainUtils";
 import { registerOrgGoogleTags } from "./utils/orgGoogleTags";
+
+// Idioma global de fechas: dayjs en español para todo el bundle (antes dependía de
+// qué módulo cargara primero y llamara dayjs.locale("es")). Los selectores de
+// @mantine/dates NO leen el locale global de dayjs: usan el de <DatesProvider>.
+dayjs.locale("es");
 
 declare global {
   interface Window {
@@ -212,6 +220,14 @@ export default function AppWithBranding() {
       xxl: "24px",
     },
 
+    // Formato por defecto de los selectores de fecha: con locale "es" el default de
+    // Mantine ("MMMM D, YYYY") saldría "septiembre 25, 2026". Los que definen su
+    // propio valueFormat lo conservan.
+    components: {
+      DateInput: { defaultProps: { valueFormat: "DD/MM/YYYY" } },
+      DatePickerInput: { defaultProps: { valueFormat: "DD/MM/YYYY" } },
+    },
+
     // Branding de color que ya tenías
     colors,
     primaryColor,
@@ -229,14 +245,16 @@ export default function AppWithBranding() {
 
   return (
     <MantineProvider theme={theme}>
-      <ModalsProvider>
-        <Notifications />
-        <GoogleMapsProvider>
-          <DndProvider backend={HTML5Backend}>
-            <App />
-          </DndProvider>
-        </GoogleMapsProvider>
-      </ModalsProvider>
+      <DatesProvider settings={{ locale: "es", firstDayOfWeek: 1 }}>
+        <ModalsProvider>
+          <Notifications />
+          <GoogleMapsProvider>
+            <DndProvider backend={HTML5Backend}>
+              <App />
+            </DndProvider>
+          </GoogleMapsProvider>
+        </ModalsProvider>
+      </DatesProvider>
     </MantineProvider>
   );
 }

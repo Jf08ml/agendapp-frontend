@@ -29,6 +29,8 @@ import {
   IconShoppingCart,
   IconGift,
 } from "@tabler/icons-react";
+import { DateInput } from "@mantine/dates";
+import dayjs from "dayjs";
 import { CountryCode } from "libphonenumber-js";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -583,12 +585,16 @@ export default function PublicPackagePurchasePage() {
               />
             )}
             {birthDateCfg.enabled && (
-              <TextInput
+              <DateInput
                 label={birthDateCfg.label || "Fecha de nacimiento"}
-                type="date"
-                value={form.birthDate}
-                onChange={(e) => setField("birthDate", e.currentTarget.value)}
+                value={form.birthDate ? dayjs(form.birthDate, "YYYY-MM-DD").toDate() : null}
+                onChange={(d) => setField("birthDate", d ? dayjs(d).format("YYYY-MM-DD") : "")}
+                valueFormat="DD/MM/YYYY"
+                placeholder="DD/MM/AAAA"
+                maxDate={new Date()}
                 required={birthDateCfg.required}
+                clearable
+                popoverProps={{ withinPortal: true, trapFocus: false }}
               />
             )}
             {notesCfg.enabled && (

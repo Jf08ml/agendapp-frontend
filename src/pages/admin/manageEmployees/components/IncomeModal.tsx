@@ -247,7 +247,7 @@ const IncomeModal = ({ isOpen, onClose, employee }: IncomeModalProps) => {
                   incomes.map((income) => (
                     <Table.Tr key={income._id}>
                       <Table.Td>
-                        {new Date(income.date).toLocaleDateString()}
+                        {new Date(income.date).toLocaleDateString("es-CO")}
                       </Table.Td>
                       <Table.Td>{formatCurrency(income.amount, org?.currency || "COP")}</Table.Td>
                       <Table.Td>{income.description || "Sin descripción"}</Table.Td>

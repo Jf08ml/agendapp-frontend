@@ -95,12 +95,16 @@ function minutesToTime(minutes: number): string {
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
-function floorToHour(mins: number) {
-  return Math.floor(mins / 60) * 60;
+// Las filas de la tabla duran 60 min, o 30 min cuando algún horario no cae en hora
+// exacta (p. ej. el negocio abre a las 9:30): así la primera fila arranca a las 9:30 y
+// no a las 9:00.
+function floorToSlot(mins: number, slot: number) {
+  return Math.floor(mins / slot) * slot;
 }
-function ceilToHour(mins: number) {
-  return Math.ceil(mins / 60) * 60;
+function ceilToSlot(mins: number, slot: number) {
+  return Math.ceil(mins / slot) * slot;
 }
+const isValidTime = (t?: string): t is string => !!t && /^\d{1,2}:\d{2}$/.test(t);
 
 type Range = { start: number; end: number };
 type Break = { start: string; end: string };
@@ -232,6 +236,7 @@ function buildAvailabilityIndexHourly(args: {
   employees: Employee[];
   employeeSchedules: Map<string, WeeklySchedule>;
   subtractOrgBreaks: boolean;
+  slotMinutes: number;
 }): HourIndex {
   const idx: HourIndex = new Map();
 
@@ -245,10 +250,10 @@ function buildAvailabilityIndexHourly(args: {
     const dayStartMin = timeToMinutes(orgDay.start);
     const dayEndMin = timeToMinutes(orgDay.end);
 
-    const hourStart = floorToHour(dayStartMin);
-    const hourEnd = ceilToHour(dayEndMin);
+    const hourStart = floorToSlot(dayStartMin, args.slotMinutes);
+    const hourEnd = ceilToSlot(dayEndMin, args.slotMinutes);
 
-    for (let t = hourStart; t < hourEnd; t += 60) {
+    for (let t = hourStart; t < hourEnd; t += args.slotMinutes) {
       dayMap.set(t, { available: [], resting: [] });
     }
 
@@ -284,7 +289,7 @@ function buildAvailabilityIndexHourly(args: {
       if (!activeRange) continue;
 
       for (const [hour, cell] of dayMap) {
-        const hourRange: Range = { start: hour, end: hour + 60 };
+        const hourRange: Range = { start: hour, end: hour + args.slotMinutes };
 
         // Está dentro del rango activo del día?
         const isInActive = overlaps(activeRange, hourRange);
@@ -468,6 +473,27 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
   // Si solo es informativo, ponlo false.
   const subtractOrgBreaks = true;
 
+  // Duración de cada fila: 60 min, o 30 si algún horario (de la organización, de un
+  // profesional o un descanso) empieza o termina en una hora no exacta, como 9:30.
+  const slotMinutes = useMemo(() => {
+    if (!orgData) return 60;
+    const times: (string | undefined)[] = [];
+    for (const day of DAY_LABELS.map((d) => d.value)) {
+      const orgDay = getOrgDaySchedule(orgData, day);
+      if (!orgDay) continue;
+      times.push(orgDay.start, orgDay.end);
+      for (const b of orgDay.breaks ?? []) times.push(b.start, b.end);
+      for (const sched of employeeSchedules.values()) {
+        if (!sched.enabled) continue;
+        const empDay = sched.schedule?.find((d) => d.day === day);
+        if (!empDay?.isAvailable) continue;
+        times.push(empDay.start, empDay.end);
+        for (const b of empDay.breaks ?? []) times.push(b.start, b.end);
+      }
+    }
+    return times.some((t) => isValidTime(t) && timeToMinutes(t) % 60 !== 0) ? 30 : 60;
+  }, [orgData, employeeSchedules]);
+
   const hourlyIndex = useMemo(() => {
     if (!orgData) return new Map() as HourIndex;
 
@@ -477,8 +503,9 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
       employees,
       employeeSchedules,
       subtractOrgBreaks,
+      slotMinutes,
     });
-  }, [orgData, employees, employeeSchedules]);
+  }, [orgData, employees, employeeSchedules, slotMinutes]);
 
   // Filas (horas): todas las horas del rango operativo de la organización (unión por días)
   const allHours = useMemo(() => {
@@ -492,14 +519,14 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
       const dayStartMin = timeToMinutes(orgDay.start);
       const dayEndMin = timeToMinutes(orgDay.end);
 
-      const hourStart = floorToHour(dayStartMin);
-      const hourEnd = ceilToHour(dayEndMin);
+      const hourStart = floorToSlot(dayStartMin, slotMinutes);
+      const hourEnd = ceilToSlot(dayEndMin, slotMinutes);
 
-      for (let t = hourStart; t < hourEnd; t += 60) set.add(t);
+      for (let t = hourStart; t < hourEnd; t += slotMinutes) set.add(t);
     }
 
     return Array.from(set).sort((a, b) => a - b);
-  }, [orgData]);
+  }, [orgData, slotMinutes]);
 
   // Horas con al menos 1 disponible en cualquier día
   const availableHours = useMemo(() => {
@@ -551,7 +578,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
 
     const dayStart = timeToMinutes(orgDay.start);
     const dayEnd = timeToMinutes(orgDay.end);
-    const hr: Range = { start: hourStart, end: hourStart + 60 };
+    const hr: Range = { start: hourStart, end: hourStart + slotMinutes };
 
     if (hr.end <= dayStart || hr.start >= dayEnd) return <Box h={32} />;
 
@@ -579,7 +606,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
       <Stack gap={6}>
         <Text size="xs" fw={700}>
           {DAY_LABELS.find((d) => d.value === day)?.label} · {minutesToTime(hourStart)} -{" "}
-          {minutesToTime(hourStart + 60)}
+          {minutesToTime(hourStart + slotMinutes)}
         </Text>
 
         <Divider />
@@ -686,7 +713,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
     const orgDay = getOrgDaySchedule(orgData, selectedDay);
 
     const hourStart = selectedHour;
-    const hourEnd = selectedHour + 60;
+    const hourEnd = selectedHour + slotMinutes;
 
     const cell = hourlyIndex.get(selectedDay)?.get(hourStart);
     const availableIds = cell?.available ?? [];
@@ -872,7 +899,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
           <Paper p="md" withBorder>
             <Group justify="space-between" align="flex-start" mb="sm">
               <Stack gap={2}>
-                <Title order={4}>Disponibilidad (por hora)</Title>
+                <Title order={4}>Disponibilidad ({slotMinutes === 60 ? "por hora" : "cada 30 min"})</Title>
                 <Text size="sm" c="dimmed">
                   Los descansos (breaks) se restan: generan huecos visuales cuando no hay nadie trabajando.
                 </Text>

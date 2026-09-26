@@ -38,6 +38,8 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { notifications } from "@mantine/notifications";
+import { DateInput } from "@mantine/dates";
+import dayjs from "dayjs";
 import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
 import SuperadminNav from "./SuperadminNav";
 import { IoAlertCircle } from "react-icons/io5";
@@ -719,12 +721,13 @@ export default function SuperadminManagement() {
             </Text>
           </Alert>
 
-          <TextInput
+          <DateInput
             label="Nueva Fecha de Vencimiento (opcional)"
-            placeholder="2025-02-09"
-            type="date"
-            value={newPeriodEnd}
-            onChange={(e) => setNewPeriodEnd(e.currentTarget.value)}
+            placeholder="DD/MM/AAAA"
+            value={newPeriodEnd ? dayjs(newPeriodEnd, "YYYY-MM-DD").toDate() : null}
+            onChange={(d) => setNewPeriodEnd(d ? dayjs(d).format("YYYY-MM-DD") : "")}
+            valueFormat="DD/MM/YYYY"
+            clearable
             description="Si no se especifica, se añadirá 1 mes desde hoy"
           />
 

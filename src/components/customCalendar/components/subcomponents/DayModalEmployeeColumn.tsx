@@ -4,6 +4,8 @@ import { format } from "date-fns";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import { useDrop, DropTargetMonitor } from "react-dnd";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../app/store";
 import { ItemTypes } from "./ItemTypes";
 import { Appointment } from "../../../../services/appointmentService";
 import { Employee, EmployeeScheduleException } from "../../../../services/employeeService";
@@ -63,6 +65,41 @@ function computeDayBlocks(
   return blocks;
 }
 
+// Franja visible: uno o varios bloqueos que se pintan superpuestos se ven como UNA sola
+// franja, así que se manejan (y se eliminan) juntos. Si no, al quitar el de arriba el de
+// abajo seguía pintado justo debajo y parecía que "se eliminó pero sigue ahí".
+interface DayBand {
+  top: number;
+  height: number;
+  label: string;
+  allDay: boolean;
+  members: DayBlock[];
+}
+
+function mergeOverlappingBlocks(blocks: DayBlock[]): DayBand[] {
+  const sorted = [...blocks].sort((a, b) => a.top - b.top);
+  const bands: DayBand[] = [];
+  for (const block of sorted) {
+    const last = bands[bands.length - 1];
+    // Se fusionan solo si se pisan de verdad; dos bloqueos contiguos (10-12 y 12-14) quedan separados
+    if (last && block.top < last.top + last.height) {
+      const bottom = Math.max(last.top + last.height, block.top + block.height);
+      last.height = bottom - last.top;
+      last.allDay = last.allDay || block.allDay;
+      last.members.push(block);
+      continue;
+    }
+    bands.push({ top: block.top, height: block.height, label: block.label, allDay: block.allDay, members: [block] });
+  }
+  for (const band of bands) {
+    if (band.members.length > 1) {
+      const labels = [...new Set(band.members.map((m) => m.label))];
+      band.label = labels.length > 2 ? `${labels.slice(0, 2).join(" · ")} +${labels.length - 2}` : labels.join(" · ");
+    }
+  }
+  return bands;
+}
+
 interface EmployeeColumnProps {
   employee: Employee;
   appoinments: Appointment[];
@@ -83,7 +120,7 @@ interface EmployeeColumnProps {
   timezone?: string; // 🌍 Timezone de la organización
   timeFormat?: string;
   /** Se llama tras eliminar un bloqueo, con la lista de excepciones ya actualizada */
-  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
+  onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 interface DraggedItem {
@@ -119,15 +156,17 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   onExceptionDeleted,
 }) => {
   const columnRef = useRef<HTMLDivElement | null>(null);
+  const currentUserId = useSelector((state: RootState) => state.auth.userId);
 
   const allAppointments = useMemo(
     () => Object.values(appointmentsByEmployee).flat(),
     [appointmentsByEmployee]
   );
 
-  // 🚫 Bloqueos (excepciones de horario) del profesional para el día visible
-  const dayBlocks = useMemo(
-    () => computeDayBlocks(employee, selectedDay, startHour, endHour),
+  // 🚫 Bloqueos (excepciones de horario) del profesional para el día visible, agrupados en
+  // franjas (los superpuestos se ven y se eliminan como uno solo)
+  const dayBands = useMemo(
+    () => mergeOverlappingBlocks(computeDayBlocks(employee, selectedDay, startHour, endHour)),
     [employee, selectedDay, startHour, endHour]
   );
 
@@ -201,43 +240,69 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
     }
   };
 
-  const handleDeleteBlock = useCallback(
-    (block: DayBlock) => {
-      const exceptionId = block.id!;
+  const handleDeleteBand = useCallback(
+    (band: DayBand) => {
+      const members = band.members.filter((m) => m.id);
+      if (members.length === 0) return;
       const dayStr = format(selectedDay, "yyyy-MM-dd");
-      // Un bloqueo multi-día se quita solo del día que se está viendo; los demás días se mantienen
-      const isMultiDay = block.startDate !== block.endDate;
+      const name = employee.names.trim();
+      const hasMultiDay = members.some((m) => m.startDate !== m.endDate);
+      const single = members.length === 1 ? members[0] : null;
 
       modals.openConfirmModal({
-        title: isMultiDay ? "Eliminar bloqueo de este día" : "Eliminar bloqueo",
-        children: isMultiDay ? (
-          <Text size="sm">
-            Este bloqueo de {employee.names.trim()} abarca del {block.startDate} al {block.endDate}.
-            Solo se eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar
-            todo el rango, hazlo desde el horario del profesional.
-          </Text>
+        title: single
+          ? hasMultiDay
+            ? "Eliminar bloqueo de este día"
+            : "Eliminar bloqueo"
+          : "Eliminar bloqueos de este día",
+        children: single ? (
+          hasMultiDay ? (
+            <Text size="sm">
+              Este bloqueo de {name} abarca del {single.startDate} al {single.endDate}.
+              Solo se eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar
+              todo el rango, hazlo desde el horario del profesional.
+            </Text>
+          ) : (
+            <Text size="sm">
+              ¿Eliminar este bloqueo de horario de {name}? Esta acción no se puede deshacer.
+            </Text>
+          )
         ) : (
           <Text size="sm">
-            ¿Eliminar este bloqueo de horario de {employee.names.trim()}? Esta acción no se puede
-            deshacer.
+            En este horario {name} tiene {members.length} bloqueos superpuestos. Se quitarán todos
+            del {dayStr}
+            {hasMultiDay ? "; los demás días de cada bloqueo se mantienen" : ""}.
           </Text>
         ),
         labels: { confirm: "Eliminar", cancel: "Cancelar" },
         confirmProps: { color: "red" },
         zIndex: 2000,
         onConfirm: async () => {
+          // Secuencial: cada respuesta trae la lista ya actualizada y así no chocan las
+          // escrituras sobre el mismo profesional.
+          let latest: Awaited<ReturnType<typeof removeEmployeeException>>;
           try {
-            const updated = await removeEmployeeException(
-              employee._id,
-              exceptionId,
-              isMultiDay ? dayStr : undefined
-            );
-            showNotification({ title: "Éxito", message: "Bloqueo eliminado", color: "green" });
-            onExceptionDeleted?.(employee._id, updated ?? []);
-          } catch {
+            for (const m of members) {
+              // Un bloqueo multi-día se quita solo del día visible; los demás días se mantienen
+              latest = await removeEmployeeException(
+                employee._id,
+                m.id!,
+                m.startDate !== m.endDate ? dayStr : undefined
+              );
+            }
+            showNotification({
+              title: "Éxito",
+              message: members.length > 1 ? "Bloqueos eliminados" : "Bloqueo eliminado",
+              color: "green",
+            });
+            onExceptionDeleted?.(employee._id, latest ?? []);
+          } catch (err) {
+            // Si alguno ya se había eliminado, la pantalla se alinea con lo último que confirmó el servidor
+            if (latest) onExceptionDeleted?.(employee._id, latest);
+            // El mensaje viene del servidor (p. ej. "Solo puedes gestionar bloqueos de tu propia agenda.")
             showNotification({
               title: "Error",
-              message: "No se pudo eliminar el bloqueo",
+              message: err instanceof Error && err.message ? err.message : "No se pudo eliminar el bloqueo",
               color: "red",
             });
           }
@@ -353,6 +418,13 @@ const renderGuides = () => {
 
 
   const canCreate = hasPermission("appointments:create");
+  // Quien puede crear citas gestiona los bloqueos de cualquier profesional; quien solo tiene
+  // "Bloquear su propia agenda" (manage_own_blocks) puede quitar únicamente los suyos.
+  const canManageBlocks =
+    canCreate ||
+    (hasPermission("appointments:manage_own_blocks") && employee._id === currentUserId);
+  // Área táctil más grande en pantallas touch (16px era muy difícil de acertar con el dedo)
+  const blockBtnSize = isTouchDevice() ? 28 : 18;
 
   return (
     <div
@@ -388,22 +460,22 @@ const renderGuides = () => {
       </Box>
 
       {/* 🚫 Bloqueos de horario (encima de las guías, debajo de las citas) */}
-      {dayBlocks.map((block, i) => (
+      {dayBands.map((band, i) => (
         <Box
           key={`block-${i}`}
-          title={block.label}
+          title={band.label}
           style={{
             position: "absolute",
-            top: `${block.top}px`,
+            top: `${band.top}px`,
             left: 0,
             right: 0,
-            height: `${block.height}px`,
+            height: `${band.height}px`,
             zIndex: 0,
             pointerEvents: "none",
             background:
               "repeating-linear-gradient(45deg, rgba(180,80,80,0.10), rgba(180,80,80,0.10) 6px, rgba(180,80,80,0.18) 6px, rgba(180,80,80,0.18) 12px)",
             borderTop: "1px solid rgba(180,80,80,0.35)",
-            borderBottom: block.allDay ? "none" : "1px solid rgba(180,80,80,0.35)",
+            borderBottom: band.allDay ? "none" : "1px solid rgba(180,80,80,0.35)",
             overflow: "hidden",
           }}
         >
@@ -415,14 +487,14 @@ const renderGuides = () => {
               textTransform: "uppercase",
               letterSpacing: 0.4,
               padding: "2px 4px",
-              paddingRight: 18,
+              paddingRight: blockBtnSize + 4,
               lineHeight: 1.1,
               whiteSpace: "nowrap",
               textOverflow: "ellipsis",
               overflow: "hidden",
             }}
           >
-            {block.label}
+            {band.label}
           </Text>
         </Box>
       ))}
@@ -439,7 +511,7 @@ const renderGuides = () => {
       </Box>
 
       {/* 🗑️ Botones para eliminar bloqueos (capa por encima de las citas) */}
-      {canCreate && dayBlocks.some((b) => b.id) && (
+      {canManageBlocks && dayBands.some((b) => b.members.some((m) => m.id)) && (
         <Box
           style={{
             position: "absolute",
@@ -451,29 +523,29 @@ const renderGuides = () => {
             pointerEvents: "none",
           }}
         >
-          {dayBlocks.map((block, i) =>
-            block.id ? (
+          {dayBands.map((band, i) =>
+            band.members.some((m) => m.id) ? (
               <Box
                 key={`block-x-${i}`}
                 role="button"
                 title="Eliminar bloqueo"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteBlock(block);
+                  handleDeleteBand(band);
                 }}
                 style={{
                   position: "absolute",
-                  top: `${block.top + 2}px`,
+                  top: `${band.top + 2}px`,
                   right: 2,
-                  width: 16,
-                  height: 16,
+                  width: blockBtnSize,
+                  height: blockBtnSize,
                   borderRadius: "50%",
                   background: "rgba(150,50,50,0.92)",
                   color: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 12,
+                  fontSize: blockBtnSize - 4,
                   fontWeight: 700,
                   lineHeight: 1,
                   cursor: "pointer",

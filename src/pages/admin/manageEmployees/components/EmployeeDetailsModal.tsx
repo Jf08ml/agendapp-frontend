@@ -319,8 +319,8 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                 ) : (
                   <Group mt="sm" justify="center">
                     <Text size="sm" c="dimmed">
-                      <strong>Período:</strong> {startDate?.toLocaleDateString() || "N/A"} -{" "}
-                      {endDate?.toLocaleDateString() || "N/A"}
+                      <strong>Período:</strong> {startDate?.toLocaleDateString("es-CO") || "N/A"} -{" "}
+                      {endDate?.toLocaleDateString("es-CO") || "N/A"}
                     </Text>
                   </Group>
                 )}
@@ -447,7 +447,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                         {appointments.map((appointment) => (
                           <Table.Tr key={appointment._id}>
                             <Table.Td>
-                              {new Date(appointment.startDate).toLocaleDateString()}
+                              {new Date(appointment.startDate).toLocaleDateString("es-CO")}
                             </Table.Td>
                             <Table.Td>{appointment.client?.name || "N/A"}</Table.Td>
                             <Table.Td>{appointment.service?.name || "N/A"}</Table.Td>
@@ -497,7 +497,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                         {advances.map((advance) => (
                           <Table.Tr key={advance._id}>
                             <Table.Td>
-                              {new Date(advance.date).toLocaleDateString()}
+                              {new Date(advance.date).toLocaleDateString("es-CO")}
                             </Table.Td>
                             <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
                             <Table.Td>
@@ -538,7 +538,7 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
                         {incomes.map((income) => (
                           <Table.Tr key={income._id}>
                             <Table.Td>
-                              {new Date(income.date).toLocaleDateString()}
+                              {new Date(income.date).toLocaleDateString("es-CO")}
                             </Table.Td>
                             <Table.Td>{formatCurrency(income.amount)}</Table.Td>
                             <Table.Td>

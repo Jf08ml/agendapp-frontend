@@ -27,6 +27,10 @@ import { TimeInput, DatePickerInput } from "@mantine/dates";
 import { BiPlus, BiTrash, BiSave, BiChevronDown, BiChevronUp } from "react-icons/bi";
 import { IoInformationCircleOutline } from "react-icons/io5";
 import { showNotification } from "@mantine/notifications";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../app/store";
+import TimeOfDayInput from "../../../../components/TimeOfDayInput";
+import { formatTimeLabel } from "../../../../utils/timeOfDay";
 import {
   getEmployeeSchedule,
   updateEmployeeSchedule,
@@ -135,6 +139,12 @@ export default function EmployeeScheduleSection({
   const [exceptionModalOpen, setExceptionModalOpen] = useState(false);
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(DEFAULT_EXCEPTION_FORM);
   const [savingException, setSavingException] = useState(false);
+  const is24h = useSelector((s: RootState) => s.organization.organization?.timeFormat) === "24h";
+  // Con 12 h el mensaje muestra las horas con AM/PM para que se note si "2:00" quedó en AM
+  const exceptionTimeError =
+    !exceptionForm.allDay && exceptionForm.startTime >= exceptionForm.endTime
+      ? `La hora de fin (${formatTimeLabel(exceptionForm.endTime, is24h)}) debe ser posterior a la de inicio (${formatTimeLabel(exceptionForm.startTime, is24h)}).${is24h ? "" : " Revisa que AM/PM sea el correcto."}`
+      : null;
   // Bloqueos multi-día con el detalle de días desplegado (por _id)
   const [expandedExceptions, setExpandedExceptions] = useState<Set<string>>(new Set());
 
@@ -222,12 +232,8 @@ export default function EmployeeScheduleSection({
       });
       return;
     }
-    if (!exceptionForm.allDay && exceptionForm.startTime >= exceptionForm.endTime) {
-      showNotification({
-        title: "Validación",
-        message: "La hora de inicio debe ser anterior a la hora de fin",
-        color: "orange",
-      });
+    if (exceptionTimeError) {
+      showNotification({ title: "Validación", message: exceptionTimeError, color: "orange" });
       return;
     }
     setSavingException(true);
@@ -775,24 +781,26 @@ export default function EmployeeScheduleSection({
           />
 
           <Collapse in={!exceptionForm.allDay}>
-            <Group grow>
-              <TimeInput
+            <Stack gap="xs">
+              <TimeOfDayInput
                 label="Hora inicio"
                 value={exceptionForm.startTime}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
-                  setExceptionForm((f) => ({ ...f, startTime: val }));
-                }}
+                timeFormat={is24h ? "24h" : "12h"}
+                onChange={(startTime) => setExceptionForm((f) => ({ ...f, startTime }))}
               />
-              <TimeInput
+              <TimeOfDayInput
                 label="Hora fin"
                 value={exceptionForm.endTime}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
-                  setExceptionForm((f) => ({ ...f, endTime: val }));
-                }}
+                timeFormat={is24h ? "24h" : "12h"}
+                error={!!exceptionTimeError}
+                onChange={(endTime) => setExceptionForm((f) => ({ ...f, endTime }))}
               />
-            </Group>
+              {exceptionTimeError && (
+                <Text size="xs" c="red">
+                  {exceptionTimeError}
+                </Text>
+              )}
+            </Stack>
           </Collapse>
 
           <TextInput

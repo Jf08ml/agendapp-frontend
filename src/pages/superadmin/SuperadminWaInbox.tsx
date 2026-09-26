@@ -15,6 +15,7 @@ import {
   Button,
   Divider,
   Paper,
+  Switch,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconBrandWhatsapp, IconCheck, IconChecks, IconAlertTriangle } from "@tabler/icons-react";
@@ -26,8 +27,11 @@ import {
   getConversationMessages,
   markConversationRead,
   replyToConversation,
+  getPlatformSettings,
+  updatePlatformSettings,
   type PlatformConversation,
   type PlatformWaMessage,
+  type PlatformSettings,
 } from "../../services/platformInboxService";
 
 dayjs.locale("es");
@@ -79,6 +83,37 @@ export default function SuperadminWaInbox() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [settings, setSettings] = useState<PlatformSettings | null>(null);
+  const [savingKey, setSavingKey] = useState<keyof PlatformSettings | null>(null);
+
+  useEffect(() => {
+    getPlatformSettings()
+      .then(setSettings)
+      .catch((err) => {
+        console.error("Error cargando la configuración de envíos:", err);
+        notifications.show({
+          color: "red",
+          title: "No se pudo cargar la configuración",
+          message: "Los interruptores de envíos automáticos no están disponibles.",
+        });
+      });
+  }, []);
+
+  const handleToggleSetting = async (key: keyof PlatformSettings, value: boolean) => {
+    if (!settings) return;
+    const previous = settings;
+    setSettings({ ...settings, [key]: value });
+    setSavingKey(key);
+    try {
+      setSettings(await updatePlatformSettings({ [key]: value }));
+    } catch (err) {
+      console.error("Error guardando la configuración de envíos:", err);
+      setSettings(previous);
+      notifications.show({ color: "red", title: "No se pudo guardar", message: "Intenta de nuevo." });
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   const loadConversations = useCallback(async () => {
     try {
@@ -166,6 +201,28 @@ export default function SuperadminWaInbox() {
               </Text>
             </div>
           </Group>
+        </Card>
+
+        <Card withBorder radius="md" p="md">
+          <Text fw={600} size="sm" mb="sm">
+            Envíos automáticos desde el número de AgenditApp
+          </Text>
+          <Stack gap="sm">
+            <Switch
+              label="Retargeting de activación"
+              description="Cada día a las 11:00 a.m.: activa_tu_cuenta, agenda_tu_primera_cita y conecta_tu_whatsapp. No incluye el aviso de trial por vencer."
+              checked={settings?.retargetingEnabled ?? false}
+              disabled={!settings || savingKey === "retargetingEnabled"}
+              onChange={(e) => void handleToggleSetting("retargetingEnabled", e.currentTarget.checked)}
+            />
+            <Switch
+              label="Aviso de WhatsApp desconectado por WhatsApp"
+              description="Mensaje de texto libre cuando la sesión de una organización se cae. Apagado, la organización igual recibe el aviso por notificación push y dentro de la app."
+              checked={settings?.waDisconnectWhatsappAlertEnabled ?? false}
+              disabled={!settings || savingKey === "waDisconnectWhatsappAlertEnabled"}
+              onChange={(e) => void handleToggleSetting("waDisconnectWhatsappAlertEnabled", e.currentTarget.checked)}
+            />
+          </Stack>
         </Card>
 
         <Card withBorder radius="md" p={0} style={{ overflow: "hidden" }}>

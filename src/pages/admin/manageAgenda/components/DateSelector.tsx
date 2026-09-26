@@ -1,6 +1,7 @@
 import React from "react";
-import { Input, Text } from "@mantine/core";
-import { format, set } from "date-fns";
+import { Text } from "@mantine/core";
+import { DateInput } from "@mantine/dates";
+import { set } from "date-fns";
 
 interface DateSelectorProps {
   label: string;
@@ -8,29 +9,38 @@ interface DateSelectorProps {
   onChange: (date: Date) => void;
 }
 
+// Selector de fecha del modal de citas/disponibilidad. Usa el DateInput de Mantine
+// (en español vía <DatesProvider>) en vez de <input type="date">, cuyo calendario
+// depende del idioma del navegador.
 const DateSelector: React.FC<DateSelectorProps> = ({
   label,
   value,
   onChange,
 }) => {
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const [year, month, day] = e.currentTarget.value.split("-").map(Number);
-    const updatedDate = set(value || new Date(), {
-      year: year || new Date().getFullYear(),
-      month: (month || new Date().getMonth() + 1) - 1,
-      date: day || new Date().getDate(),
-    });
-    onChange(updatedDate);
+  const handleDateChange = (picked: Date | null) => {
+    if (!picked) return;
+    // Solo cambia año/mes/día: la hora del valor actual se conserva.
+    onChange(
+      set(value || new Date(), {
+        year: picked.getFullYear(),
+        month: picked.getMonth(),
+        date: picked.getDate(),
+      })
+    );
   };
 
   return (
     <div>
       <Text>{label}</Text>
-      <Input
-        type="date"
+      <DateInput
         size="md"
-        value={value ? format(value, "yyyy-MM-dd") : ""}
+        value={value ?? null}
         onChange={handleDateChange}
+        valueFormat="DD/MM/YYYY"
+        placeholder="DD/MM/AAAA"
+        clearable={false}
+        // Los modales de la agenda usan zIndex hasta 300: el desplegable debe quedar encima.
+        popoverProps={{ withinPortal: true, zIndex: 400 }}
       />
     </div>
   );

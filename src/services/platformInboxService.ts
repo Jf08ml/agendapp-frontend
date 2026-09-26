@@ -32,6 +32,22 @@ export interface PlatformWaMessage {
   createdAt: string;
 }
 
+// Interruptores de los envíos automáticos por el número de plataforma (ambos apagados por defecto).
+export interface PlatformSettings {
+  retargetingEnabled: boolean;
+  waDisconnectWhatsappAlertEnabled: boolean;
+}
+
+export const getPlatformSettings = async (): Promise<PlatformSettings> => {
+  const response = await apiGeneral.get("/admin/wa-inbox/settings");
+  return response.data.data;
+};
+
+export const updatePlatformSettings = async (patch: Partial<PlatformSettings>): Promise<PlatformSettings> => {
+  const response = await apiGeneral.patch("/admin/wa-inbox/settings", patch);
+  return response.data.data;
+};
+
 export const getConversations = async (): Promise<PlatformConversation[]> => {
   const response = await apiGeneral.get("/admin/wa-inbox/conversations");
   return response.data.data;

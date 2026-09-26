@@ -49,7 +49,7 @@ interface WeekViewProps {
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   loadingMonth?: boolean;
   timezone?: string;
-  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
+  onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const WeekView: FC<WeekViewProps> = ({

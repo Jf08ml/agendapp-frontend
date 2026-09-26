@@ -12,9 +12,13 @@ import {
   Text,
   Alert,
 } from "@mantine/core";
-import { DatePickerInput, TimeInput } from "@mantine/dates";
+import { DatePickerInput } from "@mantine/dates";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../app/store";
+import TimeOfDayInput from "../../../../components/TimeOfDayInput";
+import { formatTimeLabel } from "../../../../utils/timeOfDay";
 import { Employee, EmployeeScheduleException } from "../../../../services/employeeService";
 import {
   addEmployeeException,
@@ -73,6 +77,14 @@ export default function AgendaBlockModal({
   const [applyToAll, setApplyToAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const is24h = useSelector((s: RootState) => s.organization.organization?.timeFormat) === "24h";
+
+  // Mensaje único para la validación y para el aviso en pantalla. Con 12 h se muestran las
+  // horas con AM/PM para que se note si "2:00" quedó en AM por error.
+  const timeRangeError =
+    !form.allDay && form.startTime >= form.endTime
+      ? `La hora de fin (${formatTimeLabel(form.endTime, is24h)}) debe ser posterior a la de inicio (${formatTimeLabel(form.startTime, is24h)}).${is24h ? "" : " Revisa que AM/PM sea el correcto."}`
+      : null;
 
   const ownName = restrictedToEmployeeId
     ? employees.find((e) => e._id === restrictedToEmployeeId)?.names?.trim()
@@ -112,12 +124,8 @@ export default function AgendaBlockModal({
       });
       return;
     }
-    if (!form.allDay && form.startTime >= form.endTime) {
-      showNotification({
-        title: "Validación",
-        message: "La hora de inicio debe ser anterior a la hora de fin",
-        color: "orange",
-      });
+    if (timeRangeError) {
+      showNotification({ title: "Validación", message: timeRangeError, color: "orange" });
       return;
     }
 
@@ -246,24 +254,26 @@ export default function AgendaBlockModal({
         />
 
         <Collapse in={!form.allDay}>
-          <Group grow>
-            <TimeInput
+          <Stack gap="xs">
+            <TimeOfDayInput
               label="Hora inicio"
               value={form.startTime}
-              onChange={(e) => {
-                const startTime = e.currentTarget.value;
-                setForm((f) => ({ ...f, startTime }));
-              }}
+              timeFormat={is24h ? "24h" : "12h"}
+              onChange={(startTime) => setForm((f) => ({ ...f, startTime }))}
             />
-            <TimeInput
+            <TimeOfDayInput
               label="Hora fin"
               value={form.endTime}
-              onChange={(e) => {
-                const endTime = e.currentTarget.value;
-                setForm((f) => ({ ...f, endTime }));
-              }}
+              timeFormat={is24h ? "24h" : "12h"}
+              error={!!timeRangeError}
+              onChange={(endTime) => setForm((f) => ({ ...f, endTime }))}
             />
-          </Group>
+            {timeRangeError && (
+              <Text size="xs" c="red">
+                {timeRangeError}
+              </Text>
+            )}
+          </Stack>
         </Collapse>
 
         <TextInput

@@ -61,8 +61,8 @@ const SearchAppointmentsModal: FC<SearchAppointmentsModalProps> = ({
               </Text>
               <Text size="sm" c="dimmed">
                 Profesional: {appt.employee?.names} <br />
-                {new Date(appt.startDate).toLocaleString()} -{" "}
-                {new Date(appt.endDate).toLocaleString()}
+                {new Date(appt.startDate).toLocaleString("es-CO")} -{" "}
+                {new Date(appt.endDate).toLocaleString("es-CO")}
               </Text>
             </Card>
           ))}

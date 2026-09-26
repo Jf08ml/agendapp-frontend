@@ -241,7 +241,7 @@ const AdvanceModal = ({ isOpen, onClose, employee }: AdvanceModalProps) => {
                   advances.map((advance) => (
                     <Table.Tr key={advance._id}>
                       <Table.Td>
-                        {new Date(advance.date).toLocaleDateString()}
+                        {new Date(advance.date).toLocaleDateString("es-CO")}
                       </Table.Td>
                       <Table.Td>{formatCurrency(advance.amount, org?.currency || "COP")}</Table.Td>
                       <Table.Td>{advance.description || "Sin descripción"}</Table.Td>

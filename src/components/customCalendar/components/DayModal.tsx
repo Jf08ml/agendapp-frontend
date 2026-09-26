@@ -51,7 +51,7 @@ interface DayModalProps {
   employees: Employee[];
   setAppointments: React.Dispatch<React.SetStateAction<Appointment[]>>;
   timezone?: string; // 🌍 Timezone de la organización
-  onExceptionDeleted?: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
+  onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
 const DayModal: FC<DayModalProps> = ({
