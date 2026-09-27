@@ -357,7 +357,14 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
       config_id: import.meta.env.VITE_META_CONFIG_ID,
       response_type: "code",
       override_default_response_type: true,
-      scope: "whatsapp_business_management,whatsapp_business_messaging",
+      // Sin `scope`: con `config_id` (Facebook Login for Business) los permisos
+      // los define la configuración de login del App Dashboard, no un scope en
+      // tiempo de ejecución. Mandar ambos abre el diálogo de login clásico y
+      // Meta responde "Facebook Login is currently unavailable for this app"
+      // a cualquier cuenta sin rol en la App — funciona para el dueño porque las
+      // cuentas con rol en la App bypasean esa validación. Quitado 2026-09-27
+      // tras confirmar que whatsapp_business_management/messaging/business_management
+      // ya tienen Acceso Avanzado aprobado (desde 2026-07-06) y el error seguía.
       extras: {
         featureType: "whatsapp_business_app_onboarding",
         sessionInfoVersion: "3",
