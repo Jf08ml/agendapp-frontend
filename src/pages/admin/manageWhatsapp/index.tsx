@@ -9,12 +9,12 @@ import {
   Center,
   CheckIcon,
   CopyButton,
-  Divider,
   Group,
   Kbd,
   Paper,
   Progress,
   SegmentedControl,
+  Select,
   Stack,
   Switch,
   Tabs,
@@ -30,8 +30,10 @@ import { RootState, AppDispatch } from "../../../app/store";
 import {
   BiBot,
   BiCopy,
+  BiDesktop,
   BiInfoCircle,
   BiLink,
+  BiLogoMeta,
   BiRefresh,
   BiX,
   BiQrScan,
@@ -101,6 +103,17 @@ const UI_STATUS: Record<
   },
 };
 
+const METHOD_STORAGE_KEY = "wa_connection_method";
+
+function readStoredMethod(): "web" | "meta" | null {
+  try {
+    const v = localStorage.getItem(METHOD_STORAGE_KEY);
+    return v === "web" || v === "meta" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 // -----------------------------
 // 2) Componente principal
 // -----------------------------
@@ -148,6 +161,28 @@ const WhatsappOrgSession: React.FC = () => {
     logout,
     sendTest,
   } = useWhatsappStatus(organization?._id, initialClientId);
+
+  // Método de conexión visible: solo se muestra el panel del método elegido.
+  // Arranca con la última elección de este navegador; si no hay, en Meta cuando la
+  // org ya conectó por Meta (o solo tiene Meta disponible) y en Web en los demás casos.
+  const [connectionMethod, setConnectionMethod] = useState<"web" | "meta">(() => {
+    if (organization?.hideBaileysUI) return "meta";
+    return (
+      readStoredMethod() ??
+      (organization?.waConnectionType === "meta" ? "meta" : "web")
+    );
+  });
+  const handleChangeMethod = (val: string | null) => {
+    if (val !== "web" && val !== "meta") return;
+    setConnectionMethod(val);
+    try {
+      localStorage.setItem(METHOD_STORAGE_KEY, val);
+    } catch {
+      /* almacenamiento no disponible: la elección solo dura esta visita */
+    }
+  };
+  const showWebPanel = !organization?.hideBaileysUI && connectionMethod === "web";
+  const showMetaPanel = !!organization?._id && (organization?.hideBaileysUI || connectionMethod === "meta");
 
   // Estado local para UI de conexión
   const [connectMode, setConnectMode] = useState<"qr" | "pairing">("qr");
@@ -276,12 +311,31 @@ const WhatsappOrgSession: React.FC = () => {
           </Tabs.List>
 
           {/* ============================================================= */}
-          {/* TAB 1: CONEXIÓN — Baileys (app) + Meta/Facebook (Cloud API)   */}
+          {/* TAB 1: CONEXIÓN — Baileys (app) o Meta/Facebook (Cloud API)  */}
           {/* ============================================================= */}
           <Tabs.Panel value="connection" pt="md">
             <Stack gap="md">
-              {/* SECCIÓN BAILEYS */}
+              {/* SELECTOR DE MÉTODO — desplegable cerrado: solo se ve el método elegido,
+                  no las dos opciones a la vez. Solo si la org tiene más de uno disponible. */}
               {!organization?.hideBaileysUI && (
+                <Select
+                  label="Método de conexión"
+                  value={connectionMethod}
+                  onChange={handleChangeMethod}
+                  data={[
+                    { value: "web", label: "WhatsApp Web" },
+                    { value: "meta", label: "API oficial de Meta" },
+                  ]}
+                  leftSection={
+                    connectionMethod === "meta" ? <BiLogoMeta size={16} /> : <BiDesktop size={16} />
+                  }
+                  allowDeselect={false}
+                  maw={340}
+                />
+              )}
+
+              {/* SECCIÓN BAILEYS */}
+              {showWebPanel && (
                 <Stack gap="md">
                   <Group justify="space-between" align="center">
                     <Title order={5}>WhatsApp Web (WEB)</Title>
@@ -548,13 +602,11 @@ const WhatsappOrgSession: React.FC = () => {
                       </Button>
                     </Group>
                   )}
-
-                  <Divider />
                 </Stack>
               )}
 
               {/* META / FACEBOOK (Cloud API + coexistencia) */}
-              {organization?._id && (
+              {showMetaPanel && organization?._id && (
                 <MetaConnectionPanel organizationId={organization._id} />
               )}
             </Stack>

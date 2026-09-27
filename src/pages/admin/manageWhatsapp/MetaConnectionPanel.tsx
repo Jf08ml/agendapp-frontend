@@ -37,6 +37,9 @@ import {
 
 const FB_APP_ID = import.meta.env.VITE_META_APP_ID;
 const META_REDIRECT_ORIGIN = import.meta.env.VITE_META_REDIRECT_ORIGIN || window.location.origin;
+// Versión del Embedded Signup a forzar en `extras.version` (ej. "v4-public-preview").
+// Vacía = no se manda y Meta decide según la configuración. Solo para pruebas locales.
+const META_ES_VERSION: string | undefined = import.meta.env.VITE_META_ES_VERSION || undefined;
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -350,6 +353,18 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
     }
     setConnecting(true);
     embeddedDataRef.current = {};
+    const launchOptions = {
+      config_id: import.meta.env.VITE_META_CONFIG_ID,
+      response_type: "code",
+      override_default_response_type: true,
+      scope: "whatsapp_business_management,whatsapp_business_messaging",
+      extras: {
+        featureType: "whatsapp_business_app_onboarding",
+        sessionInfoVersion: "3",
+        ...(META_ES_VERSION ? { version: META_ES_VERSION } : {}),
+      },
+    };
+    console.log("[MetaConnect] FB.login options:", launchOptions);
     window.FB.login(
       (res) => {
         console.log("[MetaConnect] FB.login response:", res);
@@ -367,9 +382,21 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
         (async () => {
           try {
             const redirectUri = META_REDIRECT_ORIGIN.replace(/\/$/, "") + "/";
-            await embeddedConnectMeta(organizationId, fbCode, redirectUri, wabaId, phoneNumberId);
+            const result = await embeddedConnectMeta(organizationId, fbCode, redirectUri, wabaId, phoneNumberId);
             setFbStep("mode");
             notifications.show({ color: "green", message: "Cuenta conectada. Elige el modo de activación." });
+            if (result.isCoexistence) {
+              const syncFailed =
+                !!result.dataSync && (!result.dataSync.contacts.ok || !result.dataSync.history.ok);
+              notifications.show({
+                color: syncFailed ? "orange" : "blue",
+                autoClose: 15000,
+                title: syncFailed ? "Sincronización pendiente" : "Sincronizando tu WhatsApp Business",
+                message: syncFailed
+                  ? "No se pudo iniciar la importación de contactos e historial. Contacta a soporte de AgenditApp: hay 24 horas para reintentarla."
+                  : "Estamos importando tus contactos e historial de chats. Mantén abierta la app de WhatsApp Business en tu celular durante unos minutos.",
+              });
+            }
           } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
               ?? (err instanceof Error ? err.message : "Error al conectar");
@@ -379,16 +406,7 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
           }
         })();
       },
-      {
-        config_id: import.meta.env.VITE_META_CONFIG_ID,
-        response_type: "code",
-        override_default_response_type: true,
-        scope: "whatsapp_business_management,whatsapp_business_messaging",
-        extras: {
-          featureType: "whatsapp_business_app_onboarding",
-          sessionInfoVersion: "3",
-        },
-      }
+      launchOptions
     );
   }
 

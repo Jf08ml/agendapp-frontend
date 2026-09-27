@@ -393,7 +393,19 @@ export const embeddedConnectMeta = async (
   redirectUri: string,
   wabaId?: string,
   phoneNumberId?: string
-): Promise<{ wabaId: string; phoneNumberId: string; phone: string; verifiedName: string }> => {
+): Promise<{
+  wabaId: string;
+  phoneNumberId: string;
+  phone: string;
+  verifiedName: string;
+  /** El número venía de la app de WhatsApp Business (coexistencia). */
+  isCoexistence?: boolean;
+  /** Solicitud de sincronización de contactos e historial (solo en coexistencia). */
+  dataSync?: {
+    contacts: { ok: boolean; error?: string };
+    history: { ok: boolean; error?: string };
+  } | null;
+}> => {
   const response = await apiOrganization.post(`/${organizationId}/meta-embedded-connect`, {
     code, redirectUri, wabaId, phoneNumberId,
   });
