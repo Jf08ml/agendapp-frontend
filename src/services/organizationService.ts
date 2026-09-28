@@ -1,10 +1,5 @@
 import { apiGeneral, apiOrganization } from "./axiosConfig";
 import { AxiosResponse } from "axios";
-import {
-  OFFLINE_FETCH_TIMEOUT_MS,
-  cacheSet,
-  fetchWithOfflineFallback,
-} from "../utils/offlineCache";
 export interface Role {
   name: string;
   permissions: string[];
@@ -479,43 +474,13 @@ export const syncMetaTemplates = async (organizationId: string) => {
   return response.data.data;
 };
 
-// En dev el tenant se elige con ?slug=, así que el hostname (localhost) no basta
-// para distinguir una org de otra en el caché offline.
-const orgConfigCacheKey = () =>
-  `org-config:${window.location.hostname}:${
-    import.meta.env.DEV ? localStorage.getItem("app_dev_slug") ?? "" : ""
-  }`;
-
-// Petición en vivo de la config de la org. A diferencia de getOrganizationConfig,
-// lanza si falla (sin caer al caché offline): la usa el sondeo de reconexión.
-export const fetchOrganizationConfigLive = async (): Promise<Organization> => {
-  const response: AxiosResponse<Organization> = await apiGeneral.get(
-    "/organization-config",
-    { timeout: OFFLINE_FETCH_TIMEOUT_MS }
-  );
-  return response.data;
-};
-
-// Guarda la respuesta ya obtenida (la usa el sondeo de reconexión)
-export const cacheOrganizationConfig = (organization: Organization) =>
-  cacheSet(orgConfigCacheKey(), organization, "public");
-
-// Obtener organización según el dominio actual (branding automático).
-// Sin conexión devuelve la última copia guardada, para que la app pueda arrancar
-// y mostrar la agenda guardada en vez de quedarse en "Cargando organización…".
-// Si el servidor tarda y se arranca con la copia, `onFresh` recibe la config
-// actualizada cuando por fin llega.
-export const getOrganizationConfig = async (
-  onFresh?: (organization: Organization) => void
-): Promise<Organization | null> => {
+// Obtener organización según el dominio actual (branding automático)
+export const getOrganizationConfig = async (): Promise<Organization | null> => {
   try {
-    const { data, pending } = await fetchWithOfflineFallback(
-      orgConfigCacheKey(),
-      fetchOrganizationConfigLive,
-      "public"
+    const response: AxiosResponse<Organization> = await apiGeneral.get(
+      "/organization-config"
     );
-    pending?.then((fresh) => onFresh?.(fresh)).catch(() => undefined);
-    return data;
+    return response.data;
   } catch (error) {
     console.error("Error al obtener la organización por dominio:", error);
     return null;

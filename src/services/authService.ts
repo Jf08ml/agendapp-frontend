@@ -1,9 +1,5 @@
 import { apiAuth, apiGeneral } from "./axiosConfig";
 import { AxiosResponse } from "axios";
-import { isNetworkError } from "../utils/offlineCache";
-
-// La renovación del token no debe colgarse con señal muerta (ver useSessionExpiry)
-const REFRESH_TIMEOUT_MS = 10_000;
 
 // Definir el tipo de respuesta para el inicio de sesión
 interface LoginResponse {
@@ -63,13 +59,9 @@ export const loginSuperadmin = async (
 // Pegarle a /api/login/refresh (bug anterior) daba 404 y además caía bajo el
 // rate limiter de login (5 req/15min), pensado para fuerza bruta, no para
 // renovaciones silenciosas de sesión.
-//
-// `networkError` distingue "no hay red" de "el servidor rechazó el token": con
-// red caída no se puede renovar, pero eso NO significa que la sesión expiró, y
-// cerrarla dejaría al usuario sin poder ver su agenda guardada (ver offlineCache.ts).
-export const refreshTokenDetailed = async (
+export const refreshToken = async (
   currentToken: string
-): Promise<{ result: LoginResponse | null; networkError: boolean }> => {
+): Promise<LoginResponse | null> => {
   try {
     const response: AxiosResponse<{ data: LoginResponse }> = await apiGeneral.post(
       "/refresh",
@@ -77,21 +69,15 @@ export const refreshTokenDetailed = async (
       {
         headers: {
           Authorization: `Bearer ${currentToken}`
-        },
-        timeout: REFRESH_TIMEOUT_MS,
+        }
       }
     );
-    return { result: response.data.data, networkError: false };
+    return response.data.data;
   } catch (error) {
     console.error("Error al renovar el token:", error);
-    return { result: null, networkError: isNetworkError(error) };
+    return null;
   }
 };
-
-export const refreshToken = async (
-  currentToken: string
-): Promise<LoginResponse | null> =>
-  (await refreshTokenDetailed(currentToken)).result;
 
 // Función para guardar el token en localStorage
 export const saveToken = (token: string) => {

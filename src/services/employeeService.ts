@@ -79,13 +79,11 @@ export const getEmployees = async (): Promise<Employee[]> => {
 
 // Obtener profesionales por organizationId
 export const getEmployeesByOrganizationId = async (
-  organizationId: string,
-  options?: { timeoutMs?: number } // Tope de espera (la agenda lo usa para caer al caché offline)
+  organizationId: string
 ): Promise<Employee[]> => {
   try {
     const response = await apiEmployeePublic.get<Response<Employee[]>>(
-      `/organization/${organizationId}`,
-      { timeout: options?.timeoutMs }
+      `/organization/${organizationId}`
     );
     return response.data.data;
   } catch (error) {
@@ -96,13 +94,11 @@ export const getEmployeesByOrganizationId = async (
 
 // Obtener un profesional por ID
 export const getEmployeeById = async (
-  employeeId: string,
-  options?: { timeoutMs?: number } // Tope de espera (para caer al caché offline)
+  employeeId: string
 ): Promise<Employee | undefined> => {
   try {
     const response = await apiEmployee.get<Response<Employee>>(
-      `/${employeeId}`,
-      { timeout: options?.timeoutMs }
+      `/${employeeId}`
     );
     return response.data.data;
   } catch (error) {

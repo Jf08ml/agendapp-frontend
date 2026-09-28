@@ -223,8 +223,7 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 export const getAppointmentsByOrganizationId = async (
   organizationId: string,
   startDate?: string, // Fecha de inicio opcional
-  endDate?: string, // Fecha de fin opcional
-  options?: { timeoutMs?: number } // Tope de espera (la agenda lo usa para caer al caché offline)
+  endDate?: string // Fecha de fin opcional
 ): Promise<Appointment[]> => {
   try {
     // Construir los parámetros de consulta si las fechas están definidas
@@ -240,9 +239,7 @@ export const getAppointmentsByOrganizationId = async (
       queryParams.toString() ? `?${queryParams.toString()}` : ""
     }`;
 
-    const response = await apiAppointment.get<Response<Appointment[]>>(url, {
-      timeout: options?.timeoutMs,
-    });
+    const response = await apiAppointment.get<Response<Appointment[]>>(url);
     return response.data.data;
   } catch (error) {
     handleAxiosError(error, "Error al obtener las citas por organización");

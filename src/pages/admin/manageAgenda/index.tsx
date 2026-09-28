@@ -3,7 +3,6 @@
 import React, {
   useEffect,
   useMemo,
-  useRef,
   useState,
   useCallback,
   Suspense,
@@ -22,7 +21,7 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
-import { addMonths, format, isSameMonth } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
@@ -69,18 +68,6 @@ import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
 import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
-import OfflineBanner from "../../../components/OfflineBanner";
-import {
-  OFFLINE_FETCH_TIMEOUT_MS,
-  agendaMonthKey,
-  cacheGet,
-  cacheSet,
-  fetchWithOfflineFallback,
-  isNetworkError,
-  reportLiveFailure,
-} from "../../../utils/offlineCache";
-import type { FetchOfflineOptions } from "../../../utils/offlineCache";
-import { markLive, useOfflineMode } from "../../../utils/offlineMode";
 import { IconShieldCog, IconCalendarOff } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
@@ -95,25 +82,6 @@ const ReorderEmployeesModal = lazy(
 );
 const AgendaBlockModal = lazy(() => import("./components/AgendaBlockModal"));
 const AvailabilityModal = lazy(() => import("./components/AvailabilityModal"));
-
-// Precarga del mes siguiente para el modo sin conexión: se salta si la copia
-// guardada tiene menos de esto (evita pegarle al endpoint de citas en cada visita)
-const PREFETCH_MIN_AGE_MS = 10 * 60 * 1000;
-const PREFETCH_DELAY_MS = 2_000;
-// Si la consulta del mes tardó más que esto, el servidor va justo para esa org:
-// no se le suma una segunda consulta pesada solo por precargar
-const PREFETCH_MAX_QUERY_MS = 3_000;
-
-// De dónde salen las citas que se ven en pantalla
-type AgendaSource =
-  | { status: "live"; cachedAt: null }
-  // copia guardada mientras llega la respuesta (el servidor responde, pero lento)
-  | { status: "updating"; cachedAt: number }
-  // copia guardada porque la petición en vivo falló (sin conexión o sin respuesta)
-  | { status: "cache"; cachedAt: number }
-  // la petición falló y ese mes nunca se guardó
-  | { status: "missing"; cachedAt: null };
-const LIVE_SOURCE: AgendaSource = { status: "live", cachedAt: null };
 
 export interface CreateAppointmentPayload {
   service: Service;
@@ -166,17 +134,6 @@ const ScheduleView: React.FC = () => {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sendingReminders, setSendingReminders] = useState(false);
-
-  // Modo sin conexión (solo lectura): ver utils/offlineCache.ts
-  const offlineMode = useOfflineMode();
-  const isOffline = offlineMode.offline;
-  const [agendaSource, setAgendaSource] = useState<AgendaSource>(LIVE_SOURCE);
-  const [retrying, setRetrying] = useState(false);
-  const skipRecoveryRef = useRef(false);
-  // Identifica la carga de mes más reciente: la respuesta tardía de una carga
-  // anterior (otro mes) no debe pisar lo que se está viendo
-  const monthRequestRef = useRef(0);
-  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [reminderDate, setReminderDate] = useState<Date | null>(null);
   const [permissionsEmployee, setPermissionsEmployee] = useState<Employee | null>(null);
@@ -391,233 +348,77 @@ const ScheduleView: React.FC = () => {
   };
 
   // ---------- DATA: Profesionales/Citas ----------
-  const fetchEmployees = useCallback(
-    async (options?: FetchOfflineOptions) => {
-      if (!readyForScopedFetch) return;
-      const applyEmployees = (list: Employee[]) => {
-        let activeEmployees = list.filter((e) => e.isActive);
+  const fetchEmployees = useCallback(async () => {
+    if (!readyForScopedFetch) return;
+    try {
+      const response = await getEmployeesByOrganizationId(
+        organizationId as string,
+      );
+      let activeEmployees = response.filter((e) => e.isActive);
 
-        if (!canViewAll) {
-          if (!userId) return;
-          activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
-        }
-        setEmployees(activeEmployees);
-      };
-      try {
-        // Si la respuesta falla o tarda se usa la última lista guardada (ver
-        // utils/offlineCache.ts); si llega tarde, reemplaza a la copia
-        const { data, pending } = await fetchWithOfflineFallback(
-          `agenda-employees:${organizationId}`,
-          () =>
-            getEmployeesByOrganizationId(organizationId as string, {
-              timeoutMs: OFFLINE_FETCH_TIMEOUT_MS,
-            }),
-          "user",
-          { waitForLive: options?.waitForLive === true },
-        );
-        applyEmployees(data);
-        pending?.then(applyEmployees).catch(() => undefined);
-      } catch (error) {
-        console.error(error);
+      if (!canViewAll) {
+        if (!userId) return;
+        activeEmployees = activeEmployees.filter((emp) => emp._id === userId);
       }
-    },
-    [readyForScopedFetch, organizationId, canViewAll, userId],
-  );
-
-  // Un profesional sin "ver todas" solo ve (y solo guarda offline) sus citas
-  const scopeAppointments = useCallback(
-    (list: Appointment[]): Appointment[] =>
-      canViewAll
-        ? list
-        : userId
-          ? list.filter((a) => a.employee._id === userId)
-          : [],
-    [canViewAll, userId],
-  );
-
-  // Precarga oportunista del mes siguiente al actual, para poder navegar hacia
-  // adelante sin conexión. Solo se dispara desde el mes en curso.
-  const prefetchNextMonth = useCallback(
-    (date: Date) => {
-      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-      prefetchTimerRef.current = setTimeout(async () => {
-        try {
-          const next = addMonths(date, 1);
-          const start = startOfMonthInTimezone(next, organizationTimezone);
-          const end = endOfMonthInTimezone(next, organizationTimezone);
-          const key = agendaMonthKey(organizationId as string, start);
-          const existing = await cacheGet<Appointment[]>(key);
-          if (existing && Date.now() - existing.cachedAt < PREFETCH_MIN_AGE_MS) {
-            return;
-          }
-          const list = await getAppointmentsByOrganizationId(
-            organizationId as string,
-            start,
-            end,
-            { timeoutMs: OFFLINE_FETCH_TIMEOUT_MS },
-          );
-          await cacheSet(key, scopeAppointments(list));
-        } catch {
-          // Es solo una optimización: si falla, el mes se guardará al visitarlo
-        }
-      }, PREFETCH_DELAY_MS);
-    },
-    [organizationId, organizationTimezone, scopeAppointments],
-  );
-
-  useEffect(
-    () => () => {
-      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-    },
-    [],
-  );
+      setEmployees(activeEmployees);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [readyForScopedFetch, organizationId, canViewAll, userId]);
 
   const fetchAppointmentsForMonth = useCallback(
-    async (date: Date, options?: FetchOfflineOptions) => {
+    async (date: Date) => {
       if (!readyForScopedFetch) return;
-      const requestId = ++monthRequestRef.current;
-      const startedAt = Date.now();
       setLoadingMonth(true);
       try {
         const start = startOfMonthInTimezone(date, organizationTimezone);
         const end = endOfMonthInTimezone(date, organizationTimezone);
-        // Si la petición falla o tarda se sirve la última copia guardada de ESTE
-        // mes (ya filtrada por permisos: eso es lo que se guarda)
-        const { data, cachedAt, pending } = await fetchWithOfflineFallback(
-          agendaMonthKey(organizationId as string, start),
-          async () =>
-            scopeAppointments(
-              await getAppointmentsByOrganizationId(
-                organizationId as string,
-                start,
-                end,
-                { timeoutMs: OFFLINE_FETCH_TIMEOUT_MS },
-              ),
-            ),
-          "user",
-          { waitForLive: options?.waitForLive === true },
+        const response = await getAppointmentsByOrganizationId(
+          organizationId as string,
+          start,
+          end,
         );
 
-        setAppointments(normalizeAppointmentDates(data));
+        const scoped = canViewAll
+          ? response
+          : userId
+            ? response.filter((a) => a.employee._id === userId)
+            : [];
 
-        if (cachedAt === null) {
-          setAgendaSource(LIVE_SOURCE);
-          if (
-            Date.now() - startedAt < PREFETCH_MAX_QUERY_MS &&
-            isSameMonth(date, new Date())
-          ) {
-            prefetchNextMonth(date);
-          }
-        } else if (pending) {
-          // El servidor responde pero tarda: se ve la copia mientras tanto y se
-          // reemplaza cuando llegue (esto NO es "sin conexión")
-          setAgendaSource({ status: "updating", cachedAt });
-          pending
-            .then((fresh) => {
-              if (requestId !== monthRequestRef.current) return; // ya cambió de mes
-              setAppointments(normalizeAppointmentDates(fresh));
-              setAgendaSource(LIVE_SOURCE);
-            })
-            .catch(async (error) => {
-              if (requestId !== monthRequestRef.current) return;
-              await reportLiveFailure(error);
-              setAgendaSource({ status: "cache", cachedAt });
-            });
-        } else {
-          setAgendaSource({ status: "cache", cachedAt });
-        }
-      } catch (error) {
-        if (!isNetworkError(error)) throw error;
-        // La petición falló y ese mes nunca se guardó: no dejar en pantalla las
-        // citas del mes anterior bajo el título del mes nuevo
-        setAppointments([]);
-        setAgendaSource({ status: "missing", cachedAt: null });
+        setAppointments(normalizeAppointmentDates(scoped));
       } finally {
         setLoadingMonth(false);
       }
     },
-    [
-      readyForScopedFetch,
-      organizationId,
-      organizationTimezone,
-      scopeAppointments,
-      prefetchNextMonth,
-    ],
+    [readyForScopedFetch, organizationId, organizationTimezone, canViewAll, userId],
   );
 
   const fetchAppointmentsForDay = useCallback(
     async (date: Date): Promise<Appointment[]> => {
       if (!readyForScopedFetch) return [];
-      const start = startOfDayInTimezone(date, organizationTimezone);
-      const end = endOfDayInTimezone(date, organizationTimezone);
       try {
+        const start = startOfDayInTimezone(date, organizationTimezone);
+        const end = endOfDayInTimezone(date, organizationTimezone);
         const response = await getAppointmentsByOrganizationId(
           organizationId as string,
           start,
           end,
-          { timeoutMs: OFFLINE_FETCH_TIMEOUT_MS },
         );
-        markLive();
-        return normalizeAppointmentDates(scopeAppointments(response));
-      } catch (error) {
-        if (isNetworkError(error)) {
-          // Día fuera del mes cargado y sin respuesta: sacarlo de la copia
-          // guardada del mes que lo contiene (si existe)
-          void reportLiveFailure(error);
-          const monthStart = startOfMonthInTimezone(date, organizationTimezone);
-          const entry = await cacheGet<Appointment[]>(
-            agendaMonthKey(organizationId as string, monthStart),
-          );
-          if (entry) {
-            const from = new Date(start).getTime();
-            const to = new Date(end).getTime();
-            return normalizeAppointmentDates(entry.data).filter((a) => {
-              const t = a.startDate.getTime();
-              return t >= from && t <= to;
-            });
-          }
-        }
+
+        const scoped = canViewAll
+          ? response
+          : userId
+            ? response.filter((a) => a.employee._id === userId)
+            : [];
+
+        return normalizeAppointmentDates(scoped);
+      } catch {
         console.error("Error al obtener citas del día");
         return [];
       }
     },
-    [readyForScopedFetch, organizationId, organizationTimezone, scopeAppointments],
+    [readyForScopedFetch, organizationId, organizationTimezone, canViewAll, userId],
   );
-
-  // Al volver la conexión, recargar en vivo lo que se estaba viendo de la copia
-  // guardada (useOfflineRecovery detecta el regreso y sube `recoveries`)
-  const lastRecoveriesRef = useRef(offlineMode.recoveries);
-  useEffect(() => {
-    if (offlineMode.recoveries === lastRecoveriesRef.current) return;
-    lastRecoveriesRef.current = offlineMode.recoveries;
-    // Solo si se estaba viendo una copia por falla; en "updating" la respuesta
-    // pendiente ya se encarga de reemplazarla
-    if (
-      skipRecoveryRef.current ||
-      (agendaSource.status !== "cache" && agendaSource.status !== "missing")
-    ) {
-      return;
-    }
-    void fetchEmployees();
-    void fetchAppointmentsForMonth(currentDate);
-  }, [offlineMode.recoveries]);
-
-  const handleRetryOffline = useCallback(async () => {
-    setRetrying(true);
-    skipRecoveryRef.current = true; // esta recarga ya es la que haría el efecto de arriba
-    try {
-      // Acción del usuario: esperar de verdad la respuesta en vez de adelantarse
-      // con la copia (con un servidor lento eso haría imposible que "Reintentar"
-      // llegue a funcionar)
-      await Promise.all([
-        fetchEmployees({ waitForLive: true }),
-        fetchAppointmentsForMonth(currentDate, { waitForLive: true }),
-      ]);
-    } finally {
-      skipRecoveryRef.current = false;
-      setRetrying(false);
-    }
-  }, [fetchEmployees, fetchAppointmentsForMonth, currentDate]);
   /**
    * MANEJO DE SERVICIO
    */
@@ -676,18 +477,6 @@ const ScheduleView: React.FC = () => {
    */
   const openModal = useCallback(
     (selectedDay: Date | null, interval?: Date, employeeId?: string) => {
-      // Crear citas necesita el servidor (clientes, disponibilidad, validaciones)
-      if (isOffline) {
-        showNotification({
-          title: "Sin conexión",
-          message: "Para crear citas necesitas conexión a internet.",
-          color: "yellow",
-          autoClose: 3000,
-          position: "top-right",
-        });
-        return;
-      }
-
       const startDate =
         combineDateAndTime(selectedDay, interval || new Date()) || new Date();
 
@@ -712,7 +501,7 @@ const ScheduleView: React.FC = () => {
         });
       }
     },
-    [employees, combineDateAndTime, isOffline],
+    [employees, combineDateAndTime],
   );
 
   /**
@@ -1453,7 +1242,6 @@ const ScheduleView: React.FC = () => {
             <Button
               size="xs"
               onClick={() => openModal(new Date(), new Date())}
-              disabled={isOffline}
               style={{ borderRadius: 8 }}
             >
               Crear cita
@@ -1468,7 +1256,6 @@ const ScheduleView: React.FC = () => {
                   color="gray"
                   size="md"
                   onClick={() => setBlockModalOpened(true)}
-                  disabled={isOffline}
                   aria-label="Bloquear horario"
                 >
                   <IconCalendarOff size={18} />
@@ -1481,7 +1268,6 @@ const ScheduleView: React.FC = () => {
                 color="gray"
                 leftSection={<IconCalendarOff size={16} />}
                 onClick={() => setBlockModalOpened(true)}
-                disabled={isOffline}
                 style={{ borderRadius: 8 }}
               >
                 Bloquear
@@ -1533,34 +1319,15 @@ const ScheduleView: React.FC = () => {
             sendingReminders={sendingReminders}
             reasonForDisabled={reason}
             canSearchAppointments={hasPermission("appointments:search_schedule")}
-            canCreate={hasPermission("appointments:create") && !isOffline}
-            canSendReminders={hasPermission("appointments:send_reminders") && !isOffline}
-            canReorderEmployees={hasPermission("appointments:reorderemployees") && !isOffline}
-            canViewAvailability={hasPermission("appointments:search_schedule") && !isOffline}
+            canCreate={hasPermission("appointments:create")}
+            canSendReminders={hasPermission("appointments:send_reminders")}
+            canReorderEmployees={hasPermission("appointments:reorderemployees")}
+            canViewAvailability={hasPermission("appointments:search_schedule")}
             reminderDate={reminderDate}
             onChangeReminderDate={setReminderDate}
           />
         </Group>
       </Box>
-
-      {/* Modo sin conexión: la agenda es de solo lectura y puede ser una copia guardada */}
-      {(isOffline || agendaSource.status !== "live") && (
-        <OfflineBanner
-          status={
-            agendaSource.status === "live"
-              ? "offline"
-              : // Esperando respuesta, pero la sonda ya confirmó que no hay red
-                agendaSource.status === "updating" && isOffline
-                ? "cache"
-                : agendaSource.status
-          }
-          offline={isOffline}
-          cachedAt={agendaSource.cachedAt}
-          timeFormat={organization?.timeFormat === "24h" ? "24h" : "12h"}
-          onRetry={handleRetryOffline}
-          retrying={retrying}
-        />
-      )}
 
       {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
       {employees.length === 0 && <SetupGuide employees={employees} />}

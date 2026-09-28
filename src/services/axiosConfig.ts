@@ -1,6 +1,4 @@
 import axios, { AxiosInstance } from "axios";
-import { clearOfflineCache, isNetworkError } from "../utils/offlineCache";
-import { setReachabilityProbe } from "../utils/offlineMode";
 
 const API_BASE_URL: string =
   import.meta.env.VITE_NODE_ENV === "production"
@@ -166,8 +164,6 @@ const forceLogout = () => {
   localStorage.removeItem("app_role");
   localStorage.removeItem("app_token_expires_at");
   localStorage.removeItem("app_dev_slug");
-  // La página se recarga sin pasar por el store: borrar la copia offline aquí
-  void clearOfflineCache();
 
   if (!isPublic && !currentPath.includes("/login")) {
     window.dispatchEvent(
@@ -291,17 +287,6 @@ const createPublicAxiosInstance = (baseURL: string): AxiosInstance => {
 
 // Crear instancias de Axios para diferentes partes de la API
 const apiGeneral: AxiosInstance = createAxiosInstance(API_BASE_URL);
-
-// Sonda de alcance para el modo sin conexión (ver offlineMode.ts): con que el
-// servidor conteste algo —aunque sea un error HTTP— la red está bien.
-setReachabilityProbe(async () => {
-  try {
-    await apiGeneral.get("/organization-config", { timeout: 5_000 });
-    return true;
-  } catch (error) {
-    return !isNetworkError(error);
-  }
-});
 
 const apiClient: AxiosInstance = createAxiosInstance(`${API_BASE_URL}/clients`);
 

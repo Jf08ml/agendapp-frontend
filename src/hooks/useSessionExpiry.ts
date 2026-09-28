@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { logout, refreshTokenSuccess } from "../features/auth/sliceAuth";
-import { refreshToken, refreshTokenDetailed } from "../services/authService";
+import { refreshToken } from "../services/authService";
 import { checkCurrentSession } from "../services/sessionService";
 import { AppDispatch, RootState } from "../app/store";
 
@@ -89,14 +89,10 @@ export function useSessionExpiry() {
       return;
     }
 
-    const { result, networkError } = await refreshTokenDetailed(token);
+    const result = await refreshToken(token);
     if (result?.token) {
       dispatch(refreshTokenSuccess({ token: result.token, expiresAt: result.expiresAt }));
       hasExpiredRef.current = false;
-    } else if (networkError) {
-      // Sin conexión no se puede renovar, pero la sesión no expiró: cerrarla
-      // dejaría al usuario sin su agenda guardada y sin poder volver a entrar.
-      // checkExpiry lo reintenta en el siguiente ciclo (cada 60s / al volver).
     } else {
       handleExpiredSession();
     }
