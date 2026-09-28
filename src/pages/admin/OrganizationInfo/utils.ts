@@ -37,6 +37,8 @@ export const normalizeOrg = (response: Organization): Organization => ({
   serviceTiers: Array.isArray(response.serviceTiers) ? [...response.serviceTiers] : [],
   referralTiers: Array.isArray(response.referralTiers) ? [...response.referralTiers] : [],
   enableOnlineBooking: response.enableOnlineBooking ?? true,
+  enableAiBooking: response.enableAiBooking ?? true,
+  enableManualBooking: response.enableManualBooking ?? true,
   reservationPolicy: response.reservationPolicy ?? "manual",
   enableClassBooking: response.enableClassBooking ?? false,
   showServicesCard: response.showServicesCard ?? true,

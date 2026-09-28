@@ -169,6 +169,12 @@ export interface Organization {
   reservationPolicy?: ReservationPolicy;
   showLoyaltyProgram?: boolean;
   enableOnlineBooking?: boolean;
+  // Sub-interruptores de enableOnlineBooking: qué método(s) de reserva se ofrecen.
+  // Con los dos en true (default) se muestra la pantalla de elección IA/manual;
+  // con uno solo, el cliente entra directo a ese flujo. El backend no permite
+  // dejar los dos en false.
+  enableAiBooking?: boolean;
+  enableManualBooking?: boolean;
   enableClassBooking?: boolean;
   // Visibilidad de las tarjetas de acceso rápido "Nuestros Servicios" y "Ubicación"
   // en los layouts modern/minimal/cards. Sin equivalente hasta ahora (a diferencia

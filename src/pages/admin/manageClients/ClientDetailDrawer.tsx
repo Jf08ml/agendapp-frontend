@@ -44,6 +44,7 @@ import {
   Client,
   RewardHistoryEntry,
   redeemReward,
+  deleteReward,
   ClientFollowUpStatus,
   getClientFollowUpStatus,
 } from "../../../services/clientService";
@@ -192,6 +193,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 
   // ── Premios ────────────────────────────────────────────────────────────
   const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [deletingRewardId, setDeletingRewardId] = useState<string | null>(null);
 
   // ── Seguimientos ───────────────────────────────────────────────────────
   const [followUpStatus, setFollowUpStatus] = useState<ClientFollowUpStatus | null>(null);
@@ -316,6 +318,29 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
     } finally {
       setRedeemingId(null);
     }
+  };
+
+  const handleDeleteReward = (rewardId: string) => {
+    if (!client) return;
+    confirmAction(
+      async () => {
+        setDeletingRewardId(rewardId);
+        try {
+          const updated = await deleteReward(client._id, rewardId);
+          if (updated) {
+            onClientUpdated(updated);
+            showNotification({ title: "Recompensa eliminada", message: "El premio fue eliminado del historial.", color: "green", autoClose: 3000, position: "top-right" });
+          }
+        } catch (err) {
+          showNotification({ title: "Error", message: (err as Error).message || "No se pudo eliminar el premio.", color: "red", autoClose: 4000, position: "top-right" });
+        } finally {
+          setDeletingRewardId(null);
+        }
+      },
+      "Eliminar premio",
+      "¿Eliminar este premio del historial? Esta acción no se puede deshacer y no afecta el progreso de fidelidad del cliente.",
+      "red"
+    );
   };
 
   if (!client) return null;
@@ -669,7 +694,14 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             ) : (
               <Stack gap="sm">
                 {[...rewardsList].reverse().map((entry) => (
-                  <RewardCard key={entry._id} entry={entry} redeemingId={redeemingId} onRedeem={handleRedeem} />
+                  <RewardCard
+                    key={entry._id}
+                    entry={entry}
+                    redeemingId={redeemingId}
+                    deletingId={deletingRewardId}
+                    onRedeem={handleRedeem}
+                    onDelete={handleDeleteReward}
+                  />
                 ))}
               </Stack>
             )}
@@ -809,11 +841,15 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
 function RewardCard({
   entry,
   redeemingId,
+  deletingId,
   onRedeem,
+  onDelete,
 }: {
   entry: RewardHistoryEntry;
   redeemingId: string | null;
+  deletingId: string | null;
   onRedeem: (rewardId: string) => void;
+  onDelete: (rewardId: string) => void;
 }) {
   return (
     <Paper withBorder radius="md" p="sm">
@@ -838,17 +874,29 @@ function RewardCard({
             </Text>
           )}
         </Box>
-        {!entry.redeemed && (
-          <Button
-            size="xs"
-            color="green"
-            variant="light"
-            loading={redeemingId === entry._id}
-            onClick={() => onRedeem(entry._id)}
+        <Group gap={6} wrap="nowrap">
+          {!entry.redeemed && (
+            <Button
+              size="xs"
+              color="green"
+              variant="light"
+              loading={redeemingId === entry._id}
+              onClick={() => onRedeem(entry._id)}
+            >
+              Canjear
+            </Button>
+          )}
+          <ActionIcon
+            size="lg"
+            color="red"
+            variant="subtle"
+            loading={deletingId === entry._id}
+            onClick={() => onDelete(entry._id)}
+            aria-label="Eliminar premio"
           >
-            Canjear
-          </Button>
-        )}
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
       </Group>
     </Paper>
   );

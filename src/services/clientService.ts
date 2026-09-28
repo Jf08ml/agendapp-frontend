@@ -358,6 +358,16 @@ export const redeemReward = async (clientId: string, rewardId: string): Promise<
   }
 };
 
+// Eliminar un premio del historial (canjeado o no)
+export const deleteReward = async (clientId: string, rewardId: string): Promise<Client | undefined> => {
+  try {
+    const response = await apiClient.delete<Response<Client>>(`/${clientId}/rewards/${rewardId}`);
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al eliminar la recompensa");
+  }
+};
+
 // Carga masiva de clientes desde Excel
 export const bulkUploadClients = async (
   clients: Array<{

@@ -49,7 +49,9 @@ import { MpDepositNotice } from "../../components/MpDepositNotice";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 interface BookingChatPanelProps {
-  onBack: () => void;
+  // Ausente cuando la org solo tiene el asistente IA habilitado — no hay
+  // pantalla de elección a la que volver, así que se oculta el botón.
+  onBack?: () => void;
   preselectedService?: { _id: string; name: string };
 }
 
@@ -382,14 +384,16 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
           </Stack>
         )}
 
-        <Button
-          variant="subtle" color="gray" size="sm"
-          leftSection={<IconArrowLeft size={14} />}
-          onClick={onBack}
-          mt="xs"
-        >
-          Volver al inicio
-        </Button>
+        {onBack && (
+          <Button
+            variant="subtle" color="gray" size="sm"
+            leftSection={<IconArrowLeft size={14} />}
+            onClick={onBack}
+            mt="xs"
+          >
+            Volver al inicio
+          </Button>
+        )}
 
       </Stack>
     );
@@ -409,9 +413,11 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         }}
       >
         <Flex align="center" gap="sm">
-          <ActionIcon variant="transparent" onClick={onBack} aria-label="Volver" style={{ color: "white" }}>
-            <IconArrowLeft size={18} />
-          </ActionIcon>
+          {onBack && (
+            <ActionIcon variant="transparent" onClick={onBack} aria-label="Volver" style={{ color: "white" }}>
+              <IconArrowLeft size={18} />
+            </ActionIcon>
+          )}
           <ThemeIcon size={34} radius="xl" style={{ background: "rgba(255,255,255,0.18)", flexShrink: 0 }}>
             <IconRobot size={18} color="white" />
           </ThemeIcon>

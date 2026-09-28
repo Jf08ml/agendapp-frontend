@@ -18,6 +18,7 @@ import {
   IconChevronRight,
   IconCalendarOff,
 } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
 import {
   addMonths,
   subMonths,
@@ -93,6 +94,58 @@ export default function OnlineBookingTab({
           {...form.getInputProps("enableOnlineBooking", { type: "checkbox" })}
           disabled={!isEditing}
         />
+
+        <Collapse in={form.values.enableOnlineBooking ?? true}>
+          <Paper withBorder p="md" radius="md" ml="md">
+            <Stack gap="sm">
+              <Text size="sm" fw={600}>
+                Métodos de reserva disponibles
+              </Text>
+              <Text size="xs" c="dimmed">
+                Con los dos activos, el cliente elige cómo reservar. Con uno
+                solo, entra directo a ese flujo sin pantalla de elección.
+              </Text>
+
+              <Switch
+                label="Asistente con IA (Beta)"
+                description="El cliente reserva conversando con el asistente."
+                checked={form.values.enableAiBooking ?? true}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  if (!checked && !(form.values.enableManualBooking ?? true)) {
+                    notifications.show({
+                      color: "orange",
+                      message:
+                        "Debes dejar activo al menos un método de reserva.",
+                    });
+                    return;
+                  }
+                  form.setFieldValue("enableAiBooking", checked);
+                }}
+                disabled={!isEditing}
+              />
+
+              <Switch
+                label="Reserva manual paso a paso"
+                description="El cliente elige servicio, fecha y hora por su cuenta."
+                checked={form.values.enableManualBooking ?? true}
+                onChange={(e) => {
+                  const checked = e.currentTarget.checked;
+                  if (!checked && !(form.values.enableAiBooking ?? true)) {
+                    notifications.show({
+                      color: "orange",
+                      message:
+                        "Debes dejar activo al menos un método de reserva.",
+                    });
+                    return;
+                  }
+                  form.setFieldValue("enableManualBooking", checked);
+                }}
+                disabled={!isEditing}
+              />
+            </Stack>
+          </Paper>
+        </Collapse>
 
         <Switch
           label="Habilitar reserva de clases"

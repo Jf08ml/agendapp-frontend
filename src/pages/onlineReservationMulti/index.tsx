@@ -59,7 +59,42 @@ import { trackReservationConversion } from "../../utils/orgGoogleTags";
 type BookingMode = "choice" | "chat" | "manual";
 
 export default function MultiBookingWizard() {
-  const [mode, setMode] = useState<BookingMode>("choice");
+  const organization = useSelector(
+    (state: RootState) => state.organization.organization
+  );
+
+  // Sub-interruptores de enableOnlineBooking (default true si la org aún no
+  // cargó o el campo no vino — el backend siempre lo manda, pero una copia
+  // offline vieja del org config podría no tenerlo). Con uno solo activo se
+  // entra directo a ese flujo, sin pantalla de elección.
+  const aiEnabled = organization?.enableAiBooking !== false;
+  const manualEnabled = organization?.enableManualBooking !== false;
+  const onlyAiEnabled = aiEnabled && !manualEnabled;
+  const onlyManualEnabled = !aiEnabled && manualEnabled;
+
+  const [mode, setMode] = useState<BookingMode>(() => {
+    if (onlyAiEnabled) return "chat";
+    if (onlyManualEnabled) return "manual";
+    return "choice";
+  });
+
+  // Si `organization` todavía no había cargado en el primer render (el
+  // inicializador de arriba solo corre una vez), corrige apenas se sepa que
+  // solo hay un método disponible — evita quedar atascado en "choice".
+  useEffect(() => {
+    if (mode !== "choice") return;
+    if (onlyAiEnabled) setMode("chat");
+    else if (onlyManualEnabled) setMode("manual");
+  }, [mode, onlyAiEnabled, onlyManualEnabled]);
+
+  // Vuelve a la pantalla de elección, salvo que ya no tenga sentido mostrarla
+  // (solo un método activo) — evita que "Volver" abra la elección con una
+  // opción que el admin desactivó.
+  const goToChoice = () => {
+    if (onlyAiEnabled) return setMode("chat");
+    if (onlyManualEnabled) return setMode("manual");
+    setMode("choice");
+  };
 
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -109,10 +144,6 @@ export default function MultiBookingWizard() {
 
   // Bloquea navegación/reenvíos tras terminar
   const [completed, setCompleted] = useState(false);
-
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
-  );
 
   // Pre-selección de servicio vía query param ?serviceId=
   const [searchParams] = useSearchParams();
@@ -380,7 +411,7 @@ export default function MultiBookingWizard() {
       <Card withBorder radius="md" p={0}
         style={{ overflow: "hidden", height: FULL_H, display: "flex", flexDirection: "column" }}>
         <BookingChatPanel
-          onBack={() => setMode("choice")}
+          onBack={onlyAiEnabled ? undefined : goToChoice}
           preselectedService={preselectedService}
         />
       </Card>

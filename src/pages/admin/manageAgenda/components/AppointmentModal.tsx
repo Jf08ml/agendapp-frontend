@@ -2260,6 +2260,9 @@ ${clientServices}`;
                       </Group>
                       <Flex direction="column" gap={6}>
                         <Text size="sm">
+                          <strong>Cliente:</strong> {appointment.client.name}
+                        </Text>
+                        <Text size="sm">
                           <strong>Servicio:</strong>{" "}
                           {appointment.service ? appointment.service.name : "Sin servicio"}
                         </Text>
