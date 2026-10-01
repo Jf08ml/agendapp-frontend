@@ -16,6 +16,11 @@ export interface EmployeeScheduleException {
   startTime?: string; // "HH:mm" (solo si !allDay)
   endTime?: string;   // "HH:mm" (solo si !allDay)
   reason?: string;
+  // 🔁 Bloqueo recurrente (ver utils/scheduleExceptions.ts)
+  recurrence?: "weekly" | "monthly";
+  weekdays?: number[];
+  monthDays?: number[];
+  excludedDates?: string[];
 }
 
 // Definir la estructura de un profesional

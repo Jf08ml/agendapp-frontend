@@ -54,6 +54,7 @@ import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
+import { computeDepositTotal, uniformDepositPercentage } from "../../utils/deposit";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 type BookingMode = "choice" | "chat" | "manual";
@@ -291,10 +292,13 @@ export default function MultiBookingWizard() {
       // reserva. Preferimos Mercado Pago (automático); si no está conectado pero
       // hay métodos de transferencia, usamos el flujo de comprobante con IA.
       // (El depósito no aplica a series recurrentes en esta versión.)
+      // El abono puede ser distinto por servicio (% o monto fijo): se decide con el total real.
+      const depositServices = dates
+        .map((date) => services.find((s) => s._id === date.serviceId))
+        .filter((s): s is NonNullable<typeof s> => !!s);
       const depositConfigured =
         !clientPackageId &&
-        !!organization?.requireReservationDeposit &&
-        (organization?.reservationDepositPercentage ?? 0) > 0 &&
+        computeDepositTotal(organization, depositServices) > 0 &&
         recurrencePattern.type !== "weekly";
       const hasMp = !!organization?.mpCollect?.connected;
       const hasReceipt = (organization?.paymentMethods?.length ?? 0) > 0;
@@ -513,18 +517,17 @@ export default function MultiBookingWizard() {
           />
         );
       case 4: {
-        const depositPct = organization?.reservationDepositPercentage ?? 0;
+        const depositServices = dates
+          .map((date) => services.find((s) => s._id === date.serviceId))
+          .filter((s): s is NonNullable<typeof s> => !!s);
+        const depositTotal = computeDepositTotal(organization, depositServices);
+        const depositPct = uniformDepositPercentage(organization, depositServices);
         const depositActive =
           !clientPackageId &&
-          !!organization?.requireReservationDeposit &&
-          depositPct > 0 &&
+          depositTotal > 0 &&
           (!!organization?.mpCollect?.connected ||
             (organization?.paymentMethods?.length ?? 0) > 0) &&
           recurrencePattern.type !== "weekly";
-        const depositSubtotal = dates.reduce((total, date) => {
-          const service = services.find((s) => s._id === date.serviceId);
-          return total + (service?.price || 0);
-        }, 0);
         const anyHidePrice = dates.some(
           (date) => services.find((s) => s._id === date.serviceId)?.hidePrice
         );
@@ -545,7 +548,7 @@ export default function MultiBookingWizard() {
               <MpDepositNotice
                 percentage={depositPct}
                 currency={organization?.currency ?? "COP"}
-                amount={anyHidePrice ? undefined : Math.round((depositSubtotal * depositPct) / 100)}
+                amount={anyHidePrice ? undefined : depositTotal}
                 objectLabel="tu reserva"
               />
             )}
@@ -673,6 +676,18 @@ export default function MultiBookingWizard() {
                     );
                     return total + (service?.price || 0);
                   }, 0)}
+                  depositAmount={(() => {
+                    const depServices = dates
+                      .map((date) => services.find((s) => s._id === date.serviceId))
+                      .filter((s): s is NonNullable<typeof s> => !!s);
+                    return computeDepositTotal(organization, depServices);
+                  })()}
+                  depositPercentage={uniformDepositPercentage(
+                    organization,
+                    dates
+                      .map((date) => services.find((s) => s._id === date.serviceId))
+                      .filter((s): s is NonNullable<typeof s> => !!s)
+                  )}
                   hidePrice={dates.some(
                     (date) => services.find((s) => s._id === date.serviceId)?.hidePrice
                   )}

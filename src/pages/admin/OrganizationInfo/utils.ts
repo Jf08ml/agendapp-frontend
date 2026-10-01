@@ -62,6 +62,8 @@ export const normalizeOrg = (response: Organization): Organization => ({
   paymentMethods: ensureArray(response.paymentMethods as any, []),
   requireReservationDeposit: response.requireReservationDeposit ?? false,
   reservationDepositPercentage: response.reservationDepositPercentage ?? 50,
+  reservationDepositType: response.reservationDepositType ?? "percentage",
+  reservationDepositFixedAmount: response.reservationDepositFixedAmount ?? 0,
   requireClassDeposit: response.requireClassDeposit ?? false,
   classDepositPercentage: response.classDepositPercentage ?? 50,
   depositPreferredMethod: response.depositPreferredMethod ?? "mercadopago",
@@ -71,6 +73,9 @@ export const normalizeOrg = (response: Organization): Organization => ({
     graceHours: response.reminderSettings?.graceHours ?? 4,
     sendTimeStart: response.reminderSettings?.sendTimeStart ?? "07:00",
     sendTimeEnd: response.reminderSettings?.sendTimeEnd ?? "20:00",
+    mode: response.reminderSettings?.mode ?? "relative",
+    daysBefore: response.reminderSettings?.daysBefore ?? 1,
+    sendAt: response.reminderSettings?.sendAt ?? "08:00",
     secondReminder: {
       enabled: response.reminderSettings?.secondReminder?.enabled ?? false,
       hoursBefore: response.reminderSettings?.secondReminder?.hoursBefore ?? 2,
@@ -100,6 +105,11 @@ export const normalizeOrg = (response: Organization): Organization => ({
   currency: response.currency ?? "COP",
   timeFormat: response.timeFormat ?? "12h",
   aiAssistantName: response.aiAssistantName ?? "Roxi",
+  reschedulePolicy: {
+    enabled: response.reschedulePolicy?.enabled ?? false,
+    maxReschedules: response.reschedulePolicy?.maxReschedules ?? 1,
+    minHoursBeforeAppointment: response.reschedulePolicy?.minHoursBeforeAppointment ?? 24,
+  },
   cancellationPolicy: {
     minHoursBeforeAppointment:
       response.cancellationPolicy?.minHoursBeforeAppointment ?? 0,

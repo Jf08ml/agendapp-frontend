@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
+import { computeServiceDeposit } from "../../../utils/deposit";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
@@ -325,6 +326,24 @@ const AdminServices: React.FC = () => {
           <Text size="sm" fw={600}>
             {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
           </Text>
+          {organization?.requireReservationDeposit && service.price > 0 && (
+            <Tooltip
+              label={
+                service.deposit && service.deposit.mode !== "inherit"
+                  ? "Abono propio de este servicio (editable en el formulario del servicio)"
+                  : "Abono según la regla general de la organización"
+              }
+              withArrow
+            >
+              <Badge
+                variant={service.deposit && service.deposit.mode !== "inherit" ? "filled" : "light"}
+                color="orange"
+                size="xs"
+              >
+                Abono ${computeServiceDeposit(organization, service).toLocaleString()}
+              </Badge>
+            </Tooltip>
+          )}
           {service.hidePrice && (
             <Tooltip label="El precio no se muestra a los clientes (aparece 'Consultar')" withArrow>
               <Badge

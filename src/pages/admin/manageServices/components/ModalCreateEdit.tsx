@@ -24,6 +24,8 @@ import {
   Select,
 } from "@mantine/core";
 import { BsImage, BsTrash, BsPlusCircle } from "react-icons/bs";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../../app/store";
 import { Service, ServiceCost } from "../../../../services/serviceService";
 import { ImageUploadField, PdfAndVideoFields } from "../../components/MediaUploadFields";
 
@@ -44,6 +46,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   allTypes,
   allServices,
 }) => {
+  const requireDeposit = useSelector((s: RootState) => !!s.organization.organization?.requireReservationDeposit);
   const [editingService, setEditingService] = useState<Service>({
     _id: "",
     name: "",
@@ -211,6 +214,69 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                   withAsterisk
                   min={0}
                 />
+              )}
+              {requireDeposit && !isFreeService && (
+                <Box>
+                  <Text size="sm" fw={500}>Abono de reserva</Text>
+                  <Text size="xs" c="dimmed" mb={6}>
+                    Por defecto este servicio usa la regla general de la organización. Puedes definir un abono propio.
+                  </Text>
+                  <SegmentedControl
+                    fullWidth
+                    value={editingService.deposit?.mode ?? "inherit"}
+                    onChange={(val) =>
+                      setEditingService({
+                        ...editingService,
+                        deposit: {
+                          mode: val as "inherit" | "percentage" | "fixed",
+                          value: editingService.deposit?.value ?? 0,
+                        },
+                      })
+                    }
+                    data={[
+                      { label: "Regla general", value: "inherit" },
+                      { label: "Porcentaje", value: "percentage" },
+                      { label: "Monto fijo", value: "fixed" },
+                    ]}
+                  />
+                  {editingService.deposit?.mode === "percentage" && (
+                    <NumberInput
+                      mt="xs"
+                      label="Porcentaje de abono de este servicio"
+                      description="0 = este servicio no exige abono"
+                      suffix="%"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={editingService.deposit.value}
+                      onChange={(value) =>
+                        setEditingService({
+                          ...editingService,
+                          deposit: { mode: "percentage", value: typeof value === "number" ? value : 0 },
+                        })
+                      }
+                    />
+                  )}
+                  {editingService.deposit?.mode === "fixed" && (
+                    <NumberInput
+                      mt="xs"
+                      label="Monto fijo de abono de este servicio"
+                      description="0 = este servicio no exige abono. Nunca supera el precio del servicio."
+                      prefix="$ "
+                      thousandSeparator="."
+                      decimalSeparator=","
+                      min={0}
+                      max={editingService.price > 0 ? editingService.price : undefined}
+                      value={editingService.deposit.value}
+                      onChange={(value) =>
+                        setEditingService({
+                          ...editingService,
+                          deposit: { mode: "fixed", value: typeof value === "number" ? value : 0 },
+                        })
+                      }
+                    />
+                  )}
+                </Box>
               )}
               <Box>
                 <NumberInput

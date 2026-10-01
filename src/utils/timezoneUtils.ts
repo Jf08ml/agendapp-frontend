@@ -78,3 +78,7 @@ export const startOfDayInTimezone = (date: Date | string, tz: string): string =>
 export const endOfDayInTimezone = (date: Date | string, tz: string): string => {
   return dayjs(date).tz(tz).endOf('day').toISOString();
 };
+
+/** Fecha de HOY ("YYYY-MM-DD") en la zona horaria dada (la de la organización), no la del navegador ni UTC. */
+export const todayInTimezone = (tz: string): string =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

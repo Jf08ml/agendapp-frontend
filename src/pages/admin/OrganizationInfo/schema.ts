@@ -190,6 +190,9 @@ export const schema = z.object({
       ]).optional(),
       sendTimeStart: hhmmOrEmpty.optional(),
       sendTimeEnd: hhmmOrEmpty.optional(),
+      mode: z.enum(["relative", "fixedTime"]).optional(),
+      daysBefore: z.number().int().min(0).max(7).optional(),
+      sendAt: hhmmOrEmpty.optional(),
       secondReminder: z.object({
         enabled: z.boolean().optional(),
         hoursBefore: z.union([
@@ -198,6 +201,15 @@ export const schema = z.object({
           z.undefined()
         ]).optional(),
       }).optional(),
+    })
+    .optional(),
+
+  // Reagendamiento por el cliente desde el enlace
+  reschedulePolicy: z
+    .object({
+      enabled: z.boolean().optional(),
+      maxReschedules: z.union([z.number().int().min(1).max(10), z.null(), z.undefined()]).optional(),
+      minHoursBeforeAppointment: z.union([z.number().int().min(0).max(168), z.null(), z.undefined()]).optional(),
     })
     .optional(),
 
@@ -247,6 +259,12 @@ export const schema = z.object({
   requireReservationDeposit: z.boolean().optional(),
   reservationDepositPercentage: z.union([
     z.number().min(0).max(100),
+    z.null(),
+    z.undefined()
+  ]).optional(),
+  reservationDepositType: z.enum(["percentage", "fixed"]).optional(),
+  reservationDepositFixedAmount: z.union([
+    z.number().min(0),
     z.null(),
     z.undefined()
   ]).optional(),

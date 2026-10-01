@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { computeDepositTotal, uniformDepositPercentage } from "../../../utils/deposit";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Table,
@@ -1529,34 +1530,34 @@ const ReservationsList: React.FC = () => {
                 <>
                   <Divider />
                   <Alert color="blue" icon={<BiInfoCircle />}>
-                    {organization?.reservationDepositPercentage && organization.reservationDepositPercentage > 0 ? (
-                      <Group gap="xs">
-                        <Text size="sm" fw={500}>
-                          Abono requerido:
+                    {(() => {
+                      const groupServices = selectedGroupReservations.map((r) =>
+                        typeof r.serviceId === "object" && r.serviceId
+                          ? (r.serviceId as any)
+                          : { price: 0 }
+                      );
+                      const depositTotal = computeDepositTotal(organization, groupServices);
+                      const totalPrice = groupServices.reduce((sum, sv) => sum + (sv.price || 0), 0);
+                      const pct = uniformDepositPercentage(organization, groupServices);
+                      return depositTotal > 0 ? (
+                        <Group gap="xs">
+                          <Text size="sm" fw={500}>
+                            Abono requerido:
+                          </Text>
+                          <Text size="sm" c="blue" fw={700}>
+                            ${depositTotal.toLocaleString("es-CL")}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            ({pct !== undefined ? `${pct}% del total` : "según la regla de cada servicio"} de $
+                            {totalPrice.toLocaleString("es-CL")})
+                          </Text>
+                        </Group>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          ⚠️ El abono no está configurado. Ve a Configuración → Organización → Métodos de pago para establecerlo.
                         </Text>
-                        <Text size="sm" c="blue" fw={700}>
-                          ${(() => {
-                            const totalPrice = selectedGroupReservations.reduce((sum, r) => {
-                              const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
-                              const price = sObj?.price || 0;
-                              return sum + price;
-                            }, 0);
-                            const deposit = (totalPrice * organization.reservationDepositPercentage) / 100;
-                            return deposit.toLocaleString('es-CL');
-                          })()}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          ({organization.reservationDepositPercentage}% del total de ${selectedGroupReservations.reduce((sum, r) => {
-                            const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
-                            return sum + (sObj?.price || 0);
-                          }, 0).toLocaleString('es-CL')})
-                        </Text>
-                      </Group>
-                    ) : (
-                      <Text size="sm" c="dimmed">
-                        ⚠️ El porcentaje de depósito no está configurado. Ve a Configuración → Organización para establecerlo.
-                      </Text>
-                    )}
+                      );
+                    })()}
                   </Alert>
                 </>
               )}

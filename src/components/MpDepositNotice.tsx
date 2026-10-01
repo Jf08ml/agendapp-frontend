@@ -7,9 +7,10 @@ import { IconInfoCircle } from "@tabler/icons-react";
 import { formatCurrency } from "../utils/formatCurrency";
 
 interface MpDepositNoticeProps {
-  percentage: number;
+  /** % del abono. Omitir cuando el abono es un monto fijo o mezcla reglas distintas por servicio. */
+  percentage?: number;
   currency: string;
-  /** Monto del abono (subtotal * pct/100). Si se omite o es 0, solo se muestra el %. */
+  /** Monto del abono ya calculado. Si se omite o es 0, solo se muestra el %. */
   amount?: number;
   /** Lo que se confirma, ej. "tu reserva" | "tu inscripción". */
   objectLabel?: string;
@@ -27,12 +28,22 @@ export function MpDepositNotice({
         Se requiere un abono para confirmar
       </Text>
       <Text size="sm">
-        Para confirmar {objectLabel} debes realizar un abono del{" "}
-        <strong>{percentage}%</strong>
-        {amount && amount > 0 ? (
+        Para confirmar {objectLabel} debes realizar un abono
+        {percentage && percentage > 0 ? (
           <>
             {" "}
-            (<strong>{formatCurrency(amount, currency)}</strong>)
+            del <strong>{percentage}%</strong>
+            {amount && amount > 0 ? (
+              <>
+                {" "}
+                (<strong>{formatCurrency(amount, currency)}</strong>)
+              </>
+            ) : null}
+          </>
+        ) : amount && amount > 0 ? (
+          <>
+            {" "}
+            de <strong>{formatCurrency(amount, currency)}</strong>
           </>
         ) : null}
         . El valor restante se paga en el establecimiento.

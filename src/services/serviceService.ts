@@ -17,6 +17,8 @@ export interface Service {
   duration: number;
   isActive?: boolean;
   hidePrice?: boolean;
+  // 💳 Abono de reserva propio: "inherit" usa la regla general de la organización
+  deposit?: { mode: "inherit" | "percentage" | "fixed"; value: number };
   featured?: boolean; // ⭐ Destacado: se muestra primero en landing, wizard y chatbot
   maxConcurrentAppointments?: number; // 👥 Número de citas simultáneas que puede atender un profesional (default: 1)
   recommendations?: string; // 📋 Recomendaciones para el cliente antes de la cita
@@ -37,6 +39,7 @@ interface CreateServicePayload {
   price: number;
   duration: number;
   featured?: boolean;
+  deposit?: { mode: "inherit" | "percentage" | "fixed"; value: number };
   maxConcurrentAppointments?: number;
   recommendations?: string;
   costs?: ServiceCost[];

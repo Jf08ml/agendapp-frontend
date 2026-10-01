@@ -4,6 +4,7 @@
  * Componente para configurar horarios de disponibilidad de profesionales
  * Adaptado para Mantine UI
  */
+import { todayInTimezone } from "../../../../utils/timezoneUtils";
 import { useState, useEffect } from "react";
 import {
   Box,
@@ -31,6 +32,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import TimeOfDayInput from "../../../../components/TimeOfDayInput";
 import { formatTimeLabel } from "../../../../utils/timeOfDay";
+import BlockRepeatFields, { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../components/BlockRepeatFields";
+import { NO_END_DATE, describeRecurrence, hasNoEnd, listUpcomingOccurrences } from "../../../../utils/scheduleExceptions";
 import {
   getEmployeeSchedule,
   updateEmployeeSchedule,
@@ -139,7 +142,10 @@ export default function EmployeeScheduleSection({
   const [exceptionModalOpen, setExceptionModalOpen] = useState(false);
   const [exceptionForm, setExceptionForm] = useState<ExceptionForm>(DEFAULT_EXCEPTION_FORM);
   const [savingException, setSavingException] = useState(false);
+  const [exceptionRepeat, setExceptionRepeat] = useState<BlockRepeatValue>(DEFAULT_REPEAT);
+  const [exceptionNoEnd, setExceptionNoEnd] = useState(false);
   const is24h = useSelector((s: RootState) => s.organization.organization?.timeFormat) === "24h";
+  const orgTimezone = useSelector((s: RootState) => s.organization.organization?.timezone) || "America/Bogota";
   // Con 12 h el mensaje muestra las horas con AM/PM para que se note si "2:00" quedó en AM
   const exceptionTimeError =
     !exceptionForm.allDay && exceptionForm.startTime >= exceptionForm.endTime
@@ -224,12 +230,19 @@ export default function EmployeeScheduleSection({
   };
 
   const handleAddException = async () => {
-    if (!exceptionForm.startDate || !exceptionForm.endDate) {
+    const isRecurring = exceptionRepeat.recurrence !== "none";
+    const endMissing = isRecurring ? !exceptionNoEnd && !exceptionForm.endDate : !exceptionForm.endDate;
+    if (!exceptionForm.startDate || endMissing) {
       showNotification({
         title: "Validación",
-        message: "Selecciona las fechas de inicio y fin",
+        message: isRecurring ? "Selecciona la fecha de inicio y, si aplica, la de fin" : "Selecciona las fechas de inicio y fin",
         color: "orange",
       });
+      return;
+    }
+    const repeatErr = repeatError(exceptionRepeat);
+    if (repeatErr) {
+      showNotification({ title: "Validación", message: repeatErr, color: "orange" });
       return;
     }
     if (exceptionTimeError) {
@@ -240,7 +253,8 @@ export default function EmployeeScheduleSection({
     try {
       const payload: Omit<ScheduleException, "_id" | "createdAt"> = {
         startDate: toDateStr(exceptionForm.startDate),
-        endDate: toDateStr(exceptionForm.endDate),
+        endDate: isRecurring && exceptionNoEnd ? NO_END_DATE : toDateStr(exceptionForm.endDate!),
+        ...repeatPayload(exceptionRepeat),
         allDay: exceptionForm.allDay,
         ...(exceptionForm.reason ? { reason: exceptionForm.reason } : {}),
         ...(!exceptionForm.allDay
@@ -251,6 +265,8 @@ export default function EmployeeScheduleSection({
       if (updated) setExceptions(updated);
       setExceptionModalOpen(false);
       setExceptionForm(DEFAULT_EXCEPTION_FORM);
+      setExceptionRepeat(DEFAULT_REPEAT);
+      setExceptionNoEnd(false);
       showNotification({
         title: "Éxito",
         message: "Bloqueo agregado correctamente",
@@ -644,7 +660,12 @@ export default function EmployeeScheduleSection({
         ) : (
           <Stack gap="xs">
             {exceptions.map((exc) => {
-              const isMultiDay = exc.startDate !== exc.endDate;
+              const isRecurring = !!exc.recurrence;
+              // Recurrente: se despliegan las próximas ocurrencias para quitarlas una a una
+              const isMultiDay = isRecurring || exc.startDate !== exc.endDate;
+              const occurrenceDays = isRecurring
+                ? listUpcomingOccurrences(exc, todayInTimezone(orgTimezone), 12)
+                : listDaysInRange(exc.startDate, exc.endDate);
               const daysExpanded = isMultiDay && expandedExceptions.has(exc._id!);
               return (
                 <Paper key={exc._id} p="sm" withBorder>
@@ -652,7 +673,9 @@ export default function EmployeeScheduleSection({
                     <div>
                       <Group gap="xs">
                         <Text size="sm" fw={500}>
-                          {isMultiDay
+                          {isRecurring
+                            ? describeRecurrence(exc)
+                            : isMultiDay
                             ? `${formatDisplayDate(exc.startDate)} → ${formatDisplayDate(exc.endDate)}`
                             : formatDisplayDate(exc.startDate)}
                         </Text>
@@ -666,6 +689,13 @@ export default function EmployeeScheduleSection({
                           </Badge>
                         )}
                       </Group>
+                      {isRecurring && (
+                        <Text size="xs" c="dimmed" mt={2}>
+                          {hasNoEnd(exc)
+                            ? `Desde el ${formatDisplayDate(exc.startDate)}, sin fecha de fin`
+                            : `Del ${formatDisplayDate(exc.startDate)} al ${formatDisplayDate(exc.endDate)}`}
+                        </Text>
+                      )}
                       {exc.reason && (
                         <Text size="xs" c="dimmed" mt={2}>
                           {exc.reason}
@@ -682,11 +712,11 @@ export default function EmployeeScheduleSection({
                           }
                           onClick={() => toggleExceptionExpanded(exc._id!)}
                         >
-                          {daysExpanded ? "Ocultar días" : "Ver y quitar días"}
+                          {daysExpanded ? "Ocultar días" : isRecurring ? "Ver y quitar fechas" : "Ver y quitar días"}
                         </Button>
                       )}
                     </div>
-                    <Tooltip label={isMultiDay ? "Eliminar todo el bloqueo" : "Eliminar bloqueo"}>
+                    <Tooltip label={isRecurring ? "Eliminar toda la repetición" : isMultiDay ? "Eliminar todo el bloqueo" : "Eliminar bloqueo"}>
                       <ActionIcon
                         color="red"
                         variant="light"
@@ -710,7 +740,7 @@ export default function EmployeeScheduleSection({
                             overflowY: "auto",
                           }}
                         >
-                          {listDaysInRange(exc.startDate, exc.endDate).map((day) => (
+                          {occurrenceDays.map((day) => (
                             <Group key={day} justify="space-between" wrap="nowrap">
                               <Text size="sm">{formatDayWithWeekday(day)}</Text>
                               <Tooltip label="Eliminar solo este día">
@@ -741,14 +771,18 @@ export default function EmployeeScheduleSection({
         onClose={() => {
           setExceptionModalOpen(false);
           setExceptionForm(DEFAULT_EXCEPTION_FORM);
+          setExceptionRepeat(DEFAULT_REPEAT);
+          setExceptionNoEnd(false);
         }}
         title="Agregar Bloqueo Temporal"
         size="md"
       >
         <Stack gap="md">
+          <BlockRepeatFields value={exceptionRepeat} onChange={setExceptionRepeat} referenceDate={exceptionForm.startDate} />
+
           <Group grow>
             <DatePickerInput
-              label="Fecha inicio"
+              label={exceptionRepeat.recurrence === "none" ? "Fecha inicio" : "Desde"}
               placeholder="Seleccionar fecha"
               value={exceptionForm.startDate}
               onChange={(val) =>
@@ -757,18 +791,29 @@ export default function EmployeeScheduleSection({
               required
               clearable
             />
-            <DatePickerInput
-              label="Fecha fin"
-              placeholder="Seleccionar fecha"
-              value={exceptionForm.endDate}
-              minDate={exceptionForm.startDate ?? undefined}
-              onChange={(val) =>
-                setExceptionForm((f) => ({ ...f, endDate: val }))
-              }
-              required
-              clearable
-            />
+            {!(exceptionRepeat.recurrence !== "none" && exceptionNoEnd) && (
+              <DatePickerInput
+                label={exceptionRepeat.recurrence === "none" ? "Fecha fin" : "Hasta"}
+                placeholder="Seleccionar fecha"
+                value={exceptionForm.endDate}
+                minDate={exceptionForm.startDate ?? undefined}
+                onChange={(val) =>
+                  setExceptionForm((f) => ({ ...f, endDate: val }))
+                }
+                required
+                clearable
+              />
+            )}
           </Group>
+
+          {exceptionRepeat.recurrence !== "none" && (
+            <Switch
+              label="Sin fecha de fin"
+              description="El bloqueo se repite indefinidamente; puedes quitarlo o excluir días cuando quieras"
+              checked={exceptionNoEnd}
+              onChange={(e) => setExceptionNoEnd(e.currentTarget.checked)}
+            />
+          )}
 
           <Switch
             label="Todo el día"

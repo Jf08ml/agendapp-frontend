@@ -12,6 +12,7 @@ import { Employee, EmployeeScheduleException } from "../../../../services/employ
 import { removeEmployeeException } from "../../../../services/scheduleService";
 import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../../utils/scheduleUtils";
 import DraggableAppointmentCard from "../DraggableAppointmentCard";
+import { describeRecurrence, exceptionAppliesToDay } from "../../../../utils/scheduleExceptions";
 import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
 
 interface DayBlock {
@@ -23,6 +24,9 @@ interface DayBlock {
   /** Rango completo del bloqueo (puede abarcar varios días, más allá del día visible) */
   startDate: string;
   endDate: string;
+  /** Bloqueo recurrente: se quita solo la ocurrencia del día visible */
+  recurrence?: "weekly" | "monthly";
+  recurrenceLabel?: string;
 }
 
 // Calcula los bloqueos (excepciones) del profesional que aplican al día visible,
@@ -45,10 +49,15 @@ function computeDayBlocks(
 
   const blocks: DayBlock[] = [];
   for (const ex of exceptions) {
-    // ¿La excepción cubre este día? (comparación de strings ISO YYYY-MM-DD)
-    if (!(ex.startDate <= dayStr && dayStr <= ex.endDate)) continue;
+    // ¿La excepción cubre este día? (rango ISO YYYY-MM-DD + regla de recurrencia − excluidos)
+    if (!exceptionAppliesToDay(ex, dayStr)) continue;
 
-    const range = { startDate: ex.startDate, endDate: ex.endDate };
+    const range = {
+      startDate: ex.startDate,
+      endDate: ex.endDate,
+      recurrence: ex.recurrence,
+      recurrenceLabel: ex.recurrence ? describeRecurrence(ex) : undefined,
+    };
 
     if (ex.allDay || !ex.startTime || !ex.endTime) {
       blocks.push({ id: ex._id, top: 0, height: totalHeight, label: ex.reason || "Bloqueado", allDay: true, ...range });
@@ -246,7 +255,9 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       if (members.length === 0) return;
       const dayStr = format(selectedDay, "yyyy-MM-dd");
       const name = employee.names.trim();
-      const hasMultiDay = members.some((m) => m.startDate !== m.endDate);
+      // Multi-día o recurrente: solo se quita la ocurrencia del día visible
+      const isRanged = (m: DayBlock) => !!m.recurrence || m.startDate !== m.endDate;
+      const hasMultiDay = members.some(isRanged);
       const single = members.length === 1 ? members[0] : null;
 
       modals.openConfirmModal({
@@ -257,11 +268,19 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
           : "Eliminar bloqueos de este día",
         children: single ? (
           hasMultiDay ? (
-            <Text size="sm">
-              Este bloqueo de {name} abarca del {single.startDate} al {single.endDate}.
-              Solo se eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar
-              todo el rango, hazlo desde el horario del profesional.
-            </Text>
+            single.recurrence ? (
+              <Text size="sm">
+                Este bloqueo de {name} se repite ({single.recurrenceLabel?.toLowerCase()}). Solo se
+                eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar toda la
+                repetición, hazlo desde el horario del profesional.
+              </Text>
+            ) : (
+              <Text size="sm">
+                Este bloqueo de {name} abarca del {single.startDate} al {single.endDate}.
+                Solo se eliminará el bloqueo del {dayStr}; los demás días se mantienen. Para quitar
+                todo el rango, hazlo desde el horario del profesional.
+              </Text>
+            )
           ) : (
             <Text size="sm">
               ¿Eliminar este bloqueo de horario de {name}? Esta acción no se puede deshacer.
@@ -287,7 +306,7 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
               latest = await removeEmployeeException(
                 employee._id,
                 m.id!,
-                m.startDate !== m.endDate ? dayStr : undefined
+                isRanged(m) ? dayStr : undefined
               );
             }
             showNotification({

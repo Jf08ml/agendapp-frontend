@@ -1,4 +1,6 @@
 import { useState } from "react";
+import BlockRepeatFields, { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../components/BlockRepeatFields";
+import { NO_END_DATE } from "../../../../utils/scheduleExceptions";
 import {
   Modal,
   Stack,
@@ -77,6 +79,8 @@ export default function AgendaBlockModal({
   const [applyToAll, setApplyToAll] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [repeat, setRepeat] = useState<BlockRepeatValue>(DEFAULT_REPEAT);
+  const [noEnd, setNoEnd] = useState(false);
   const is24h = useSelector((s: RootState) => s.organization.organization?.timeFormat) === "24h";
 
   // Mensaje único para la validación y para el aviso en pantalla. Con 12 h se muestran las
@@ -92,6 +96,8 @@ export default function AgendaBlockModal({
 
   const reset = () => {
     setForm(DEFAULT_FORM);
+    setRepeat(DEFAULT_REPEAT);
+    setNoEnd(false);
     setApplyToAll(false);
     setSelectedIds([]);
   };
@@ -116,12 +122,19 @@ export default function AgendaBlockModal({
       });
       return;
     }
-    if (!form.startDate || !form.endDate) {
+    const isRecurring = repeat.recurrence !== "none";
+    const endMissing = isRecurring ? !noEnd && !form.endDate : !form.endDate;
+    if (!form.startDate || endMissing) {
       showNotification({
         title: "Validación",
-        message: "Selecciona las fechas de inicio y fin",
+        message: isRecurring ? "Selecciona la fecha de inicio y, si aplica, la de fin" : "Selecciona las fechas de inicio y fin",
         color: "orange",
       });
+      return;
+    }
+    const repeatErr = repeatError(repeat);
+    if (repeatErr) {
+      showNotification({ title: "Validación", message: repeatErr, color: "orange" });
       return;
     }
     if (timeRangeError) {
@@ -131,7 +144,8 @@ export default function AgendaBlockModal({
 
     const payload: Omit<ScheduleException, "_id" | "createdAt"> = {
       startDate: toDateStr(form.startDate),
-      endDate: toDateStr(form.endDate),
+      endDate: isRecurring && noEnd ? NO_END_DATE : toDateStr(form.endDate!),
+      ...repeatPayload(repeat),
       allDay: form.allDay,
       ...(form.reason ? { reason: form.reason } : {}),
       ...(!form.allDay
@@ -219,9 +233,11 @@ export default function AgendaBlockModal({
           </>
         )}
 
+        <BlockRepeatFields value={repeat} onChange={setRepeat} referenceDate={form.startDate} />
+
         <Group grow>
           <DatePickerInput
-            label="Fecha inicio"
+            label={repeat.recurrence === "none" ? "Fecha inicio" : "Desde"}
             placeholder="Seleccionar fecha"
             value={form.startDate}
             onChange={(val) => setForm((f) => ({ ...f, startDate: val }))}
@@ -229,17 +245,28 @@ export default function AgendaBlockModal({
             clearable
             popoverProps={{ zIndex: 1100 }}
           />
-          <DatePickerInput
-            label="Fecha fin"
-            placeholder="Seleccionar fecha"
-            value={form.endDate}
-            minDate={form.startDate ?? undefined}
-            onChange={(val) => setForm((f) => ({ ...f, endDate: val }))}
-            required
-            clearable
-            popoverProps={{ zIndex: 1100 }}
-          />
+          {!(repeat.recurrence !== "none" && noEnd) && (
+            <DatePickerInput
+              label={repeat.recurrence === "none" ? "Fecha fin" : "Hasta"}
+              placeholder="Seleccionar fecha"
+              value={form.endDate}
+              minDate={form.startDate ?? undefined}
+              onChange={(val) => setForm((f) => ({ ...f, endDate: val }))}
+              required
+              clearable
+              popoverProps={{ zIndex: 1100 }}
+            />
+          )}
         </Group>
+
+        {repeat.recurrence !== "none" && (
+          <Switch
+            label="Sin fecha de fin"
+            description="El bloqueo se repite indefinidamente; puedes quitarlo o excluir días cuando quieras"
+            checked={noEnd}
+            onChange={(e) => setNoEnd(e.currentTarget.checked)}
+          />
+        )}
 
         <Switch
           label="Todo el día"

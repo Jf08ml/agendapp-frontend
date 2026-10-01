@@ -14,6 +14,10 @@ interface ReservationDepositAlertProps {
   clientName?: string;
   serviceName?: string;
   servicePrice?: number;
+  /** Abono ya calculado (suma de las reglas por servicio). Si se omite, se usa el % general sobre servicePrice. */
+  depositAmount?: number;
+  /** % común a todos los servicios; undefined si el abono es un monto fijo o mezcla reglas. */
+  depositPercentage?: number;
   appointmentDate?: string;
   appointmentTime?: string;
   /** Si algún servicio de la reserva tiene el precio oculto, no se muestra el monto exacto del abono. */
@@ -25,6 +29,8 @@ export function ReservationDepositAlert({
   clientName,
   serviceName,
   servicePrice = 0,
+  depositAmount: depositAmountProp,
+  depositPercentage: depositPercentageProp,
   appointmentDate,
   appointmentTime,
   hidePrice = false,
@@ -35,7 +41,10 @@ export function ReservationDepositAlert({
   const isMobile = useMediaQuery("(max-width: 48rem)");
   
   const requireDeposit = organization?.requireReservationDeposit || false;
-  const depositPercentage = organization?.reservationDepositPercentage || 50;
+  const hasExplicitDeposit = depositAmountProp !== undefined;
+  const depositPercentage = hasExplicitDeposit
+    ? depositPercentageProp
+    : organization?.reservationDepositPercentage || 50;
   const paymentMethods = organization?.paymentMethods || [];
   const whatsappUrl = organization?.whatsappUrl || "";
   const currency = organization?.currency || "COP";
@@ -45,7 +54,7 @@ export function ReservationDepositAlert({
     return null;
   }
 
-  const depositAmount = (servicePrice * depositPercentage) / 100;
+  const depositAmount = hasExplicitDeposit ? depositAmountProp : (servicePrice * (depositPercentage ?? 0)) / 100;
 
   const paymentTypeLabels: Record<string, string> = {
     nequi: "Nequi",
@@ -94,8 +103,8 @@ export function ReservationDepositAlert({
       `Servicio: ${serviceName || "N/A"}\n` +
       `Cliente: ${clientName || "N/A"}\n` +
       (hidePrice
-        ? `Abono: ${depositPercentage}%\n`
-        : `Abono: ${formatCurrency(depositAmount, currency)} (${depositPercentage}%)\n`) +
+        ? `Abono: ${depositPercentage ? `${depositPercentage}%` : "según el servicio"}\n`
+        : `Abono: ${formatCurrency(depositAmount, currency)}${depositPercentage ? ` (${depositPercentage}%)` : ""}\n`) +
       `ID Reserva: ${reservationId || "N/A"}\n\n` +
       `Espero confirmacion de la reserva. Gracias!`
     );
@@ -121,8 +130,19 @@ export function ReservationDepositAlert({
             Abono requerido para aprobar tu reserva
           </Text>
           <Text size={isMobile ? "xs" : "sm"}>
-            Para asegurar tu cita, deberás hacer un abono del <strong>{depositPercentage}%</strong> del
-            valor del servicio.
+            {depositPercentage ? (
+              <>
+                Para asegurar tu cita, deberás hacer un abono del <strong>{depositPercentage}%</strong> del
+                valor del servicio.
+              </>
+            ) : hidePrice ? (
+              <>Para asegurar tu cita, deberás hacer un abono. El monto te lo confirmaremos.</>
+            ) : (
+              <>
+                Para asegurar tu cita, deberás hacer un abono de{" "}
+                <strong>{formatCurrency(depositAmount, currency)}</strong>.
+              </>
+            )}
           </Text>
         </div>
 

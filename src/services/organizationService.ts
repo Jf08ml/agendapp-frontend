@@ -45,10 +45,20 @@ export interface ReminderSettings {
   graceHours?: 0 | 2 | 4;
   sendTimeStart?: string;
   sendTimeEnd?: string;
+  // "relative" = X horas antes de cada cita; "fixedTime" = hora fija del día, N días antes
+  mode?: "relative" | "fixedTime";
+  daysBefore?: number;
+  sendAt?: string; // "HH:mm" 24 h
   secondReminder?: {
     enabled: boolean;
     hoursBefore: number;
   };
+}
+
+export interface ReschedulePolicy {
+  enabled?: boolean;
+  maxReschedules?: number; // veces que el cliente puede reagendar una misma cita
+  minHoursBeforeAppointment?: number; // anticipación mínima respecto a la cita actual
 }
 
 export interface CancellationPolicy {
@@ -194,6 +204,8 @@ export interface Organization {
   paymentMethods?: PaymentMethod[];
   requireReservationDeposit?: boolean;
   reservationDepositPercentage?: number;
+  reservationDepositType?: "percentage" | "fixed";
+  reservationDepositFixedAmount?: number;
   // Tienda pública de productos (flags públicos expuestos en organization-config)
   storeEnabled?: boolean;
   storeCodEnabled?: boolean;
@@ -224,6 +236,7 @@ export interface Organization {
   autoMarkAttended?: boolean;
   autoRegisterServiceOnAttendance?: boolean;
   cancellationPolicy?: CancellationPolicy;
+  reschedulePolicy?: ReschedulePolicy;
   termsAndConditions?: {
     enabled?: boolean;
     text?: string;

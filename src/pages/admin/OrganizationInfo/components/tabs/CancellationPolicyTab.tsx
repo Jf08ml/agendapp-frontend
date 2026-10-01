@@ -52,6 +52,47 @@ export default function CancellationPolicyTab({
           )}
         </Stack>
       </SectionCard>
+
+      <SectionCard
+        title="Reagendamiento por el cliente"
+        description="Permite que el cliente cambie el día u hora de su cita desde el mismo enlace que recibe por WhatsApp, sin tener que escribirte."
+      >
+        <Stack gap="md">
+          <Switch
+            label="Permitir que el cliente reagende su cita"
+            description="Solo aplica a citas individuales; mantiene el mismo servicio y profesional, y solo ofrece horarios realmente libres."
+            {...form.getInputProps("reschedulePolicy.enabled", { type: "checkbox" })}
+            disabled={!isEditing}
+          />
+
+          {form.values.reschedulePolicy?.enabled && (
+            <>
+              <NumberInput
+                label="Veces que puede reagendar una misma cita"
+                description="Al llegar a este número, el enlace ya no ofrece reagendar."
+                min={1}
+                max={10}
+                {...form.getInputProps("reschedulePolicy.maxReschedules")}
+                disabled={!isEditing}
+              />
+              <NumberInput
+                label="Anticipación mínima para reagendar"
+                description="No se puede reagendar con menos de estas horas de anticipación a la cita. Deja en 0 para permitirlo hasta el último momento."
+                min={0}
+                max={168}
+                {...form.getInputProps("reschedulePolicy.minHoursBeforeAppointment")}
+                disabled={!isEditing}
+                rightSection={<Text size="sm" c="dimmed">horas</Text>}
+              />
+              <Group gap="xs">
+                <Text size="sm" c="dimmed">
+                  Cada reagendamiento te llega como notificación, y el cliente recibirá un nuevo recordatorio para la nueva fecha.
+                </Text>
+              </Group>
+            </>
+          )}
+        </Stack>
+      </SectionCard>
     </Stack>
   );
 }

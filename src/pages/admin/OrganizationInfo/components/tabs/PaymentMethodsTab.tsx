@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UseFormReturnType } from "@mantine/form";
 import {
   Stack,
+  SegmentedControl,
   Button,
   Card,
   Text,
@@ -49,6 +50,8 @@ export default function PaymentMethodsTab({
   const methods = form.values.paymentMethods || [];
   const requireDeposit = form.values.requireReservationDeposit ?? false;
   const depositPercentage = form.values.reservationDepositPercentage ?? 50;
+  const depositType = form.values.reservationDepositType ?? "percentage";
+  const depositFixedAmount = form.values.reservationDepositFixedAmount ?? 0;
   const requireClassDeposit = form.values.requireClassDeposit ?? false;
   const classDepositPercentage = form.values.classDepositPercentage ?? 50;
 
@@ -180,17 +183,49 @@ export default function PaymentMethodsTab({
           />
 
           {requireDeposit && (
-            <NumberInput
-              label="Porcentaje de abono requerido"
-              description="Porcentaje del total que el cliente debe abonar"
-              value={depositPercentage}
-              onChange={(val) => form.setFieldValue("reservationDepositPercentage", val as number)}
-              min={0}
-              max={100}
-              suffix="%"
-              step={5}
-              disabled={!isEditing}
-            />
+            <>
+              <SegmentedControl
+                value={depositType}
+                onChange={(val) =>
+                  form.setFieldValue("reservationDepositType", val as "percentage" | "fixed")
+                }
+                disabled={!isEditing}
+                data={[
+                  { label: "Porcentaje del precio", value: "percentage" },
+                  { label: "Monto fijo por servicio", value: "fixed" },
+                ]}
+              />
+
+              {depositType === "percentage" ? (
+                <NumberInput
+                  label="Porcentaje de abono requerido"
+                  description="Porcentaje del total que el cliente debe abonar"
+                  value={depositPercentage}
+                  onChange={(val) => form.setFieldValue("reservationDepositPercentage", val as number)}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  step={5}
+                  disabled={!isEditing}
+                />
+              ) : (
+                <NumberInput
+                  label="Monto fijo de abono por servicio"
+                  description="Se cobra este valor por cada servicio reservado (nunca más que el precio del servicio)"
+                  value={depositFixedAmount}
+                  onChange={(val) => form.setFieldValue("reservationDepositFixedAmount", Number(val) || 0)}
+                  min={0}
+                  thousandSeparator="."
+                  decimalSeparator=","
+                  disabled={!isEditing}
+                />
+              )}
+
+              <Text size="xs" c="dimmed">
+                Esta es la regla general. Puedes definir un abono distinto (porcentaje o monto fijo) en cada
+                servicio desde Gestionar servicios.
+              </Text>
+            </>
           )}
         </Stack>
       </Card>

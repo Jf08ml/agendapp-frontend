@@ -351,6 +351,11 @@ export interface ScheduleException {
   startTime?: string; // "HH:mm" - solo si !allDay
   endTime?: string;   // "HH:mm" - solo si !allDay
   reason?: string;
+  // 🔁 Bloqueo recurrente: aplica solo a los días del rango que cumplan la regla
+  recurrence?: "weekly" | "monthly";
+  weekdays?: number[]; // 0 = domingo … 6 = sábado
+  monthDays?: number[]; // 1 … 31
+  excludedDates?: string[];
   createdAt?: string;
 }
 

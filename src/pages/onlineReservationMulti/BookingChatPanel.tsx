@@ -46,6 +46,8 @@ import { createMultipleReservations, createReservationCheckout } from "../../ser
 import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
 import { useNavigate } from "react-router-dom";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
+import { getServicesByOrganizationId, type Service } from "../../services/serviceService";
+import { computeDepositTotal, resolveDepositRule, uniformDepositPercentage } from "../../utils/deposit";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
 
 interface BookingChatPanelProps {
@@ -106,6 +108,30 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
   const [reservationDone, setReservationDone] = useState(false);
   const [reservationError, setReservationError] = useState<string | null>(null);
 
+  // Servicios de la org: el abono puede ser distinto por servicio (% o monto fijo),
+  // así que para avisar/cobrar bien hay que conocer la regla de cada uno.
+  const [orgServices, setOrgServices] = useState<Service[]>([]);
+  useEffect(() => {
+    if (!org?._id || !org.requireReservationDeposit) return;
+    getServicesByOrganizationId(org._id).then(setOrgServices).catch(() => setOrgServices([]));
+  }, [org?._id, org?.requireReservationDeposit]);
+
+  const depositFor = (payload: BookingPayload | null) => {
+    const svcs = (payload?.services ?? [])
+      .map((ps) => orgServices.find((o) => o._id === ps.serviceId))
+      .filter((x): x is Service => !!x);
+    // Sin la lista de servicios (aún cargando / falló) caemos a la regla general.
+    const configured = svcs.length
+      ? computeDepositTotal(org, svcs) > 0
+      : !!org?.requireReservationDeposit && resolveDepositRule(org).value > 0;
+    return {
+      configured,
+      amount: svcs.length ? computeDepositTotal(org, svcs) : undefined,
+      percentage: svcs.length ? uniformDepositPercentage(org, svcs) : resolveDepositRule(org).mode === "percentage" ? resolveDepositRule(org).value : undefined,
+      anyHidePrice: svcs.some((x) => x.hidePrice),
+    };
+  };
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -165,9 +191,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       // Si el servicio ya se paga con un paquete de sesiones (clientPackageId en
       // el payload preparado por el AI), el costo es $0 — no se cobra depósito.
       const depositConfigured =
-        !pendingPayload?.clientPackageId &&
-        !!org?.requireReservationDeposit &&
-        (org?.reservationDepositPercentage ?? 0) > 0;
+        !pendingPayload?.clientPackageId && depositFor(pendingPayload).configured;
       const hasMp = !!org?.mpCollect?.connected;
       const hasReceipt = (org?.paymentMethods?.length ?? 0) > 0;
       const prefersReceipt = org?.depositPreferredMethod === "receipt";
@@ -549,12 +573,16 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                       </Text>
                     </Alert>
                   ) : (
-                    !!org?.requireReservationDeposit &&
-                    (org?.reservationDepositPercentage ?? 0) > 0 &&
+                    depositFor(pendingPayload).configured &&
                     (!!org?.mpCollect?.connected ||
                       (org?.paymentMethods?.length ?? 0) > 0) && (
                       <MpDepositNotice
-                        percentage={org!.reservationDepositPercentage ?? 0}
+                        percentage={depositFor(pendingPayload).percentage}
+                        amount={
+                          depositFor(pendingPayload).anyHidePrice
+                            ? undefined
+                            : depositFor(pendingPayload).amount
+                        }
                         currency={org?.currency ?? "COP"}
                         objectLabel="tu reserva"
                       />

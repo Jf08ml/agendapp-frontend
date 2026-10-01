@@ -23,6 +23,7 @@ import {
   formatFullDateInTimezone,
 } from "../../utils/timezoneUtils";
 import cancellationService from "../../services/cancellationService";
+import RescheduleCard from "./RescheduleCard";
 import { MdEventBusy, MdCheckCircle, MdError } from "react-icons/md";
 import "./PublicCancelPage.css";
 
@@ -119,6 +120,18 @@ export const PublicCancelPage: React.FC = () => {
       setError(errorMsg);
     } finally {
       setLoading(false);
+    }
+  }, [token]);
+
+  // Refresco silencioso (sin spinner de página) tras reagendar: así la tarjeta de
+  // reagendamiento conserva su mensaje de éxito y la fecha mostrada se actualiza.
+  const refreshInfoSilently = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await cancellationService.getCancellationInfo(token);
+      if (response.status === "success") setInfo(response.data);
+    } catch {
+      /* se mantiene la info anterior */
     }
   }, [token]);
 
@@ -618,6 +631,11 @@ export const PublicCancelPage: React.FC = () => {
                 })()}
               </Stack>
             </Stack>
+          )}
+
+          {/* Reagendar (solo si el negocio lo habilitó y la cita cumple la política) */}
+          {!action && token && (
+            <RescheduleCard token={token} onRescheduled={refreshInfoSilently} />
           )}
 
           {/* Advertencia condicional */}

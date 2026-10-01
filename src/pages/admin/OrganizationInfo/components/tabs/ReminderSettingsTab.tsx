@@ -1,8 +1,10 @@
-import { Alert, Divider, List, NumberInput, SegmentedControl, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
+import { Alert, Divider, List, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, TextInput, Tooltip } from "@mantine/core";
 import { IconBell, IconBulb, IconBrandWhatsapp, IconLock, IconUserCheck } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
+import TimeOfDayInput from "../../../../../components/TimeOfDayInput";
+import { formatTimeLabel } from "../../../../../utils/timeOfDay";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
 
@@ -14,6 +16,7 @@ export default function ReminderSettingsTab({
   isEditing: boolean;
 }) {
   const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const timeFormat = useSelector((s: RootState) => s.organization.organization?.timeFormat);
   const canUseReminders = planLimits?.autoReminders !== false;
   const maxReminders = planLimits?.maxRemindersPerAppointment ?? 2;
   const canUseSecondReminder = canUseReminders && maxReminders >= 2;
@@ -23,6 +26,12 @@ export default function ReminderSettingsTab({
   const graceHours = form.values.reminderSettings?.graceHours ?? 4;
   const start = form.values.reminderSettings?.sendTimeStart ?? "07:00";
   const end = form.values.reminderSettings?.sendTimeEnd ?? "20:00";
+  const mode = form.values.reminderSettings?.mode ?? "relative";
+  const isFixed = mode === "fixedTime";
+  const daysBefore = form.values.reminderSettings?.daysBefore ?? 1;
+  const sendAt = form.values.reminderSettings?.sendAt || "08:00";
+  const daysLabel =
+    daysBefore === 0 ? "el mismo día de la cita" : daysBefore === 1 ? "el día anterior" : `${daysBefore} días antes`;
 
   return (
     <Stack gap="md">
@@ -58,29 +67,90 @@ export default function ReminderSettingsTab({
             <>
               <Divider />
 
-              <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                <NumberInput
-                  label="Anticipación del recordatorio"
-                  description="¿Con cuántas horas de anticipación enviar el mensaje?"
-                  placeholder="24"
-                  min={1}
-                  max={72}
-                  suffix=" horas"
-                  {...form.getInputProps("reminderSettings.hoursBefore")}
+              <div>
+                <Text size="sm" fw={500} mb={2}>
+                  ¿Cuándo enviar el recordatorio?
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  value={mode}
+                  onChange={(val) =>
+                    form.setFieldValue("reminderSettings.mode", val as "relative" | "fixedTime")
+                  }
                   disabled={!isEditing}
+                  data={[
+                    { label: "Horas antes de cada cita", value: "relative" },
+                    { label: "A una hora fija del día", value: "fixedTime" },
+                  ]}
                 />
+              </div>
 
-                <Alert
-                  icon={<IconBulb size={14} />}
-                  color="blue"
-                  variant="light"
-                  title="Ejemplo"
-                  styles={{ title: { fontSize: 13 }, body: { fontSize: 12 } }}
-                >
-                  Cita el martes a las 3 PM → recordatorio el lunes a las 3 PM
-                  {` (${hours}h antes)`}
-                </Alert>
-              </SimpleGrid>
+              {!isFixed && (
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                  <NumberInput
+                    label="Anticipación del recordatorio"
+                    description="¿Con cuántas horas de anticipación enviar el mensaje?"
+                    placeholder="24"
+                    min={1}
+                    max={72}
+                    suffix=" horas"
+                    {...form.getInputProps("reminderSettings.hoursBefore")}
+                    disabled={!isEditing}
+                  />
+
+                  <Alert
+                    icon={<IconBulb size={14} />}
+                    color="blue"
+                    variant="light"
+                    title="Ejemplo"
+                    styles={{ title: { fontSize: 13 }, body: { fontSize: 12 } }}
+                  >
+                    Cita el martes a las 3 PM → recordatorio el lunes a las 3 PM
+                    {` (${hours}h antes)`}
+                  </Alert>
+                </SimpleGrid>
+              )}
+
+              {isFixed && (
+                <>
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                    <Select
+                      label="Día de envío"
+                      description="¿Cuántos días antes de la cita?"
+                      allowDeselect={false}
+                      value={String(daysBefore)}
+                      onChange={(val) =>
+                        form.setFieldValue("reminderSettings.daysBefore", Number(val ?? 1))
+                      }
+                      data={[
+                        { value: "0", label: "El mismo día de la cita" },
+                        { value: "1", label: "1 día antes" },
+                        { value: "2", label: "2 días antes" },
+                        { value: "3", label: "3 días antes" },
+                      ]}
+                      disabled={!isEditing}
+                    />
+                    <TimeOfDayInput
+                      label="Hora de envío"
+                      value={sendAt}
+                      onChange={(v) => form.setFieldValue("reminderSettings.sendAt", v)}
+                      timeFormat={timeFormat}
+                    />
+                  </SimpleGrid>
+
+                  <Alert
+                    icon={<IconBulb size={14} />}
+                    color="blue"
+                    variant="light"
+                    title="Ejemplo"
+                    styles={{ title: { fontSize: 13 }, body: { fontSize: 12 } }}
+                  >
+                    Todas las citas del martes (sin importar su hora) reciben el recordatorio {daysLabel} a las{" "}
+                    {formatTimeLabel(sendAt, timeFormat === "24h")}. Así, si alguien cancela, aún tienes el resto del día para
+                    ofrecer ese cupo.
+                  </Alert>
+                </>
+              )}
 
               <div>
                 <Text size="sm" fw={500} mb={2}>
@@ -106,6 +176,7 @@ export default function ReminderSettingsTab({
                 />
               </div>
 
+              {!isFixed && (
               <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                 <TextInput
                   label="Horario de envío — desde"
@@ -122,6 +193,7 @@ export default function ReminderSettingsTab({
                   disabled={!isEditing}
                 />
               </SimpleGrid>
+              )}
 
               <Alert
                 icon={<IconBrandWhatsapp size={14} />}
@@ -129,9 +201,16 @@ export default function ReminderSettingsTab({
                 variant="light"
               >
                 <List size="xs" spacing={4}>
-                  <List.Item>
-                    Si la hora calculada cae fuera del rango {start}–{end}, el mensaje se enviará al comienzo del rango.
-                  </List.Item>
+                  {isFixed ? (
+                    <List.Item>
+                      Las citas creadas después de la hora de envío reciben su recordatorio en la siguiente pasada
+                      (cada 30 min), respetando el margen de gracia.
+                    </List.Item>
+                  ) : (
+                    <List.Item>
+                      Si la hora calculada cae fuera del rango {start}–{end}, el mensaje se enviará al comienzo del rango.
+                    </List.Item>
+                  )}
                   <List.Item>
                     Varios servicios en el mismo día se consolidan en <strong>un solo mensaje</strong> para no saturar al cliente.
                   </List.Item>
