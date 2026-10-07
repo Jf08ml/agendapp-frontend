@@ -949,6 +949,19 @@ const ScheduleView: React.FC = () => {
         startDate &&
         endDate
       ) {
+        // El fin solo es editable con 1 servicio o al editar; con varios lo calcula el backend
+        if ((selectedAppointment || services.length === 1) && endDate <= startDate) {
+          showNotification({
+            title: "Revisa el horario",
+            message: "La hora de fin debe ser posterior a la hora de inicio.",
+            color: "red",
+            autoClose: 4000,
+            position: "top-right",
+          });
+          setCreatingAppointment(false);
+          return;
+        }
+
         if (selectedAppointment) {
           const firstService = services[0];
           const payload = {

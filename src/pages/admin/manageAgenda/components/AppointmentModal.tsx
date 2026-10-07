@@ -1569,6 +1569,13 @@ ${clientServices}`;
                         setNewAppointment((prev) => ({ ...prev, endDate: date }))
                       }
                     />
+                    {newAppointment.startDate &&
+                      newAppointment.endDate &&
+                      newAppointment.endDate <= newAppointment.startDate && (
+                        <Text size="xs" c="red" mt={4}>
+                          La hora de fin debe ser posterior a la de inicio
+                        </Text>
+                      )}
                   </Box>
                 </Grid.Col>
               )}
