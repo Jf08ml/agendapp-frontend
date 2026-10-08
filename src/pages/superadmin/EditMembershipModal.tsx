@@ -14,6 +14,7 @@ import {
   Switch,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
+import dayjs from "dayjs";
 import { notifications } from "@mantine/notifications";
 import { Membership, Plan } from "../../services/membershipService";
 import { apiGeneral } from "../../services/axiosConfig";
@@ -35,6 +36,9 @@ export function EditMembershipModal({
   onSuccess,
 }: EditMembershipModalProps) {
   const [loading, setLoading] = useState(false);
+  // Solo si se elige otra fecha se envía como día de calendario (el backend la guarda como
+  // fin de ese día en la zona de la org); si no, se conserva la hora exacta del pago.
+  const [endDateTouched, setEndDateTouched] = useState(false);
   const [formData, setFormData] = useState({
     planId: "",
     status: "active",
@@ -60,6 +64,7 @@ export function EditMembershipModal({
         autoRenew: membership.autoRenew || false,
         adminNotes: membership.adminNotes || "",
       });
+      setEndDateTouched(false);
     }
   }, [membership]);
 
@@ -72,7 +77,9 @@ export function EditMembershipModal({
         planId: formData.planId,
         status: formData.status,
         currentPeriodStart: formData.currentPeriodStart.toISOString(),
-        currentPeriodEnd: formData.currentPeriodEnd.toISOString(),
+        currentPeriodEnd: endDateTouched
+          ? dayjs(formData.currentPeriodEnd).format("YYYY-MM-DD")
+          : formData.currentPeriodEnd.toISOString(),
         lastPaymentDate: formData.lastPaymentDate?.toISOString() || null,
         lastPaymentAmount: formData.lastPaymentAmount,
         autoRenew: formData.autoRenew,
@@ -170,13 +177,15 @@ export function EditMembershipModal({
 
         <DateInput
           label="Fecha de Vencimiento"
+          description="Tiene acceso completo hasta el final de este día (zona horaria del negocio)"
           value={formData.currentPeriodEnd}
-          onChange={(date) =>
+          onChange={(date) => {
+            setEndDateTouched(true);
             setFormData({
               ...formData,
               currentPeriodEnd: date || new Date(),
-            })
-          }
+            });
+          }}
           valueFormat="DD/MM/YYYY"
           required
         />
