@@ -24,8 +24,9 @@ import { Reservation } from "../../services/reservationService";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { CountryCode } from "libphonenumber-js";
 import { checkClientPackagesByIdentifierPublic, ClientPackage } from "../../services/packageService";
-import { Paper, Checkbox, Anchor } from "@mantine/core";
-import { IconPackage } from "@tabler/icons-react";
+import { Paper, Checkbox, Anchor, Alert } from "@mantine/core";
+import { IconPackage, IconAlertTriangle } from "@tabler/icons-react";
+import { formatPhoneInternational } from "../../utils/phoneUtils";
 import {
   DEFAULT_CLIENT_FORM_CONFIG,
   BUILT_IN_FIELD_KEYS,
@@ -110,6 +111,9 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
   const [emailError, setEmailError] = useState<string | null>(null);
   const [foundName, setFoundName] = useState<string | null>(null);
+  // Teléfono buscado que no corresponde a ningún cliente — un dígito mal escrito
+  // crea un cliente nuevo y la confirmación por WhatsApp le llega a un desconocido.
+  const [phoneNotFound, setPhoneNotFound] = useState<string | null>(null);
   const [clientId, setClientId] = useState<string | null>(null);
   const [detectedPackages, setDetectedPackages] = useState<ClientPackage[]>([]);
   const [useDetectedPackage, setUseDetectedPackage] = useState(true);
@@ -153,6 +157,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
     setPhoneCountry(phone_country);
     setPhoneValid(isValid);
     setPhoneError(null);
+    setPhoneNotFound(null);
     const newPhone = phone_e164 ?? "";
     if (customerDetails.phone !== newPhone) {
       setBookingData((prev) => ({
@@ -174,6 +179,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
 
     setIsLookingUp(true);
     setFoundName(null);
+    setPhoneNotFound(null);
 
     try {
       const client = await getClientByIdentifier(field, value, orgId);
@@ -227,6 +233,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         }
       } else {
         setClientId(null);
+        if (field === "phone") setPhoneNotFound(value);
         setDetectedPackages([]);
         onPackageDetected?.(null, null);
       }
@@ -328,6 +335,15 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           <Text size="xs" c="dimmed">Cliente encontrado:</Text>
           <Badge variant="light" size="sm">{foundName}</Badge>
         </Group>
+      )}
+      {phoneNotFound && !isLookingUp && (
+        <Alert color="yellow" variant="light" p="xs" icon={<IconAlertTriangle size={16} />}>
+          <Text size="xs">
+            No encontramos reservas anteriores con el{" "}
+            <Text span fw={700} size="xs">{formatPhoneInternational(phoneNotFound)}</Text>.
+            Si ya has venido antes, revisa que el número esté bien escrito.
+          </Text>
+        </Alert>
       )}
     </>
   );

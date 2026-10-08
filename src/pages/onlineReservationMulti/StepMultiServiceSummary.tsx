@@ -8,6 +8,7 @@ import {
   Badge,
   Avatar,
   Box,
+  Button,
 } from "@mantine/core";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
@@ -17,7 +18,8 @@ import {
 } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
-import { IconRepeat, IconPackage } from "@tabler/icons-react";
+import { IconRepeat, IconPackage, IconPhone } from "@tabler/icons-react";
+import { formatPhoneInternational } from "../../utils/phoneUtils";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
@@ -67,6 +69,10 @@ interface Props {
   timeFormat?: string;
   // Se detectó un paquete de sesiones que cubre esta reserva — el costo es $0.
   usingPackage?: boolean;
+  // Teléfono E.164 al que llegará la confirmación — se resalta para que el
+  // cliente detecte un dígito mal escrito antes de confirmar.
+  customerPhone?: string;
+  onEditPhone?: () => void;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
@@ -90,6 +96,8 @@ export default function StepMultiServiceSummary({
   seriesPreview,
   timeFormat,
   usingPackage = false,
+  customerPhone,
+  onEditPhone,
 }: Props) {
   if (!times) return null;
 
@@ -248,6 +256,26 @@ export default function StepMultiServiceSummary({
               Se crearán <Text span fw={700} c="green">{seriesPreview.availableCount}</Text> de {seriesPreview.totalOccurrences} citas
             </Text>
           </Stack>
+        </Paper>
+      )}
+
+      {customerPhone && (
+        <Paper withBorder p="md" radius="md" style={{ borderLeft: '4px solid var(--mantine-color-yellow-6)' }}>
+          <Group justify="space-between" wrap="nowrap" align="center">
+            <Group gap="sm" wrap="nowrap">
+              <IconPhone size={20} />
+              <Stack gap={0}>
+                <Text size="sm" c="dimmed">Te enviaremos la confirmación al</Text>
+                <Text fw={800} size="lg">{formatPhoneInternational(customerPhone)}</Text>
+                <Text size="xs" c="dimmed">Revisa que el número esté bien escrito.</Text>
+              </Stack>
+            </Group>
+            {onEditPhone && (
+              <Button variant="subtle" size="xs" onClick={onEditPhone}>
+                Corregir
+              </Button>
+            )}
+          </Group>
         </Paper>
       )}
 

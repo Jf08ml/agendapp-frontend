@@ -1,3 +1,4 @@
+import axios from "axios";
 import { apiClient } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 
@@ -275,7 +276,17 @@ export const getClientByIdentifier = async (
   organizationId: string
 ): Promise<Client | undefined> => {
   if (field === 'phone') {
-    return getClientByPhoneNumberAndOrganization(value, organizationId);
+    // El endpoint de teléfono responde 404 cuando no existe: es "no encontrado",
+    // no un error (los formularios públicos avisan de un posible número mal escrito).
+    try {
+      const response = await apiClient.get<Response<Client>>(
+        `/phone/${value}/organization/${organizationId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return undefined;
+      handleAxiosError(error, "Error al buscar el cliente");
+    }
   }
   try {
     const response = await apiClient.get<Response<Client>>('/by-identifier', {

@@ -274,3 +274,16 @@ export function extractCountryFromE164(phone_e164: string): CountryCode | null {
     return null;
   }
 }
+
+/**
+ * Formatea un E.164 en formato internacional legible para cualquier país
+ * (+34619332673 → "+34 619 33 26 73"). Si no se puede parsear, devuelve el original.
+ */
+export function formatPhoneInternational(phone_e164: string): string {
+  if (!phone_e164) return "";
+  try {
+    return parsePhoneNumber(phone_e164).formatInternational();
+  } catch {
+    return phone_e164;
+  }
+}

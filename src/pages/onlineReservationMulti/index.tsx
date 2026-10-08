@@ -543,6 +543,8 @@ export default function MultiBookingWizard() {
               seriesPreview={seriesPreview}
               timeFormat={organization?.timeFormat}
               usingPackage={!!clientPackageId}
+              customerPhone={customerDetails.phone}
+              onEditPhone={() => setCurrentStep(3)}
             />
             {depositActive && (
               <MpDepositNotice
