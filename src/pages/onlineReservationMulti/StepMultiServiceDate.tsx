@@ -42,11 +42,16 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   onDatePicked,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
-  const [loading, setLoading] = useState(false);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
-  // Meses ("YYYY-MM") cuya disponibilidad ya se consultó para los servicios actuales
-  const loadedMonthsRef = useRef<Set<string>>(new Set());
-  const requestSeqRef = useRef(0);
+  // Meses ("YYYY-MM") cuya respuesta ya llegó / que están en consulta. Son estado
+  // (no refs) para que la preselección nunca vea un mes "cargado" sin sus datos.
+  const [loadedMonths, setLoadedMonths] = useState<Set<string>>(() => new Set());
+  const [pendingMonths, setPendingMonths] = useState<Set<string>>(() => new Set());
+  // Meses ya pedidos para los servicios actuales (evita consultas duplicadas)
+  const requestedMonthsRef = useRef<Set<string>>(new Set());
+  // Cambia al cambiar los servicios: invalida las respuestas en vuelo de antes.
+  // Navegar de mes NO la cambia, así varias consultas de meses conviven.
+  const generationRef = useRef(0);
 
   // Mes visible en el calendario (controlado para cargar disponibilidad por mes)
   const [displayedMonth, setDisplayedMonth] = useState<Date>(
@@ -88,10 +93,11 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
 
   // Al cambiar los servicios, la disponibilidad cargada deja de ser válida
   useEffect(() => {
-    loadedMonthsRef.current = new Set();
-    requestSeqRef.current += 1;
+    requestedMonthsRef.current = new Set();
+    generationRef.current += 1;
     setAvailability({});
-    setLoading(false);
+    setLoadedMonths(new Set());
+    setPendingMonths(new Set());
   }, [organizationId, servicesWithDuration]);
 
   // Cargar disponibilidad del mes visible (bajo demanda, un mes a la vez).
@@ -100,7 +106,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     if (!organizationId || servicesWithDuration.length === 0) return;
 
     const monthKey = dayjs(displayedMonth).format("YYYY-MM");
-    if (loadedMonthsRef.current.has(monthKey)) return;
+    if (requestedMonthsRef.current.has(monthKey)) return;
 
     // Incluye los días de meses vecinos que se ven en la grilla (semana inicia lunes)
     const monthStart = dayjs(displayedMonth).startOf("month");
@@ -113,9 +119,9 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     const rangeEnd = gridEnd.isAfter(maxDate) ? dayjs(maxDate) : gridEnd;
     if (rangeEnd.isBefore(rangeStart, "day")) return;
 
-    loadedMonthsRef.current.add(monthKey);
-    const seq = ++requestSeqRef.current;
-    setLoading(true);
+    requestedMonthsRef.current.add(monthKey);
+    const generation = generationRef.current;
+    setPendingMonths((prev) => new Set(prev).add(monthKey));
 
     checkDaysAvailability(
       organizationId,
@@ -124,22 +130,32 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
       rangeEnd.format("YYYY-MM-DD")
     )
       .then((response) => {
-        if (seq !== requestSeqRef.current) return;
+        if (generation !== generationRef.current) return;
         if (response?.availability) {
           setAvailability((prev) => ({ ...prev, ...response.availability }));
+          setLoadedMonths((prev) => new Set(prev).add(monthKey));
         } else {
           // Permitir reintento si se vuelve a este mes
-          loadedMonthsRef.current.delete(monthKey);
+          requestedMonthsRef.current.delete(monthKey);
         }
       })
       .catch((error) => {
-        loadedMonthsRef.current.delete(monthKey);
+        if (generation !== generationRef.current) return;
+        requestedMonthsRef.current.delete(monthKey);
         console.error("Error loading availability:", error);
       })
       .finally(() => {
-        if (seq === requestSeqRef.current) setLoading(false);
+        if (generation !== generationRef.current) return;
+        setPendingMonths((prev) => {
+          const next = new Set(prev);
+          next.delete(monthKey);
+          return next;
+        });
       });
   }, [organizationId, servicesWithDuration, displayedMonth, maxDate]);
+
+  const displayedMonthKey = dayjs(displayedMonth).format("YYYY-MM");
+  const loading = pendingMonths.has(displayedMonthKey);
 
   const emitDate = useCallback(
     (date: Date | null) => {
@@ -174,15 +190,15 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   // disponibilidad (avanzando de mes si el actual está lleno) para que las
   // horas aparezcan de una vez.
   useEffect(() => {
-    if (!autoSearchRef.current.active || loading) return;
-    const monthKey = dayjs(displayedMonth).format("YYYY-MM");
-    if (!loadedMonthsRef.current.has(monthKey)) return;
+    if (!autoSearchRef.current.active) return;
+    // Solo decidir con la respuesta del mes ya recibida
+    if (!loadedMonths.has(displayedMonthKey)) return;
 
     const today = dayjs().format("YYYY-MM-DD");
     const firstAvailable = Object.keys(availability)
       .filter(
         (d) =>
-          d.startsWith(monthKey) &&
+          d.startsWith(displayedMonthKey) &&
           d >= today &&
           availability[d] &&
           businessDays.includes(dayjs(d).day())
@@ -205,7 +221,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     } else {
       autoSearchRef.current.active = false;
     }
-  }, [availability, loading, displayedMonth, businessDays, emitDate, maxDate]);
+  }, [availability, loadedMonths, displayedMonth, displayedMonthKey, businessDays, emitDate, maxDate]);
 
   // Determinar si un día está deshabilitado (solo días pasados y no laborables)
   // NO deshabilitamos días sin disponibilidad para poder aplicar estilos
@@ -286,7 +302,6 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   );
 
   // Mes visible sin ningún día con horarios
-  const displayedMonthKey = dayjs(displayedMonth).format("YYYY-MM");
   const displayedMonthName = dayjs(displayedMonth).format("MMMM");
   const monthEntries = useMemo(
     () =>
@@ -294,7 +309,9 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     [availability, displayedMonthKey]
   );
   const monthIsFull =
-    !loading && monthEntries.length > 0 && !monthEntries.some(([, ok]) => ok);
+    loadedMonths.has(displayedMonthKey) &&
+    monthEntries.length > 0 &&
+    !monthEntries.some(([, ok]) => ok);
 
   return (
     <Stack gap="sm">
