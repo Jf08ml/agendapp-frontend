@@ -243,14 +243,14 @@ export default function AppWithBranding() {
   // con una marca clara, el color tal cual sobre blanco no se lee.
   const brandTextLight = isHex ? getReadableBrandColor(colorValue, "light") : null;
   const brandTextDark = isHex ? getReadableBrandColor(colorValue, "dark") : null;
+  const brandTextVars = (brandText: string | null): Record<string, string> =>
+    brandText
+      ? { "--mantine-color-anchor": brandText, "--brand-text": brandText }
+      : { "--brand-text": "var(--mantine-primary-color-filled)" };
   const cssVariablesResolver: CSSVariablesResolver = () => ({
     variables: {},
-    light: brandTextLight
-      ? { "--mantine-color-anchor": brandTextLight, "--brand-text": brandTextLight }
-      : { "--brand-text": "var(--mantine-primary-color-filled)" },
-    dark: brandTextDark
-      ? { "--mantine-color-anchor": brandTextDark, "--brand-text": brandTextDark }
-      : { "--brand-text": "var(--mantine-primary-color-filled)" },
+    light: brandTextVars(brandTextLight),
+    dark: brandTextVars(brandTextDark),
   });
 
   // En signup domain: no loading, no org needed
