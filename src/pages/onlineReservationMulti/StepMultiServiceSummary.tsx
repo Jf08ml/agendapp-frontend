@@ -1,15 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // StepMultiServiceSummary.tsx
-import {
-  Paper,
-  Stack,
-  Text,
-  Group,
-  Divider,
-  Badge,
-  Avatar,
-  Box,
-  Button,
-} from "@mantine/core";
+// Tarjeta compacta "Tu cita" que encabeza el paso de datos + confirmación.
+import { Paper, Stack, Text, Group, Divider, Anchor } from "@mantine/core";
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import {
@@ -18,45 +10,13 @@ import {
 } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
-import { IconRepeat, IconPackage, IconPhone } from "@tabler/icons-react";
+import { IconCalendarEvent, IconRepeat, IconPackage, IconPhone } from "@tabler/icons-react";
 import { formatPhoneInternational } from "../../utils/phoneUtils";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
 
 dayjs.locale("es");
-
-// Helper para asegurar Date válido
-const ensureDate = (d: unknown): Date | null => {
-  if (!d) return null;
-
-  if (d instanceof Date) {
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  if (typeof d === "string") {
-    const parsed = new Date(d);
-    if (!isNaN(parsed.getTime())) return parsed;
-
-    const dj = dayjs(d);
-    if (dj.isValid()) return dj.toDate();
-  }
-
-  if (typeof d === "number") {
-    const parsed = new Date(d);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
-};
-
-// Helper para formatear fecha con fallback
-const safeFormat = (d: unknown, format: string, fallback = "-"): string => {
-  const date = ensureDate(d);
-  if (!date) return fallback;
-  const dj = dayjs(date);
-  return dj.isValid() ? dj.format(format) : fallback;
-};
 
 interface Props {
   services: Service[];
@@ -69,22 +29,19 @@ interface Props {
   timeFormat?: string;
   // Se detectó un paquete de sesiones que cubre esta reserva — el costo es $0.
   usingPackage?: boolean;
-  // Teléfono E.164 al que llegará la confirmación — se resalta para que el
-  // cliente detecte un dígito mal escrito antes de confirmar.
-  customerPhone?: string;
-  onEditPhone?: () => void;
+  /** Volver a elegir fecha/hora */
+  onEdit?: () => void;
 }
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-// --- Helpers de precio ---
 function toNumber(v: unknown): number {
   if (v == null) return 0;
   const n = typeof v === "string" ? Number(v) : (v as number);
   return Number.isFinite(n) ? n : 0;
 }
 
-const WEEKDAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const WEEKDAY_LABELS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 
 export default function StepMultiServiceSummary({
   services,
@@ -96,210 +53,150 @@ export default function StepMultiServiceSummary({
   seriesPreview,
   timeFormat,
   usingPackage = false,
-  customerPhone,
-  onEditPhone,
+  onEdit,
 }: Props) {
   if (!times) return null;
 
-  // Lookups
   const svcMap = Object.fromEntries(services.map((s) => [s._id, s]));
   const empMap = Object.fromEntries(employees.map((e) => [e._id, e]));
 
-  const displayDate = dates[0]?.date
-    ? capitalize(safeFormat(dates[0].date, "dddd, D MMM YYYY", "-"))
+  const dateText = dates[0]?.date
+    ? capitalize(dayjs(dates[0].date).format("dddd D [de] MMMM"))
     : "-";
 
   // Usar el string original si existe para evitar conversiones de timezone
-  let startText = "-";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((times as any).startTimeStr) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    startText = formatTimeFromISO((times as any).startTimeStr, timeFormat);
-  } else if (times.startTime) {
-    startText = formatTime(times.startTime, timeFormat);
-  } else if (times.intervals?.[0]) {
-    startText = formatTime(times.intervals[0].from, timeFormat);
-  }
+  const startText = (times as any).startTimeStr
+    ? formatTimeFromISO((times as any).startTimeStr, timeFormat)
+    : times.startTime
+    ? formatTime(times.startTime, timeFormat)
+    : times.intervals?.[0]
+    ? formatTime(times.intervals[0].from, timeFormat)
+    : "-";
 
-  // Total del bloque — $0 si se paga con un paquete de sesiones ya cubierto.
+  const isRecurring = recurrencePattern?.type === "weekly" && !!seriesPreview;
+  const occurrences = isRecurring ? seriesPreview!.availableCount : 1;
+
   const grandTotal = usingPackage
     ? 0
-    : times.intervals.reduce((acc, iv) => {
-        const svc = svcMap[iv.serviceId];
-        return acc + toNumber(svc?.price);
-      }, 0);
+    : times.intervals.reduce((acc, iv) => acc + toNumber(svcMap[iv.serviceId]?.price), 0) *
+      occurrences;
 
   // Si algún servicio tiene precio oculto, no mostrar precios ni total
   const anyHidePrice = times.intervals.some((iv) => svcMap[iv.serviceId]?.hidePrice);
 
   return (
-    <Stack>
-      <Group justify="space-between" align="center">
-        <Text fw={700} size="lg">
-          Resumen de tu reserva
-        </Text>
-
-        <Group gap="xs" wrap="wrap">
-          <Badge variant="light">
-            {times.intervals.length} servicio
-            {times.intervals.length === 1 ? "" : "s"}
-          </Badge>
-          {dates[0]?.date && (
-            <Badge variant="outline">
-              {capitalize(safeFormat(dates[0].date, "dddd, D MMM YYYY", "-"))}
-            </Badge>
+    <Paper withBorder radius="md" p="sm">
+      <Stack gap="sm">
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <Group gap="xs" wrap="nowrap" align="flex-start">
+            <IconCalendarEvent
+              size={20}
+              color="var(--brand-text)"
+              style={{ flexShrink: 0, marginTop: 2 }}
+            />
+            <Stack gap={0}>
+              <Text fw={700} lh={1.3}>
+                {dateText}
+              </Text>
+              <Text fw={700} lh={1.3} c="var(--brand-text)">
+                {startText}
+              </Text>
+            </Stack>
+          </Group>
+          {onEdit && (
+            <Anchor component="button" type="button" size="sm" onClick={onEdit}>
+              Cambiar
+            </Anchor>
           )}
         </Group>
-      </Group>
 
-      {usingPackage && (
-        <Group gap={6} p="xs" style={{ borderRadius: 8 }} bg="green.0">
-          <IconPackage size={16} color="var(--mantine-color-green-7)" />
-          <Text size="sm" fw={600} c="green.8">
-            Esta reserva se paga con tu paquete de sesiones — no pagas nada ahora.
-          </Text>
-        </Group>
-      )}
+        <Divider />
 
-      <Divider />
+        <Stack gap={8}>
+          {times.intervals.map((iv, idx) => {
+            const svc = svcMap[iv.serviceId];
+            const emp = iv.employeeId ? empMap[iv.employeeId] : undefined;
+            const price = usingPackage ? 0 : toNumber(svc?.price);
+            const ivAny = iv as any;
+            const fromText = ivAny.startStr
+              ? formatTimeFromISO(ivAny.startStr, timeFormat)
+              : formatTime(iv.from, timeFormat);
+            const toText = ivAny.endStr
+              ? formatTimeFromISO(ivAny.endStr, timeFormat)
+              : formatTime(iv.to, timeFormat);
 
-      <Paper withBorder p="md" radius="md">
-        <Stack gap="xs">
-          <Group gap="xs" wrap="wrap">
-            <Badge size="sm" variant="filled">
-              {displayDate}
-            </Badge>
-            <Badge size="sm" variant="outline">
-              Inicio {startText}
-            </Badge>
-          </Group>
-
-          <Divider my="xs" />
-
-          <Stack gap="sm">
-            {times.intervals.map((iv, idx) => {
-              const svc = svcMap[iv.serviceId];
-              const emp = iv.employeeId ? empMap[iv.employeeId] : undefined;
-              const price = usingPackage ? 0 : toNumber(svc?.price);
-
-              // Usar strings originales si existen
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const ivAny = iv as any;
-              const fromText = ivAny.startStr
-                ? formatTimeFromISO(ivAny.startStr, timeFormat)
-                : formatTime(iv.from, timeFormat);
-              const toText = ivAny.endStr
-                ? formatTimeFromISO(ivAny.endStr, timeFormat)
-                : formatTime(iv.to, timeFormat);
-
-              return (
-                <Group
-                  key={`${iv.serviceId}-${idx}`}
-                  align="center"
-                  wrap="nowrap"
-                >
-                  <Box style={{ width: 40 }}>
-                    {emp ? (
-                      <Avatar
-                        radius="xl"
-                        size="sm"
-                        src={emp.profileImage || undefined}
-                      >
-                        {!emp.profileImage && emp.names
-                          ? emp.names.charAt(0)
-                          : null}
-                      </Avatar>
-                    ) : (
-                      <Badge size="xs" variant="dot">
-                        Libre
-                      </Badge>
-                    )}
-                  </Box>
-
-                  <Stack gap={2} style={{ flex: 1 }}>
-                    <Group justify="space-between" wrap="nowrap">
-                      <Text fw={600} size="sm">
-                        {svc?.name ?? "Servicio"}
-                      </Text>
-                      {!svc?.hidePrice && (
-                        <Text fw={600} size="sm" c={price === 0 ? "green" : undefined}>
-                          {price === 0 ? "Gratis" : formatCurrency(price, currency)}
-                        </Text>
-                      )}
-                    </Group>
-                    <Text c="dimmed" size="sm">
-                      {fromText} - {toText}
-                      {emp ? ` · ${emp.names}` : " · Sin preferencia"}
-                    </Text>
-                  </Stack>
-                </Group>
-              );
-            })}
-          </Stack>
+            return (
+              <Group key={`${iv.serviceId}-${idx}`} justify="space-between" wrap="nowrap" align="flex-start">
+                <Stack gap={0} style={{ minWidth: 0 }}>
+                  <Text size="sm" fw={600} lh={1.3}>
+                    {svc?.name ?? "Servicio"}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {fromText} – {toText}
+                    {emp ? ` · con ${emp.names}` : ""}
+                  </Text>
+                </Stack>
+                {!svc?.hidePrice && (
+                  <Text size="sm" fw={600} c={price === 0 ? "green" : undefined} style={{ whiteSpace: "nowrap" }}>
+                    {price === 0 ? "Gratis" : formatCurrency(price, currency)}
+                  </Text>
+                )}
+              </Group>
+            );
+          })}
         </Stack>
-      </Paper>
 
-      {/* 🔁 Info de recurrencia */}
-      {recurrencePattern?.type === 'weekly' && seriesPreview && (
-        <Paper withBorder p="md" radius="md" style={{ borderLeft: '4px solid var(--mantine-color-blue-6)' }}>
-          <Group gap="xs" mb="xs">
-            <IconRepeat size={18} />
-            <Text fw={700} size="sm">Citas recurrentes</Text>
-          </Group>
-          <Stack gap={4}>
+        {isRecurring && (
+          <Group gap={6} wrap="nowrap">
+            <IconRepeat size={16} style={{ flexShrink: 0 }} />
             <Text size="sm">
-              Cada {recurrencePattern.intervalWeeks === 1 ? 'semana' : `${recurrencePattern.intervalWeeks} semanas`}
-              {' · '}
-              {recurrencePattern.weekdays?.map(d => WEEKDAY_LABELS[d]).join(', ')}
+              Cada {recurrencePattern!.intervalWeeks === 1 ? "semana" : `${recurrencePattern!.intervalWeeks} semanas`}
+              {" "}({recurrencePattern!.weekdays?.map((d) => WEEKDAY_LABELS[d]).join(", ")}) ·{" "}
+              <Text span fw={700} inherit>
+                {seriesPreview!.availableCount} citas
+              </Text>
             </Text>
-            <Text size="sm" c="dimmed">
-              Se crearán <Text span fw={700} c="green">{seriesPreview.availableCount}</Text> de {seriesPreview.totalOccurrences} citas
-            </Text>
-          </Stack>
-        </Paper>
-      )}
+          </Group>
+        )}
 
-      {customerPhone && (
-        <Paper withBorder p="md" radius="md" style={{ borderLeft: '4px solid var(--mantine-color-yellow-6)' }}>
-          <Group justify="space-between" wrap="nowrap" align="center">
-            <Group gap="sm" wrap="nowrap">
-              <IconPhone size={20} />
-              <Stack gap={0}>
-                <Text size="sm" c="dimmed">Te enviaremos la confirmación al</Text>
-                <Text fw={800} size="lg">{formatPhoneInternational(customerPhone)}</Text>
-                <Text size="xs" c="dimmed">Revisa que el número esté bien escrito.</Text>
-              </Stack>
+        {usingPackage && (
+          <Group gap={6} wrap="nowrap">
+            <IconPackage size={16} color="var(--mantine-color-green-7)" style={{ flexShrink: 0 }} />
+            <Text size="sm" fw={600} c="green.8">
+              Se paga con tu paquete de sesiones
+            </Text>
+          </Group>
+        )}
+
+        {!anyHidePrice && (
+          <>
+            <Divider />
+            <Group justify="space-between">
+              <Text fw={600}>{isRecurring ? `Total (${occurrences} citas)` : "Total"}</Text>
+              <Text fw={800} size="lg">
+                {grandTotal === 0 ? "Gratis" : formatCurrency(grandTotal, currency)}
+              </Text>
             </Group>
-            {onEditPhone && (
-              <Button variant="subtle" size="xs" onClick={onEditPhone}>
-                Corregir
-              </Button>
-            )}
-          </Group>
-        </Paper>
-      )}
+          </>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
 
-      {!anyHidePrice && (
-        <Paper p="md" shadow="sm" radius="md" withBorder>
-          <Group justify="space-between">
-            <Text fw={700} size="md">
-              {recurrencePattern?.type === 'weekly' && seriesPreview
-                ? `Total estimado (${seriesPreview.availableCount} citas)`
-                : 'Total a pagar'
-              }
-            </Text>
-            <Text fw={800} size="lg" c="green">
-              {(() => {
-                const multiplier = recurrencePattern?.type === 'weekly' && seriesPreview
-                  ? seriesPreview.availableCount
-                  : 1;
-                const total = grandTotal * multiplier;
-                return total === 0 ? "Gratis" : formatCurrency(total, currency);
-              })()}
-            </Text>
-          </Group>
-        </Paper>
-      )}
-    </Stack>
+/** Línea que resalta el teléfono de confirmación para detectar un dígito mal escrito */
+export function ConfirmationPhoneNote({ phone }: { phone?: string }) {
+  if (!phone) return null;
+  return (
+    <Group gap="xs" wrap="nowrap" align="flex-start">
+      <IconPhone size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+      <Text size="sm">
+        Te enviaremos la confirmación al{" "}
+        <Text span fw={800} inherit style={{ whiteSpace: "nowrap" }}>
+          {formatPhoneInternational(phone)}
+        </Text>
+        . Revisa que esté bien escrito.
+      </Text>
+    </Group>
   );
 }

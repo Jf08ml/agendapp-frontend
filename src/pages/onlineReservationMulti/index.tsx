@@ -6,7 +6,8 @@ import BookingChatPanel from "./BookingChatPanel";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
-import StepMultiServiceSummary from "./StepMultiServiceSummary";
+import StepMultiServiceSummary, { ConfirmationPhoneNote } from "./StepMultiServiceSummary";
+import StepHeading from "./StepHeading";
 import StepCustomerData from "./StepCustomerData";
 import {
   Service,
@@ -101,16 +102,15 @@ export default function MultiBookingWizard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Paso actual (0..4) + finish (5)
+  // Paso actual (0..2) + finish (3)
   const [currentStep, setCurrentStep] = useState(0);
 
   // Paso 1: selección servicios/profesionales
   const [selected, setSelected] = useState<SelectedService[]>([]);
-  // Paso 2: fechas
+  // Paso 2: fecha + horario
   const [dates, setDates] = useState<ServiceWithDate[]>([]);
-  // Paso 3: horarios
   const [times, setTimes] = useState<MultiServiceBlockSelection | null>(null);
-  // Paso 4: datos cliente
+  // Paso 3: datos cliente + resumen
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
     email: "",
@@ -164,6 +164,8 @@ export default function MultiBookingWizard() {
   // === Responsive helpers ===
   const isMobile = useMediaQuery("(max-width: 48rem)"); // ~768px
   const contentTopRef = useRef<HTMLDivElement | null>(null);
+  // Sección de horas dentro del paso "Fecha y hora" (scroll al tocar un día)
+  const timesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!organization?._id) return;
@@ -204,13 +206,10 @@ export default function MultiBookingWizard() {
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Validaciones para navegación
-  const canGoNextFromStep0 = selected.length > 0;
-
-  const canGoNextFromStep1 = (() => {
-    if (selected.length === 0) return false;
-    if (dates.length === 0) return false;
-    return !!dates[0]?.date;
-  })();
+  // En agendamiento automático cada servicio necesita profesional
+  const employeeRequired = organization?.reservationPolicy === "auto_if_available";
+  const canGoNextFromStep0 =
+    selected.length > 0 && (!employeeRequired || selected.every((s) => !!s.employeeId));
 
   const hasChosenTimes = (() => {
     if (!times) return false;
@@ -277,7 +276,7 @@ export default function MultiBookingWizard() {
       setSubmitting(true);
 
       if (!hasCustomerData) {
-        setCurrentStep(3);
+        setCurrentStep(2);
         return;
       }
 
@@ -373,7 +372,7 @@ export default function MultiBookingWizard() {
       });
 
       setCompleted(true);
-      setCurrentStep(5); // Paso “Finish”
+      setCurrentStep(3); // Paso “Finish”
     } finally {
       setSubmitting(false);
     }
@@ -433,15 +432,12 @@ export default function MultiBookingWizard() {
 
   // ======= Header y contenido compactos en móvil =======
   const steps = [
-    { key: 0, label: "Servicios y Profesionales" },
-    { key: 1, label: "Fechas" },
-    { key: 2, label: "Horarios" },
-    { key: 3, label: "Tus datos" },
-    { key: 4, label: "Resumen" },
-    { key: 5, label: "Finish" },
+    { key: 0, label: "Servicio" },
+    { key: 1, label: "Fecha y hora" },
+    { key: 2, label: "Confirmar" },
   ];
-  const totalSteps = 5; // 0..4 son pasos, el 5 es Completed
-  const progressValue = Math.min((currentStep / totalSteps) * 100, 100);
+  const totalSteps = steps.length; // 0..2 son pasos, el 3 es Completed
+  const FINISH_STEP = totalSteps;
 
   function renderStepContent(step: number) {
     switch (step) {
@@ -452,71 +448,49 @@ export default function MultiBookingWizard() {
             employees={employees}
             value={selected}
             onChange={setSelected}
-            employeeRequired={
-              organization?.reservationPolicy === "auto_if_available"
-            }
+            employeeRequired={employeeRequired}
           />
         );
       case 1:
         return (
-          <StepMultiServiceDate
-            selectedServices={selected}
-            services={services}
-            value={dates}
-            onChange={setDates}
-          />
-        );
-      case 2:
-        return (
-          <StepMultiServiceTime
-            organizationId={orgId}
-            selectedServices={selected}
-            services={services}
-            employees={employees}
-            dates={dates}
-            value={times}
-            onChange={setTimes}
-            recurrencePattern={recurrencePattern}
-            onRecurrenceChange={setRecurrencePattern}
-            seriesPreview={seriesPreview}
-            onSeriesPreviewChange={setSeriesPreview}
-            timeFormat={organization?.timeFormat}
-          />
-        );
-      case 3:
-        return (
-          <StepCustomerData
-            bookingData={
-              { customerDetails, customFieldValues, organizationId: orgId } as Partial<Reservation>
-            }
-            setBookingData={(updater) => {
-              const base: Partial<Reservation> = {
-                customerDetails,
-                customFieldValues,
-                organizationId: orgId,
-              };
-              const next =
-                typeof updater === "function"
-                  ? (updater as any)(base)
-                  : updater;
-              if (next?.customerDetails) {
-                setCustomerDetails(
-                  next.customerDetails as typeof customerDetails
-                );
+          <Stack gap="lg">
+            <StepMultiServiceDate
+              selectedServices={selected}
+              services={services}
+              value={dates}
+              onChange={setDates}
+              onDatePicked={() =>
+                // Esperar a que se pinte la sección de horas antes de desplazar
+                setTimeout(
+                  () =>
+                    timesRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    }),
+                  50
+                )
               }
-              if (next?.customFieldValues) {
-                setCustomFieldValues(next.customFieldValues as Record<string, unknown>);
-              }
-            }}
-            onClientUpdateReady={(updateFn) => {
-              updateClientRef.current = updateFn;
-            }}
-            selectedServiceIds={selected.map((s) => s.serviceId)}
-            onPackageDetected={(pkgId) => setClientPackageId(pkgId)}
-            onTermsAcceptedChange={setTermsAccepted}
-          />
+            />
+            {dates[0]?.date && <Divider />}
+            <div ref={timesRef} style={{ scrollMarginTop: isMobile ? 60 : 16 }}>
+              <StepMultiServiceTime
+                organizationId={orgId}
+                selectedServices={selected}
+                services={services}
+                employees={employees}
+                dates={dates}
+                value={times}
+                onChange={setTimes}
+                recurrencePattern={recurrencePattern}
+                onRecurrenceChange={setRecurrencePattern}
+                seriesPreview={seriesPreview}
+                onSeriesPreviewChange={setSeriesPreview}
+                timeFormat={organization?.timeFormat}
+              />
+            </div>
+          </Stack>
         );
-      case 4: {
+      case 2: {
         const depositServices = dates
           .map((date) => services.find((s) => s._id === date.serviceId))
           .filter((s): s is NonNullable<typeof s> => !!s);
@@ -532,27 +506,71 @@ export default function MultiBookingWizard() {
           (date) => services.find((s) => s._id === date.serviceId)?.hidePrice
         );
         return (
-          <Stack gap={isMobile ? "md" : "lg"}>
-            <StepMultiServiceSummary
-              services={services}
-              employees={employees}
-              dates={dates}
-              times={times}
-              currency={organization?.currency}
-              recurrencePattern={recurrencePattern}
-              seriesPreview={seriesPreview}
-              timeFormat={organization?.timeFormat}
-              usingPackage={!!clientPackageId}
-              customerPhone={customerDetails.phone}
-              onEditPhone={() => setCurrentStep(3)}
-            />
-            {depositActive && (
-              <MpDepositNotice
-                percentage={depositPct}
-                currency={organization?.currency ?? "COP"}
-                amount={anyHidePrice ? undefined : depositTotal}
-                objectLabel="tu reserva"
+          <Stack gap="lg">
+            <Stack gap="xs">
+              <StepHeading title="Confirma tu cita" />
+              <StepMultiServiceSummary
+                services={services}
+                employees={employees}
+                dates={dates}
+                times={times}
+                currency={organization?.currency}
+                recurrencePattern={recurrencePattern}
+                seriesPreview={seriesPreview}
+                timeFormat={organization?.timeFormat}
+                usingPackage={!!clientPackageId}
+                onEdit={() => setCurrentStep(1)}
               />
+            </Stack>
+
+            <Stack gap="sm">
+              <StepHeading title="Tus datos" />
+              <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
+                <StepCustomerData
+                  bookingData={
+                    { customerDetails, customFieldValues, organizationId: orgId } as Partial<Reservation>
+                  }
+                  setBookingData={(updater) => {
+                    const base: Partial<Reservation> = {
+                      customerDetails,
+                      customFieldValues,
+                      organizationId: orgId,
+                    };
+                    const next =
+                      typeof updater === "function"
+                        ? (updater as any)(base)
+                        : updater;
+                    if (next?.customerDetails) {
+                      setCustomerDetails(
+                        next.customerDetails as typeof customerDetails
+                      );
+                    }
+                    if (next?.customFieldValues) {
+                      setCustomFieldValues(next.customFieldValues as Record<string, unknown>);
+                    }
+                  }}
+                  onClientUpdateReady={(updateFn) => {
+                    updateClientRef.current = updateFn;
+                  }}
+                  selectedServiceIds={selected.map((s) => s.serviceId)}
+                  onPackageDetected={(pkgId) => setClientPackageId(pkgId)}
+                  onTermsAcceptedChange={setTermsAccepted}
+                />
+              </Paper>
+            </Stack>
+
+            {(depositActive || customerDetails.phone) && (
+              <Stack gap="sm">
+                <ConfirmationPhoneNote phone={customerDetails.phone} />
+                {depositActive && (
+                  <MpDepositNotice
+                    percentage={depositPct}
+                    currency={organization?.currency ?? "COP"}
+                    amount={anyHidePrice ? undefined : depositTotal}
+                    objectLabel="tu reserva"
+                  />
+                )}
+              </Stack>
             )}
           </Stack>
         );
@@ -566,8 +584,10 @@ export default function MultiBookingWizard() {
     <Card
       withBorder
       radius="md"
-      p={isMobile ? "md" : "xl"}
-      style={{ position: "relative", minHeight: FULL_H }}
+      p={isMobile ? "sm" : "xl"}
+      // overflow visible: el Card de Mantine trae overflow hidden, que rompe el
+      // position: sticky de la barra de botones (abajo)
+      style={{ position: "relative", minHeight: FULL_H, overflow: "visible" }}
     >
       <LoadingOverlay visible={submitting} zIndex={1000} />
       <div ref={contentTopRef} />
@@ -587,55 +607,50 @@ export default function MultiBookingWizard() {
             iconSize={26}
             allowNextStepsSelect={false}
           >
-            {steps.slice(0, 5).map((s) => (
+            {steps.map((s) => (
               <Stepper.Step key={s.key} label={s.label} />
             ))}
             <Stepper.Completed>Finish</Stepper.Completed>
           </Stepper>
         ) : (
-          // Mobile: Header compacto con barra de progreso
-          <Paper
-            withBorder
-            p="sm"
-            radius="md"
-            style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 9,
-              background: "var(--mantine-color-body)",
-            }}
-          >
-            <Group justify="space-between" align="center">
-              <Text size="sm" fw={600}>
-                {currentStep < 5 ? steps[currentStep].label : "¡Completado!"}
-              </Text>
-              <Text size="xs" c="dimmed">
-                Paso {Math.min(currentStep + 1, 5)} de 5
-              </Text>
-            </Group>
-            <Divider my={6} />
-            <div
-              style={{
-                height: 6,
-                borderRadius: 9999,
-                overflow: "hidden",
-                background: "var(--mantine-color-gray-2)",
-              }}
+          // Mobile: progreso segmentado con el nombre de cada paso
+          currentStep < FINISH_STEP && (
+            <Group
+              gap={6}
+              wrap="nowrap"
+              align="flex-start"
+              py={6}
             >
-              <div
-                style={{
-                  width: `${progressValue}%`,
-                  height: "100%",
-                  background: "var(--mantine-color-green-6)",
-                  transition: "width 160ms ease",
-                }}
-              />
-            </div>
-          </Paper>
+              {steps.map((s) => {
+                const reached = s.key <= currentStep;
+                return (
+                  <Stack key={s.key} gap={4} style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        height: 4,
+                        borderRadius: 9999,
+                        background: reached
+                          ? "var(--brand-text)"
+                          : "var(--mantine-color-default-border)",
+                        transition: "background 160ms ease",
+                      }}
+                    />
+                    <Text
+                      size="xs"
+                      fw={s.key === currentStep ? 700 : 500}
+                      c={s.key === currentStep ? undefined : "dimmed"}
+                    >
+                      {s.key + 1}. {s.label}
+                    </Text>
+                  </Stack>
+                );
+              })}
+            </Group>
+          )
         )}
 
         {/* ======= STEP CONTENT ======= */}
-        {currentStep < 5 ? (
+        {currentStep < FINISH_STEP ? (
           <Stack gap={isMobile ? "md" : "xl"}>
             {renderStepContent(currentStep)}
           </Stack>
@@ -723,75 +738,15 @@ export default function MultiBookingWizard() {
           </Stack>
         )}
 
-        {/* Acciones desktop */}
-        {!isMobile && currentStep < 5 && !completed && (
-          <Group justify="flex-end" wrap="wrap" gap="sm">
-            {currentStep > 0 && (
-              <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>
-                Atrás
-              </BackBtn>
-            )}
-
-            {currentStep === 0 && (
-              <NextBtn
-                disabled={!canGoNextFromStep0}
-                onClick={() => setCurrentStep(1)}
-              >
-                Siguiente
-              </NextBtn>
-            )}
-
-            {currentStep === 1 && (
-              <NextBtn
-                disabled={!canGoNextFromStep1}
-                onClick={() => setCurrentStep(2)}
-              >
-                Siguiente
-              </NextBtn>
-            )}
-
-            {currentStep === 2 && (
-              <NextBtn
-                disabled={!hasChosenTimes}
-                onClick={() => setCurrentStep(3)}
-              >
-                Continuar
-              </NextBtn>
-            )}
-
-            {currentStep === 3 && (
-              <NextBtn
-                disabled={!hasCustomerData}
-                onClick={() => {
-                  setCurrentStep(4);
-                }}
-              >
-                Continuar
-              </NextBtn>
-            )}
-
-            {currentStep === 4 && (
-              <Button loading={submitting} onClick={handleSchedule}>
-                Reservar
-              </Button>
-            )}
-          </Group>
-        )}
-
-        {/* Acciones mobile sticky */}
-        {isMobile && currentStep < 5 && !completed && (
-          <Paper
-            withBorder
-            radius="md"
-            p="sm"
-            style={{
-              position: "sticky",
-              bottom: 0,
-              zIndex: 10,
-              background: "var(--mantine-color-body)",
-            }}
-          >
-            <Stack gap="sm">
+        {/* Acciones fijas abajo (desktop alineadas a la derecha; móvil lado a lado) */}
+        {currentStep < FINISH_STEP && !completed && (() => {
+          const actions = (
+            <Group
+              justify={isMobile ? "stretch" : "flex-end"}
+              wrap="nowrap"
+              gap="sm"
+              grow={isMobile}
+            >
               {currentStep > 0 && (
                 <BackBtn onClick={() => setCurrentStep((s) => s - 1)}>
                   Atrás
@@ -809,41 +764,50 @@ export default function MultiBookingWizard() {
 
               {currentStep === 1 && (
                 <NextBtn
-                  disabled={!canGoNextFromStep1}
+                  disabled={!hasChosenTimes}
                   onClick={() => setCurrentStep(2)}
                 >
-                  Siguiente
+                  Continuar
                 </NextBtn>
               )}
 
               {currentStep === 2 && (
                 <NextBtn
-                  disabled={!hasChosenTimes}
-                  onClick={() => setCurrentStep(3)}
-                >
-                  Continuar
-                </NextBtn>
-              )}
-
-              {currentStep === 3 && (
-                <NextBtn
                   disabled={!hasCustomerData}
-                  onClick={() => {
-                    setCurrentStep(4);
-                  }}
+                  loading={submitting}
+                  onClick={handleSchedule}
                 >
-                  Continuar
+                  Reservar
                 </NextBtn>
               )}
+            </Group>
+          );
 
-              {currentStep === 4 && (
-                <Button fullWidth loading={submitting} onClick={handleSchedule}>
-                  Reservar
-                </Button>
-              )}
-            </Stack>
-          </Paper>
-        )}
+          // Fija abajo (también en escritorio): con muchos horarios no hay que
+          // bajar hasta el final para continuar
+          return (
+            <Paper
+              withBorder
+              radius="md"
+              p="sm"
+              style={{
+                position: "sticky",
+                // Pegada al borde inferior, por encima del footer del AppShell
+                // (solo trae la versión): así ocupa el mínimo de pantalla
+                bottom: 0,
+                zIndex: "calc(var(--app-shell-footer-z-index, 100) + 1)",
+                // Respeta la barra de inicio del iPhone
+                paddingBottom: "calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom))",
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+                boxShadow: "0 -4px 12px rgba(0, 0, 0, 0.08)",
+                background: "var(--mantine-color-body)",
+              }}
+            >
+              {actions}
+            </Paper>
+          );
+        })()}
       </Stack>
     </Card>
   );

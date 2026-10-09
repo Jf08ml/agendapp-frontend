@@ -64,7 +64,7 @@ function ChatPreview() {
 
 // Pills de pasos (desktop)
 function StepsPreview() {
-  const steps = ["Servicio", "Fecha", "Hora", "Confirmar"];
+  const steps = ["Servicio", "Fecha y hora", "Confirmar"];
   return (
     <Stack gap="xs" align="center">
       <ThemeIcon size={44} radius="xl" color="gray" variant="light">

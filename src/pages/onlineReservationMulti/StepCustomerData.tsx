@@ -10,7 +10,6 @@ import {
   Text,
   Group,
   Badge,
-  Divider,
 } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { useMediaQuery } from "@mantine/hooks";
@@ -331,17 +330,16 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         </Group>
       )}
       {foundName && !isLookingUp && (
-        <Group gap="xs">
-          <Text size="xs" c="dimmed">Cliente encontrado:</Text>
-          <Badge variant="light" size="sm">{foundName}</Badge>
-        </Group>
+        <Text size="sm" c="green.8" fw={600}>
+          ¡Hola de nuevo, {foundName.split(" ")[0]}!
+        </Text>
       )}
       {phoneNotFound && !isLookingUp && (
         <Alert color="yellow" variant="light" p="xs" icon={<IconAlertTriangle size={16} />}>
           <Text size="xs">
-            No encontramos reservas anteriores con el{" "}
+            Es la primera vez que vemos el{" "}
             <Text span fw={700} size="xs">{formatPhoneInternational(phoneNotFound)}</Text>.
-            Si ya has venido antes, revisa que el número esté bien escrito.
+            Si ya has venido, revisa el número.
           </Text>
         </Alert>
       )}
@@ -402,8 +400,6 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
           <LookupFeedback />
         </Stack>
       )}
-
-      <Divider />
 
       {/* ── NOMBRE (siempre obligatorio) ─────────────────────────── */}
       <TextInput
@@ -472,7 +468,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
             locale="es"
             valueFormat="DD/MM/YYYY"
             onChange={(value) => handleInputChange("birthDate", value)}
-            placeholder="Selecciona una fecha 00/00/0000"
+            placeholder="DD/MM/AAAA"
             maxDate={new Date()}
             required={birthDateCfg.required}
             clearable
@@ -485,7 +481,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
       {notesCfg.enabled && (
         <Textarea
           label={notesCfg.label || "Notas"}
-          placeholder="Información adicional..."
+          placeholder={notesCfg.required ? "¿Algo que debamos saber?" : "¿Algo que debamos saber? (opcional)"}
           value={customerDetails.notes || ""}
           onChange={(e) => handleInputChange("notes", e.currentTarget.value)}
           required={notesCfg.required}

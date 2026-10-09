@@ -1,13 +1,13 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Stack,
   Text,
   Paper,
-  Divider,
   Loader,
+  Group,
   Center,
-  Badge,
 } from "@mantine/core";
+import StepHeading from "./StepHeading";
 import { useMediaQuery } from "@mantine/hooks";
 import { DatePicker } from "@mantine/dates";
 import { Service } from "../../services/serviceService";
@@ -19,22 +19,39 @@ import { RootState } from "../../app/store";
 import { checkDaysAvailability } from "../../services/scheduleService";
 dayjs.locale("es");
 
+// Hasta cuántos meses adelante se puede reservar en línea
+const MAX_MONTHS_AHEAD = 12;
+
 interface StepMultiServiceDateProps {
   selectedServices: SelectedService[];
   services: Service[];
   value: ServiceWithDate[];
   onChange: (next: ServiceWithDate[]) => void;
+  /** Se llama solo cuando la persona toca un día (no en la preselección automática) */
+  onDatePicked?: () => void;
 }
+
+// Cuántos meses avanza solo el calendario buscando el primer día disponible
+const AUTO_SEARCH_MAX_MONTHS = 3;
 
 const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   selectedServices,
   services,
   value,
   onChange,
+  onDatePicked,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
   const [loading, setLoading] = useState(false);
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
+  // Meses ("YYYY-MM") cuya disponibilidad ya se consultó para los servicios actuales
+  const loadedMonthsRef = useRef<Set<string>>(new Set());
+  const requestSeqRef = useRef(0);
+
+  // Mes visible en el calendario (controlado para cargar disponibilidad por mes)
+  const [displayedMonth, setDisplayedMonth] = useState<Date>(
+    () => value[0]?.date ?? new Date()
+  );
 
   const organization = useSelector(
     (s: RootState) => s.organization.organization
@@ -42,59 +59,89 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   const organizationId = organization?._id;
 
   // Días de negocio de la organización (fallback)
-  const businessDays = organization?.openingHours?.businessDays ?? [1, 2, 3, 4, 5];
+  const orgBusinessDays = organization?.openingHours?.businessDays;
+  const businessDays = useMemo(
+    () => orgBusinessDays ?? [1, 2, 3, 4, 5],
+    [orgBusinessDays]
+  );
 
-  // Cargar disponibilidad cuando cambian los servicios seleccionados
+  // Búsqueda automática del primer día disponible (ver efecto más abajo)
+  const autoSearchRef = useRef({ active: !value[0]?.date, monthsAdvanced: 0 });
+
+  const maxDate = useMemo(
+    () => dayjs().add(MAX_MONTHS_AHEAD, "month").endOf("month").toDate(),
+    []
+  );
+
+  const servicesWithDuration = useMemo(
+    () =>
+      selectedServices.map((sel) => {
+        const svc = services.find((s) => s._id === sel.serviceId);
+        return {
+          serviceId: sel.serviceId,
+          employeeId: sel.employeeId,
+          duration: svc?.duration ?? 30,
+        };
+      }),
+    [selectedServices, services]
+  );
+
+  // Al cambiar los servicios, la disponibilidad cargada deja de ser válida
   useEffect(() => {
-    if (!organizationId || selectedServices.length === 0) {
-      setAvailability({});
-      return;
-    }
+    loadedMonthsRef.current = new Set();
+    requestSeqRef.current += 1;
+    setAvailability({});
+    setLoading(false);
+  }, [organizationId, servicesWithDuration]);
 
-    const loadAvailability = async () => {
-      setLoading(true);
-      try {
-        // Preparar servicios con duración
-        const servicesWithDuration = selectedServices.map((sel) => {
-          const svc = services.find((s) => s._id === sel.serviceId);
-          return {
-            serviceId: sel.serviceId,
-            employeeId: sel.employeeId,
-            duration: svc?.duration ?? 30,
-          };
-        });
+  // Cargar disponibilidad del mes visible (bajo demanda, un mes a la vez).
+  // El backend acepta hasta 60 días por consulta; la grilla de un mes son ≤ 42.
+  useEffect(() => {
+    if (!organizationId || servicesWithDuration.length === 0) return;
 
-        // Calcular rango: desde hoy hasta 59 días adelante (60 días en total)
-        const startDate = dayjs().format("YYYY-MM-DD");
-        const endDate = dayjs().add(59, "day").format("YYYY-MM-DD");
+    const monthKey = dayjs(displayedMonth).format("YYYY-MM");
+    if (loadedMonthsRef.current.has(monthKey)) return;
 
-        const response = await checkDaysAvailability(
-          organizationId,
-          servicesWithDuration,
-          startDate,
-          endDate
-        );
+    // Incluye los días de meses vecinos que se ven en la grilla (semana inicia lunes)
+    const monthStart = dayjs(displayedMonth).startOf("month");
+    const monthEnd = dayjs(displayedMonth).endOf("month");
+    const gridStart = monthStart.subtract((monthStart.day() + 6) % 7, "day");
+    const gridEnd = monthEnd.add((7 - monthEnd.day()) % 7, "day");
 
-        console.log("checkDaysAvailability response:", response);
+    const today = dayjs().startOf("day");
+    const rangeStart = gridStart.isBefore(today) ? today : gridStart;
+    const rangeEnd = gridEnd.isAfter(maxDate) ? dayjs(maxDate) : gridEnd;
+    if (rangeEnd.isBefore(rangeStart, "day")) return;
 
+    loadedMonthsRef.current.add(monthKey);
+    const seq = ++requestSeqRef.current;
+    setLoading(true);
+
+    checkDaysAvailability(
+      organizationId,
+      servicesWithDuration,
+      rangeStart.format("YYYY-MM-DD"),
+      rangeEnd.format("YYYY-MM-DD")
+    )
+      .then((response) => {
+        if (seq !== requestSeqRef.current) return;
         if (response?.availability) {
-          console.log("Availability loaded:", Object.keys(response.availability).length, "days");
-          setAvailability(response.availability);
+          setAvailability((prev) => ({ ...prev, ...response.availability }));
         } else {
-          console.log("No availability data in response:", response);
+          // Permitir reintento si se vuelve a este mes
+          loadedMonthsRef.current.delete(monthKey);
         }
-      } catch (error) {
+      })
+      .catch((error) => {
+        loadedMonthsRef.current.delete(monthKey);
         console.error("Error loading availability:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      })
+      .finally(() => {
+        if (seq === requestSeqRef.current) setLoading(false);
+      });
+  }, [organizationId, servicesWithDuration, displayedMonth, maxDate]);
 
-    loadAvailability();
-  }, [organizationId, selectedServices, services]);
-
-  // Handler para seleccionar fecha
-  const handleDateSelect = useCallback(
+  const emitDate = useCallback(
     (date: Date | null) => {
       onChange(
         selectedServices.map((s) => ({
@@ -106,6 +153,59 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     },
     [selectedServices, onChange]
   );
+
+  // Handler para seleccionar fecha (toque de la persona)
+  const handleDateSelect = useCallback(
+    (date: Date | null) => {
+      autoSearchRef.current = { active: false, monthsAdvanced: 0 };
+      emitDate(date);
+      if (date) onDatePicked?.();
+    },
+    [emitDate, onDatePicked]
+  );
+
+  // Navegación manual de meses: desde ahí ya no se mueve ni preselecciona solo
+  const handleMonthChange = useCallback((date: Date) => {
+    autoSearchRef.current = { active: false, monthsAdvanced: 0 };
+    setDisplayedMonth(date);
+  }, []);
+
+  // Preselección: al entrar sin día elegido, abrir en el primer día con
+  // disponibilidad (avanzando de mes si el actual está lleno) para que las
+  // horas aparezcan de una vez.
+  useEffect(() => {
+    if (!autoSearchRef.current.active || loading) return;
+    const monthKey = dayjs(displayedMonth).format("YYYY-MM");
+    if (!loadedMonthsRef.current.has(monthKey)) return;
+
+    const today = dayjs().format("YYYY-MM-DD");
+    const firstAvailable = Object.keys(availability)
+      .filter(
+        (d) =>
+          d.startsWith(monthKey) &&
+          d >= today &&
+          availability[d] &&
+          businessDays.includes(dayjs(d).day())
+      )
+      .sort()[0];
+
+    if (firstAvailable) {
+      autoSearchRef.current.active = false;
+      emitDate(dayjs(firstAvailable).toDate());
+      return;
+    }
+
+    const next = dayjs(displayedMonth).add(1, "month").startOf("month");
+    if (
+      autoSearchRef.current.monthsAdvanced < AUTO_SEARCH_MAX_MONTHS &&
+      !next.isAfter(maxDate)
+    ) {
+      autoSearchRef.current.monthsAdvanced += 1;
+      setDisplayedMonth(next.toDate());
+    } else {
+      autoSearchRef.current.active = false;
+    }
+  }, [availability, loading, displayedMonth, businessDays, emitDate, maxDate]);
 
   // Determinar si un día está deshabilitado (solo días pasados y no laborables)
   // NO deshabilitamos días sin disponibilidad para poder aplicar estilos
@@ -141,44 +241,43 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
         return {};
       }
 
-      // Si está seleccionado, mostrar estilo de selección prominente
+      // Seleccionado: color de marca de la organización
       if (isSelected) {
         return {
           style: {
-            backgroundColor: "#228be6",
-            color: "#ffffff",
+            backgroundColor: "var(--mantine-primary-color-filled)",
+            color: "var(--mantine-primary-color-contrast)",
+            // Anillo legible aunque la marca sea muy clara (amarillo, rosa pastel)
+            boxShadow: "inset 0 0 0 2px var(--brand-text)",
             fontWeight: 700,
-            borderRadius: "50%",
-            boxShadow: "0 0 0 2px #228be6, 0 0 0 4px #ffffff",
           },
         };
       }
 
-      // Si tenemos datos de disponibilidad
-      if (Object.keys(availability).length > 0) {
-        const hasAvailability = availability[dateStr];
+      const hasAvailability = availability[dateStr];
 
-        if (hasAvailability === false) {
-          return {
-            disabled: true, // Deshabilitar para que no se pueda seleccionar
-            style: {
-              backgroundColor: "#ffe0e0",
-              color: "#c92a2a",
-              textDecoration: "line-through",
-              cursor: "not-allowed",
-            },
-          };
-        }
+      // Sin horarios: apagado y tachado, no seleccionable
+      if (hasAvailability === false) {
+        return {
+          disabled: true,
+          style: {
+            color: "var(--mantine-color-gray-5)",
+            textDecoration: "line-through",
+            cursor: "not-allowed",
+          },
+        };
+      }
 
-        if (hasAvailability === true) {
-          return {
-            style: {
-              backgroundColor: isToday ? "#d0ebff" : "#d3f9d8",
-              color: isToday ? "#1864ab" : "#2b8a3e",
-              fontWeight: 700,
-            },
-          };
-        }
+      // Con horarios: verde suave
+      if (hasAvailability === true) {
+        return {
+          style: {
+            backgroundColor: "var(--mantine-color-green-light)",
+            color: "var(--mantine-color-green-light-color)",
+            fontWeight: 700,
+            ...(isToday ? { outline: "1px solid var(--mantine-color-green-5)" } : {}),
+          },
+        };
       }
 
       return {};
@@ -186,132 +285,63 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
     [availability, businessDays, selectedDate]
   );
 
-  // Contar días disponibles
-  const availableDaysCount = useMemo(
-    () => Object.values(availability).filter(Boolean).length,
-    [availability]
+  // Mes visible sin ningún día con horarios
+  const displayedMonthKey = dayjs(displayedMonth).format("YYYY-MM");
+  const displayedMonthName = dayjs(displayedMonth).format("MMMM");
+  const monthEntries = useMemo(
+    () =>
+      Object.entries(availability).filter(([d]) => d.startsWith(displayedMonthKey)),
+    [availability, displayedMonthKey]
   );
-
-  const hasAvailabilityData = Object.keys(availability).length > 0;
+  const monthIsFull =
+    !loading && monthEntries.length > 0 && !monthEntries.some(([, ok]) => ok);
 
   return (
-    <Stack>
-      <Text fw={600} size={isMobile ? "sm" : "md"}>
-        Selecciona el día de tu cita
-      </Text>
-
-      <Divider />
-
-      <Stack gap="xs">
-        {hasAvailabilityData && (
-          <Text c="dimmed" size="sm">
-            Los días en <Text span c="green" fw={600}>verde</Text> tienen horarios disponibles.
-            <Text span c="red" fw={600}> Los días tachados</Text> no tienen disponibilidad.
-          </Text>
-        )}
-
-        {loading ? (
-          <Center py="xl">
-            <Stack align="center" gap="xs">
-              <Loader size="sm" />
-              <Text size="sm" c="dimmed">
-                Verificando disponibilidad...
-              </Text>
-            </Stack>
-          </Center>
-        ) : (
+    <Stack gap="sm">
+      <StepHeading
+        title="Elige el día"
+        hint={
           <>
-            {availableDaysCount > 0 && (
-              <Badge variant="light" color="green" size="sm">
-                {availableDaysCount} días con disponibilidad
-              </Badge>
-            )}
-
-            {availableDaysCount === 0 && hasAvailabilityData && (
-              <Badge variant="light" color="red" size="sm">
-                No hay disponibilidad en los próximos días
-              </Badge>
-            )}
-
-            <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
-              <DatePicker
-                minDate={new Date()}
-                maxDate={dayjs().add(59, "day").toDate()}
-                value={value[0]?.date || null}
-                onChange={handleDateSelect}
-                size={isMobile ? "sm" : "md"}
-                style={{ width: "100%" }}
-                locale="es"
-                getDayProps={getDayProps}
-                excludeDate={isDisabledDay}
-              />
-            </Paper>
-
-            {/* Día seleccionado */}
-            {selectedDate && (
-              <Paper withBorder p="sm" radius="md" bg="blue.0">
-                <Text size="sm" fw={600} c="blue.7">
-                  Día seleccionado: {dayjs(selectedDate).format("dddd, D [de] MMMM [de] YYYY")}
-                </Text>
-              </Paper>
-            )}
-
-            {/* Leyenda de colores */}
-            {hasAvailabilityData && (
-              <Stack gap={4}>
-                <Text size="xs" c="dimmed" fw={500}>
-                  Leyenda:
-                </Text>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        backgroundColor: "#d3f9d8",
-                        borderRadius: 4,
-                        border: "1px solid #2b8a3e",
-                      }}
-                    />
-                    <Text size="xs" c="dimmed">
-                      Disponible
-                    </Text>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        backgroundColor: "#ffe0e0",
-                        borderRadius: 4,
-                        border: "1px solid #c92a2a",
-                      }}
-                    />
-                    <Text size="xs" c="dimmed">
-                      Sin disponibilidad
-                    </Text>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        backgroundColor: "#228be6",
-                        borderRadius: "50%",
-                        border: "2px solid #228be6",
-                        boxShadow: "0 0 0 2px #ffffff",
-                      }}
-                    />
-                    <Text size="xs" c="dimmed">
-                      Seleccionado
-                    </Text>
-                  </div>
-                </div>
-              </Stack>
-            )}
+            Los días en{" "}
+            <Text span c="green" fw={600} inherit>
+              verde
+            </Text>{" "}
+            tienen horarios libres.
           </>
-        )}
-      </Stack>
+        }
+      />
+
+      <Paper withBorder radius="md" p={isMobile ? 6 : "md"} pos="relative">
+        <Center>
+          <DatePicker
+            minDate={new Date()}
+            maxDate={maxDate}
+            date={displayedMonth}
+            onDateChange={handleMonthChange}
+            value={value[0]?.date || null}
+            onChange={handleDateSelect}
+            size="md"
+            locale="es"
+            getDayProps={getDayProps}
+            excludeDate={isDisabledDay}
+          />
+        </Center>
+      </Paper>
+
+      {loading && (
+        <Group gap="xs" justify="center">
+          <Loader size="xs" />
+          <Text size="sm" c="dimmed">
+            Buscando días libres…
+          </Text>
+        </Group>
+      )}
+
+      {monthIsFull && (
+        <Text size="sm" c="dimmed" ta="center">
+          No quedan horarios en {displayedMonthName}. Prueba el mes siguiente.
+        </Text>
+      )}
     </Stack>
   );
 };

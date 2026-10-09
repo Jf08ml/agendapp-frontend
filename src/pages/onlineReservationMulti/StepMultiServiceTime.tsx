@@ -2,17 +2,16 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Stack,
-  Group,
-  Paper,
   Text,
-  Notification,
+  Paper,
   Loader,
   Divider,
-  ScrollArea,
   SimpleGrid,
   UnstyledButton,
+  Anchor,
   Button,
   Switch,
+  useMatches,
 } from "@mantine/core";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -30,6 +29,9 @@ import type { RecurrencePattern, SeriesPreview as SeriesPreviewType } from "../.
 import RecurrenceSelector from "../../components/customCalendar/components/RecurrenceSelector";
 import SeriesPreviewComponent from "../../components/customCalendar/components/SeriesPreview";
 import { previewRecurringReservations } from "../../services/reservationService";
+import StepHeading from "./StepHeading";
+
+const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 interface StepMultiServiceTimeProps {
   organizationId: string;
@@ -78,8 +80,20 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     }[]
   >([]);
 
-  // UI state: mostrar/ocultar grid
-  const [showBlockPicker, setShowBlockPicker] = useState(true);
+  // La recurrencia es poco usada: queda plegada tras un enlace
+  const [showRecurrence, setShowRecurrence] = useState(false);
+
+  // Cada franja (Mañana/Tarde/Noche) muestra 2 filas y el resto tras "Ver más"
+  const cols = useMatches({ base: 3, sm: 4, md: 5, lg: 6 });
+  const visiblePerPeriod = cols * 2;
+  const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set());
+  const togglePeriod = (period: string) =>
+    setExpandedPeriods((prev) => {
+      const next = new Set(prev);
+      if (next.has(period)) next.delete(period);
+      else next.add(period);
+      return next;
+    });
 
   const [previewLoading, setPreviewLoading] = useState(false);
 
@@ -129,11 +143,6 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recurrencePattern, isBlockSelected, isRecurrenceActive]);
-
-  // Al seleccionar bloque: colapsar el grid
-  useEffect(() => {
-    setShowBlockPicker(!isBlockSelected);
-  }, [isBlockSelected]);
 
   useEffect(() => {
     const load = async () => {
@@ -200,6 +209,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
         }));
 
         setBlockOptions(mapped);
+        setExpandedPeriods(new Set());
       } finally {
         setLoading(false);
       }
@@ -215,7 +225,6 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     startStr?: string
   ) => {
     onChange({ startTime: start, intervals, startTimeStr: startStr });
-    setShowBlockPicker(false);
   };
 
   // Tile compacto para la grilla de opciones
@@ -228,27 +237,30 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     active: boolean;
     onClick: () => void;
   }) => {
-    const bg = active ? "var(--mantine-color-green-light)" : "white";
-    const borderColor = active
-      ? "var(--mantine-color-green-filled)"
-      : "var(--mantine-color-gray-3)";
-
     return (
       <UnstyledButton
         onClick={onClick}
+        aria-pressed={active}
         style={{
           width: "100%",
           padding: 10,
-          minHeight: 44,
-          borderRadius: 12,
-          border: `1px solid ${borderColor}`,
-          background: bg,
+          minHeight: 46,
+          borderRadius: 10,
+          border: `1px solid ${
+            active
+              ? "var(--brand-text)"
+              : "var(--mantine-color-default-border)"
+          }`,
+          background: active
+            ? "var(--mantine-primary-color-filled)"
+            : "var(--mantine-color-body)",
+          color: active ? "var(--mantine-primary-color-contrast)" : undefined,
           cursor: "pointer",
           textAlign: "center",
           userSelect: "none",
         }}
       >
-        <Text fw={800} size="sm" style={{ lineHeight: 1.15 }}>
+        <Text fw={700} size="sm" inherit style={{ lineHeight: 1.15 }}>
           {label}
         </Text>
       </UnstyledButton>
@@ -259,158 +271,134 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   if (loading) {
     return (
       <Stack align="center" justify="center" style={{ minHeight: 120 }} gap="xs">
-        <Loader />
-        <Text size="sm">Buscando horarios disponibles...</Text>
+        <Loader size="sm" />
+        <Text size="sm" c="dimmed">Buscando horas libres…</Text>
       </Stack>
     );
   }
 
-  if (dates.length === 0) {
-    return (
-      <Stack align="center" justify="center" style={{ minHeight: 120 }}>
-        <Text c="dimmed" size="sm">
-          Selecciona primero al menos una fecha.
-        </Text>
-      </Stack>
-    );
-  }
+  if (dateMissing) return null;
 
-  const cols = { base: 2, sm: 3, md: 4, lg: 5 };
+  const totalMin = selectedServices.reduce((acc, sel) => {
+    const svc = services.find((s) => s._id === sel.serviceId);
+    return acc + (svc?.duration ?? 0);
+  }, 0);
+  const uniqueEmpIds = Array.from(
+    new Set(selectedServices.map((s) => s.employeeId).filter(Boolean) as string[])
+  );
+  const who =
+    uniqueEmpIds.length === 1
+      ? employees.find((e) => e._id === uniqueEmpIds[0])?.names
+      : undefined;
+
+  // Agrupar por franja usando la hora del string del backend (sin conversión de timezone)
+  const periodOf = (block: (typeof blockOptions)[number]): string => {
+    const startStr = (block as any).startStr as string | undefined;
+    const match = startStr?.match(/T(\d{2}):/);
+    const hour = match ? Number(match[1]) : block.start.getHours();
+    if (hour < 12) return "Mañana";
+    if (hour < 18) return "Tarde";
+    return "Noche";
+  };
+  const groups = ["Mañana", "Tarde", "Noche"]
+    .map((period) => ({
+      period,
+      blocks: blockOptions.filter((b) => periodOf(b) === period),
+    }))
+    .filter((g) => g.blocks.length > 0);
 
   return (
-    <Stack gap="xs">
-      <Text fw={800} size="md">
-        Selecciona horarios
-      </Text>
-      <Divider />
+    <Stack gap="sm">
+      <StepHeading
+        title="Elige la hora"
+        hint={[
+          capitalize(dayjs(dates[0].date).format("dddd D [de] MMMM")),
+          `${totalMin} min`,
+          who ? `con ${who}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      />
 
       {blockOptions.length === 0 ? (
-        <Notification color="red" title="Sin bloques disponibles">
-          No hay bloques disponibles para la combinación seleccionada (verifica
-          profesionales y duración).
-        </Notification>
-      ) : (
-        <Paper withBorder p="sm">
-          {/* Header */}
-          <Group justify="space-between" gap="xs" wrap="nowrap" mb={4}>
-            <Text fw={800} size="sm" lineClamp={1}>
-              {selectedServices.length} servicios seleccionados
-            </Text>
-
-            <Text size="xs" c="dimmed">
-              {dates?.[0]?.date
-                ? dayjs(dates[0].date).format("DD/MM/YYYY")
-                : "-"}
-            </Text>
-          </Group>
-
-          {/* Subheader */}
-          <Text size="xs" c="dimmed" mb="xs">
-            {(() => {
-              const totalMin = selectedServices.reduce((acc, sel) => {
-                const svc = services.find((s) => s._id === sel.serviceId);
-                return acc + (svc?.duration ?? 0);
-              }, 0);
-
-              const empIds = selectedServices
-                .map((s) => s.employeeId)
-                .filter(Boolean) as string[];
-              const uniqueEmpIds = Array.from(new Set(empIds));
-
-              const who =
-                uniqueEmpIds.length === 1
-                  ? employees.find((e) => e._id === uniqueEmpIds[0])?.names ??
-                    "Sin preferencia"
-                  : "Múltiples profesionales";
-
-              return `${who} · ${totalMin} min`;
-            })()}
+        <Paper withBorder radius="md" p="md" ta="center">
+          <Text size="sm" c="dimmed">
+            Este día ya no tiene horarios. Elige otro día en el calendario.
           </Text>
+        </Paper>
+      ) : (
+        <Stack gap="sm">
+          {groups.map(({ period, blocks }) => {
+            const isSelectedBlock = (block: (typeof blocks)[number]) =>
+              isBlockSelected &&
+              dayjs(value!.startTime as Date).valueOf() === dayjs(block.start).valueOf();
+            // Si sobraría un solo horario no vale la pena esconderlo
+            const hidden = blocks.length - visiblePerPeriod;
+            const collapsible = hidden > 1;
+            // La hora elegida nunca queda escondida tras "Ver más"
+            const selectedIsHidden = blocks.slice(visiblePerPeriod).some(isSelectedBlock);
+            const expanded = !collapsible || expandedPeriods.has(period) || selectedIsHidden;
+            const shown = expanded ? blocks : blocks.slice(0, visiblePerPeriod);
 
-          {/* Contenido */}
-          {isBlockSelected && !showBlockPicker ? (
-            <>
-              <Group justify="space-between" align="center" mb="xs">
-                <Text fw={800} size="sm">
-                  Hora seleccionada
-                </Text>
-                <Button
-                  size="xs"
-                  variant="light"
-                  onClick={() => setShowBlockPicker(true)}
-                >
-                  Cambiar hora
-                </Button>
-              </Group>
-
-              <Stack gap="xs">
-                {(value?.intervals ?? []).map((i: any, idx: number) => {
-                  const svc = services.find((s) => s._id === i.serviceId);
-                  const durationMin =
-                    typeof svc?.duration === "number" ? svc.duration : null;
-
-                  const startTime =
-                    i.startStr ? formatTimeFromISO(i.startStr, timeFormat) : formatTime(i.from, timeFormat);
-                  const endTime =
-                    i.endStr ? formatTimeFromISO(i.endStr, timeFormat) : formatTime(i.to, timeFormat);
+            return (
+            <Stack key={period} gap={6}>
+              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+                {period}
+              </Text>
+              <SimpleGrid cols={cols} spacing="xs">
+                {shown.map((block) => {
+                  const startStr = (block as any).startStr as string | undefined;
+                  const isSelected = isSelectedBlock(block);
 
                   return (
-                    <Stack key={`${i.serviceId}-${idx}`} gap={2}>
-                      <Text size="sm" fw={700} lineClamp={1}>
-                        {svc?.name ?? "Servicio"}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {durationMin != null && `${durationMin} min · `}
-                        {startTime} - {endTime}
-                      </Text>
-                    </Stack>
+                    <TimeTile
+                      key={block.start.toISOString()}
+                      label={
+                        startStr
+                          ? formatTimeFromISO(startStr, timeFormat)
+                          : formatTime(block.start, timeFormat)
+                      }
+                      active={isSelected}
+                      onClick={() =>
+                        handleBlockSelect(block.start, block.intervals, startStr)
+                      }
+                    />
                   );
                 })}
-              </Stack>
-            </>
-          ) : (
-            <>
-              <Group justify="space-between" mb="xs">
-                <Text fw={700} size="sm">
-                  Horas disponibles (inicio-fin)
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {blockOptions.length} opciones
-                </Text>
-              </Group>
-
-              <ScrollArea h={260} offsetScrollbars>
-                <SimpleGrid cols={cols} spacing="xs">
-                  {blockOptions.map((block) => {
-                    const isSelected =
-                      isBlockSelected &&
-                      dayjs(value!.startTime as Date).valueOf() ===
-                        dayjs(block.start).valueOf();
-
-                    return (
-                      <TimeTile
-                        key={block.start.toISOString()}
-                        label={block.rangeLabel}
-                        active={isSelected}
-                        onClick={() =>
-                          handleBlockSelect(
-                            block.start,
-                            block.intervals,
-                            (block as any).startStr
-                          )
-                        }
-                      />
-                    );
-                  })}
-                </SimpleGrid>
-              </ScrollArea>
-            </>
-          )}
-        </Paper>
+              </SimpleGrid>
+              {collapsible && !selectedIsHidden && (
+                <Button
+                  variant="subtle"
+                  size="compact-sm"
+                  onClick={() => togglePeriod(period)}
+                  style={{ alignSelf: "center" }}
+                >
+                  {expanded
+                    ? "Ver menos"
+                    : `Ver ${hidden} ${hidden === 1 ? "horario" : "horarios"} más`}
+                </Button>
+              )}
+            </Stack>
+            );
+          })}
+        </Stack>
       )}
 
       {/* 🔁 Sección de recurrencia (solo cuando ya hay horario seleccionado) */}
-      {isBlockSelected && (
+      {isBlockSelected && !showRecurrence && !isRecurrenceActive && (
+        <Anchor
+          component="button"
+          type="button"
+          size="sm"
+          ta="left"
+          mt="xs"
+          onClick={() => setShowRecurrence(true)}
+        >
+          ¿Quieres repetir esta cita cada semana?
+        </Anchor>
+      )}
+
+      {isBlockSelected && (showRecurrence || isRecurrenceActive) && (
         <>
           <Divider my="xs" />
           <Switch

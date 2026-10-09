@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 import { AppDispatch, RootState } from "./app/store";
-import { createTheme, MantineProvider } from "@mantine/core";
+import { createTheme, MantineProvider, type CSSVariablesResolver } from "@mantine/core";
+import { getReadableBrandColor } from "./utils/brandColor";
 import { DatesProvider } from "@mantine/dates";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -231,6 +232,25 @@ export default function AppWithBranding() {
     // Branding de color que ya tenías
     colors,
     primaryColor,
+
+    // Texto negro (en vez de blanco) sobre botones/badges/checks rellenos cuando
+    // el color de marca es claro (amarillo, rosa pastel…). Expone también
+    // --mantine-primary-color-contrast para estilos propios.
+    autoContrast: true,
+  });
+
+  // Color de marca legible como texto/borde sobre el fondo (enlaces, acentos):
+  // con una marca clara, el color tal cual sobre blanco no se lee.
+  const brandTextLight = isHex ? getReadableBrandColor(colorValue, "light") : null;
+  const brandTextDark = isHex ? getReadableBrandColor(colorValue, "dark") : null;
+  const cssVariablesResolver: CSSVariablesResolver = () => ({
+    variables: {},
+    light: brandTextLight
+      ? { "--mantine-color-anchor": brandTextLight, "--brand-text": brandTextLight }
+      : { "--brand-text": "var(--mantine-primary-color-filled)" },
+    dark: brandTextDark
+      ? { "--mantine-color-anchor": brandTextDark, "--brand-text": brandTextDark }
+      : { "--brand-text": "var(--mantine-primary-color-filled)" },
   });
 
   // En signup domain: no loading, no org needed
@@ -244,7 +264,7 @@ export default function AppWithBranding() {
     return <CustomLoaderHtml loadingText="Cargando tu espacio..." />;
 
   return (
-    <MantineProvider theme={theme}>
+    <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver}>
       <DatesProvider settings={{ locale: "es", firstDayOfWeek: 1 }}>
         <ModalsProvider>
           <Notifications />
