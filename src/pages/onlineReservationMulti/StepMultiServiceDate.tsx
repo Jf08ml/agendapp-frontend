@@ -63,12 +63,17 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
   );
   const organizationId = organization?._id;
 
-  // Días de negocio de la organización (fallback)
+  // Días abiertos de la organización: misma regla que getOpenDays del backend.
+  // Con horario semanal habilitado manda ese; openingHours.businessDays es el
+  // sistema antiguo y puede quedar desactualizado (bloqueaba días abiertos).
+  const orgWeeklySchedule = organization?.weeklySchedule;
   const orgBusinessDays = organization?.openingHours?.businessDays;
-  const businessDays = useMemo(
-    () => orgBusinessDays ?? [1, 2, 3, 4, 5],
-    [orgBusinessDays]
-  );
+  const businessDays = useMemo(() => {
+    if (orgWeeklySchedule?.enabled && orgWeeklySchedule.schedule) {
+      return orgWeeklySchedule.schedule.filter((s) => s.isOpen).map((s) => s.day);
+    }
+    return orgBusinessDays ?? [1, 2, 3, 4, 5];
+  }, [orgWeeklySchedule, orgBusinessDays]);
 
   // Búsqueda automática del primer día disponible (ver efecto más abajo)
   const autoSearchRef = useRef({ active: !value[0]?.date, monthsAdvanced: 0 });
