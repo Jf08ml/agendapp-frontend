@@ -3,7 +3,7 @@ import { parseTime } from "../utils/timeOfDay";
 
 /**
  * Selector de hora con AM/PM explícito. Reemplaza al <TimeInput> de Mantine (que es un
- * <input type="time"> nativo) en los formularios de bloqueos: en el celular el campo
+ * <input type="time"> nativo) en bloqueos y horarios semanales: en el celular el campo
  * nativo sigue el formato del sistema y el AM/PM es un segmento fácil de pasar por alto,
  * así que "02:00" se guardaba como 02:00 de la madrugada aunque la persona quisiera 2 PM.
  *
@@ -31,6 +31,7 @@ interface TimeOfDayInputProps {
   error?: boolean;
   /** Los selectores se abren dentro de modales: debe quedar por encima de ellos */
   zIndex?: number;
+  disabled?: boolean;
 }
 
 export default function TimeOfDayInput({
@@ -40,6 +41,7 @@ export default function TimeOfDayInput({
   timeFormat,
   error,
   zIndex = 1100,
+  disabled,
 }: TimeOfDayInputProps) {
   const is24h = timeFormat === "24h";
   const { h, m } = parseTime(value);
@@ -52,6 +54,7 @@ export default function TimeOfDayInput({
     size: "sm" as const,
     allowDeselect: false,
     error: !!error,
+    disabled,
     comboboxProps: { zIndex, withinPortal: true },
     maxDropdownHeight: 220,
   };

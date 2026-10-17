@@ -23,7 +23,6 @@ import {
   Textarea,
   Anchor,
 } from "@mantine/core";
-import { TimeInput } from "@mantine/dates";
 import { UseFormReturnType } from "@mantine/form";
 import {
   addMonths,
@@ -44,6 +43,8 @@ import {
 import { BiPlus, BiTrash } from "react-icons/bi";
 import { RootState } from "../../../../../app/store";
 import { useHolidays } from "../../../../../hooks/useHolidays";
+import TimeOfDayInput from "../../../../../components/TimeOfDayInput";
+import { formatTimeLabel } from "../../../../../utils/timeOfDay";
 import SectionCard from "../SectionCard";
 import WeeklyScheduleSection from "../WeeklyScheduleSection";
 import type { FormValues } from "../../schema";
@@ -134,7 +135,7 @@ export default function OpeningHoursTab({
   );
 
   const addBreak = () => {
-    if (!isEditing) return;
+    if (!isEditing || newBreak.start >= newBreak.end) return;
     const nb: OpeningBreak = {
       day: Number(newBreak.day),
       start: toHHmmStrict(toHHmmLenient(newBreak.start)),
@@ -156,6 +157,9 @@ export default function OpeningHoursTab({
   const [currentDate, setCurrentDate] = useState(new Date());
   const organization = useSelector((s: RootState) => s.organization.organization);
   const country = organization?.default_country || "CO";
+  const timeFormat = organization?.timeFormat;
+  const is24h = timeFormat === "24h";
+  const baseRangeInvalid = !!opening.start && !!opening.end && opening.start >= opening.end;
   const blockHolidays = form.values.blockHolidaysForReservations ?? false;
   const allowedDates: string[] = (form.values.allowedHolidayDates as string[]) ?? [];
 
@@ -211,19 +215,28 @@ export default function OpeningHoursTab({
         )}
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-          <TimeInput
+          <TimeOfDayInput
             label="Apertura"
-            {...form.getInputProps("openingHours.start")}
-            withSeconds={false}
+            value={opening.start}
+            onChange={(t) => form.setFieldValue("openingHours.start", t)}
+            timeFormat={timeFormat}
             disabled={!isEditing}
           />
-          <TimeInput
+          <TimeOfDayInput
             label="Cierre"
-            {...form.getInputProps("openingHours.end")}
-            withSeconds={false}
+            value={opening.end}
+            onChange={(t) => form.setFieldValue("openingHours.end", t)}
+            timeFormat={timeFormat}
+            error={baseRangeInvalid}
             disabled={!isEditing}
           />
         </SimpleGrid>
+        {baseRangeInvalid && (
+          <Text size="sm" c="red" mt={4}>
+            El cierre ({formatTimeLabel(opening.end, is24h)}) debe ser después de la apertura (
+            {formatTimeLabel(opening.start, is24h)}). Revisa AM/PM.
+          </Text>
+        )}
 
         <Box mt="md">
           <Text fw={600} mb={6}>Días laborables</Text>
@@ -260,24 +273,19 @@ export default function OpeningHoursTab({
               data={DAY_LABELS.map((l, i) => ({ value: String(i), label: l }))}
               disabled={!isEditing}
             />
-            <TimeInput
+            <TimeOfDayInput
               label="Desde"
               value={newBreak.start}
-              onChange={(e) => {
-                const start = e.currentTarget.value;
-                setNewBreak((s) => ({ ...s, start }));
-              }}
-              onBlur={() => setNewBreak((s) => ({ ...s, start: toHHmmStrict(toHHmmLenient(s.start)) }))}
+              onChange={(start) => setNewBreak((s) => ({ ...s, start }))}
+              timeFormat={timeFormat}
               disabled={!isEditing}
             />
-            <TimeInput
+            <TimeOfDayInput
               label="Hasta"
               value={newBreak.end}
-              onChange={(e) => {
-                const end = e.currentTarget.value;
-                setNewBreak((s) => ({ ...s, end }));
-              }}
-              onBlur={() => setNewBreak((s) => ({ ...s, end: toHHmmStrict(toHHmmLenient(s.end)) }))}
+              onChange={(end) => setNewBreak((s) => ({ ...s, end }))}
+              timeFormat={timeFormat}
+              error={newBreak.start >= newBreak.end}
               disabled={!isEditing}
             />
             <TextInput

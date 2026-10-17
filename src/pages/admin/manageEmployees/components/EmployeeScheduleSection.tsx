@@ -24,7 +24,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { TimeInput, DatePickerInput } from "@mantine/dates";
+import { DatePickerInput } from "@mantine/dates";
 import { BiPlus, BiTrash, BiSave, BiChevronDown, BiChevronUp } from "react-icons/bi";
 import { IoInformationCircleOutline } from "react-icons/io5";
 import { showNotification } from "@mantine/notifications";
@@ -523,7 +523,7 @@ export default function EmployeeScheduleSection({
                     )}
                     {daySchedule.isAvailable && (
                       <Badge color="green" variant="light">
-                        {daySchedule.start} - {daySchedule.end}
+                        {formatTimeLabel(daySchedule.start, is24h)} - {formatTimeLabel(daySchedule.end, is24h)}
                       </Badge>
                     )}
                   </Group>
@@ -546,61 +546,49 @@ export default function EmployeeScheduleSection({
 
                 <Collapse in={isExpanded && daySchedule.isAvailable}>
                   <Stack gap="md" mt="md">
-                    <Group grow>
-                      <TimeInput
+                    <Group grow align="flex-start">
+                      <TimeOfDayInput
                         label="Hora de inicio"
                         value={daySchedule.start}
-                        onChange={(e) =>
-                          handleTimeChange(
-                            daySchedule.day,
-                            "start",
-                            e.currentTarget.value
-                          )
-                        }
+                        onChange={(t) => handleTimeChange(daySchedule.day, "start", t)}
+                        timeFormat={is24h ? "24h" : "12h"}
                       />
-                      <TimeInput
+                      <TimeOfDayInput
                         label="Hora de fin"
                         value={daySchedule.end}
-                        onChange={(e) =>
-                          handleTimeChange(
-                            daySchedule.day,
-                            "end",
-                            e.currentTarget.value
-                          )
-                        }
+                        onChange={(t) => handleTimeChange(daySchedule.day, "end", t)}
+                        timeFormat={is24h ? "24h" : "12h"}
+                        error={daySchedule.start >= daySchedule.end}
                       />
                     </Group>
+                    {daySchedule.start >= daySchedule.end && (
+                      <Text size="sm" c="red">
+                        La hora de fin ({formatTimeLabel(daySchedule.end, is24h)}) debe ser después de la de
+                        inicio ({formatTimeLabel(daySchedule.start, is24h)}). Revisa AM/PM.
+                      </Text>
+                    )}
 
                     <Divider label="Descansos" labelPosition="left" />
 
                     {daySchedule.breaks.map((brk, breakIndex) => (
                       <Group key={breakIndex} align="flex-end">
-                        <TimeInput
-                          label="Desde"
-                          value={brk.start}
-                          onChange={(e) =>
-                            handleBreakChange(
-                              daySchedule.day,
-                              breakIndex,
-                              "start",
-                              e.currentTarget.value
-                            )
-                          }
-                          style={{ flex: 1 }}
-                        />
-                        <TimeInput
-                          label="Hasta"
-                          value={brk.end}
-                          onChange={(e) =>
-                            handleBreakChange(
-                              daySchedule.day,
-                              breakIndex,
-                              "end",
-                              e.currentTarget.value
-                            )
-                          }
-                          style={{ flex: 1 }}
-                        />
+                        <Box style={{ flex: 1 }}>
+                          <TimeOfDayInput
+                            label="Desde"
+                            value={brk.start}
+                            onChange={(t) => handleBreakChange(daySchedule.day, breakIndex, "start", t)}
+                            timeFormat={is24h ? "24h" : "12h"}
+                          />
+                        </Box>
+                        <Box style={{ flex: 1 }}>
+                          <TimeOfDayInput
+                            label="Hasta"
+                            value={brk.end}
+                            onChange={(t) => handleBreakChange(daySchedule.day, breakIndex, "end", t)}
+                            timeFormat={is24h ? "24h" : "12h"}
+                            error={brk.start >= brk.end}
+                          />
+                        </Box>
                         <ActionIcon
                           color="red"
                           variant="light"
