@@ -43,7 +43,7 @@ export default function ReminderSettingsTab({
       >
         <Stack gap="md">
           <Tooltip
-            label="Disponible en Plan Esencial o superior"
+            label="Disponible en Plan Starter o superior"
             disabled={canUseReminders}
             withArrow
           >
@@ -51,7 +51,7 @@ export default function ReminderSettingsTab({
               label="Activar recordatorios automáticos"
               description={canUseReminders
                 ? "Los clientes recibirán un mensaje de WhatsApp recordándoles su cita"
-                : "Disponible en Plan Esencial o superior"}
+                : "Disponible en Plan Starter o superior"}
               {...form.getInputProps("reminderSettings.enabled", { type: "checkbox" })}
               disabled={!isEditing || !canUseReminders}
             />
@@ -59,7 +59,7 @@ export default function ReminderSettingsTab({
 
           {!canUseReminders && (
             <Alert icon={<IconLock size={14} />} color="violet" variant="light">
-              <Text size="sm">Los recordatorios automáticos están disponibles desde el <strong>Plan Esencial</strong>.</Text>
+              <Text size="sm">Los recordatorios automáticos están disponibles desde el <strong>Plan Starter</strong>.</Text>
             </Alert>
           )}
 

@@ -78,6 +78,7 @@ const EMPTY_PLAN: PlanInput = {
     professionalLanding: false,
     brandingVisible: false,
     maxRemindersPerAppointment: 0,
+    maxWhatsappAppointmentsPerMonth: null,
   },
 };
 
@@ -163,6 +164,7 @@ export default function SuperadminPlans() {
         professionalLanding: plan.limits.professionalLanding ?? false,
         brandingVisible: plan.limits.brandingVisible ?? false,
         maxRemindersPerAppointment: plan.limits.maxRemindersPerAppointment ?? 0,
+        maxWhatsappAppointmentsPerMonth: plan.limits.maxWhatsappAppointmentsPerMonth ?? null,
       },
     });
     setNewChar("");
@@ -558,6 +560,14 @@ export default function SuperadminPlans() {
                   min={0}
                   value={form.limits.maxAppointmentsPerMonth ?? ""}
                   onChange={(v) => setLimit("maxAppointmentsPerMonth", v === "" ? null : Number(v))}
+                />
+                <NumberInput
+                  label="Máx. citas con WhatsApp/mes"
+                  description="Confirmación y recordatorios automáticos"
+                  placeholder="Ilimitado"
+                  min={0}
+                  value={form.limits.maxWhatsappAppointmentsPerMonth ?? ""}
+                  onChange={(v) => setLimit("maxWhatsappAppointmentsPerMonth", v === "" ? null : Number(v))}
                 />
                 <NumberInput
                   label="Almacenamiento (GB)"

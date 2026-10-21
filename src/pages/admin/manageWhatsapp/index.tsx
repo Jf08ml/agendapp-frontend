@@ -46,6 +46,8 @@ import { fetchOrganizationConfig } from "../../../features/organization/sliceOrg
 import { notifications } from "@mantine/notifications";
 import MetaConnectionPanel from "./MetaConnectionPanel";
 import WhatsappConnectGuide from "./components/WhatsappConnectGuide";
+import WhatsappQuotaUsage from "../../../components/WhatsappQuotaUsage";
+import { usePlanLimits } from "../../../hooks/usePlanLimits";
 
 // -----------------------------
 // 1) Mapeo UI por estado
@@ -203,6 +205,7 @@ const WhatsappOrgSession: React.FC = () => {
   };
 
   const ui = UI_STATUS[code];
+  const { usage: planUsage } = usePlanLimits();
 
   // 🎉 Aha moment: al conectar WhatsApp, enviar al propio número del negocio el
   // recordatorio de ejemplo para que el dueño vea lo que reciben sus clientes.
@@ -299,6 +302,13 @@ const WhatsappOrgSession: React.FC = () => {
             </Text>
           </div>
         </Group>
+
+        {/* Tope mensual de citas con WhatsApp (solo planes de entrada) */}
+        {planUsage?.whatsappAppointmentsThisMonth?.max != null && (
+          <Paper withBorder radius="md" p="sm">
+            <WhatsappQuotaUsage usage={planUsage.whatsappAppointmentsThisMonth} showUpgrade />
+          </Paper>
+        )}
 
         <Tabs defaultValue="connection" keepMounted={false}>
           <Tabs.List>

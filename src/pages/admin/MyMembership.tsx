@@ -38,6 +38,7 @@ import { apiPlansPublic } from "../../services/axiosConfig";
 import { IoAlertCircle } from "react-icons/io5";
 import { BiCalendar, BiCreditCard, BiX } from "react-icons/bi";
 import { billingLabel, billingShort } from "../../utils/billingCycle";
+import WhatsappQuotaUsage from "../../components/WhatsappQuotaUsage";
 
 interface PublicPlan {
   _id: string;
@@ -560,6 +561,13 @@ export default function MyMembership() {
                   )}
                 </Stack>
               </Grid.Col>
+
+              {/* Citas con WhatsApp (solo planes con tope mensual) */}
+              {planInfo?.usage?.whatsappAppointmentsThisMonth?.max != null && (
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <WhatsappQuotaUsage usage={planInfo.usage.whatsappAppointmentsThisMonth} />
+                </Grid.Col>
+              )}
 
               {/* Almacenamiento */}
               <Grid.Col span={{ base: 12, md: 4 }}>

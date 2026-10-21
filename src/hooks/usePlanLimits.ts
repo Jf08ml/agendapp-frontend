@@ -21,11 +21,11 @@ const UPGRADE_MESSAGES: Record<string, string> = {
   classesModule: "Disponible en Plan Marca/Pro",
   servicePackages: "Disponible en Plan Marca/Pro",
   professionalLanding: "Disponible en Plan Marca/Pro",
-  whatsappIntegration: "Disponible en Plan Esencial o superior",
-  autoReminders: "Disponible en Plan Esencial o superior",
-  autoConfirmations: "Disponible en Plan Esencial o superior",
+  whatsappIntegration: "Disponible en Plan Starter o superior",
+  autoReminders: "Disponible en Plan Starter o superior",
+  autoConfirmations: "Disponible en Plan Starter o superior",
   loyaltyProgram: "Disponible en Plan Starter o superior",
-  maxEmployees: "Profesionales ilimitados desde Plan Starter",
+  maxEmployees: "Profesionales ilimitados desde Plan Esencial",
   maxServices: "Servicios ilimitados desde Plan Starter",
 };
 

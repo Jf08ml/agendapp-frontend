@@ -744,7 +744,7 @@ export default function ManageClasses() {
                       value: "auto_if_available",
                       label: canAutoConfirmClasses
                         ? "Automática si hay cupo"
-                        : "Automática si hay cupo (Plan Esencial o superior)",
+                        : "Automática si hay cupo (Plan Starter o superior)",
                       disabled: !canAutoConfirmClasses,
                     },
                   ]}

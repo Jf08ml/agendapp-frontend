@@ -280,6 +280,7 @@ export interface Organization {
     professionalLanding?: boolean;
     brandingVisible?: boolean;
     maxRemindersPerAppointment?: number;
+    maxWhatsappAppointmentsPerMonth?: number | null;
   } | null;
 }
 

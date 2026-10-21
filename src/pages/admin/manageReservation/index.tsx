@@ -1771,7 +1771,7 @@ const ReservationsList: React.FC = () => {
                     value: "auto_if_available",
                     label: canAutoConfirm
                       ? "Automático si hay disponibilidad"
-                      : "Automático si hay disponibilidad (Plan Esencial o superior)",
+                      : "Automático si hay disponibilidad (Plan Starter o superior)",
                     disabled: !canAutoConfirm,
                   },
                 ]}

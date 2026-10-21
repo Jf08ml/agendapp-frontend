@@ -30,6 +30,8 @@ export interface Plan {
     professionalLanding: boolean;
     brandingVisible: boolean;
     maxRemindersPerAppointment: number;
+    /** Tope mensual de citas con WhatsApp automático; null = sin tope */
+    maxWhatsappAppointmentsPerMonth?: number | null;
   };
   description: string;
   isActive: boolean;
@@ -101,6 +103,8 @@ export interface PlanUsage {
   employees: { current: number; max: number | null };
   services: { current: number; max: number | null };
   appointmentsThisMonth: { current: number; max: number | null };
+  /** Citas (visitas) con confirmación/recordatorio por WhatsApp este mes; max null = sin tope */
+  whatsappAppointmentsThisMonth?: { current: number; max: number | null };
 }
 
 export interface MyPlanInfo {
@@ -359,6 +363,8 @@ export type PlanInput = {
     professionalLanding: boolean;
     brandingVisible: boolean;
     maxRemindersPerAppointment: number;
+    /** Tope mensual de citas con WhatsApp automático; null = sin tope */
+    maxWhatsappAppointmentsPerMonth?: number | null;
   };
 };
 
