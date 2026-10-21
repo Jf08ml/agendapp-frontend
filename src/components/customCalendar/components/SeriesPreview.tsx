@@ -12,7 +12,7 @@ import {
   Box,
   Flex
 } from '@mantine/core';
-import { IconAlertCircle, IconCheck, IconClock, IconX, IconBan } from '@tabler/icons-react';
+import { IconAlertCircle, IconCheck, IconClock, IconX, IconBan, IconPackage } from '@tabler/icons-react';
 import { SeriesPreview as SeriesPreviewType } from '../../../services/appointmentService';
 
 interface SeriesPreviewProps {
@@ -50,7 +50,8 @@ const STATUS_CONFIG = {
 
 const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false, timeFormat }) => {
   const timeFmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
-  const { occurrences, totalOccurrences, availableCount } = preview;
+  const { occurrences, totalOccurrences, availableCount, packageCovered, packageCharged } = preview;
+  const usesPackage = packageCovered !== undefined;
 
   if (loading) {
     return (
@@ -116,6 +117,20 @@ const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false, timeF
             Se crearán <strong>{availableCount}</strong> de {totalOccurrences} citas.
             Las citas fuera de horario o en conflicto serán omitidas automáticamente.
           </Alert>
+
+          {usesPackage && (
+            <Alert
+              color={packageCharged ? 'orange' : 'teal'}
+              variant="light"
+              icon={<IconPackage size={16} />}
+              mt="xs"
+            >
+              <strong>{packageCovered}</strong> {packageCovered === 1 ? 'cita usa' : 'citas usan'} el paquete.
+              {!!packageCharged && (
+                <> No alcanzan las sesiones para <strong>{packageCharged}</strong>: esas se cobrarán al precio normal.</>
+              )}
+            </Alert>
+          )}
         </Box>
 
         {/* Lista de ocurrencias */}
@@ -158,9 +173,24 @@ const SeriesPreview: FC<SeriesPreviewProps> = ({ preview, loading = false, timeF
                     </Group>
 
                     <Box>
-                      <Badge color={config.color} variant="light" size="sm">
-                        {config.label}
-                      </Badge>
+                      <Group gap={4} justify="flex-end">
+                        {willBeCreated && occurrence.package && (
+                          occurrence.package.covered ? (
+                            <Badge color="teal" variant="light" size="sm" leftSection={<IconPackage size={12} />}>
+                              {occurrence.package.session
+                                ? `Sesión ${occurrence.package.session.number} de ${occurrence.package.session.total}`
+                                : 'Paquete'}
+                            </Badge>
+                          ) : (
+                            <Badge color="orange" variant="light" size="sm">
+                              Se cobra
+                            </Badge>
+                          )
+                        )}
+                        <Badge color={config.color} variant="light" size="sm">
+                          {config.label}
+                        </Badge>
+                      </Group>
                       {occurrence.reason && (
                         <Text size="xs" c="dimmed" ta="right" mt={4}>
                           {occurrence.reason}

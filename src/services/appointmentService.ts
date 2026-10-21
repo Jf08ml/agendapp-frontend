@@ -39,6 +39,8 @@ export interface Appointment {
   payments?: PaymentRecord[];
   paymentStatus?: 'unpaid' | 'partial' | 'paid' | 'free';
   clientPackageId?: string | null; // 📦 Si está definido, la cita se cubre con un paquete de sesiones prepagado
+  /** 🔢 "Sesión N de M" del paquete (solo lo calcula el backend al listar la agenda) */
+  packageSession?: { number: number; total: number };
   sessionNotes?: string; // 📝 Registro de lo hecho en la sesión (concepto genérico)
   /** Valores de campos personalizados con scope "booking" (clientFormConfig.fields). */
   customFieldValues?: Record<string, unknown>;
@@ -80,11 +82,16 @@ export interface AppointmentOccurrence {
   endDate?: string; // ISO string
   status: 'available' | 'no_work' | 'conflict' | 'error';
   reason?: string;
+  /** 📦 Solo si se eligió paquete: si lo cubre y qué número de sesión sería */
+  package?: { covered: boolean; session: { number: number; total: number } | null };
 }
 
 export interface SeriesPreview {
   totalOccurrences: number;
   availableCount: number;
+  /** 📦 Citas cubiertas por el paquete / que se cobrarán normal por falta de saldo */
+  packageCovered?: number;
+  packageCharged?: number;
   occurrences: AppointmentOccurrence[];
 }
 
@@ -552,6 +559,7 @@ export const createAppointmentSeries = async (
       advancePayment: baseAppointment.advancePayment || 0,
       customPrices: baseAppointment.customPrices,
       additionalItemsByService: baseAppointment.additionalItemsByService,
+      usePackageForServices: baseAppointment.usePackageForServices,
       employeeRequestedByClient: baseAppointment.employeeRequestedByClient || false,
       recurrencePattern,
       previewOnly: options.previewOnly || false,

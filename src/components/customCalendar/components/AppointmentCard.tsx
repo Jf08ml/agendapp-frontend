@@ -423,6 +423,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           }}
         >
           {appointment.service ? appointment.service.name : "Sin servicio"}
+          {appointment.packageSession &&
+            ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
         </Text>
 
         {/* Cliente */}

@@ -320,6 +320,8 @@ const DayModalCompactView: FC<DayModalCompactViewProps> = ({
                   </Text>
                   <Text size="xs" fw={600} style={{ color: darkenColor(employeeColor), lineHeight: 1.15 }}>
                     {appointment.service ? appointment.service.name : "Sin servicio"}
+                    {appointment.packageSession &&
+                      ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
                   </Text>
                 </Box>
               );

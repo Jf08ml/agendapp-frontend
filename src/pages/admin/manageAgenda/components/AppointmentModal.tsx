@@ -878,6 +878,7 @@ ${clientServices}`;
           startDate: newAppointment.startDate,
           organizationId,
           advancePayment: newAppointment.advancePayment,
+          usePackageForServices: usePackage,
         },
         recurrencePattern,
         { previewOnly: true },
@@ -970,6 +971,7 @@ ${clientServices}`;
     newAppointment.client,
     newAppointment.startDate,
     newAppointment.services,
+    usePackage,
   ]);
 
   const schedulingForm = (
@@ -2090,6 +2092,7 @@ ${clientServices}`;
                         startDate: newAppointment.startDate,
                         organizationId,
                         advancePayment: newAppointment.advancePayment,
+                        usePackageForServices: usePackage, // 📦 Descuenta sesiones del paquete
                       },
                       recurrencePattern,
                       {
