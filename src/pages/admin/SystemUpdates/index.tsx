@@ -13,8 +13,10 @@ import {
   Alert,
   Collapse,
   UnstyledButton,
+  Button,
 } from "@mantine/core";
 import {
+  IconBrandWhatsapp,
   IconBell,
   IconSparkles,
   IconTool,
@@ -31,6 +33,9 @@ import {
 } from "../../../services/announcementService";
 
 export const NOVEDADES_STORAGE_KEY = "novedades_last_seen";
+
+// Soporte de AgenditApp (mismo número que el enlace de ayuda del registro)
+const SUPPORT_WHATSAPP_URL = "https://api.whatsapp.com/send/?phone=573506674686";
 
 type UpdateType = AnnouncementItem["type"];
 
@@ -77,16 +82,29 @@ export default function SystemUpdates() {
 
   return (
     <Box p="md" maw={720} mx="auto">
-      <Group mb="xl" gap="sm" align="center">
-        <ThemeIcon size="lg" radius="md" variant="light" color="violet">
-          <IconBell size={20} />
-        </ThemeIcon>
-        <div>
-          <Title order={2}>Novedades del sistema</Title>
-          <Text size="sm" c="dimmed">
-            Últimas actualizaciones y mejoras de la plataforma
-          </Text>
-        </div>
+      <Group mb="xl" justify="space-between" align="center" gap="sm">
+        <Group gap="sm" align="center" wrap="nowrap">
+          <ThemeIcon size="lg" radius="md" variant="light" color="violet">
+            <IconBell size={20} />
+          </ThemeIcon>
+          <div>
+            <Title order={2}>Novedades del sistema</Title>
+            <Text size="sm" c="dimmed">
+              Últimas actualizaciones y mejoras de la plataforma
+            </Text>
+          </div>
+        </Group>
+        <Button
+          component="a"
+          href={SUPPORT_WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          color="green"
+          variant="light"
+          leftSection={<IconBrandWhatsapp size={18} />}
+        >
+          Soporte por WhatsApp
+        </Button>
       </Group>
 
       {loading && (
