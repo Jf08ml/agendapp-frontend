@@ -34,6 +34,7 @@ import { RootState } from "../../app/store";
 import {
   submitReceipt,
   getOrderStatus,
+  getReceiptCheckout,
   type ReceiptPaymentMethod,
 } from "../../services/collectionService";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
@@ -101,7 +102,12 @@ function CopyField({ label, value }: { label: string; value?: string }) {
 export default function PublicReceiptPaymentPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as ReceiptPaymentState | null;
+  const navState = location.state as ReceiptPaymentState | null;
+  // Enlace directo (?ref=...): lo envía el bot de WhatsApp, sin state de navegación.
+  const refParam = new URLSearchParams(location.search).get("ref");
+  const [fetchedState, setFetchedState] = useState<ReceiptPaymentState | null>(null);
+  const [loadingRef, setLoadingRef] = useState(!navState && !!refParam);
+  const state = navState ?? fetchedState;
   const organization = useSelector((s: RootState) => s.organization.organization);
 
   const [file, setFile] = useState<FileWithPath | null>(null);
@@ -109,6 +115,28 @@ export default function PublicReceiptPaymentPage() {
   const [view, setView] = useState<View>("upload");
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (navState || !refParam) return;
+    getReceiptCheckout(refParam)
+      .then((info) => {
+        if (!info) return;
+        setFetchedState({
+          externalReference: info.externalReference,
+          amount: info.amount,
+          currency: info.currency,
+          paymentMethods: info.paymentMethods,
+          orderType: info.orderType,
+        });
+        // El cliente puede reabrir el enlace después de pagar o de que venza.
+        const status: string = info.status;
+        if (status === "paid") setView("paid");
+        else if (status === "in_review") setView("review");
+        else if (["failed", "expired", "refunded"].includes(status)) setView("rejected");
+      })
+      .finally(() => setLoadingRef(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refParam]);
 
   // Polling: si quedó en revisión manual, escuchamos cuando el negocio lo
   // apruebe (→ paid) o rechace (→ failed/expired) para actualizar al cliente.
@@ -134,6 +162,14 @@ export default function PublicReceiptPaymentPage() {
     return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
+
+  if (loadingRef) {
+    return (
+      <Stack align="center" mt={80}>
+        <Loader />
+      </Stack>
+    );
+  }
 
   // Sin datos (recarga directa): no podemos continuar.
   if (!state?.externalReference) {

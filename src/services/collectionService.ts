@@ -164,6 +164,29 @@ export interface ReceiptCheckoutResult {
   paymentMethods: ReceiptPaymentMethod[];
 }
 
+export interface ReceiptCheckoutInfo {
+  externalReference: string;
+  status: OrderStatus;
+  amount: number;
+  currency: string;
+  orderType: "reservation" | "class" | "package" | "store";
+  expiresAt?: string;
+  paymentMethods: ReceiptPaymentMethod[];
+}
+
+// Datos del cobro por comprobante a partir de la referencia — para abrir
+// /pago/comprobante?ref=... desde el enlace que envía el bot de WhatsApp.
+export const getReceiptCheckout = async (
+  externalReference: string
+): Promise<ReceiptCheckoutInfo | null> => {
+  try {
+    const { data } = await apiGeneral.get(`/collection/receipt/${externalReference}`);
+    return data.data as ReceiptCheckoutInfo;
+  } catch {
+    return null;
+  }
+};
+
 export interface ReservationReceiptPayload {
   organizationId: string;
   services: { serviceId: string; employeeId?: string | null; duration?: number }[];
