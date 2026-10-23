@@ -235,26 +235,26 @@ export default function PublicReceiptPaymentPage() {
     );
   }
 
-  // ── Recibido, en revisión manual (con polling en vivo) ──────────────────────
+  // ── Recibido, en revisión manual ────────────────────────────────────────────
+  // Sin spinner: la revisión depende del negocio y puede tardar horas — un
+  // "cargando" infinito hacía creer que la página se había colgado. El polling
+  // sigue en segundo plano por si lo aprueban mientras está abierta.
   if (view === "review") {
     return (
-      <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
+      <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto" px="md">
         <ThemeIcon size={80} radius="xl" color="yellow" variant="light">
           <IconClockHour4 size={52} />
         </ThemeIcon>
         <Title order={2} ta="center">
-          Recibimos tu comprobante
+          Tu comprobante está en revisión
         </Title>
         <Text c="dimmed" ta="center">
-          Lo estamos validando. Esta pantalla se actualizará automáticamente cuando
-          el negocio lo confirme, y también te avisaremos por WhatsApp.
+          Lo recibimos y {organization?.name ? <b>{organization.name.trim()}</b> : "el negocio"} lo
+          está revisando. Te avisaremos por WhatsApp apenas quede validado.
         </Text>
-        <Group gap="xs">
-          <Loader size="sm" color="yellow" />
-          <Text size="sm" c="dimmed">
-            Esperando confirmación…
-          </Text>
-        </Group>
+        <Text size="sm" fw={600} ta="center">
+          Ya puedes cerrar esta página.
+        </Text>
         <Button size="md" variant="light" onClick={() => navigate("/")}>
           Volver al inicio
         </Button>
