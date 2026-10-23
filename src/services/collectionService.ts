@@ -280,6 +280,20 @@ export interface ReceiptOrder {
     aiVerdict?: "match" | "mismatch" | "unreadable";
     aiNotes?: string;
     reviewStatus?: string;
+    /** El pago se validó pero la reserva no se pudo confirmar (ej. profesional ocupado). */
+    fulfillError?: string | null;
+  };
+  /** Reserva vinculada (solo type "reservation"). */
+  linkedReservation?: {
+    customerName: string;
+    customerPhone: string;
+    items: Array<{
+      reservationId: string;
+      service: string;
+      employee: string | null;
+      startDate: string;
+      status: string;
+    }>;
   };
 }
 

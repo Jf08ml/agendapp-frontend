@@ -5,8 +5,29 @@ import { Service } from "./serviceService";
 import { Employee } from "./employeeService";
 import type { RecurrencePattern, SeriesPreview } from "./appointmentService";
 
+// Pago del abono de la reserva (Order poblado en GET /reservations/:orgId).
+export interface ReservationPaymentOrder {
+  _id: string;
+  status: "created" | "pending" | "in_review" | "paid" | "failed" | "expired" | "refunded";
+  amount: number;
+  currency: string;
+  provider: "mercadopago" | "receipt";
+  externalReference?: string;
+  receipt?: {
+    imageUrl?: string;
+    aiVerdict?: "match" | "mismatch" | "unreadable";
+    aiNotes?: string;
+    reviewStatus?: string;
+    uploadedAt?: string;
+    /** El pago se validó pero la reserva no se pudo confirmar (ej. profesional ocupado). */
+    fulfillError?: string | null;
+  };
+}
+
 export interface Reservation {
   _id?: string;
+  /** Abono de la reserva (poblado) — null si la reserva no exige pago. */
+  orderId?: ReservationPaymentOrder | string | null;
   serviceId: Service | string;
   employeeId: Employee | string | null;
   startDate: Date | string;

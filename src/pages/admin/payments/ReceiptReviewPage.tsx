@@ -26,6 +26,9 @@ import {
   IconRefresh,
 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
+import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import type { RootState } from "../../../app/store";
 import {
   listReceiptOrders,
   reviewReceiptOrder,
@@ -75,6 +78,7 @@ export default function ReceiptReviewPage() {
   const [rejectFor, setRejectFor] = useState<ReceiptOrder | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
   const [filter, setFilter] = useState<"in_review" | "all">("in_review");
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const load = async (status: "in_review" | "all" = filter) => {
     setLoading(true);
@@ -96,12 +100,22 @@ export default function ReceiptReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  // reviewReceiptOrder lanza el error del servidor (handleAxiosError): antes no se
+  // atrapaba, el botón quedaba "cargando" para siempre y el motivo nunca se veía.
   const handleApprove = async (order: ReceiptOrder) => {
     setProcessing(order._id);
-    const ok = await reviewReceiptOrder(order._id, "approve");
-    setProcessing(null);
-    if (ok) {
+    try {
+      await reviewReceiptOrder(order._id, "approve");
       notifications.show({ color: "teal", message: "Pago aprobado y reserva confirmada." });
+    } catch (e) {
+      notifications.show({
+        color: "red",
+        title: "No se pudo aprobar",
+        message: e instanceof Error ? e.message : "No se pudo procesar la revisión.",
+        autoClose: 10000,
+      });
+    } finally {
+      setProcessing(null);
       load();
     }
   };
@@ -109,15 +123,34 @@ export default function ReceiptReviewPage() {
   const handleReject = async () => {
     if (!rejectFor) return;
     setProcessing(rejectFor._id);
-    const ok = await reviewReceiptOrder(rejectFor._id, "reject", rejectNotes.trim() || undefined);
-    setProcessing(null);
-    if (ok) {
+    try {
+      await reviewReceiptOrder(rejectFor._id, "reject", rejectNotes.trim() || undefined);
       notifications.show({ color: "orange", message: "Comprobante rechazado." });
       setRejectFor(null);
       setRejectNotes("");
+    } catch (e) {
+      notifications.show({
+        color: "red",
+        title: "No se pudo rechazar",
+        message: e instanceof Error ? e.message : "No se pudo procesar la revisión.",
+        autoClose: 10000,
+      });
+    } finally {
+      setProcessing(null);
       load();
     }
   };
+
+  const timezone = organization?.timezone || "America/Bogota";
+  const formatDateTime = (iso: string) =>
+    new Date(iso).toLocaleString("es-CO", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: timezone,
+    });
 
   return (
     <Container size="lg" py="lg">
@@ -191,6 +224,44 @@ export default function ReceiptReviewPage() {
                     {order.amount.toLocaleString()} {order.currency}
                   </Text>
                 </Group>
+
+                {/* Reserva vinculada: qué se está aprobando */}
+                {order.linkedReservation && (
+                  <Card withBorder p="xs" radius="sm" mb="sm">
+                    <Text size="sm" fw={600}>
+                      {order.linkedReservation.customerName}
+                      {order.linkedReservation.customerPhone && (
+                        <Text span size="xs" c="dimmed" fw={400}>
+                          {"  "}
+                          {order.linkedReservation.customerPhone}
+                        </Text>
+                      )}
+                    </Text>
+                    {order.linkedReservation.items.map((it) => (
+                      <Text key={it.reservationId} size="xs" c="dimmed">
+                        {it.service} · {it.employee || "Sin profesional"} · {formatDateTime(it.startDate)}
+                      </Text>
+                    ))}
+                  </Card>
+                )}
+
+                {order.receipt?.fulfillError && order.status === "in_review" && (
+                  <Card bg="red.0" p="xs" radius="sm" mb="sm">
+                    <Stack gap={6}>
+                      <Group gap={6} wrap="nowrap" align="flex-start">
+                        <IconAlertTriangle size={16} color="var(--mantine-color-red-7)" />
+                        <Text size="xs" c="red.9">
+                          El pago es válido, pero no se pudo confirmar la reserva: {order.receipt.fulfillError}
+                        </Text>
+                      </Group>
+                      {order.type === "reservation" && (
+                        <Button component={Link} to="/gestionar-reservas-online" size="xs" variant="light" color="red">
+                          Resolver en Gestionar reservas
+                        </Button>
+                      )}
+                    </Stack>
+                  </Card>
+                )}
 
                 {order.receipt?.imageUrl && (
                   <Image

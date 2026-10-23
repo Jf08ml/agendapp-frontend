@@ -32,12 +32,15 @@ import {
   ThemeIcon,
   Pagination,
   ActionIcon,
+  Image,
 } from "@mantine/core";
 import { useMediaQuery, useDebouncedValue } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
+import { reviewReceiptOrder } from "../../../services/collectionService";
 import {
   Reservation,
+  ReservationPaymentOrder,
   ReservationStats,
   getReservationsByOrganization,
   getReservationStats,
@@ -159,7 +162,17 @@ const ReservationsList: React.FC = () => {
     isGroup?: boolean;
     groupId?: string;
     conflictingAppointments?: Array<{ _id: string; startDate: string; endDate: string; status: string; client?: { name: string } }>;
+    /** Abono a aprobar después de forzar la aprobación (si el admin lo eligió). */
+    paymentOrderId?: string | null;
   } | null>(null);
+
+  // 💳 Comprobante de abono: ver la imagen y decidir el pago al aprobar
+  const [receiptView, setReceiptView] = useState<ReservationPaymentOrder | null>(null);
+  const [receiptPrompt, setReceiptPrompt] = useState<{
+    order: ReservationPaymentOrder;
+    proceed: (approvePayment: boolean) => Promise<unknown>;
+  } | null>(null);
+  const [receiptPromptBusy, setReceiptPromptBusy] = useState(false);
 
   useEffect(() => {
     // En mobile, empezamos con filtros colapsados; en desktop, abiertos
@@ -415,10 +428,84 @@ const ReservationsList: React.FC = () => {
   // en el servidor, independientes de filtros y de la página cargada.
   const sourceStats = stats;
 
+  // ------- PAGO DEL ABONO (comprobante) -------
+  // Order del abono de la reserva o de su grupo (todas comparten el mismo).
+  const getPaymentOrder = (
+    reservation: Reservation,
+    groupReservations?: Reservation[] | null
+  ): ReservationPaymentOrder | null => {
+    const list = groupReservations?.length ? groupReservations : [reservation];
+    for (const r of list) {
+      if (r.orderId && typeof r.orderId === "object") return r.orderId;
+    }
+    return null;
+  };
+
+  // Comprobante esperando decisión del admin: al aprobar la reserva se pregunta
+  // si el pago es válido (antes se aprobaba la reserva y el abono quedaba sin
+  // registrar, con el comprobante colgado en revisión).
+  const isReceiptInReview = (order: ReservationPaymentOrder | null) =>
+    !!order && order.provider === "receipt" && order.status === "in_review";
+
+  const formatMoney = (order: ReservationPaymentOrder) =>
+    `$${order.amount.toLocaleString("es-CO")} ${order.currency}`;
+
+  const renderPaymentBadge = (order: ReservationPaymentOrder | null, size: "xs" | "sm" = "xs") => {
+    if (!order) return null;
+    const amount = formatMoney(order);
+    const map: Record<string, { label: string; color: string }> = {
+      in_review: { label: `Comprobante en revisión · ${amount}`, color: "yellow" },
+      paid: { label: `Abono pagado · ${amount}`, color: "teal" },
+      created: { label: `Abono sin pagar · ${amount}`, color: "gray" },
+      pending: { label: `Abono sin pagar · ${amount}`, color: "gray" },
+      failed: { label: "Comprobante rechazado", color: "red" },
+      expired: { label: "Abono vencido", color: "gray" },
+    };
+    const info = map[order.status];
+    if (!info) return null;
+    const clickable = !!order.receipt?.imageUrl;
+    return (
+      <Badge
+        size={size}
+        color={info.color}
+        variant={order.status === "in_review" ? "filled" : "light"}
+        radius="lg"
+        style={clickable ? { cursor: "pointer" } : undefined}
+        onClick={
+          clickable
+            ? (e) => {
+                e.stopPropagation();
+                setReceiptView(order);
+              }
+            : undefined
+        }
+      >
+        🧾 {info.label}
+      </Badge>
+    );
+  };
+
+  // Aprueba el abono (registra el pago en la cita ya creada y cierra el comprobante).
+  const approvePayment = async (orderId: string) => {
+    try {
+      await reviewReceiptOrder(orderId, "approve");
+      showNotification({ title: "Abono registrado", message: "El pago quedó registrado en la cita.", color: "teal" });
+    } catch (e) {
+      showNotification({
+        title: "La reserva se aprobó, pero el abono no",
+        message: e instanceof Error ? e.message : "No se pudo registrar el pago. Revísalo en Comprobantes de pago.",
+        color: "red",
+        autoClose: 10000,
+      });
+    }
+  };
+
   // ------- ACTIONS -------
   const handleUpdateStatus = async (
     reservationId: string,
-    newStatus: "approved" | "rejected"
+    newStatus: "approved" | "rejected",
+    // undefined = aún no se decidió el comprobante; null = aprobar solo la reserva
+    opts: { paymentOrderId?: string | null } = {}
   ): Promise<"success" | "error" | "concurrency"> => {
     const reservation = reservations.find((r) => r._id === reservationId);
     if (!reservation) {
@@ -438,6 +525,18 @@ const ReservationsList: React.FC = () => {
       return "error";
     }
 
+    if (newStatus === "approved" && opts.paymentOrderId === undefined) {
+      const order = getPaymentOrder(reservation, reservation.groupId ? groupsMap.get(reservation.groupId) : null);
+      if (order && isReceiptInReview(order)) {
+        setReceiptPrompt({
+          order,
+          proceed: (approvePaymentToo) =>
+            handleUpdateStatus(reservationId, "approved", { paymentOrderId: approvePaymentToo ? order._id : null }),
+        });
+        return "error";
+      }
+    }
+
     try {
       setRowBusy(
         reservationId,
@@ -451,6 +550,7 @@ const ReservationsList: React.FC = () => {
         } correctamente`,
         color: "green",
       });
+      if (opts.paymentOrderId) await approvePayment(opts.paymentOrderId);
       if (organization?._id) {
         await loadPage(organization._id);
         void loadStats(organization._id);
@@ -463,6 +563,7 @@ const ReservationsList: React.FC = () => {
           message: err.response.data.message,
           reservationId,
           conflictingAppointments: err.response.data.data.conflictingAppointments || [],
+          paymentOrderId: opts.paymentOrderId,
         });
         return "concurrency";
       }
@@ -612,9 +713,24 @@ const ReservationsList: React.FC = () => {
   };
 
   // 👥 ACCIONES GRUPALES
-  const handleApproveGroup = async (groupId: string): Promise<"success" | "error" | "concurrency"> => {
+  const handleApproveGroup = async (
+    groupId: string,
+    opts: { paymentOrderId?: string | null } = {}
+  ): Promise<"success" | "error" | "concurrency"> => {
     const group = groupsMap.get(groupId);
     if (!group) return "error";
+
+    if (opts.paymentOrderId === undefined) {
+      const order = getPaymentOrder(group[0], group);
+      if (order && isReceiptInReview(order)) {
+        setReceiptPrompt({
+          order,
+          proceed: (approvePaymentToo) =>
+            handleApproveGroup(groupId, { paymentOrderId: approvePaymentToo ? order._id : null }),
+        });
+        return "error";
+      }
+    }
 
     try {
       for (const reservation of group) {
@@ -642,6 +758,7 @@ const ReservationsList: React.FC = () => {
         position: "top-right",
         autoClose: 3000,
       });
+      if (opts.paymentOrderId) await approvePayment(opts.paymentOrderId);
 
       if (organization?._id) {
         await loadPage(organization._id);
@@ -657,6 +774,7 @@ const ReservationsList: React.FC = () => {
           isGroup: true,
           groupId,
           conflictingAppointments: err.response.data.data.conflictingAppointments || [],
+          paymentOrderId: opts.paymentOrderId,
         });
         if (organization?._id) {
           await loadPage(organization._id);
@@ -819,6 +937,7 @@ const ReservationsList: React.FC = () => {
           } as any);
         }
         showNotification({ title: "Grupo Aprobado", message: "Reservas aprobadas correctamente", color: "green", position: "top-right" });
+        if (warning.paymentOrderId) await approvePayment(warning.paymentOrderId);
         if (organization?._id) {
           await loadPage(organization._id);
           void loadStats(organization._id);
@@ -837,6 +956,7 @@ const ReservationsList: React.FC = () => {
         setRowBusy(warning.reservationId, "approve");
         await updateReservation(warning.reservationId, { status: "approved", forceApprove: true } as any);
         showNotification({ title: "Aprobada", message: "Cita creada correctamente", color: "green" });
+        if (warning.paymentOrderId) await approvePayment(warning.paymentOrderId);
         if (organization?._id) {
           await loadPage(organization._id);
           void loadStats(organization._id);
@@ -1060,6 +1180,7 @@ const ReservationsList: React.FC = () => {
                 ⚠ Sin cita
               </Badge>
             )}
+            {renderPaymentBadge(getPaymentOrder(reservation, groupReservations))}
           </Group>
 
           <Text fw={600} size="sm">
@@ -1325,6 +1446,66 @@ const ReservationsList: React.FC = () => {
                 </Text>
               )}
             </Box>
+
+            {/* Pago del abono (comprobante) */}
+            {(() => {
+              const order = getPaymentOrder(selectedReservation, selectedGroupReservations);
+              if (!order) return null;
+              return (
+                <Box>
+                  <Text size="sm" fw={600} c="dimmed" mb={4}>
+                    Abono
+                  </Text>
+                  <Group gap="xs">
+                    {renderPaymentBadge(order, "sm")}
+                    {order.receipt?.imageUrl && (
+                      <Button size="xs" variant="subtle" onClick={() => setReceiptView(order)}>
+                        Ver comprobante
+                      </Button>
+                    )}
+                  </Group>
+                  {order.status === "in_review" && order.receipt?.fulfillError && selectedReservation.status === "pending" && (
+                    <Text size="xs" c="red" mt={4}>
+                      El pago es válido, pero no se pudo confirmar la reserva: {order.receipt.fulfillError}. Cambia el profesional u horario y apruébala.
+                    </Text>
+                  )}
+                  {/* Reserva ya aprobada (ej. desde aquí antes de esta mejora) con el
+                      comprobante aún en revisión: registrar o rechazar el abono. */}
+                  {isReceiptInReview(order) && selectedReservation.status !== "pending" && (
+                    <Group gap="xs" mt="xs">
+                      <Button
+                        size="xs"
+                        color="teal"
+                        onClick={async () => {
+                          await approvePayment(order._id);
+                          handleCloseDetail();
+                          if (organization?._id) await loadPage(organization._id);
+                        }}
+                      >
+                        Registrar abono
+                      </Button>
+                      <Button
+                        size="xs"
+                        color="red"
+                        variant="light"
+                        onClick={async () => {
+                          try {
+                            await reviewReceiptOrder(order._id, "reject");
+                            showNotification({ title: "Comprobante rechazado", message: "Se le avisó al cliente.", color: "orange" });
+                            handleCloseDetail();
+                            if (organization?._id) await loadPage(organization._id);
+                          } catch (e) {
+                            showNotification({ title: "No se pudo rechazar", message: e instanceof Error ? e.message : "Intenta de nuevo.", color: "red" });
+                          }
+                        }}
+                      >
+                        Rechazar comprobante
+                      </Button>
+                    </Group>
+                  )}
+                </Box>
+              );
+            })()}
 
             {/* Campos personalizados (Organization.clientFormConfig.fields, scope "booking") */}
             {selectedReservation.customFieldValues &&
@@ -1689,6 +1870,117 @@ const ReservationsList: React.FC = () => {
             <Text c="dimmed" ta="center">No hay información disponible</Text>
           )}
         </div>
+      </Modal>
+
+      {/* Modal: ver comprobante del abono */}
+      <Modal
+        opened={!!receiptView}
+        onClose={() => setReceiptView(null)}
+        title="Comprobante de pago"
+        centered
+        zIndex={400}
+      >
+        {receiptView && (
+          <Stack gap="sm">
+            <Group justify="space-between">
+              {renderPaymentBadge(receiptView, "sm")}
+            </Group>
+            {receiptView.receipt?.imageUrl && (
+              <Image src={receiptView.receipt.imageUrl} alt="Comprobante" mah={420} fit="contain" radius="sm" />
+            )}
+            {receiptView.receipt?.aiNotes && (
+              <Text size="xs" c="dimmed">
+                Revisión IA: {receiptView.receipt.aiNotes}
+              </Text>
+            )}
+          </Stack>
+        )}
+      </Modal>
+
+      {/* Modal: aprobar una reserva que tiene comprobante en revisión */}
+      <Modal
+        opened={!!receiptPrompt}
+        onClose={() => !receiptPromptBusy && setReceiptPrompt(null)}
+        title="Esta reserva tiene un comprobante en revisión"
+        centered
+        zIndex={400}
+      >
+        {receiptPrompt && (
+          <Stack gap="sm">
+            <Text size="sm">
+              El cliente subió un comprobante de <b>{formatMoney(receiptPrompt.order)}</b>. ¿Es válido?
+            </Text>
+            {receiptPrompt.order.receipt?.imageUrl && (
+              <Image src={receiptPrompt.order.receipt.imageUrl} alt="Comprobante" mah={320} fit="contain" radius="sm" />
+            )}
+            {receiptPrompt.order.receipt?.aiNotes && (
+              <Text size="xs" c="dimmed">
+                Revisión IA: {receiptPrompt.order.receipt.aiNotes}
+              </Text>
+            )}
+            <Stack gap="xs" mt="xs">
+              <Button
+                color="teal"
+                loading={receiptPromptBusy}
+                onClick={async () => {
+                  const prompt = receiptPrompt;
+                  setReceiptPromptBusy(true);
+                  setReceiptPrompt(null);
+                  try {
+                    await prompt.proceed(true);
+                  } finally {
+                    setReceiptPromptBusy(false);
+                  }
+                }}
+              >
+                Sí, aprobar reserva y registrar el abono
+              </Button>
+              <Button
+                variant="default"
+                disabled={receiptPromptBusy}
+                onClick={async () => {
+                  const prompt = receiptPrompt;
+                  setReceiptPrompt(null);
+                  await prompt.proceed(false);
+                }}
+              >
+                Aprobar solo la reserva (el comprobante queda pendiente)
+              </Button>
+              <Button
+                color="red"
+                variant="light"
+                disabled={receiptPromptBusy}
+                onClick={async () => {
+                  const order = receiptPrompt.order;
+                  setReceiptPromptBusy(true);
+                  try {
+                    await reviewReceiptOrder(order._id, "reject");
+                    showNotification({
+                      title: "Comprobante rechazado",
+                      message: "La reserva se liberó y se le avisó al cliente.",
+                      color: "orange",
+                    });
+                    setReceiptPrompt(null);
+                    if (organization?._id) {
+                      await loadPage(organization._id);
+                      void loadStats(organization._id);
+                    }
+                  } catch (e) {
+                    showNotification({
+                      title: "No se pudo rechazar",
+                      message: e instanceof Error ? e.message : "Intenta de nuevo.",
+                      color: "red",
+                    });
+                  } finally {
+                    setReceiptPromptBusy(false);
+                  }
+                }}
+              >
+                No es válido: rechazar comprobante y liberar la reserva
+              </Button>
+            </Stack>
+          </Stack>
+        )}
       </Modal>
 
       {/* Modal: cupo máximo alcanzado — permite forzar la aprobación */}
@@ -2197,6 +2489,7 @@ const ReservationsList: React.FC = () => {
                                 ⚠ Sin cita
                               </Badge>
                             )}
+                            {renderPaymentBadge(getPaymentOrder(reservation, groupReservations))}
                           </Stack>
                         </Table.Td>
 
