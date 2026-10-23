@@ -115,6 +115,11 @@ const EmployeeCard: React.FC<Props> = ({
                 Desactivado
               </Badge>
             )}
+            {employee.isActive && employee.onlineBookingEnabled === false && (
+              <Badge color="gray" variant="light" mt={6}>
+                Oculto en reserva en línea
+              </Badge>
+            )}
           </Box>
         </Group>
 

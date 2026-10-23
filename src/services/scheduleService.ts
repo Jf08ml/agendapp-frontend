@@ -273,10 +273,13 @@ export interface BatchSlotsResponse {
 }
 
 // Obtener bloques para múltiples servicios (mismo día)
+// onlineBooking: true desde la reserva en línea — excluye a los profesionales
+// ocultos de la reserva en línea (la agenda interna no lo envía y los ve a todos).
 export const getMultiServiceBlocks = async (
   date: string,
   organizationId: string,
-  services: Array<{ serviceId: string; employeeId: string | null; duration: number }>
+  services: Array<{ serviceId: string; employeeId: string | null; duration: number }>,
+  opts: { onlineBooking?: boolean } = {}
 ): Promise<MultiServiceBlocksResponse | undefined> => {
   try {
     const response = await apiGeneral.post<Response<MultiServiceBlocksResponse>>(
@@ -284,7 +287,8 @@ export const getMultiServiceBlocks = async (
       {
         date,
         organizationId,
-        services
+        services,
+        onlineBooking: opts.onlineBooking === true,
       }
     );
     return response.data.data;
@@ -323,7 +327,8 @@ export const checkDaysAvailability = async (
   organizationId: string,
   services: Array<{ serviceId: string; employeeId: string | null; duration: number }>,
   startDate: string,
-  endDate: string
+  endDate: string,
+  opts: { onlineBooking?: boolean } = {}
 ): Promise<DaysAvailabilityResponse | undefined> => {
   try {
     const response = await apiGeneral.post<Response<DaysAvailabilityResponse>>(
@@ -332,7 +337,8 @@ export const checkDaysAvailability = async (
         organizationId,
         services,
         startDate,
-        endDate
+        endDate,
+        onlineBooking: opts.onlineBooking === true,
       }
     );
     return response.data.data;

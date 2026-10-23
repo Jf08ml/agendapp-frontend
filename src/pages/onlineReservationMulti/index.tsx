@@ -176,7 +176,8 @@ export default function MultiBookingWizard() {
     ])
       .then(([servicesData, employeesData]) => {
         setServices(servicesData.filter((s) => s.isActive));
-        setEmployees(employeesData);
+        // Sin los profesionales ocultos de la reserva en línea (siguen en la agenda interna)
+        setEmployees(employeesData.filter((e) => e.onlineBookingEnabled !== false));
       })
       .finally(() => setLoading(false));
   }, [organization]);

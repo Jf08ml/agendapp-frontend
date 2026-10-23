@@ -22,6 +22,7 @@ import {
   Divider,
   Badge,
   Tooltip,
+  Switch,
 } from "@mantine/core";
 import { AGENDA_PERMISSIONS } from "../../../../constants/agendaPermissions";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
@@ -65,6 +66,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     },
     customPermissions: [],
     isActive: true,
+    onlineBookingEnabled: true,
     profileImage: "",
     color: "",
     commissionType: "percentage",
@@ -92,6 +94,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         },
         customPermissions: employee.customPermissions || [],
         isActive: employee.isActive ?? true,
+        onlineBookingEnabled: employee.onlineBookingEnabled !== false,
         profileImage: employee.profileImage || "",
         color: employee.color || "",
         commissionType: employee.commissionType ?? "percentage",
@@ -157,6 +160,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
       },
       customPermissions: [],
       isActive: true,
+      onlineBookingEnabled: true,
       profileImage: "",
       color: "",
       commissionType: "percentage",
@@ -408,6 +412,25 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
                   )}
                 </Paper>
               </Box>
+
+              {/* Reserva en línea */}
+              <Paper withBorder p="md">
+                <Switch
+                  label="Disponible para reserva en línea"
+                  description={
+                    editingEmployee.onlineBookingEnabled !== false
+                      ? "Los clientes pueden elegirlo al reservar en línea y los asistentes de reservas lo ofrecen."
+                      : "Oculto en la reserva en línea y en los asistentes de reservas. Sigue en tu agenda y puedes asignarle citas."
+                  }
+                  checked={editingEmployee.onlineBookingEnabled !== false}
+                  onChange={(e) =>
+                    setEditingEmployee({
+                      ...editingEmployee,
+                      onlineBookingEnabled: e.currentTarget.checked,
+                    })
+                  }
+                />
+              </Paper>
 
               {/* Imagen de perfil */}
               <Box>

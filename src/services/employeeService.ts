@@ -36,6 +36,9 @@ export interface Employee {
   role: Role;
   customPermissions: string[];
   isActive: boolean;
+  // false = oculto de la reserva en línea (wizard público y asistentes de
+  // reservas web/WhatsApp); sigue activo en la agenda interna. Sin el campo = visible.
+  onlineBookingEnabled?: boolean;
   profileImage: string;
   color: string;
   order?: number;

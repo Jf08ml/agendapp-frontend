@@ -164,7 +164,8 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
         const response = await getMultiServiceBlocks(
           dayjs(dates[0].date).format("YYYY-MM-DD"),
           organizationId,
-          chainServices
+          chainServices,
+          { onlineBooking: true }
         );
 
         if (!response || !response.blocks) {

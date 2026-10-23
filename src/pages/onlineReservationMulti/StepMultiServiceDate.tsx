@@ -132,7 +132,8 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
       organizationId,
       servicesWithDuration,
       rangeStart.format("YYYY-MM-DD"),
-      rangeEnd.format("YYYY-MM-DD")
+      rangeEnd.format("YYYY-MM-DD"),
+      { onlineBooking: true }
     )
       .then((response) => {
         if (generation !== generationRef.current) return;
