@@ -29,7 +29,7 @@ const MAX_ATTEMPTS = 15;          // 60 segundos máximo
 
 type PageStatus = "waiting" | "activated" | "timeout";
 
-const SUPPORT_WHATSAPP = "573132735116";
+const SUPPORT_WHATSAPP = "573506674686";
 
 export default function PaymentSuccess() {
   const navigate = useNavigate();
