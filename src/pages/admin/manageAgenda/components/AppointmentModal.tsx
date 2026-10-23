@@ -2106,8 +2106,34 @@ ${clientServices}`;
             );
           })();
 
+  // 🔄 ¿La edición mueve la cita (día/hora/profesional)? → ofrecer avisar al cliente
+  const isRescheduling =
+    !!appointment &&
+    ((!!newAppointment.startDate &&
+      new Date(appointment.startDate).getTime() !== new Date(newAppointment.startDate).getTime()) ||
+      (!!newAppointment.employee &&
+        String(newAppointment.employee._id) !==
+          String((appointment.employee as Employee | undefined)?._id ?? appointment.employee)));
+
   const actionButtons = (
     <>
+          {isRescheduling && (
+            <Checkbox
+              mt="md"
+              color="green"
+              checked={newAppointment.notifyClientOnReschedule ?? true}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                setNewAppointment((prev) => ({ ...prev, notifyClientOnReschedule: checked }));
+              }}
+              label={
+                <Group gap={6} wrap="nowrap">
+                  <FaWhatsapp color="#25D366" />
+                  <Text size="sm">Avisar al cliente por WhatsApp del nuevo horario</Text>
+                </Group>
+              }
+            />
+          )}
           {/* Botones de acción */}
           <Group
             mt="xl"

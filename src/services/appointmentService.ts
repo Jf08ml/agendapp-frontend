@@ -419,8 +419,8 @@ export const createMultiEmployeeBatch = async (
 // Actualizar una cita
 export const updateAppointment = async (
   appointmentId: string,
-  updatedData: Partial<Appointment> & { skipConcurrencyCheck?: boolean }
-): Promise<Appointment | undefined> => {
+  updatedData: Partial<Appointment> & { skipConcurrencyCheck?: boolean; notifyClient?: boolean }
+): Promise<(Appointment & { clientNotification?: ClientNotificationResult }) | undefined> => {
   try {
     // Transformar fechas al formato correcto sin timezone
     const payload = { ...updatedData };
@@ -431,7 +431,7 @@ export const updateAppointment = async (
       payload.endDate = asISO(payload.endDate) as any;
     }
 
-    const response = await apiAppointment.put<Response<Appointment>>(
+    const response = await apiAppointment.put<Response<Appointment & { clientNotification?: ClientNotificationResult }>>(
       `/${appointmentId}`,
       payload
     );
@@ -444,6 +444,21 @@ export const updateAppointment = async (
     }
     handleAxiosError(error, "Error al actualizar la cita");
   }
+};
+
+// 🔄 Resultado del aviso de reprogramación por WhatsApp (solo si el admin lo pidió)
+export interface ClientNotificationResult {
+  status: "sent" | "blocked" | "skipped" | "failed";
+  reason?: string;
+}
+
+/** Texto para el toast de la agenda: "" si no se pidió aviso. */
+export const describeClientNotification = (
+  n?: ClientNotificationResult
+): { text: string; warn: boolean } => {
+  if (!n) return { text: "", warn: false };
+  if (n.status === "sent") return { text: " Se avisó al cliente por WhatsApp.", warn: false };
+  return { text: ` No se avisó al cliente${n.reason ? `: ${n.reason}` : ""}.`, warn: true };
 };
 
 // 🔁 Reprogramar "esta y las siguientes" de una serie
@@ -468,12 +483,14 @@ export interface SeriesRescheduleResult {
   appointment: Appointment;
   moved: { _id: string; startDate: string; endDate: string }[];
   skipped: { _id: string; startDate: string; status: string; reason?: string }[];
+  clientNotification?: ClientNotificationResult;
 }
 
 type SeriesReschedulePayload = Partial<Appointment> & {
   services?: unknown[];
   skipConcurrencyCheck?: boolean;
   force?: boolean;
+  notifyClient?: boolean;
 };
 
 const seriesReschedulePayload = (data: SeriesReschedulePayload) => {

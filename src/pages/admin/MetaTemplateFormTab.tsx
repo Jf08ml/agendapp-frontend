@@ -58,7 +58,7 @@ export interface MetaTemplateStatus {
 // {{reward}}→{{premio}}, {{count}}→{{cantidad_citas}},
 // {{currentCount}}→{{cantidad_actual}}, {{remaining}}→{{faltantes}}, {{nextReward}}→{{proximo_premio}},
 // {{cita_pal}}→{{cita_o_citas}}, {{agendada_pal}}→{{agendada_o_agendadas}},
-// {{recommendations}}→{{recomendaciones}}
+// {{recommendations}}→{{recomendaciones}}, {{previousDate}}→{{fecha_anterior}}
 
 const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
   scheduleAppointmentBatch: {
@@ -77,6 +77,25 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
     headerText: "Citas recurrentes confirmadas",
     bodyText:
       "🔁 ¡Hola, {{nombre_cliente}}!\n\n¡Tu serie de citas recurrentes ha sido creada exitosamente!\n\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n👩‍💼 Te atenderá: {{profesional}}\n\n📅 *Tus citas programadas:*\n{{lista_citas}}\n\n❌ *Cancelación flexible:*\nPuedes cancelar todas tus citas o solo algunas desde este enlace:\n{{enlace_cancelacion}}\n\nSi necesitas ajustar horarios o cambiar algún servicio, *responde a este chat* y con gusto te ayudamos.\n\n¡Te esperamos en cada sesión!",
+    footerText: "",
+  },
+  // 🔄 Aviso de reprogramación
+  rescheduleAppointment: {
+    name: "cita_reprogramada",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Cita reprogramada",
+    bodyText:
+      "🔄 ¡Hola, {{nombre_cliente}}!\n\nTu cita en *{{nombre_negocio}}* fue reprogramada.\n\n❌ Antes: {{fecha_anterior}}\n✅ Ahora: {{fecha_cita}}\n✨ Servicio: {{servicio}}\n👩‍💼 Te atenderá: {{profesional}}\n📍 Dirección: {{direccion}}\n\nSi necesitas cancelar tu cita, puedes hacerlo desde este enlace:\n{{enlace_cancelacion}}\n\nSi el nuevo horario no te sirve, *responde a este chat* y con gusto te ayudamos.",
+    footerText: "",
+  },
+  rescheduleAppointmentSeries: {
+    name: "citas_reprogramadas",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Citas reprogramadas",
+    bodyText:
+      "🔄 ¡Hola, {{nombre_cliente}}!\n\nTus citas en *{{nombre_negocio}}* fueron reprogramadas.\n\n📍 Dirección: {{direccion}}\n👩‍💼 Te atenderá: {{profesional}}\n\n📅 *Tus nuevos horarios:*\n{{lista_citas}}\n\n❌ Puedes cancelar todas tus citas o solo algunas desde este enlace:\n{{enlace_cancelacion}}\n\nSi algún horario no te sirve, *responde a este chat* y con gusto te ayudamos.",
     footerText: "",
   },
   reminder: {
@@ -281,6 +300,7 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
 const VARIABLE_EXAMPLES: Record<string, string> = {
   nombre_cliente: "Maria Garcia",
   fecha_cita: "lunes 13 de enero a las 10:00 AM",
+  fecha_anterior: "viernes 10 de enero a las 3:00 PM",
   nombre_negocio: "Mi Negocio",
   direccion: "Calle 19 #27-38",
   lista_servicios: "Pestañas pelo a pelo",

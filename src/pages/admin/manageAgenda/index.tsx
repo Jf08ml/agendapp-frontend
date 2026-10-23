@@ -33,6 +33,7 @@ import {
   deleteAppointment,
   getAppointmentsByOrganizationId,
   markAttendance,
+  describeClientNotification,
   previewSeriesReschedule,
   rescheduleSeriesFromAppointment,
   updateAppointment,
@@ -105,6 +106,8 @@ export interface CreateAppointmentPayload {
   usePackageForServices?: Record<string, string>; // serviceId -> clientPackageId
   // Valores de campos personalizados con scope "booking" (Organization.clientFormConfig.fields)
   customFieldValues?: Record<string, unknown>;
+  // 🔄 Al reprogramar (editar día/hora/profesional): avisar al cliente por WhatsApp (por defecto sí)
+  notifyClientOnReschedule?: boolean;
 }
 
 const ScheduleView: React.FC = () => {
@@ -947,6 +950,7 @@ const ScheduleView: React.FC = () => {
         clientPackageId,
         usePackageForServices,
         customFieldValues,
+        notifyClientOnReschedule,
       } = newAppointment;
 
       if (
@@ -972,6 +976,14 @@ const ScheduleView: React.FC = () => {
 
         if (selectedAppointment) {
           const firstService = services[0];
+          // ¿La edición mueve la cita (día/hora/profesional)?
+          const employeeId = (employee as any)?._id ?? employee;
+          const originalEmployeeId =
+            (selectedAppointment.employee as any)?._id ?? selectedAppointment.employee;
+          const movesSchedule =
+            new Date(selectedAppointment.startDate).getTime() !== startDate.getTime() ||
+            String(employeeId) !== String(originalEmployeeId);
+
           const payload = {
             services: [firstService],
             employee,
@@ -983,18 +995,13 @@ const ScheduleView: React.FC = () => {
             organizationId: organizationId as string,
             advancePayment,
             customFieldValues,
+            // 🔄 Aviso de reprogramación por WhatsApp (casilla del modal, marcada por defecto)
+            notifyClient: movesSchedule && (notifyClientOnReschedule ?? true),
             ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
           // 🔁 Si se mueve una cita de serie (día/hora/profesional), preguntar si
           // aplicar el mismo cambio a las siguientes — antes se hacía a mano una por una.
-          const employeeId = (employee as any)?._id ?? employee;
-          const originalEmployeeId =
-            (selectedAppointment.employee as any)?._id ?? selectedAppointment.employee;
-          const movesSchedule =
-            new Date(selectedAppointment.startDate).getTime() !== startDate.getTime() ||
-            String(employeeId) !== String(originalEmployeeId);
-
           if (selectedAppointment.seriesId && movesSchedule && !options?.seriesScope) {
             const preview = await previewSeriesReschedule(selectedAppointment._id, payload);
             if (preview && preview.items.length > 0) {
@@ -1032,24 +1039,28 @@ const ScheduleView: React.FC = () => {
               force: options.forceSeries,
             });
             const skipped = result?.skipped.length ?? 0;
+            const waNotice = describeClientNotification(result?.clientNotification);
+            const warn = skipped > 0 || waNotice.warn;
             showNotification({
               title: "Serie reprogramada",
               message:
                 `Se reprogramaron ${(result?.moved.length ?? 0) + 1} citas.` +
                 (skipped > 0
                   ? ` ${skipped} ${skipped === 1 ? "se quedó" : "se quedaron"} en su horario por choque o fuera de horario.`
-                  : ""),
-              color: skipped > 0 ? "orange" : "green",
-              autoClose: skipped > 0 ? 6000 : 3000,
+                  : "") +
+                waNotice.text,
+              color: warn ? "orange" : "green",
+              autoClose: warn ? 7000 : 3000,
               position: "top-right",
             });
           } else {
-            await updateAppointment(selectedAppointment._id, payload);
+            const updated = await updateAppointment(selectedAppointment._id, payload);
+            const waNotice = describeClientNotification(updated?.clientNotification);
             showNotification({
               title: "Éxito",
-              message: "Cita actualizada correctamente",
-              color: "green",
-              autoClose: 3000,
+              message: "Cita actualizada correctamente." + waNotice.text,
+              color: waNotice.warn ? "orange" : "green",
+              autoClose: waNotice.warn ? 7000 : 3000,
               position: "top-right",
             });
           }

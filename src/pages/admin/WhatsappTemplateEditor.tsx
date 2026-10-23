@@ -97,6 +97,34 @@ const templateInfo = {
       { name: "{{cancellationLink}}", desc: "Enlace para cancelar todas o algunas citas" },
     ],
   },
+  rescheduleAppointment: {
+    title: "Cita Reprogramada",
+    shortTitle: "Reprogramación (individual)",
+    description: "Aviso al cliente cuando reprogramas su cita desde la agenda (si dejas marcada la casilla al guardar)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{previousDate}}", desc: "Fecha y hora anterior de la cita" },
+      { name: "{{date}}", desc: "Nueva fecha y hora de la cita" },
+      { name: "{{service}}", desc: "Nombre del servicio" },
+      { name: "{{employee}}", desc: "Nombre del profesional" },
+      { name: "{{address}}", desc: "Dirección del negocio" },
+      { name: "{{cancellationLink}}", desc: "Enlace para cancelar la cita" },
+    ],
+  },
+  rescheduleAppointmentSeries: {
+    title: "Citas Reprogramadas",
+    shortTitle: "Reprogramación (serie)",
+    description: "Aviso al cliente cuando reprogramas varias citas de su serie (\"esta y las siguientes\")",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{address}}", desc: "Dirección del negocio" },
+      { name: "{{employee}}", desc: "Nombre del profesional" },
+      { name: "{{appointmentsList}}", desc: "Lista de citas con sus nuevos horarios" },
+      { name: "{{cancellationLink}}", desc: "Enlace para cancelar todas o algunas citas" },
+    ],
+  },
   reminder: {
     title: "Primer Recordatorio",
     shortTitle: "Primer recordatorio",
@@ -301,7 +329,7 @@ const templateInfo = {
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
 const SIDEBAR_GROUPS = [
-  { label: "Citas", keys: ["scheduleAppointmentBatch", "recurringAppointmentSeries"] },
+  { label: "Citas", keys: ["scheduleAppointmentBatch", "recurringAppointmentSeries", "rescheduleAppointment", "rescheduleAppointmentSeries"] },
   { label: "Recordatorios", keys: ["reminder", "secondReminder"] },
   { label: "Reservas", keys: ["statusReservationPending"] },
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
@@ -317,6 +345,8 @@ const SIDEBAR_GROUPS = [
 const META_DEFAULT_NAMES: Record<string, string> = {
   scheduleAppointmentBatch: "confirmacion_cita",
   recurringAppointmentSeries: "citas_recurrentes",
+  rescheduleAppointment: "cita_reprogramada",
+  rescheduleAppointmentSeries: "citas_reprogramadas",
   reminder: "recordatorio_cita",
   secondReminder: "segundo_recordatorio",
   statusReservationPending: "reserva_pendiente",
@@ -370,6 +400,8 @@ export default function WhatsappTemplateEditor() {
     scheduleAppointment: true,
     scheduleAppointmentBatch: true,
     recurringAppointmentSeries: true,
+    rescheduleAppointment: true,
+    rescheduleAppointmentSeries: true,
     reminder: true,
     secondReminder: true,
     statusReservationPending: true,
@@ -478,6 +510,9 @@ export default function WhatsappTemplateEditor() {
         scheduleAppointment: templateSettings.scheduleAppointment,
         scheduleAppointmentBatch: templateSettings.scheduleAppointmentBatch,
         recurringAppointmentSeries: templateSettings.recurringAppointmentSeries,
+        // 🔄 Reprogramación — siempre en el payload (el backend reemplaza enabledTypes completo)
+        rescheduleAppointment: templateSettings.rescheduleAppointment ?? true,
+        rescheduleAppointmentSeries: templateSettings.rescheduleAppointmentSeries ?? true,
         reminder: templateSettings.reminder,
         secondReminder: templateSettings.secondReminder,
         statusReservationPending: templateSettings.statusReservationPending,
@@ -832,6 +867,8 @@ export default function WhatsappTemplateEditor() {
                               { key: "scheduleAppointment", label: "Confirmación de cita individual", desc: "Al crear una cita individual" },
                               { key: "scheduleAppointmentBatch", label: "Confirmación de citas múltiples", desc: "Al crear varias citas juntas" },
                               { key: "recurringAppointmentSeries", label: "Confirmación de citas recurrentes", desc: "Al crear una serie de citas" },
+                              { key: "rescheduleAppointment", label: "Aviso de cita reprogramada", desc: "Al reprogramar una cita desde la agenda (si dejas marcada la casilla al guardar)" },
+                              { key: "rescheduleAppointmentSeries", label: "Aviso de citas reprogramadas (serie)", desc: "Al reprogramar \"esta y las siguientes\" de una serie" },
                               { key: "statusReservationPending", label: "Notificación de reserva recibida", desc: "Cuando el cliente solicita una reserva (política manual)" },
                               { key: "clientConfirmationAck", label: "Agradecimiento por confirmación", desc: "Cuando el cliente confirma asistencia" },
                               { key: "clientCancellationAck", label: "Aviso de cancelación al cliente", desc: "Cuando el cliente cancela" },

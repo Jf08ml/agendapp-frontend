@@ -22,6 +22,9 @@ export interface WhatsappTemplates {
   loyaltyReferralReward: WhatsappTemplate;
   loyaltyServiceProgress: WhatsappTemplate;
   loyaltyReferralProgress: WhatsappTemplate;
+  // 🔄 Aviso de reprogramación
+  rescheduleAppointment: WhatsappTemplate;
+  rescheduleAppointmentSeries: WhatsappTemplate;
   // 📚 Módulo de Clases (opcionales: el editor de clases las consume)
   classEnrollmentConfirmed?: WhatsappTemplate;
   classEnrollmentPending?: WhatsappTemplate;
@@ -58,6 +61,8 @@ export interface TemplatesResponse {
     loyaltyReferralReward: string;
     loyaltyServiceProgress: string;
     loyaltyReferralProgress: string;
+    rescheduleAppointment?: string;
+    rescheduleAppointmentSeries?: string;
     classEnrollmentConfirmed?: string;
     classEnrollmentPending?: string;
     classEnrollmentCancelled?: string;
@@ -86,6 +91,9 @@ export interface WhatsappTemplateSettings {
   loyaltyReferralReward?: boolean;
   loyaltyServiceProgress?: boolean;
   loyaltyReferralProgress?: boolean;
+  // 🔄 Aviso de reprogramación
+  rescheduleAppointment?: boolean;
+  rescheduleAppointmentSeries?: boolean;
   // 📚 Módulo de Clases
   classEnrollmentConfirmed?: boolean;
   classEnrollmentPending?: boolean;
