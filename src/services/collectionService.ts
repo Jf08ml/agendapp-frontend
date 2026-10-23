@@ -93,6 +93,8 @@ export interface PublicPackageItem {
   _id: string;
   name: string;
   description?: string;
+  /** 🖼️ Fotos del paquete (la primera es la portada) */
+  images?: string[];
   // Ausente/irrelevante cuando el paquete tiene niveles (usar tiers[]).
   price?: number;
   tiers?: PublicPackageTier[];

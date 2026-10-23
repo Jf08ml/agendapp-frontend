@@ -21,6 +21,7 @@ import {
   Paper,
   Tabs,
   List,
+  Image,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import {
@@ -53,6 +54,7 @@ import ModalAssignPackage from "./components/ModalAssignPackage";
 import ClientPackagesTab from "./components/ClientPackagesTab";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import { apiClient } from "../../../services/axiosConfig";
+import { uploadImage } from "../../../services/imageService";
 
 const AdminPackages: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
@@ -119,8 +121,21 @@ const AdminPackages: React.FC = () => {
     return data;
   }, [packages, debouncedSearch, status]);
 
-  const handleSavePackage = async (data: any) => {
+  const handleSavePackage = async (rawData: any) => {
     try {
+      // 🖼️ Subir las fotos nuevas (File) y conservar las ya subidas (URL), igual que servicios
+      const images: (File | string)[] = rawData.images || [];
+      const uploaded = await Promise.all(
+        images.filter((img): img is File => typeof img !== "string").map((f) => uploadImage(f))
+      );
+      const data = {
+        ...rawData,
+        images: [
+          ...images.filter((img): img is string => typeof img === "string"),
+          ...(uploaded.filter(Boolean) as string[]),
+        ],
+      };
+
       if (data._id) {
         const updated = await updateServicePackage(data._id, {
           ...data,
@@ -379,6 +394,11 @@ const AdminPackages: React.FC = () => {
                   transition: "all 0.2s ease",
                 }}
               >
+                {pkg.images?.[0] && (
+                  <Card.Section mb="sm">
+                    <Image src={pkg.images[0]} h={140} alt={pkg.name} fit="cover" />
+                  </Card.Section>
+                )}
                 <Group justify="space-between" mb="sm">
                   <Group gap="xs">
                     <Badge

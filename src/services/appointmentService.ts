@@ -446,6 +446,76 @@ export const updateAppointment = async (
   }
 };
 
+// 🔁 Reprogramar "esta y las siguientes" de una serie
+export interface SeriesRescheduleItem {
+  _id: string;
+  occurrenceNumber?: number;
+  serviceName: string;
+  oldStartDate: string;
+  oldEndDate: string;
+  newStartDate: string;
+  newEndDate: string;
+  status: "available" | "conflict" | "no_work" | "past";
+  reason?: string;
+}
+
+export interface SeriesReschedulePreview {
+  items: SeriesRescheduleItem[];
+  summary: { total: number; available: number; conflict: number; no_work: number; past: number };
+}
+
+export interface SeriesRescheduleResult {
+  appointment: Appointment;
+  moved: { _id: string; startDate: string; endDate: string }[];
+  skipped: { _id: string; startDate: string; status: string; reason?: string }[];
+}
+
+type SeriesReschedulePayload = Partial<Appointment> & {
+  services?: unknown[];
+  skipConcurrencyCheck?: boolean;
+  force?: boolean;
+};
+
+const seriesReschedulePayload = (data: SeriesReschedulePayload) => {
+  const payload: Record<string, unknown> = { ...data };
+  if (data.startDate) payload.startDate = asISO(data.startDate);
+  if (data.endDate) payload.endDate = asISO(data.endDate);
+  return payload;
+};
+
+export const previewSeriesReschedule = async (
+  appointmentId: string,
+  data: SeriesReschedulePayload
+): Promise<SeriesReschedulePreview | undefined> => {
+  try {
+    const res = await apiAppointment.post<Response<SeriesReschedulePreview>>(
+      `/${appointmentId}/series-reschedule`,
+      { ...seriesReschedulePayload(data), previewOnly: true }
+    );
+    return res.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al calcular la reprogramación de la serie");
+  }
+};
+
+export const rescheduleSeriesFromAppointment = async (
+  appointmentId: string,
+  data: SeriesReschedulePayload
+): Promise<SeriesRescheduleResult | undefined> => {
+  try {
+    const res = await apiAppointment.post<Response<SeriesRescheduleResult>>(
+      `/${appointmentId}/series-reschedule`,
+      seriesReschedulePayload(data)
+    );
+    return res.data.data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+      throw error;
+    }
+    handleAxiosError(error, "Error al reprogramar la serie");
+  }
+};
+
 // Confirmar múltiples citas en batch
 export const batchConfirmAppointments = async (
   appointmentIds: string[],

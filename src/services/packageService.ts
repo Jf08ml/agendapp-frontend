@@ -32,6 +32,8 @@ export interface ServicePackage {
   _id: string;
   name: string;
   description: string;
+  /** 🖼️ Fotos del paquete (la primera es la portada) */
+  images?: string[];
   organizationId: string;
   services: PackageServiceItem[];
   classes?: PackageClassItem[];

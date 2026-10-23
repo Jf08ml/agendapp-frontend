@@ -33,8 +33,11 @@ import {
   deleteAppointment,
   getAppointmentsByOrganizationId,
   markAttendance,
+  previewSeriesReschedule,
+  rescheduleSeriesFromAppointment,
   updateAppointment,
 } from "../../../services/appointmentService";
+import SeriesRescheduleContent from "./components/SeriesRescheduleContent";
 import {
   Employee,
   getEmployeesByOrganizationId,
@@ -923,7 +926,12 @@ const ScheduleView: React.FC = () => {
   /**
    * CREAR O ACTUALIZAR CITA
    */
-  const addOrUpdateAppointment = async (options?: { skipConcurrencyCheck?: boolean }) => {
+  const addOrUpdateAppointment = async (options?: {
+    skipConcurrencyCheck?: boolean;
+    /** 🔁 Cita de serie: "single" = solo esta, "following" = esta y las siguientes */
+    seriesScope?: "single" | "following";
+    forceSeries?: boolean;
+  }) => {
     setCreatingAppointment(true);
     try {
       const {
@@ -978,14 +986,73 @@ const ScheduleView: React.FC = () => {
             ...(options?.skipConcurrencyCheck && { skipConcurrencyCheck: true }),
           };
 
-          await updateAppointment(selectedAppointment._id, payload);
-          showNotification({
-            title: "Éxito",
-            message: "Cita actualizada correctamente",
-            color: "green",
-            autoClose: 3000,
-            position: "top-right",
-          });
+          // 🔁 Si se mueve una cita de serie (día/hora/profesional), preguntar si
+          // aplicar el mismo cambio a las siguientes — antes se hacía a mano una por una.
+          const employeeId = (employee as any)?._id ?? employee;
+          const originalEmployeeId =
+            (selectedAppointment.employee as any)?._id ?? selectedAppointment.employee;
+          const movesSchedule =
+            new Date(selectedAppointment.startDate).getTime() !== startDate.getTime() ||
+            String(employeeId) !== String(originalEmployeeId);
+
+          if (selectedAppointment.seriesId && movesSchedule && !options?.seriesScope) {
+            const preview = await previewSeriesReschedule(selectedAppointment._id, payload);
+            if (preview && preview.items.length > 0) {
+              setCreatingAppointment(false);
+              const modalId = "series-reschedule";
+              modals.open({
+                modalId,
+                title: "Reprogramar cita de una serie",
+                centered: true,
+                zIndex: 400,
+                children: (
+                  <SeriesRescheduleContent
+                    preview={preview}
+                    timezone={organizationTimezone}
+                    timeFormat={organization?.timeFormat}
+                    onOnlyThis={() => {
+                      modals.close(modalId);
+                      addOrUpdateAppointment({ ...options, seriesScope: "single" });
+                    }}
+                    onThisAndFollowing={(force) => {
+                      modals.close(modalId);
+                      addOrUpdateAppointment({ ...options, seriesScope: "following", forceSeries: force });
+                    }}
+                    onCancel={() => modals.close(modalId)}
+                  />
+                ),
+              });
+              return;
+            }
+          }
+
+          if (options?.seriesScope === "following") {
+            const result = await rescheduleSeriesFromAppointment(selectedAppointment._id, {
+              ...payload,
+              force: options.forceSeries,
+            });
+            const skipped = result?.skipped.length ?? 0;
+            showNotification({
+              title: "Serie reprogramada",
+              message:
+                `Se reprogramaron ${(result?.moved.length ?? 0) + 1} citas.` +
+                (skipped > 0
+                  ? ` ${skipped} ${skipped === 1 ? "se quedó" : "se quedaron"} en su horario por choque o fuera de horario.`
+                  : ""),
+              color: skipped > 0 ? "orange" : "green",
+              autoClose: skipped > 0 ? 6000 : 3000,
+              position: "top-right",
+            });
+          } else {
+            await updateAppointment(selectedAppointment._id, payload);
+            showNotification({
+              title: "Éxito",
+              message: "Cita actualizada correctamente",
+              color: "green",
+              autoClose: 3000,
+              position: "top-right",
+            });
+          }
         } else {
           const payload = {
             services: services.map((s) => s._id ?? s),
@@ -1038,7 +1105,7 @@ const ScheduleView: React.FC = () => {
           ),
           labels: { confirm: "Crear de todas formas", cancel: "Cancelar" },
           confirmProps: { color: "orange" },
-          onConfirm: () => addOrUpdateAppointment({ skipConcurrencyCheck: true }),
+          onConfirm: () => addOrUpdateAppointment({ ...options, skipConcurrencyCheck: true }),
         });
         return;
       }

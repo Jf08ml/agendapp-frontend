@@ -41,6 +41,10 @@ interface ModalAssignPackageProps {
     tierId?: string;
   }) => void;
   currency?: string;
+  /** Cliente preseleccionado (ej. al vender el paquete desde el modal de la cita) */
+  defaultClientId?: string;
+  /** Para abrirlo encima de otro modal (el de citas usa zIndex 300) */
+  zIndex?: number;
 }
 
 const PAYMENT_METHODS = [
@@ -59,6 +63,8 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
   clients,
   onAssign,
   currency = "COP",
+  defaultClientId,
+  zIndex,
 }) => {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientSearch, setClientSearch] = useState("");
@@ -74,14 +80,14 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setClientId(null);
+      setClientId(defaultClientId ?? null);
       setClientSearch("");
       setPaymentMethod("efectivo");
       setPaymentNotes("");
       setPurchaseDate(new Date());
       setTierId(servicePackage?.tiers?.[0]?._id || null);
     }
-  }, [isOpen, servicePackage]);
+  }, [isOpen, servicePackage, defaultClientId]);
 
   const clientOptions = useMemo(() => {
     const q = debouncedClientSearch.toLowerCase();
@@ -124,6 +130,9 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
     }
   };
 
+  // Desplegables encima del modal cuando este se abre sobre otro (zIndex alto)
+  const dropdownZ = zIndex ? { zIndex: zIndex + 1 } : undefined;
+
   if (!servicePackage) return null;
 
   return (
@@ -142,6 +151,7 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
       centered
       radius="md"
       overlayProps={{ blur: 2 }}
+      zIndex={zIndex}
     >
       <Stack gap="lg">
         <Paper withBorder p="md" radius="md" bg="gray.0">
@@ -193,6 +203,7 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
           onSearchChange={setClientSearch}
           searchValue={clientSearch}
           nothingFoundMessage="No se encontraron clientes"
+          comboboxProps={dropdownZ}
           required
           withAsterisk
         />
@@ -202,6 +213,7 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
             label="Fecha de inicio"
             value={purchaseDate}
             onChange={setPurchaseDate}
+            popoverProps={dropdownZ}
             required
             withAsterisk
           />
@@ -226,6 +238,7 @@ const ModalAssignPackage: React.FC<ModalAssignPackageProps> = ({
           data={PAYMENT_METHODS}
           value={paymentMethod}
           onChange={setPaymentMethod}
+          comboboxProps={dropdownZ}
           required
           withAsterisk
         />

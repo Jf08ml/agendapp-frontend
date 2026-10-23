@@ -25,6 +25,7 @@ import { Service } from "../../../../services/serviceService";
 import { ServicePackage, PackageServiceItem, PackageClassItem, PackageTier } from "../../../../services/packageService";
 import { ClassType } from "../../../../services/classService";
 import { Autocomplete } from "@mantine/core";
+import { ImageUploadField } from "../../components/MediaUploadFields";
 
 interface ModalCreateEditPackageProps {
   isOpen: boolean;
@@ -74,6 +75,8 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
 }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  // Fotos: URLs ya subidas (string) o archivos nuevos (File) que sube el padre al guardar
+  const [images, setImages] = useState<(File | string)[]>([]);
   const [price, setPrice] = useState<number>(0);
   const [hasTiers, setHasTiers] = useState(false);
   const [tiers, setTiers] = useState<EditingTier[]>([]);
@@ -89,6 +92,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     if (servicePackage) {
       setName(servicePackage.name);
       setDescription(servicePackage.description || "");
+      setImages(servicePackage.images || []);
       setPrice(servicePackage.price ?? 0);
       const existingTiers = servicePackage.tiers || [];
       setHasTiers(existingTiers.length > 0);
@@ -123,6 +127,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     } else {
       setName("");
       setDescription("");
+      setImages([]);
       setPrice(0);
       setHasTiers(false);
       setTiers([]);
@@ -225,6 +230,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
         _id: servicePackage?._id,
         name: name.trim(),
         description: description.trim(),
+        images,
         ...(hasTiers
           ? {
               tiers: tiers.map((t) => ({
@@ -304,6 +310,13 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
               minRows={2}
               autosize
             />
+            <Box>
+              <Text size="sm" fw={500} mb={4}>Fotos</Text>
+              <Text size="xs" c="dimmed" mb="xs">
+                La primera es la portada del paquete en la página de compra
+              </Text>
+              <ImageUploadField images={images} onChange={setImages} />
+            </Box>
             <Switch
               label="Este paquete tiene niveles (ej: x4 / x8 / x12)"
               description="Misma base de servicios/clases, distinta cantidad de sesiones — cada nivel con su propio precio, en vez de crear un paquete separado por cada uno"

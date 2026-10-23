@@ -20,6 +20,7 @@ import {
   Textarea,
   Divider,
   SegmentedControl,
+  Image,
 } from "@mantine/core";
 import {
   IconCheck,
@@ -367,6 +368,11 @@ export default function PublicPackagePurchasePage() {
             const tiered = hasTiers(pkg);
             return (
               <Card key={pkg._id} withBorder radius="md" padding="lg">
+                {pkg.images?.[0] && (
+                  <Card.Section mb="sm">
+                    <Image src={pkg.images[0]} h={180} alt={pkg.name} fit="cover" />
+                  </Card.Section>
+                )}
                 <Stack gap="sm" h="100%">
                   <Stack gap={4}>
                     <Text fw={600} size="lg">

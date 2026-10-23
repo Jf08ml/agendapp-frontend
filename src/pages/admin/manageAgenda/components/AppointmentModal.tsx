@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
+  Stack,
   Button,
   Modal,
   Grid,
@@ -57,7 +58,14 @@ dayjs.extend(timezone);
 import { CreateAppointmentPayload } from "..";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
-import { getActivePackagesForService, ClientPackage } from "../../../../services/packageService";
+import {
+  getActivePackagesForService,
+  getServicePackages,
+  assignPackageToClient,
+  ClientPackage,
+  ServicePackage,
+} from "../../../../services/packageService";
+import ModalAssignPackage from "../../managePackages/components/ModalAssignPackage";
 import { IconPackage, IconX, IconNotes, IconListDetails } from "@tabler/icons-react";
 import { BiCopy, BiCheckCircle, BiPlus, BiTrash, BiX, BiSearch } from "react-icons/bi";
 import { FaWhatsapp } from "react-icons/fa";
@@ -335,6 +343,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   // Estado para paquetes de sesiones del cliente
   const [availablePackages, setAvailablePackages] = useState<Record<string, ClientPackage[]>>({});
   const [usePackage, setUsePackage] = useState<Record<string, string>>({}); // serviceId -> clientPackageId
+  // 📦 Paquetes del negocio (para venderlos desde la cita) y el que se está asignando
+  const [orgPackages, setOrgPackages] = useState<ServicePackage[]>([]);
+  const [assigningPackage, setAssigningPackage] = useState<ServicePackage | null>(null);
+  const [packagesRefreshKey, setPackagesRefreshKey] = useState(0);
 
   // 📝 Notas de la sesión (registro genérico de lo hecho en la cita).
   // lastSavedNotes se trackea localmente (no desde la prop `appointment`,
@@ -960,7 +972,63 @@ ${clientServices}`;
     };
 
     fetchPackages();
-  }, [newAppointment.client?._id, newAppointment.services?.map(s => s._id).join(","), organizationId]);
+  }, [newAppointment.client?._id, newAppointment.services?.map(s => s._id).join(","), organizationId, packagesRefreshKey]);
+
+  // 📦 Paquetes activos del negocio, solo al crear (para ofrecer venderlos desde la cita)
+  useEffect(() => {
+    if (!opened || appointment || !organizationId) return;
+    getServicePackages(organizationId, true)
+      .then(setOrgPackages)
+      .catch(() => setOrgPackages([]));
+  }, [opened, appointment, organizationId]);
+
+  // Paquetes del negocio que incluyen algún servicio elegido que el cliente aún no tiene cubierto
+  const sellablePackages = useMemo(() => {
+    if (!newAppointment.client?._id) return [];
+    const uncovered = (newAppointment.services || []).filter((svc) => !availablePackages[svc._id]);
+    if (uncovered.length === 0) return [];
+    return orgPackages
+      .map((pkg) => {
+        // serviceId llega poblado ({ _id, name, ... }) desde getServicePackages
+        const pkgServiceIds = new Set(
+          pkg.services.map((s) => {
+            const id = s.serviceId as string | { _id: string };
+            return typeof id === "object" ? id._id : id;
+          })
+        );
+        const serviceNames = uncovered.filter((svc) => pkgServiceIds.has(svc._id)).map((svc) => svc.name);
+        return { pkg, serviceNames };
+      })
+      .filter(({ serviceNames }) => serviceNames.length > 0);
+  }, [orgPackages, availablePackages, newAppointment.client?._id, newAppointment.services]);
+
+  const handleAssignPackageFromAppointment = async (data: {
+    servicePackageId: string;
+    clientId: string;
+    paymentMethod: string;
+    paymentNotes: string;
+    purchaseDate: string;
+    tierId?: string;
+  }) => {
+    if (!organizationId) return;
+    try {
+      await assignPackageToClient({ ...data, organizationId });
+      setAssigningPackage(null);
+      // Recargar los paquetes del cliente: el nuevo queda preseleccionado para esta cita
+      setPackagesRefreshKey((k) => k + 1);
+      notifications.show({
+        title: "Paquete asignado",
+        message: "Esta cita se descontará del paquete al crearla.",
+        color: "teal",
+      });
+    } catch (error) {
+      notifications.show({
+        title: "Error",
+        message: error instanceof Error ? error.message : "No se pudo asignar el paquete",
+        color: "red",
+      });
+    }
+  };
 
   // 🔁 Resetear preview cuando cambian los parámetros de recurrencia
   useEffect(() => {
@@ -1478,6 +1546,48 @@ ${clientServices}`;
                 Las sesiones se descontarán del paquete al crear la cita.
                 Precio: $0 para servicios cubiertos por el paquete.
               </Text>
+            </Box>
+          )}
+
+          {/* 📦 Vender un paquete desde la cita: el cliente aún no lo tiene, pero el
+              servicio está en un paquete del negocio → asignarlo y descontar esta sesión */}
+          {!appointment && sellablePackages.length > 0 && (
+            <Box
+              mb="xl"
+              p="md"
+              style={{ borderRadius: 8, border: "1px dashed #63e6be" }}
+            >
+              <Group gap="xs" mb="xs">
+                <IconPackage size={18} color="#099268" />
+                <Text size="sm" fw={600} c="teal.8">
+                  ¿El cliente compró un paquete?
+                </Text>
+              </Group>
+              <Text size="xs" c="dimmed" mb="sm">
+                Asígnaselo aquí y esta cita se descuenta del paquete automáticamente.
+              </Text>
+              <Stack gap={6}>
+                {sellablePackages.map(({ pkg, serviceNames }) => (
+                  <Group key={pkg._id} justify="space-between" wrap="nowrap">
+                    <Stack gap={0} style={{ minWidth: 0 }}>
+                      <Text size="sm" fw={500} truncate>
+                        {pkg.name}
+                      </Text>
+                      <Text size="xs" c="dimmed" truncate>
+                        Incluye {serviceNames.join(", ")}
+                      </Text>
+                    </Stack>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="teal"
+                      onClick={() => setAssigningPackage(pkg)}
+                    >
+                      Asignar
+                    </Button>
+                  </Group>
+                ))}
+              </Stack>
             </Box>
           )}
 
@@ -2743,6 +2853,20 @@ ${clientServices}`;
         }}
         fetchClients={fetchClients ?? (() => {})}
       />
+
+      {/* 📦 Vender/asignar un paquete al cliente sin salir de la cita */}
+      {newAppointment.client && (
+        <ModalAssignPackage
+          isOpen={!!assigningPackage}
+          onClose={() => setAssigningPackage(null)}
+          servicePackage={assigningPackage}
+          clients={[newAppointment.client]}
+          defaultClientId={newAppointment.client._id}
+          onAssign={handleAssignPackageFromAppointment}
+          currency={organization?.currency || "COP"}
+          zIndex={400}
+        />
+      )}
     </>
   );
 };
