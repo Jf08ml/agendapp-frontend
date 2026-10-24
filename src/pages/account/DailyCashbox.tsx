@@ -27,8 +27,9 @@ import {
   Menu,
   Tabs,
   Textarea,
+  Modal,
 } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
+import { DateInput, DatePickerInput } from "@mantine/dates";
 import { openConfirmModal } from "@mantine/modals";
 import {
   Appointment,
@@ -60,6 +61,7 @@ import {
   IconChecks,
   IconCircleCheck,
   IconTrash,
+  IconPencil,
   IconPlus,
   IconReceipt,
   IconUserCheck,
@@ -79,6 +81,7 @@ import {
   getExpenses,
   createExpense,
   deleteExpense as deleteExpenseApi,
+  updateExpense as updateExpenseApi,
 } from "../../services/expenseService";
 import {
   PaymentRecord,
@@ -110,6 +113,14 @@ dayjs.extend(localeData);
 dayjs.locale("es");
 
 type Interval = "daily" | "weekly" | "biweekly" | "monthly" | "custom";
+
+// Fecha que se guarda para un gasto/ingreso elegido en el calendario: si es hoy se usa
+// la hora actual; si es otro día, el mediodía, para que un desfase entre la zona del
+// navegador y la de la organización no lo corra al día anterior/siguiente.
+const toMovementDate = (day: Date): Date =>
+  dayjs(day).isSame(dayjs(), "day")
+    ? new Date()
+    : dayjs(day).hour(12).minute(0).second(0).millisecond(0).toDate();
 
 type ApptStatus =
   | "confirmed"
@@ -290,6 +301,13 @@ const DailyCashbox: React.FC = () => {
 
   // Tipo de movimiento activo en el formulario unificado
   const [movementType, setMovementType] = useState<"expense" | "income">("expense");
+  // Fecha real del movimiento (puede ser anterior al día en que se registra)
+  const [movementDate, setMovementDate] = useState<Date | null>(new Date());
+
+  // Edición de un gasto/ingreso existente
+  const [editingMovement, setEditingMovement] = useState<Expense | null>(null);
+  const [editForm, setEditForm] = useState({ concept: "", category: "", amount: 0, method: "cash", date: null as Date | null });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Tab activo del contenido — persiste la preferencia en localStorage
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -498,6 +516,69 @@ const DailyCashbox: React.FC = () => {
     }
   };
 
+  // La fecha del formulario sigue al día visible en la vista diaria; en las demás, hoy
+  useEffect(() => {
+    setMovementDate(interval === "daily" && selectedDay ? selectedDay : new Date());
+  }, [interval, selectedDay]);
+
+  const isInVisibleRange = (iso: string) => {
+    if (!startDate || !endDate) return false;
+    const t = new Date(iso).getTime();
+    return t >= startDate.getTime() && t <= endDate.getTime();
+  };
+
+  // Agrega el movimiento creado/editado a la lista solo si cae en el período visible
+  const placeMovement = (movement: Expense, title: string) => {
+    const setList = movement.type === "income" ? setIncomes : setExpenses;
+    const visible = isInVisibleRange(movement.date);
+    setList((prev) => {
+      const rest = prev.filter((m) => m._id !== movement._id);
+      return visible ? [movement, ...rest] : rest;
+    });
+    showNotification({
+      title,
+      message: visible ? "" : `Quedó con fecha ${formatInTimezone(movement.date, timezone, "DD/MM/YYYY")}, fuera del período que estás viendo.`,
+      color: "green",
+      autoClose: visible ? 2000 : 5000,
+      position: "top-right",
+    });
+  };
+
+  const openEditMovement = (movement: Expense) => {
+    setEditingMovement(movement);
+    setEditForm({
+      concept: movement.concept,
+      category: movement.category || "",
+      amount: movement.amount,
+      method: movement.method || "cash",
+      date: new Date(movement.date),
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMovement || !editForm.date || !editForm.concept.trim() || editForm.amount <= 0) return;
+    setSavingEdit(true);
+    try {
+      const dayChanged = !dayjs(editForm.date).isSame(dayjs(editingMovement.date), "day");
+      const updated = await updateExpenseApi(editingMovement._id, {
+        concept: editForm.concept.trim(),
+        category: editForm.category.trim(),
+        amount: editForm.amount,
+        method: editForm.method,
+        // Si no cambió el día se conserva la hora original
+        ...(dayChanged ? { date: toMovementDate(editForm.date).toISOString() } : {}),
+      });
+      if (updated) {
+        placeMovement(updated, updated.type === "income" ? "Ingreso actualizado" : "Gasto actualizado");
+        setEditingMovement(null);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const fetchExpenses = async () => {
     if (!startDate || !endDate) return;
     try {
@@ -538,7 +619,7 @@ const DailyCashbox: React.FC = () => {
     if (!newExpense.concept.trim() || newExpense.amount <= 0) return;
     setAddingExpense(true);
     try {
-      const date = selectedDay ?? new Date();
+      const date = toMovementDate(movementDate ?? new Date());
       const created = await createExpense({
         concept: newExpense.concept.trim(),
         category: newExpense.category.trim(),
@@ -548,9 +629,8 @@ const DailyCashbox: React.FC = () => {
         method: newExpense.method,
       });
       if (created) {
-        setExpenses((prev) => [created, ...prev]);
+        placeMovement(created, "Gasto registrado");
         setNewExpense({ concept: "", category: "", amount: 0, method: "cash" });
-        showNotification({ title: "Gasto registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
       }
     } catch (error) {
       console.error(error);
@@ -582,7 +662,7 @@ const DailyCashbox: React.FC = () => {
     if (!newIncome.concept.trim() || newIncome.amount <= 0) return;
     setAddingIncome(true);
     try {
-      const date = selectedDay ?? new Date();
+      const date = toMovementDate(movementDate ?? new Date());
       const created = await createExpense({
         concept: newIncome.concept.trim(),
         category: newIncome.category.trim(),
@@ -592,9 +672,8 @@ const DailyCashbox: React.FC = () => {
         method: newIncome.method,
       });
       if (created) {
-        setIncomes((prev) => [created, ...prev]);
+        placeMovement(created, "Ingreso registrado");
         setNewIncome({ concept: "", category: "", amount: 0, method: "cash" });
-        showNotification({ title: "Ingreso registrado", message: "", color: "green", autoClose: 2000, position: "top-right" });
       }
     } catch (error) {
       console.error(error);
@@ -1768,6 +1847,59 @@ const DailyCashbox: React.FC = () => {
         })()}
       </Drawer>
 
+      {/* ---- Modal de edición de gasto/ingreso ---- */}
+      <Modal
+        opened={!!editingMovement}
+        onClose={() => setEditingMovement(null)}
+        title={editingMovement?.type === "income" ? "Editar ingreso" : "Editar gasto"}
+        centered
+      >
+        <Stack gap="sm">
+          <TextInput
+            label="Concepto"
+            value={editForm.concept}
+            onChange={(e) => { const concept = e.currentTarget.value; setEditForm((p) => ({ ...p, concept })); }}
+          />
+          <TextInput
+            label="Categoría"
+            value={editForm.category}
+            onChange={(e) => { const category = e.currentTarget.value; setEditForm((p) => ({ ...p, category })); }}
+          />
+          <NumberInput
+            label="Monto" prefix="$ " thousandSeparator="." decimalSeparator=","
+            value={editForm.amount}
+            onChange={(v) => setEditForm((p) => ({ ...p, amount: typeof v === "number" ? v : 0 }))}
+            min={0}
+          />
+          <Select
+            label="Método"
+            value={editForm.method}
+            onChange={(v) => setEditForm((p) => ({ ...p, method: v || "cash" }))}
+            data={Object.entries(METHOD_LABELS).map(([value, label]) => ({ value, label }))}
+            clearable={false} searchable={false}
+          />
+          <DateInput
+            label="Fecha del movimiento"
+            description="Se cuenta en el día y mes de esta fecha"
+            value={editForm.date}
+            onChange={(date) => setEditForm((p) => ({ ...p, date }))}
+            maxDate={new Date()}
+            clearable={false}
+            popoverProps={{ zIndex: 400 }}
+          />
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setEditingMovement(null)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveEdit}
+              loading={savingEdit}
+              disabled={!editForm.date || !editForm.concept.trim() || editForm.amount <= 0}
+            >
+              Guardar
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       {/* ---- Modal de venta de productos ---- */}
       <SaleModal
         isOpen={saleModalOpened}
@@ -2388,14 +2520,23 @@ const DailyCashbox: React.FC = () => {
                 data={Object.entries(METHOD_LABELS).map(([value, label]) => ({ value, label }))}
                 clearable={false} searchable={false} w={140}
               />
+              <DateInput
+                placeholder="Fecha"
+                aria-label="Fecha del movimiento"
+                value={movementDate}
+                onChange={setMovementDate}
+                maxDate={new Date()}
+                clearable={false}
+                w={130}
+              />
               <Button
                 color={movementType === "income" ? "teal" : undefined}
                 leftSection={<IconPlus size={16} />}
                 onClick={movementType === "expense" ? handleAddExpense : handleAddIncome}
                 loading={movementType === "expense" ? addingExpense : addingIncome}
-                disabled={movementType === "expense"
+                disabled={!movementDate || (movementType === "expense"
                   ? !newExpense.concept.trim() || newExpense.amount <= 0
-                  : !newIncome.concept.trim() || newIncome.amount <= 0}
+                  : !newIncome.concept.trim() || newIncome.amount <= 0)}
               >
                 Agregar
               </Button>
@@ -2431,6 +2572,11 @@ const DailyCashbox: React.FC = () => {
                       <Text fw={700} c={item._type === "income" ? "teal" : "red"} size="sm">
                         {item._type === "income" ? "+" : "−"}{formatCurrency(item.amount, currency)}
                       </Text>
+                      <Tooltip label="Editar" withArrow>
+                        <ActionIcon color="gray" variant="subtle" size="sm" onClick={() => openEditMovement(item)}>
+                          <IconPencil size={14} />
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label="Eliminar" withArrow>
                         <ActionIcon color="red" variant="subtle" size="sm"
                           onClick={() => item._type === "expense" ? handleDeleteExpense(item._id) : handleDeleteIncome(item._id)}>
