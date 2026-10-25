@@ -27,6 +27,7 @@ import {
   Table,
   TextInput,
   Switch,
+  SegmentedControl,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import DateSelector from "./DateSelector";
@@ -75,6 +76,7 @@ import DynamicFormFields from "../../../../components/DynamicFormFields";
 // 🔁 Imports para citas recurrentes
 import RecurrenceSelector from "../../../../components/customCalendar/components/RecurrenceSelector";
 import SeriesPreview from "../../../../components/customCalendar/components/SeriesPreview";
+import CustomDatesSelector from "../../../../components/customCalendar/components/CustomDatesSelector";
 import {
   RecurrencePattern,
   SeriesPreview as SeriesPreviewType,
@@ -335,6 +337,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [creatingSeries, setCreatingSeries] = useState(false);
   const [notifyAllAppointments, setNotifyAllAppointments] = useState(false); // 📨 Por defecto solo primera cita
+  // Serie semanal o de fechas específicas ('custom')
+  const isSeries = recurrencePattern.type === "weekly" || recurrencePattern.type === "custom";
+  const seriesIncomplete = recurrencePattern.type === "custom" && !recurrencePattern.dates?.length;
 
   // Multi-profesional
   const [extraBlocks, setExtraBlocks] = useState<ExtraBlock[]>([]);
@@ -1868,14 +1873,15 @@ ${clientServices}`;
               mb="xl"
               p="md"
               style={{
-                backgroundColor: recurrencePattern.type === "weekly" ? "#f0f8ff" : "#f8f9fa",
+                backgroundColor: isSeries ? "#f0f8ff" : "#f8f9fa",
                 borderRadius: 8,
-                border: recurrencePattern.type === "weekly" ? "1px solid #b0d4f1" : "1px solid #e9ecef",
+                border: isSeries ? "1px solid #b0d4f1" : "1px solid #e9ecef",
               }}
             >
               <Switch
-                label="🔁 Repetir esta cita semanalmente"
-                checked={recurrencePattern.type === "weekly"}
+                label="🔁 Agendar varias citas de una vez"
+                description="Cada semana, o en las fechas que elijas (ej. las sesiones de un paquete)"
+                checked={isSeries}
                 onChange={(event) => {
                   if (event.currentTarget.checked) {
                     const dayOfWeek = newAppointment.startDate
@@ -1901,19 +1907,55 @@ ${clientServices}`;
                 }}
               />
 
-              {recurrencePattern.type === "weekly" && (
+              {isSeries && (
                 <Box mt="md">
-                  <RecurrenceSelector
-                    value={recurrencePattern}
-                    onChange={setRecurrencePattern}
-                    startDate={newAppointment.startDate}
+                  <SegmentedControl
+                    fullWidth
+                    mb="md"
+                    value={recurrencePattern.type}
+                    onChange={(type) => {
+                      const dayOfWeek = newAppointment.startDate
+                        ? newAppointment.startDate.getDay()
+                        : 1;
+                      setRecurrencePattern(
+                        type === "custom"
+                          ? { type: "custom", dates: [], intervalWeeks: 1, weekdays: [], endType: "count" }
+                          : { type: "weekly", intervalWeeks: 1, weekdays: [dayOfWeek], endType: "count", count: 4 },
+                      );
+                    }}
+                    data={[
+                      { value: "weekly", label: "Cada semana" },
+                      { value: "custom", label: "Fechas específicas" },
+                    ]}
                   />
+
+                  {recurrencePattern.type === "custom" ? (
+                    <CustomDatesSelector
+                      value={recurrencePattern.dates || []}
+                      onChange={(dates) => setRecurrencePattern((prev) => ({ ...prev, dates }))}
+                      firstDate={newAppointment.startDate}
+                      timeFormat={timeFormat}
+                    />
+                  ) : (
+                    <RecurrenceSelector
+                      value={recurrencePattern}
+                      onChange={setRecurrencePattern}
+                      startDate={newAppointment.startDate}
+                    />
+                  )}
+
+                  {Object.keys(usePackage).length > 0 && (
+                    <Text size="xs" c="dimmed" mt="xs">
+                      📦 Cada cita descuenta una sesión del paquete y se numera según su fecha («Sesión 1/15», «Sesión 2/15»…).
+                    </Text>
+                  )}
 
                   <Button
                     mt="md"
                     variant="light"
                     color="blue"
                     loading={loadingPreview}
+                    disabled={seriesIncomplete}
                     onClick={handleGeneratePreview}
                     leftSection={<Text>🔍</Text>}
                   >
@@ -2183,7 +2225,7 @@ ${clientServices}`;
                   return;
                 }
                 // 🔁 Si es cita recurrente, crearla como serie
-                if (!appointment && recurrencePattern.type === "weekly") {
+                if (!appointment && isSeries) {
                   if (!organizationId) {
                     notifications.show({
                       title: "⚠️ Error",
@@ -2240,7 +2282,7 @@ ${clientServices}`;
                     if (result && "createdCount" in result) {
                       notifications.show({
                         title: "✅ Serie creada exitosamente",
-                        message: `Se crearon ${result.createdCount} de ${result.totalOccurrences} citas recurrentes`,
+                        message: `Se crearon ${result.createdCount} de ${result.totalOccurrences} citas`,
                         color: "green",
                         autoClose: 4000,
                       });
@@ -2273,7 +2315,7 @@ ${clientServices}`;
                   onSave();
                 }
               }}
-              disabled={creatingAppointment || creatingSeries}
+              disabled={creatingAppointment || creatingSeries || (!appointment && !isMultiMode && seriesIncomplete)}
               loading={creatingAppointment || creatingSeries}
               size="xs"
               radius="md"
@@ -2282,7 +2324,7 @@ ${clientServices}`;
                   ? "✏️"
                   : isMultiMode
                     ? "👥"
-                    : recurrencePattern.type === "weekly"
+                    : isSeries
                       ? "🔁"
                       : "➕"
               }
@@ -2296,7 +2338,9 @@ ${clientServices}`;
                 ? "Actualizar Cita"
                 : isMultiMode
                   ? `Crear Citas (${extraBlocks.filter((b) => b.employee && b.services.length > 0).length + (newAppointment.employee ? 1 : 0)} profesionales)`
-                  : recurrencePattern.type === "weekly"
+                  : recurrencePattern.type === "custom"
+                    ? `Crear ${1 + (recurrencePattern.dates?.length || 0)} citas`
+                    : recurrencePattern.type === "weekly"
                     ? "Crear Serie Recurrente"
                     : "Crear Cita"}
             </Button>

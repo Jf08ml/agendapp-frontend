@@ -69,7 +69,9 @@ export interface Appointment {
 
 // 🔁 Tipos para citas recurrentes
 export interface RecurrencePattern {
-  type: 'weekly' | 'none';
+  type: 'weekly' | 'custom' | 'none';
+  /** Solo 'custom': fechas adicionales a la primera cita, sin zona ("YYYY-MM-DDTHH:mm:ss", hora de la org) */
+  dates?: string[];
   intervalWeeks: number; // 1 = cada semana, 2 = cada 2 semanas, etc.
   weekdays: number[]; // [0=Dom, 1=Lun, 2=Mar, ..., 6=Sáb]
   endType: 'date' | 'count';
