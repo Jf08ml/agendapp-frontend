@@ -437,7 +437,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
                   <Switch
                     mt="md"
                     label="Solo como respaldo"
-                    description="No aparece para que el cliente lo elija. Se le asignan reservas en línea solo los días en que los demás profesionales de ese servicio no tienen espacio."
+                    description="No aparece para que el cliente lo elija. Se le asignan reservas en línea solo en los horarios en que los demás profesionales de ese servicio están ocupados."
                     checked={editingEmployee.onlineBookingBackup === true}
                     onChange={(e) =>
                       setEditingEmployee({

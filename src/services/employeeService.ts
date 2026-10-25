@@ -40,7 +40,7 @@ export interface Employee {
   // reservas web/WhatsApp); sigue activo en la agenda interna. Sin el campo = visible.
   onlineBookingEnabled?: boolean;
   // true = respaldo en la reserva en línea: no se ofrece para elegir y solo se
-  // auto-asigna los días en que los demás profesionales del servicio están llenos.
+  // auto-asigna en los horarios en que los demás profesionales del servicio están ocupados.
   onlineBookingBackup?: boolean;
   profileImage: string;
   color: string;

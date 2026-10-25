@@ -17,8 +17,8 @@ export const TIME_FORMATS = [
 
 /**
  * ¿El servicio tiene un profesional de respaldo (onlineBookingBackup)? El
- * respaldo no se ofrece para elegir: el backend lo asigna solo los días en que
- * los demás están llenos, así que la reserva debe ir "Sin preferencia" — aun
+ * respaldo no se ofrece para elegir: el backend lo asigna solo en los horarios
+ * en que los demás están ocupados, así que la reserva debe ir "Sin preferencia" — aun
  * en agendamiento automático, donde el profesional es obligatorio (el bloque
  * elegido ya trae el profesional asignado).
  */
