@@ -67,6 +67,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     customPermissions: [],
     isActive: true,
     onlineBookingEnabled: true,
+    onlineBookingBackup: false,
     profileImage: "",
     color: "",
     commissionType: "percentage",
@@ -95,6 +96,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         customPermissions: employee.customPermissions || [],
         isActive: employee.isActive ?? true,
         onlineBookingEnabled: employee.onlineBookingEnabled !== false,
+        onlineBookingBackup: employee.onlineBookingBackup === true,
         profileImage: employee.profileImage || "",
         color: employee.color || "",
         commissionType: employee.commissionType ?? "percentage",
@@ -161,6 +163,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
       customPermissions: [],
       isActive: true,
       onlineBookingEnabled: true,
+      onlineBookingBackup: false,
       profileImage: "",
       color: "",
       commissionType: "percentage",
@@ -430,6 +433,20 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
                     })
                   }
                 />
+                {editingEmployee.onlineBookingEnabled !== false && (
+                  <Switch
+                    mt="md"
+                    label="Solo como respaldo"
+                    description="No aparece para que el cliente lo elija. Se le asignan reservas en línea solo los días en que los demás profesionales de ese servicio no tienen espacio."
+                    checked={editingEmployee.onlineBookingBackup === true}
+                    onChange={(e) =>
+                      setEditingEmployee({
+                        ...editingEmployee,
+                        onlineBookingBackup: e.currentTarget.checked,
+                      })
+                    }
+                  />
+                )}
               </Paper>
 
               {/* Imagen de perfil */}

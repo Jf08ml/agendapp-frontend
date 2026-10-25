@@ -4,6 +4,7 @@
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
+import type { Employee } from "../../services/employeeService";
 
 export const TIME_FORMATS = [
   "h:mm A",
@@ -13,6 +14,21 @@ export const TIME_FORMATS = [
 ] as const;
 
 // ---------- Helpers genéricos (mantener) ----------
+
+/**
+ * ¿El servicio tiene un profesional de respaldo (onlineBookingBackup)? El
+ * respaldo no se ofrece para elegir: el backend lo asigna solo los días en que
+ * los demás están llenos, así que la reserva debe ir "Sin preferencia" — aun
+ * en agendamiento automático, donde el profesional es obligatorio (el bloque
+ * elegido ya trae el profesional asignado).
+ */
+export const serviceHasBackupEmployee = (employees: Employee[], serviceId: string) =>
+  employees.some(
+    (e) =>
+      e.isActive &&
+      e.onlineBookingBackup === true &&
+      (e.services || []).some((svc: any) => getId(svc) === serviceId)
+  );
 
 /** Normaliza un id que puede venir como string u objeto con _id */
 export function getId(val: unknown): string | undefined {

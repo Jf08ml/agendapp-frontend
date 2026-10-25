@@ -4,6 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import BookingChoiceScreen from "./BookingChoiceScreen";
 import BookingChatPanel from "./BookingChatPanel";
 import StepMultiServiceEmployee from "./StepMultiServiceEmployee";
+import { serviceHasBackupEmployee } from "./bookingUtilsMulti";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
 import StepMultiServiceSummary, { ConfirmationPhoneNote } from "./StepMultiServiceSummary";
@@ -210,7 +211,11 @@ export default function MultiBookingWizard() {
   // En agendamiento automático cada servicio necesita profesional
   const employeeRequired = organization?.reservationPolicy === "auto_if_available";
   const canGoNextFromStep0 =
-    selected.length > 0 && (!employeeRequired || selected.every((s) => !!s.employeeId));
+    selected.length > 0 &&
+    (!employeeRequired ||
+      selected.every(
+        (s) => !!s.employeeId || serviceHasBackupEmployee(employees, s.serviceId)
+      ));
 
   const hasChosenTimes = (() => {
     if (!times) return false;

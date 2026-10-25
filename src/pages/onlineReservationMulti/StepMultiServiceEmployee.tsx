@@ -17,6 +17,7 @@ import { Employee } from "../../services/employeeService";
 import { SelectedService } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
 import StepHeading from "./StepHeading";
+import { serviceHasBackupEmployee } from "./bookingUtilsMulti";
 
 interface StepMultiServiceEmployeeProps {
   services: Service[];
@@ -118,6 +119,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
     let changed = false;
     const next = value.map((sel) => {
       if (sel.employeeId) return sel;
+      if (serviceHasBackupEmployee(activeEmployees, sel.serviceId)) return sel;
       const eligible = activeEmployees.filter((e) =>
         employeeServiceIds(e).includes(sel.serviceId)
       );
@@ -174,9 +176,13 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
 
       {value.map((sel) => {
         const service = services.find((s) => s._id === sel.serviceId);
-        const eligible = activeEmployees.filter((e) =>
-          employeeServiceIds(e).includes(sel.serviceId)
+        const eligible = activeEmployees.filter(
+          (e) =>
+            e.onlineBookingBackup !== true &&
+            employeeServiceIds(e).includes(sel.serviceId)
         );
+        const mustChoose =
+          employeeRequired && !serviceHasBackupEmployee(activeEmployees, sel.serviceId);
         const selectedEmp = sel.employeeId ? employeeById[sel.employeeId] : undefined;
         const showPrice = service && !service.hidePrice && Number(service.price) > 0;
 
@@ -206,12 +212,12 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
 
             <Select
               label="¿Con quién?"
-              placeholder={employeeRequired ? "Elige un profesional" : "Sin preferencia"}
+              placeholder={mustChoose ? "Elige un profesional" : "Sin preferencia"}
               data={[
-                ...(employeeRequired ? [] : [{ value: "none", label: "Sin preferencia" }]),
+                ...(mustChoose ? [] : [{ value: "none", label: "Sin preferencia" }]),
                 ...eligible.map((e) => ({ value: e._id, label: e.names })),
               ]}
-              value={sel.employeeId || (employeeRequired ? null : "none")}
+              value={sel.employeeId || (mustChoose ? null : "none")}
               onChange={(v) =>
                 handleEmployeeChange(sel.serviceId, !v || v === "none" ? null : v)
               }
@@ -222,7 +228,7 @@ const StepMultiServiceEmployee: React.FC<StepMultiServiceEmployeeProps> = ({
               renderOption={renderEmployeeOption as any}
               leftSection={selectedEmp ? <EmployeeAvatar emp={selectedEmp} /> : undefined}
               leftSectionWidth={selectedEmp ? 40 : undefined}
-              withAsterisk={employeeRequired}
+              withAsterisk={mustChoose}
             />
           </Paper>
         );

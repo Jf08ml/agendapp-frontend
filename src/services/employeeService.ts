@@ -39,6 +39,9 @@ export interface Employee {
   // false = oculto de la reserva en línea (wizard público y asistentes de
   // reservas web/WhatsApp); sigue activo en la agenda interna. Sin el campo = visible.
   onlineBookingEnabled?: boolean;
+  // true = respaldo en la reserva en línea: no se ofrece para elegir y solo se
+  // auto-asigna los días en que los demás profesionales del servicio están llenos.
+  onlineBookingBackup?: boolean;
   profileImage: string;
   color: string;
   order?: number;
