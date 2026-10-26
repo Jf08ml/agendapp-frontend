@@ -18,7 +18,7 @@ interface CustomDatesSelectorProps {
   value: string[];
   onChange: (dates: string[]) => void;
   /** Fecha y hora de la primera cita (la del formulario) */
-  firstDate: Date | null;
+  firstDate?: Date | null;
   timeFormat?: string;
   /** Los desplegables se abren dentro del modal de la cita (zIndex 300) */
   zIndex?: number;
