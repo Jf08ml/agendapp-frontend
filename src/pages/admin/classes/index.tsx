@@ -373,9 +373,11 @@ export default function ManageClasses() {
     try {
       const result = await bulkCreateSessions(data);
       if (result) {
+        const duplicates = result.skipped.filter((s) => s.kind === "duplicate").length;
+        const conflicts = result.skipped.length - duplicates;
         showNotification({
-          message: `${result.created.length} sesión(es) programada(s)${result.skipped.length ? `, ${result.skipped.length} omitida(s) por conflicto` : ""}`,
-          color: result.skipped.length ? "orange" : "green",
+          message: `${result.created.length} sesión(es) programada(s)${duplicates ? `, ${duplicates} ya estaban programada(s)` : ""}${conflicts ? `, ${conflicts} omitida(s) por conflicto` : ""}`,
+          color: conflicts ? "orange" : "green",
         });
         loadAll();
       }

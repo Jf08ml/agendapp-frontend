@@ -303,7 +303,8 @@ export interface BulkSessionPayload {
 
 export interface BulkSessionResult {
   created: ClassSession[];
-  skipped: { startDate: string; endDate: string; reason: string }[];
+  // "duplicate": esa misma clase ya estaba programada a esa hora; "conflict": choque de instructor o salón
+  skipped: { startDate: string; endDate: string; reason: string; kind?: "duplicate" | "conflict" }[];
 }
 
 export const bulkCreateSessions = async (data: BulkSessionPayload): Promise<BulkSessionResult | undefined> => {

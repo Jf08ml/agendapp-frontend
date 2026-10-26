@@ -33,7 +33,7 @@ const WEEKDAYS = [
 
 interface BulkResult {
   created: { _id: string; startDate: string }[];
-  skipped: { startDate: string; reason: string }[];
+  skipped: { startDate: string; reason: string; kind?: "duplicate" | "conflict" }[];
 }
 
 interface Props {
@@ -177,6 +177,24 @@ export default function BulkSessionModal({
 
   // Si ya tenemos resultado, mostrar resumen
   if (result) {
+    const duplicates = result.skipped.filter((s) => s.kind === "duplicate");
+    const conflicts = result.skipped.filter((s) => s.kind !== "duplicate");
+    // Conflictos agrupados por motivo: antes salía una línea por sesión (105 iguales)
+    const conflictGroups = Object.entries(
+      conflicts.reduce<Record<string, string[]>>((acc, s) => {
+        (acc[s.reason] ||= []).push(s.startDate);
+        return acc;
+      }, {})
+    );
+    const fmtRange = (dates: string[]) => {
+      const sorted = [...dates].sort();
+      const first = dayjs(sorted[0]);
+      const last = dayjs(sorted[sorted.length - 1]);
+      return sorted.length === 1
+        ? first.format("ddd D MMM, h:mm A")
+        : `del ${first.format("D MMM")} al ${last.format("D MMM")}`;
+    };
+
     return (
       <Modal opened={opened} onClose={onClose} title="Resultado de programación" centered size="md">
         <Stack gap="md">
@@ -184,25 +202,46 @@ export default function BulkSessionModal({
             <Badge size="lg" color="green" leftSection={<IconCheck size={14} />}>
               {result.created.length} sesión{result.created.length !== 1 ? "es" : ""} creada{result.created.length !== 1 ? "s" : ""}
             </Badge>
-            {result.skipped.length > 0 && (
+            {duplicates.length > 0 && (
+              <Badge size="lg" color="blue">
+                {duplicates.length} ya programada{duplicates.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+            {conflicts.length > 0 && (
               <Badge size="lg" color="orange" leftSection={<IconX size={14} />}>
-                {result.skipped.length} omitida{result.skipped.length !== 1 ? "s" : ""}
+                {conflicts.length} con conflicto
               </Badge>
             )}
           </Group>
 
-          {result.skipped.length > 0 && (
-            <Alert icon={<IconAlertCircle size={16} />} color="orange" title="Sesiones omitidas por conflicto">
-              <ScrollArea mah={160}>
-                <List size="xs" spacing={4}>
-                  {result.skipped.map((s, i) => (
-                    <List.Item key={i}>
-                      <Text size="xs" fw={500}>{dayjs(s.startDate).format("ddd D MMM, HH:mm")}</Text>
-                      <Text size="xs" c="dimmed">{s.reason}</Text>
-                    </List.Item>
+          {duplicates.length > 0 && (
+            <Alert icon={<IconAlertCircle size={16} />} color="blue" title="Ya estaban programadas">
+              <Text size="xs">
+                {duplicates.length === 1 ? "1 sesión" : `${duplicates.length} sesiones`} de esta clase ya
+                existían en ese horario ({fmtRange(duplicates.map((s) => s.startDate))}), así que no se
+                duplicaron. No tienes que hacer nada.
+              </Text>
+            </Alert>
+          )}
+
+          {conflictGroups.length > 0 && (
+            <Alert icon={<IconAlertCircle size={16} />} color="orange" title="No se crearon por conflicto de horario">
+              <ScrollArea mah={200}>
+                <Stack gap={8}>
+                  {conflictGroups.map(([reason, dates]) => (
+                    <div key={reason}>
+                      <Text size="xs" fw={600}>
+                        {dates.length} sesi{dates.length !== 1 ? "ones" : "ón"} ({fmtRange(dates)})
+                      </Text>
+                      <Text size="xs" c="dimmed">{reason}</Text>
+                    </div>
                   ))}
-                </List>
+                </Stack>
               </ScrollArea>
+              <Text size="xs" mt={6}>
+                Un instructor o salón no puede estar en dos sesiones a la vez: elige otro instructor,
+                salón u horario.
+              </Text>
             </Alert>
           )}
 
