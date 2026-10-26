@@ -108,8 +108,10 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
       );
       setValidityDays(servicePackage.validityDays);
       setIsActive(servicePackage.isActive);
+      // populate devuelve null si el servicio/clase fue eliminado: se descarta
+      // la referencia huérfana (typeof null === "object" rompía el modal)
       setSelectedServices(
-        servicePackage.services.map((svc: any) => ({
+        servicePackage.services.filter((svc: any) => svc.serviceId).map((svc: any) => ({
           serviceId: typeof svc.serviceId === "object" ? svc.serviceId._id : svc.serviceId,
           serviceName: typeof svc.serviceId === "object" ? svc.serviceId.name :
             availableServices.find((s) => s._id === svc.serviceId)?.name || "Servicio",
@@ -117,7 +119,7 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
         }))
       );
       setSelectedClasses(
-        (servicePackage.classes || []).map((cls: any) => ({
+        (servicePackage.classes || []).filter((cls: any) => cls.classId).map((cls: any) => ({
           classId: typeof cls.classId === "object" ? cls.classId._id : cls.classId,
           className: typeof cls.classId === "object" ? cls.classId.name :
             availableClasses.find((c) => c._id === cls.classId)?.name || "Clase",
