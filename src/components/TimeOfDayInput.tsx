@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Group, Input, Select } from "@mantine/core";
 import { parseTime } from "../utils/timeOfDay";
 
@@ -28,7 +29,10 @@ interface TimeOfDayInputProps {
   onChange: (value: string) => void;
   /** Formato de la organización: "12h" (por defecto) o "24h" */
   timeFormat?: string;
-  error?: boolean;
+  /** true marca los selectores en rojo; un texto además se muestra debajo */
+  error?: ReactNode;
+  description?: ReactNode;
+  required?: boolean;
   /** Los selectores se abren dentro de modales: debe quedar por encima de ellos */
   zIndex?: number;
   disabled?: boolean;
@@ -40,6 +44,8 @@ export default function TimeOfDayInput({
   onChange,
   timeFormat,
   error,
+  description,
+  required,
   zIndex = 1100,
   disabled,
 }: TimeOfDayInputProps) {
@@ -60,7 +66,12 @@ export default function TimeOfDayInput({
   };
 
   return (
-    <Input.Wrapper label={label}>
+    <Input.Wrapper
+      label={label}
+      description={description}
+      required={required}
+      error={typeof error === "boolean" ? undefined : error}
+    >
       <Group gap={6} wrap="nowrap" grow>
         {is24h ? (
           <Select

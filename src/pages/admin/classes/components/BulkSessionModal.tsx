@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Modal, Select, NumberInput, Textarea, Button, Group,
   Stack, SimpleGrid, Text, Alert, Badge, Chip, Divider,
-  List, ThemeIcon, ScrollArea,
+  List, ThemeIcon, ScrollArea, Checkbox,
 } from "@mantine/core";
-import { DatePickerInput, TimeInput } from "@mantine/dates";
+import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import {
   IconAlertCircle, IconCheck, IconX, IconCalendarRepeat,
@@ -15,6 +15,8 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import "dayjs/locale/es";
 import { ClassType, Room, BulkSessionPayload } from "../../../../services/classService";
 import { Employee } from "../../../../services/employeeService";
+import TimeOfDayInput from "../../../../components/TimeOfDayInput";
+import { RootState, useAppSelector } from "../../../../app/store";
 
 dayjs.extend(isoWeek);
 dayjs.locale("es");
@@ -50,6 +52,7 @@ export default function BulkSessionModal({
   const [result, setResult] = useState<BulkResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const timeFormat = useAppSelector((s: RootState) => s.organization.organization?.timeFormat);
 
   const form = useForm({
     initialValues: {
@@ -298,18 +301,40 @@ export default function BulkSessionModal({
             )}
           </div>
 
-          {/* Ventana horaria */}
-          <SimpleGrid cols={2}>
-            <TimeInput
+          {/* Ventana horaria. Selectores con AM/PM en vez del TimeInput nativo: en tablet
+              (PWA) tocar el campo nativo no abría teclado ni selector. */}
+          <SimpleGrid cols={{ base: 1, xs: 2 }}>
+            <TimeOfDayInput
               label="Desde"
               required
-              {...form.getInputProps("startTime")}
+              value={form.values.startTime}
+              onChange={(v) => form.setFieldValue("startTime", v)}
+              error={form.errors.startTime}
+              timeFormat={timeFormat}
             />
-            <TimeInput
-              label="Hasta (opcional)"
-              description="Repite la clase hasta esta hora"
-              {...form.getInputProps("endTime")}
-            />
+            <Stack gap={6}>
+              <Checkbox
+                mt={{ base: 0, xs: 28 }}
+                label="Repetir la clase hasta cierta hora"
+                checked={!!form.values.endTime}
+                onChange={(e) => {
+                  if (!e.currentTarget.checked) return form.setFieldValue("endTime", "");
+                  // Por defecto, 2 horas después del inicio (máx. 23:59)
+                  const [h, m] = form.values.startTime.split(":").map(Number);
+                  const endH = Math.min((h || 0) + 2, 23);
+                  form.setFieldValue("endTime", `${String(endH).padStart(2, "0")}:${String(endH === 23 ? 59 : m || 0).padStart(2, "0")}`);
+                }}
+              />
+              {form.values.endTime && (
+                <TimeOfDayInput
+                  label="Hasta"
+                  value={form.values.endTime}
+                  onChange={(v) => form.setFieldValue("endTime", v)}
+                  error={form.errors.endTime}
+                  timeFormat={timeFormat}
+                />
+              )}
+            </Stack>
           </SimpleGrid>
 
           {form.values.endTime && (

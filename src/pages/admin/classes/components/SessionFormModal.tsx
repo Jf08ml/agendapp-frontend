@@ -1,12 +1,15 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Modal, Select, NumberInput, Textarea, Button, Group,
   Stack, SimpleGrid, Text, Alert,
 } from "@mantine/core";
-import { DateTimePicker } from "@mantine/dates";
+import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { IconAlertCircle } from "@tabler/icons-react";
+import dayjs from "dayjs";
+import TimeOfDayInput from "../../../../components/TimeOfDayInput";
+import { RootState, useAppSelector } from "../../../../app/store";
 import { ClassType, ClassSession, Room } from "../../../../services/classService";
 import { Employee } from "../../../../services/employeeService";
 
@@ -33,6 +36,7 @@ export default function SessionFormModal({
   opened, onClose, onSubmit, classes, employees, rooms, editing, loading,
 }: Props) {
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const timeFormat = useAppSelector((s: RootState) => s.organization.organization?.timeFormat);
 
   const form = useForm({
     initialValues: {
@@ -163,22 +167,23 @@ export default function SessionFormModal({
             />
           </SimpleGrid>
 
-          <SimpleGrid cols={2}>
-            <DateTimePicker
-              label="Inicio"
-              placeholder="Fecha y hora de inicio"
-              required
-              valueFormat="DD/MM/YYYY HH:mm"
-              {...form.getInputProps("startDate")}
-            />
-            <DateTimePicker
-              label="Fin"
-              placeholder="Fecha y hora de fin"
-              required
-              valueFormat="DD/MM/YYYY HH:mm"
-              {...form.getInputProps("endDate")}
-            />
-          </SimpleGrid>
+          {/* Fecha (calendario) + hora (selectores con AM/PM). Antes era un DateTimePicker, cuya
+              hora es un <input type="time"> nativo dentro de un popover sobre el modal: en tablet
+              (PWA) al tocarlo no salía teclado ni selector y no se podía poner la hora. */}
+          <SessionDateTimeFields
+            label="Inicio"
+            value={form.values.startDate}
+            onChange={(d) => form.setFieldValue("startDate", d)}
+            error={form.errors.startDate}
+            timeFormat={timeFormat}
+          />
+          <SessionDateTimeFields
+            label="Fin"
+            value={form.values.endDate}
+            onChange={(d) => form.setFieldValue("endDate", d)}
+            error={form.errors.endDate}
+            timeFormat={timeFormat}
+          />
 
           <NumberInput
             label="Cupo de la sesión"
@@ -211,5 +216,50 @@ export default function SessionFormModal({
         </Stack>
       </form>
     </Modal>
+  );
+}
+
+function SessionDateTimeFields({
+  label, value, onChange, error, timeFormat,
+}: {
+  label: string;
+  value: Date | null;
+  onChange: (d: Date | null) => void;
+  error?: ReactNode;
+  timeFormat?: string;
+}) {
+  const d = value ? dayjs(value) : null;
+  return (
+    <SimpleGrid cols={{ base: 1, xs: 2 }}>
+      <DatePickerInput
+        label={`${label}: fecha`}
+        placeholder="Elige la fecha"
+        required
+        value={value}
+        error={error}
+        onChange={(date) => {
+          if (!date) return onChange(null);
+          const picked = dayjs(date);
+          // Conserva la hora ya elegida (8:00 si aún no había)
+          const base = d ?? picked.hour(8).minute(0);
+          onChange(
+            base.year(picked.year()).month(picked.month()).date(picked.date())
+              .second(0).millisecond(0).toDate()
+          );
+        }}
+      />
+      <TimeOfDayInput
+        label={`${label}: hora`}
+        required
+        value={d ? d.format("HH:mm") : "08:00"}
+        disabled={!d}
+        timeFormat={timeFormat}
+        onChange={(hhmm) => {
+          if (!d) return;
+          const [h, m] = hhmm.split(":").map(Number);
+          onChange(d.hour(h).minute(m).second(0).millisecond(0).toDate());
+        }}
+      />
+    </SimpleGrid>
   );
 }
