@@ -43,6 +43,10 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { useDebouncedValue, useDisclosure, useMediaQuery } from "@mantine/hooks";
 
+// Minúsculas y sin tildes: "jose" encuentra "José"
+const normalizeSearch = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
 const ClientsDashboard = () => {
   const [activeTab, setActiveTab] = useState<string>("clientes");
   const [openModal, setOpenModal] = useState(false);
@@ -98,14 +102,33 @@ const ClientsDashboard = () => {
     if (organizationId) void fetchClients();
   }, [organizationId]);
 
+  // Busca en cualquier dato del cliente: antes solo nombre y teléfono, así que en
+  // negocios que identifican a sus clientes por documento (u otro campo) no se
+  // podía encontrar a nadie por ese dato.
   const filteredClients = useMemo(() => {
-    const q = debounced.trim().toLowerCase();
+    const q = normalizeSearch(debounced);
     if (!q) return clients;
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.phone_e164 || c.phoneNumber || "").toLowerCase().includes(q)
-    );
+    const qDigits = q.replace(/\D/g, "");
+    return clients.filter((c) => {
+      const texts = [
+        c.name,
+        c.email,
+        c.documentId,
+        c.phone_e164,
+        c.phoneNumber,
+        ...Object.values(c.customFieldValues || {}).flatMap((v) =>
+          Array.isArray(v) ? v : [v]
+        ),
+      ].filter((v): v is string | number => typeof v === "string" || typeof v === "number");
+      if (texts.some((t) => normalizeSearch(String(t)).includes(q))) return true;
+      // Teléfono y documento sin espacios, guiones ni puntos ("300 123" → "+573001234567")
+      return (
+        qDigits.length >= 3 &&
+        [c.phone_e164, c.phoneNumber, c.documentId].some((t) =>
+          (t || "").replace(/\D/g, "").includes(qDigits)
+        )
+      );
+    });
   }, [debounced, clients]);
 
   const handleRegisterService = async (clientId: string) => {
@@ -337,7 +360,7 @@ const ClientsDashboard = () => {
               <Group gap="sm" w={isMobile ? "100%" : "auto"}>
                 <TextInput
                   leftSection={<BsSearch />}
-                  placeholder="Buscar por nombre o teléfono…"
+                  placeholder="Buscar por nombre, teléfono, documento, correo…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.currentTarget.value)}
                   w={isMobile ? "100%" : 320}
