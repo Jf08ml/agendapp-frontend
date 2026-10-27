@@ -187,6 +187,10 @@ export interface CreateAppointmentsBatchPayload {
   skipConcurrencyCheck?: boolean;
   /** Valores de campos personalizados con scope "booking" (Organization.clientFormConfig.fields) */
   customFieldValues?: Record<string, unknown>;
+  /** Servicios agregados al editar una cita: las nuevas citas se suman a la visita de esta cita */
+  attachToAppointmentId?: string;
+  /** No enviar el WhatsApp de confirmación al cliente */
+  skipNotification?: boolean;
 }
 
 interface Response<T> {
@@ -384,6 +388,8 @@ export const createAppointmentsBatch = async (
       ...(data.customFieldValues && Object.keys(data.customFieldValues).length > 0
         ? { customFieldValues: data.customFieldValues }
         : {}),
+      ...(data.attachToAppointmentId && { attachToAppointmentId: data.attachToAppointmentId }),
+      ...(data.skipNotification && { skipNotification: true }),
     };
     const res = await apiAppointment.post<Response<Appointment[]>>(
       "/batch",

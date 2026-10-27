@@ -927,6 +927,81 @@ const ScheduleView: React.FC = () => {
   );
 
   /**
+   * ➕ Crea los servicios agregados al editar una cita, encadenados después de ella y
+   * dentro de su misma visita (groupId y enlace de confirmar/cancelar). Sin WhatsApp:
+   * el cliente ya recibió la confirmación de la visita.
+   */
+  const addServicesToEditedAppointment = async (
+    baseAppointmentId: string,
+    data: {
+      services: Service[];
+      employee: Employee;
+      client: Client;
+      employeeRequestedByClient: boolean;
+      startDate: Date;
+      customDurations?: Record<string, number>;
+    },
+    skipConcurrencyCheck = false,
+  ): Promise<void> => {
+    try {
+      await createAppointmentsBatch({
+        services: data.services.map((s) => s._id),
+        employee: data.employee,
+        client: data.client,
+        employeeRequestedByClient: data.employeeRequestedByClient,
+        startDate: data.startDate,
+        organizationId: organizationId as string,
+        customDurations: data.customDurations,
+        attachToAppointmentId: baseAppointmentId,
+        skipNotification: true,
+        ...(skipConcurrencyCheck && { skipConcurrencyCheck: true }),
+      });
+      showNotification({
+        title: "Servicios agregados",
+        message: `Se ${data.services.length === 1 ? "agregó" : "agregaron"} ${data.services
+          .map((s) => s.name)
+          .join(", ")} a continuación de la cita.`,
+        color: "green",
+        autoClose: 4000,
+        position: "top-right",
+      });
+    } catch (error: any) {
+      if (error?.response?.data?.data?.code === "CONCURRENCY_LIMIT_REACHED") {
+        openConfirmModal({
+          title: "Conflicto de horario",
+          children: (
+            <Stack gap="xs">
+              <Text size="sm">
+                La cita se actualizó, pero no se pudo agregar{" "}
+                {data.services.map((s) => s.name).join(", ")}: {error.response.data.message}
+              </Text>
+              <Text size="sm" c="dimmed">
+                ¿Deseas agregarlo de todas formas? El profesional quedará con dos citas al mismo tiempo.
+              </Text>
+            </Stack>
+          ),
+          labels: { confirm: "Agregar de todas formas", cancel: "Cancelar" },
+          confirmProps: { color: "orange" },
+          onConfirm: async () => {
+            await addServicesToEditedAppointment(baseAppointmentId, data, true);
+            fetchAppointmentsForMonth(currentDate);
+          },
+        });
+        return;
+      }
+      showNotification({
+        title: "No se agregaron los servicios",
+        message:
+          "La cita se actualizó, pero falló agregar los demás servicios: " +
+          (error?.response?.data?.message || (error as Error).message),
+        color: "red",
+        autoClose: 6000,
+        position: "top-right",
+      });
+    }
+  };
+
+  /**
    * CREAR O ACTUALIZAR CITA
    */
   const addOrUpdateAppointment = async (options?: {
@@ -1062,6 +1137,19 @@ const ScheduleView: React.FC = () => {
               color: waNotice.warn ? "orange" : "green",
               autoClose: waNotice.warn ? 7000 : 3000,
               position: "top-right",
+            });
+          }
+
+          // ➕ Servicios agregados en la edición: la cita guarda un solo servicio,
+          // así que cada servicio extra es una cita nueva de la misma visita, a continuación
+          if (services.length > 1) {
+            await addServicesToEditedAppointment(selectedAppointment._id, {
+              services: services.slice(1),
+              employee,
+              client,
+              employeeRequestedByClient: employeeRequestedByClient ?? false,
+              startDate: endDate,
+              customDurations,
             });
           }
         } else {
