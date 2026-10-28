@@ -21,6 +21,47 @@ export interface RegisterData {
   currency?: string;
   referralCode?: string;
   businessVertical?: string;
+  /** UTM y fbclid con los que llegó desde la landing (atribución de campañas). */
+  attribution?: SignupAttribution;
+}
+
+export type SignupAttribution = Partial<
+  Record<"utm_source" | "utm_medium" | "utm_campaign" | "utm_content" | "utm_term" | "fbclid", string>
+>;
+
+const ATTRIBUTION_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid"] as const;
+const ATTRIBUTION_STORAGE_KEY = "signup_attribution";
+
+/**
+ * Lee los UTM/fbclid de la URL y los guarda en sessionStorage para la visita
+ * actual (como el código de referido): si el usuario navega antes de enviar el
+ * formulario, no se pierden. Sin datos personales.
+ */
+export function captureSignupAttribution(search: string): SignupAttribution | undefined {
+  const params = new URLSearchParams(search);
+  const fromUrl: SignupAttribution = {};
+  for (const key of ATTRIBUTION_PARAMS) {
+    const value = params.get(key)?.trim();
+    if (value) fromUrl[key] = value.slice(0, key === "fbclid" ? 500 : 200);
+  }
+  try {
+    if (Object.keys(fromUrl).length) {
+      sessionStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(fromUrl));
+      return fromUrl;
+    }
+    const stored = sessionStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as SignupAttribution) : undefined;
+  } catch {
+    return Object.keys(fromUrl).length ? fromUrl : undefined;
+  }
+}
+
+export function clearSignupAttribution(): void {
+  try {
+    sessionStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
+  } catch {
+    // sessionStorage no disponible: no hay nada que limpiar.
+  }
 }
 
 export interface RegisterResponse {

@@ -41,6 +41,8 @@ import { type CountryCode } from "libphonenumber-js";
 import {
   checkSlugAvailability,
   registerOrganization,
+  captureSignupAttribution,
+  clearSignupAttribution,
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
@@ -322,6 +324,9 @@ export default function SignupPage() {
     return () => clearTimeout(t);
   }, [successInfo, countdown]);
 
+  // Atribución de campañas: UTM/fbclid con los que llegó desde la landing.
+  const [attribution] = useState(() => captureSignupAttribution(window.location.search));
+
   const handleSubmit = async (values: SignupFormValues) => {
     setError(null);
     setIsSubmitting(true);
@@ -347,8 +352,10 @@ export default function SignupPage() {
         timezone: values.timezone || undefined, currency: values.currency || undefined,
         referralCode: values.referralCode || undefined,
         businessVertical: values.businessVertical || undefined,
+        attribution,
       });
       sessionStorage.removeItem("signup_referral_code");
+      clearSignupAttribution();
       // Evento 3 "Registro Completado" — solo tras la confirmación del backend
       trackRegistroCompletado({ email: values.email, phone: values.phone });
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
