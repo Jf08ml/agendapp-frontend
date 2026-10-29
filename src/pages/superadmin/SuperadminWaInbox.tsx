@@ -16,6 +16,7 @@ import {
   Divider,
   Paper,
   Switch,
+  SegmentedControl,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconBrandWhatsapp, IconCheck, IconChecks, IconAlertTriangle } from "@tabler/icons-react";
@@ -29,6 +30,8 @@ import {
   replyToConversation,
   getPlatformSettings,
   updatePlatformSettings,
+  getLines,
+  type PlatformWaLine,
   type PlatformConversation,
   type PlatformWaMessage,
   type PlatformSettings,
@@ -44,6 +47,7 @@ const SOURCE_LABEL: Record<PlatformWaMessage["source"], string> = {
   ai_agent: "Bot IA",
   manual: "Manual",
   alert: "Alerta",
+  oficina: "Oficina IA",
 };
 
 const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
@@ -52,6 +56,7 @@ const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
   ai_agent: "grape",
   manual: "blue",
   alert: "red",
+  oficina: "teal",
 };
 
 function conversationLabel(c: PlatformConversation) {
@@ -85,6 +90,22 @@ export default function SuperadminWaInbox() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [savingKey, setSavingKey] = useState<keyof PlatformSettings | null>(null);
+  const [line, setLine] = useState<PlatformWaLine>("platform");
+  const [oficinaConfigured, setOficinaConfigured] = useState(false);
+
+  useEffect(() => {
+    getLines()
+      .then((lines) => setOficinaConfigured(lines.some((l) => l.id === "oficina" && l.configured)))
+      .catch((err) => console.error("Error cargando los números de WhatsApp:", err));
+  }, []);
+
+  const handleChangeLine = (value: string) => {
+    setLine(value as PlatformWaLine);
+    setSelectedPhone(null);
+    setMessages([]);
+    setConversations([]);
+    setLoadingList(true);
+  };
 
   useEffect(() => {
     getPlatformSettings()
@@ -117,30 +138,30 @@ export default function SuperadminWaInbox() {
 
   const loadConversations = useCallback(async () => {
     try {
-      const data = await getConversations();
+      const data = await getConversations(line);
       setConversations(data);
     } catch (err) {
       console.error("Error cargando conversaciones:", err);
     } finally {
       setLoadingList(false);
     }
-  }, []);
+  }, [line]);
 
   const loadThread = useCallback(async (phone: string) => {
     setLoadingThread(true);
     try {
-      const data = await getConversationMessages(phone);
+      const data = await getConversationMessages(phone, line);
       setMessages(data);
       // El hilo está abierto — cualquier mensaje entrante (incluido uno que
       // haya llegado justo en este poll) se da por leído de una vez.
       setConversations((prev) => prev.map((c) => (c.phone === phone ? { ...c, unreadCount: 0 } : c)));
-      markConversationRead(phone).catch((err) => console.error("Error marcando como leído:", err));
+      markConversationRead(phone, line).catch((err) => console.error("Error marcando como leído:", err));
     } catch (err) {
       console.error("Error cargando mensajes:", err);
     } finally {
       setLoadingThread(false);
     }
-  }, []);
+  }, [line]);
 
   useEffect(() => {
     void loadConversations();
@@ -170,7 +191,7 @@ export default function SuperadminWaInbox() {
     if (!selectedPhone || !draft.trim() || sending) return;
     setSending(true);
     try {
-      await replyToConversation(selectedPhone, draft.trim());
+      await replyToConversation(selectedPhone, draft.trim(), line);
       setDraft("");
       await loadThread(selectedPhone);
       await loadConversations();
@@ -192,17 +213,32 @@ export default function SuperadminWaInbox() {
         <SuperadminNav />
 
         <Card withBorder radius="md" p="md">
-          <Group gap="xs">
-            <IconBrandWhatsapp size={22} />
-            <div>
-              <Title order={2}>WhatsApp — Retargeting y soporte</Title>
-              <Text c="dimmed" size="sm">
-                Conversaciones del número oficial de AgenditApp (recordatorios de activación + respuestas de dueños de organización)
-              </Text>
-            </div>
+          <Group justify="space-between" align="flex-start">
+            <Group gap="xs">
+              <IconBrandWhatsapp size={22} />
+              <div>
+                <Title order={2}>WhatsApp — Retargeting y soporte</Title>
+                <Text c="dimmed" size="sm">
+                  {line === "platform"
+                    ? "Conversaciones del número oficial de AgenditApp (recordatorios de activación + respuestas de dueños de organización)"
+                    : "Número de soporte y ventas: contactos, soporte y mensajes de AgenditApp Oficina IA. Incluye lo que escribes desde el teléfono. Aquí no responde ningún bot."}
+                </Text>
+              </div>
+            </Group>
+            {oficinaConfigured && (
+              <SegmentedControl
+                value={line}
+                onChange={handleChangeLine}
+                data={[
+                  { value: "platform", label: "Número oficial" },
+                  { value: "oficina", label: "Soporte y ventas" },
+                ]}
+              />
+            )}
           </Group>
         </Card>
 
+        {line === "platform" && (
         <Card withBorder radius="md" p="md">
           <Text fw={600} size="sm" mb="sm">
             Envíos automáticos desde el número de AgenditApp
@@ -216,6 +252,13 @@ export default function SuperadminWaInbox() {
               onChange={(e) => void handleToggleSetting("retargetingEnabled", e.currentTarget.checked)}
             />
             <Switch
+              label="Aviso de prueba por vencer"
+              description="trial_por_vencer, 3 días y 1 día antes del fin de la prueba. Apágalo cuando AgenditApp Oficina IA envíe estos mensajes con aprobación humana."
+              checked={settings?.trialNudgeEnabled ?? true}
+              disabled={!settings || savingKey === "trialNudgeEnabled"}
+              onChange={(e) => void handleToggleSetting("trialNudgeEnabled", e.currentTarget.checked)}
+            />
+            <Switch
               label="Aviso de WhatsApp desconectado por WhatsApp"
               description="Mensaje de texto libre cuando la sesión de una organización se cae. Apagado, la organización igual recibe el aviso por notificación push y dentro de la app."
               checked={settings?.waDisconnectWhatsappAlertEnabled ?? false}
@@ -224,6 +267,7 @@ export default function SuperadminWaInbox() {
             />
           </Stack>
         </Card>
+        )}
 
         <Card withBorder radius="md" p={0} style={{ overflow: "hidden" }}>
           <Group gap={0} align="stretch" wrap="nowrap" style={{ height: 620 }}>
