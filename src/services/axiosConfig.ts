@@ -154,9 +154,14 @@ const addNoAuthInterceptor = (api: AxiosInstance) => {
 };
 
 const forceLogout = () => {
-  const publicPaths = ["/login", "/login-admin", "/planes", "/servicios-precios", "/"];
+  const publicPaths = ["/login", "/login-admin", "/planes", "/servicios-precios"];
   const currentPath = window.location.pathname;
-  const isPublic = publicPaths.some((p) => currentPath === p || currentPath.startsWith(p));
+  // "/" va aparte con igualdad exacta: con startsWith toda ruta era "pública" y
+  // nunca se redirigía, así que la app seguía mostrando la sesión sin token.
+  const isPublic = currentPath === "/" || publicPaths.some((p) => currentPath.startsWith(p));
+  // Solo hay sesión que cerrar si había token; un visitante sin sesión que recibe
+  // un 401 en una página pública no debe acabar en el login.
+  const hadSession = !!localStorage.getItem("app_token");
 
   localStorage.removeItem("app_token");
   localStorage.removeItem("app_userId");
@@ -165,7 +170,7 @@ const forceLogout = () => {
   localStorage.removeItem("app_token_expires_at");
   localStorage.removeItem("app_dev_slug");
 
-  if (!isPublic && !currentPath.includes("/login")) {
+  if (hadSession && !isPublic) {
     window.dispatchEvent(
       new CustomEvent("session-expired", {
         detail: {

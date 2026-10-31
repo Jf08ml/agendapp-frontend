@@ -86,7 +86,11 @@ export function PlanCheckout({
       });
       navigate("/payment-success");
     } catch {
-      setPaypalError("No se pudo registrar la suscripción. Contacta soporte.");
+      // El pago ya salió en PayPal y el webhook activa el plan aunque este aviso
+      // falle (la org viaja en custom_id). No invitar a pagar de nuevo.
+      setPaypalError(
+        "Recibimos tu pago en PayPal. Tu plan se activará en unos minutos; no vuelvas a pagar. Si no se activa, escríbenos."
+      );
     } finally {
       setProcessing(false);
     }
@@ -178,7 +182,8 @@ export function PlanCheckout({
                   <PayPalButtons
                     style={{ layout: "vertical", label: "subscribe", shape: "rect" }}
                     createSubscription={(_data, actions) =>
-                      actions.subscription.create({ plan_id: paypalPlanId! })
+                      // custom_id: el webhook identifica la org aunque falle el aviso de onApprove
+                      actions.subscription.create({ plan_id: paypalPlanId!, custom_id: organizationId ?? undefined })
                     }
                     onApprove={(data) => handleSubscriptionApprove(data as { subscriptionID: string | null })}
                     onError={() => setPaypalError("Ocurrió un error con PayPal. Intenta de nuevo.")}

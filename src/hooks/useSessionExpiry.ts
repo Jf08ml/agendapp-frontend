@@ -6,10 +6,12 @@ import { refreshToken } from "../services/authService";
 import { checkCurrentSession } from "../services/sessionService";
 import { AppDispatch, RootState } from "../app/store";
 
-const PUBLIC_PATHS = ["/login", "/login-admin", "/planes", "/servicios-precios", "/"];
+const PUBLIC_PATHS = ["/login", "/login-admin", "/planes", "/servicios-precios"];
 
+// "/" con igualdad exacta: con startsWith toda ruta contaba como pública y la
+// sesión expirada nunca se cerraba.
 const isPublicPath = (pathname: string) =>
-  PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p));
+  pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
 /**
  * Detecta proactivamente cuando el token de sesión expira o fue revocada.
