@@ -105,9 +105,13 @@ const DayModal: FC<DayModalProps> = ({
     [currentDay, getAppointmentsForDay]
   );
 
-  // Si el día está fuera del mes cargado, hacer fetch solo para ese día
+  // Si el día está fuera del mes cargado, hacer fetch solo para ese día.
+  // Se repite al reabrir el modal y cuando cambia la data del mes (getAppointmentsForDay
+  // cambia tras crear/editar/cancelar): si no, una cita creada el 31-oct para el 2-nov no
+  // aparecía en el modal del 2-nov, que seguía montado con la lista vieja.
   useEffect(() => {
     let mounted = true;
+    if (!opened) return;
     // Solo fetchar si el día cae fuera del rango mensual ya cargado
     if (!isSameMonth(currentDay, loadedMonthDate)) {
       setFetchingLocalDay(true);
@@ -124,7 +128,7 @@ const DayModal: FC<DayModalProps> = ({
     return () => {
       mounted = false;
     };
-  }, [currentDay, loadedMonthDate, fetchAppointmentsForDay]);
+  }, [opened, currentDay, loadedMonthDate, fetchAppointmentsForDay, getAppointmentsForDay]);
 
   // Lo que va a mostrar
   const appointments = localDayAppointments ?? appointmentsFromMonth;
