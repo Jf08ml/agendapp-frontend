@@ -46,7 +46,7 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
-import { loadMetaPixel, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
+import { loadMetaPixel, registrationMetaEvent, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
 
 const signupSchema = z.object({
   slug: z
@@ -344,6 +344,9 @@ export default function SignupPage() {
         setError("Verificación de captcha fallida. Intenta de nuevo.");
         turnstileRef.current?.reset?.(); setTurnstileToken(""); setIsSubmitting(false); return;
       }
+      // El backend envía el CompleteRegistration a Meta (CAPI) al crear la cuenta;
+      // el Pixel usa el mismo event_id para que Meta lo cuente una sola vez.
+      const metaEvent = registrationMetaEvent();
       const result = await registerOrganization({
         slug: values.slug.toLowerCase(), businessName: values.businessName,
         ownerName: values.ownerName, email: values.email, password: values.password,
@@ -353,11 +356,12 @@ export default function SignupPage() {
         referralCode: values.referralCode || undefined,
         businessVertical: values.businessVertical || undefined,
         attribution,
+        metaEvent,
       });
       sessionStorage.removeItem("signup_referral_code");
       clearSignupAttribution();
       // Evento 3 "Registro Completado" — solo tras la confirmación del backend
-      trackRegistroCompletado({ email: values.email, phone: values.phone });
+      trackRegistroCompletado(metaEvent.event_id);
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
       const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
       setSuccessInfo({ displayUrl, redirectUrl });

@@ -23,6 +23,8 @@ export interface RegisterData {
   businessVertical?: string;
   /** UTM y fbclid con los que llegó desde la landing (atribución de campañas). */
   attribution?: SignupAttribution;
+  /** event_id del Pixel y cookies de Meta: el backend envía con ellos el CompleteRegistration. */
+  metaEvent?: { event_id: string; event_source_url: string; fbp?: string; fbc?: string };
 }
 
 export type SignupAttribution = Partial<
