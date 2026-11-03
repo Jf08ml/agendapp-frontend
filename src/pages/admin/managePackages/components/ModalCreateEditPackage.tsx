@@ -235,7 +235,12 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
         images,
         ...(hasTiers
           ? {
+              // Conservar el _id de los niveles existentes: las órdenes de
+              // compra pendientes y los paquetes asignados lo referencian
+              // (sin él, cada guardado regeneraba los ids y la aprobación del
+              // comprobante fallaba con "Este paquete tiene niveles").
               tiers: tiers.map((t) => ({
+                ...(t._id ? { _id: t._id } : {}),
                 label: t.label.trim(),
                 sessionsIncluded: t.sessionsIncluded,
                 price: t.price,

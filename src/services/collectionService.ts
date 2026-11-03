@@ -295,6 +295,26 @@ export interface ReceiptOrder {
       status: string;
     }>;
   };
+  /** Paquete vinculado (solo type "package"). */
+  linkedPackage?: {
+    customerName: string;
+    customerPhone: string;
+    customerDocumentId: string;
+    packageName: string;
+    tierLabel: string | null;
+  };
+  /** Clase vinculada (solo type "class"). */
+  linkedClass?: {
+    customerName: string;
+    customerPhone: string;
+    items: Array<{
+      enrollmentId: string;
+      attendee: string;
+      className: string;
+      startDate: string | null;
+      status: string;
+    }>;
+  };
 }
 
 export const listReceiptOrders = async (
