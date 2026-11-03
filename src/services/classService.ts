@@ -248,7 +248,8 @@ export const getSessions = async (filters: SessionFilters = {}): Promise<ClassSe
 
 export const getAvailableSessions = async (
   organizationId: string,
-  filters: { classId?: string; from?: string; to?: string } = {}
+  /** includeFull: incluir también las sesiones llenas (status "full"). */
+  filters: { classId?: string; from?: string; to?: string; includeFull?: boolean } = {}
 ): Promise<ClassSession[]> => {
   try {
     const res = await apiClassPublic.get<ApiResponse<ClassSession[]>>("/sessions/available", {

@@ -13,6 +13,7 @@ import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
 import "dayjs/locale/es";
 import { ClassSession, ClassType } from "../../../services/classService";
+import ClassRepeatPanel from "./ClassRepeatPanel";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -96,6 +97,8 @@ export default function StepSelectSession({
   );
 
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  // Sesión desde la que se abrió "Repetir…" (una a la vez).
+  const [repeatBaseId, setRepeatBaseId] = useState<string | null>(null);
 
   // Preseleccionar el día de la primera sesión marcada (al volver a este paso)
   // o, si no hay ninguna, el primer día con disponibilidad.
@@ -136,37 +139,22 @@ export default function StepSelectSession({
   const toggle = (s: ClassSession) => {
     if (selectedIds.has(s._id)) {
       onChange(selected.filter((x) => x._id !== s._id));
+      if (repeatBaseId === s._id) setRepeatBaseId(null);
     } else if (!atLimit) {
       onChange([...selected, s].sort(byStart));
     }
   };
 
-  // Mismo día de la semana y hora que `base`, desde `base` en adelante: hasta
-  // fin de ese mes o, si se reserva con paquete, hasta agotar los créditos.
-  const weeklyMatches = (base: ClassSession) => {
-    const b = dayjs(base.startDate).tz(tz);
-    const monthEnd = b.endOf("month");
-    return availableSessions
-      .filter((s) => {
-        const d = dayjs(s.startDate).tz(tz);
-        return (
-          !d.isBefore(b) &&
-          d.day() === b.day() &&
-          d.format("HH:mm") === b.format("HH:mm") &&
-          (maxSelectable != null || !d.isAfter(monthEnd))
-        );
-      })
-      .sort(byStart);
-  };
-
-  const applyWeekly = (base: ClassSession) => {
+  const addSessions = (toAdd: ClassSession[]) => {
     const next = [...selected];
-    for (const s of weeklyMatches(base)) {
+    for (const s of toAdd) {
       if (next.length >= limit) break;
       if (!next.some((x) => x._id === s._id)) next.push(s);
     }
     onChange(next.sort(byStart));
   };
+
+  const repeatBase = repeatBaseId ? selected.find((s) => s._id === repeatBaseId) ?? null : null;
 
   const getDayProps = (date: Date) => {
     const key = dateToKey(date);
@@ -206,7 +194,7 @@ export default function StepSelectSession({
       <Text fw={600} size="lg">Elige tus sesiones</Text>
       <Text size="sm" c="dimmed">{selectedClass.name} · {selectedClass.duration} min</Text>
       <Text size="xs" c="dimmed">
-        Puedes marcar una o varias sesiones. Los días en{" "}
+        Puedes marcar una o varias sesiones, o repetir una cada semana. Los días en{" "}
         <Text span c="green" fw={600}>verde</Text> tienen sesiones disponibles y los
         marcados en <Text span c="blue" fw={600}>azul</Text> ya tienen sesiones elegidas.
       </Text>
@@ -252,8 +240,6 @@ export default function StepSelectSession({
             const pct = s.capacity > 0 ? Math.round((s.enrolledCount / s.capacity) * 100) : 0;
             const employee = typeof s.employeeId === "object" ? s.employeeId : null;
             const room = typeof s.roomId === "object" ? s.roomId : null;
-            const weekly = isSelected ? weeklyMatches(s) : [];
-            const weeklyPending = weekly.filter((w) => !selectedIds.has(w._id)).length;
 
             return (
               <Card
@@ -313,23 +299,36 @@ export default function StepSelectSession({
                   </Badge>
                 </Group>
 
-                {/* Atajo: el mismo día y hora las demás semanas */}
-                {isSelected && weeklyPending > 0 && !atLimit && (
+                {/* Repetir: mismo horario otros días/semanas (como las citas recurrentes) */}
+                {isSelected && !atLimit && repeatBaseId !== s._id && (
                   <Button
                     mt="sm"
                     size="xs"
                     variant="light"
                     leftSection={<IconRepeat size={14} />}
-                    onClick={(e) => { e.stopPropagation(); applyWeekly(s); }}
+                    onClick={(e) => { e.stopPropagation(); setRepeatBaseId(s._id); }}
                   >
-                    Repetir cada {start.format("dddd")} a las {start.format("HH:mm")}
-                    {maxSelectable != null ? "" : " este mes"} (+{Math.min(weeklyPending, limit - selected.length)})
+                    Repetir esta clase…
                   </Button>
                 )}
               </Card>
             );
           })}
         </Stack>
+      )}
+
+      {repeatBase && (
+        <ClassRepeatPanel
+          key={repeatBase._id}
+          base={repeatBase}
+          sessions={sessions}
+          selectedIds={selectedIds}
+          remainingSlots={limit - selected.length}
+          hasCreditLimit={maxSelectable != null}
+          tz={tz}
+          onAdd={addSessions}
+          onClose={() => setRepeatBaseId(null)}
+        />
       )}
 
       {/* Sesiones elegidas */}

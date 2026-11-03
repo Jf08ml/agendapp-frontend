@@ -122,12 +122,12 @@ export default function ClassBookingWizard() {
     setSelectedSessions([]);
     setSessions([]);
     setLoadingSessions(true);
-    getAvailableSessions(organization._id, { classId: selectedClass._id })
+    getAvailableSessions(organization._id, { classId: selectedClass._id, includeFull: true })
       .then((data) => {
         setSessions(data);
         if (preselectSessionId && !preselectSessionAppliedRef.current) {
           preselectSessionAppliedRef.current = true;
-          const match = data.find((s) => s._id === preselectSessionId);
+          const match = data.find((s) => s._id === preselectSessionId && s.status === "open");
           if (match) {
             setSelectedSessions([match]);
             setCurrentStep(2);

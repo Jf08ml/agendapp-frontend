@@ -16,6 +16,12 @@ interface RecurrenceSelectorProps {
   onChange: (pattern: RecurrencePattern) => void;
   startDate?: Date | null;
   disabled?: boolean;
+  /** Oculta "Tipo de cita" (el caller ya decidió que es semanal). */
+  hideTypeSelector?: boolean;
+  /** Unidad del fin por cantidad (por defecto "ocurrencias"). */
+  countLabel?: string;
+  /** Tope del fin por cantidad (por defecto 100). */
+  maxCount?: number;
 }
 
 const WEEKDAY_OPTIONS = [
@@ -32,7 +38,10 @@ const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
   value,
   onChange,
   startDate,
-  disabled = false
+  disabled = false,
+  hideTypeSelector = false,
+  countLabel = "ocurrencias",
+  maxCount = 100,
 }) => {
   const isWeekly = value.type === 'weekly';
 
@@ -71,6 +80,7 @@ const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
   return (
     <Paper p="md" withBorder>
       <Stack gap="md">
+        {!hideTypeSelector && (
         <Radio.Group
           value={value.type}
           onChange={(val) => handleTypeChange(val as 'none' | 'weekly')}
@@ -81,6 +91,7 @@ const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
             <Radio value="weekly" label="Repetir semanalmente" />
           </Stack>
         </Radio.Group>
+        )}
 
         {isWeekly && (
           <Stack gap="sm" p="md" style={{ backgroundColor: '#f8f9fa', borderRadius: 8 }}>
@@ -146,11 +157,11 @@ const RecurrenceSelector: FC<RecurrenceSelectorProps> = ({
                               value={value.count}
                               onChange={(val) => onChange({ ...value, count: Number(val) || 1 })}
                               min={1}
-                              max={100}
+                              max={maxCount}
                               style={{ width: 80 }}
                               disabled={disabled}
                             />
-                            <Text size="sm">ocurrencias</Text>
+                            <Text size="sm">{countLabel}</Text>
                           </>
                         )}
                       </Group>
