@@ -63,6 +63,8 @@ export default function ClassBookingWizard() {
   );
   const [bookingMode, setBookingMode] = useState<BookingMode | null>(null);
   const [packageClassIds, setPackageClassIds] = useState<string[]>([]);
+  // Créditos disponibles por clase (modo "usar mi paquete"): tope de sesiones a marcar.
+  const [packageCredits, setPackageCredits] = useState<Record<string, number>>({});
 
   // Datos
   const [classes, setClasses] = useState<ClassType[]>([]);
@@ -72,7 +74,7 @@ export default function ClassBookingWizard() {
 
   // Selecciones
   const [selectedClass, setSelectedClass] = useState<ClassType | null>(null);
-  const [selectedSession, setSelectedSession] = useState<ClassSession | null>(null);
+  const [selectedSessions, setSelectedSessions] = useState<ClassSession[]>([]);
   const [attendee, setAttendee] = useState<AttendeeForm>(emptyAttendee());
   const [companion, setCompanion] = useState<AttendeeForm | null>(null);
 
@@ -83,11 +85,14 @@ export default function ClassBookingWizard() {
   const [pkgId, setPkgId] = useState<string | null>(null);
   const [pkgRemaining, setPkgRemaining] = useState<number>(0);
   const [usePkg, setUsePkg] = useState(true);
+  // Con varias sesiones el paquete debe cubrirlas todas (el backend lo exige).
+  const pkgCoversAll = !!pkgId && pkgRemaining >= selectedSessions.length;
+  const usingPackage = usePkg && pkgCoversAll;
 
   // ¿La inscripción exige pagar un depósito online (y no se cubre con paquete)?
   // Se cobra si hay MP conectado o métodos de transferencia configurados.
   const classDepositNeeded =
-    !(usePkg && pkgId) &&
+    !usingPackage &&
     !!organization?.requireClassDeposit &&
     (organization?.classDepositPercentage ?? 0) > 0 &&
     (!!organization?.mpCollect?.connected ||
@@ -114,7 +119,7 @@ export default function ClassBookingWizard() {
   // Cargar sesiones al seleccionar clase
   useEffect(() => {
     if (!organization?._id || !selectedClass) return;
-    setSelectedSession(null);
+    setSelectedSessions([]);
     setSessions([]);
     setLoadingSessions(true);
     getAvailableSessions(organization._id, { classId: selectedClass._id })
@@ -124,7 +129,7 @@ export default function ClassBookingWizard() {
           preselectSessionAppliedRef.current = true;
           const match = data.find((s) => s._id === preselectSessionId);
           if (match) {
-            setSelectedSession(match);
+            setSelectedSessions([match]);
             setCurrentStep(2);
           }
         }
@@ -156,16 +161,16 @@ export default function ClassBookingWizard() {
       .then((res) => {
         let found: string | null = null;
         let remaining = 0;
+        // El que más créditos tenga para la clase: con varias sesiones debe
+        // cubrirlas todas.
         for (const pkg of res.packages) {
           for (const c of pkg.classes || []) {
             const cId = typeof c.classId === "object" ? c.classId._id : c.classId;
-            if (cId === selectedClass._id && c.sessionsRemaining > 0) {
+            if (cId === selectedClass._id && c.sessionsRemaining > remaining) {
               found = pkg._id;
               remaining = c.sessionsRemaining;
-              break;
             }
           }
-          if (found) break;
         }
         setPkgId(found);
         setPkgRemaining(remaining);
@@ -190,25 +195,29 @@ export default function ClassBookingWizard() {
   const handleSelectBookingMode = (mode: BookingMode) => {
     setBookingMode(mode);
     setPackageClassIds([]);
+    setPackageCredits({});
     setPhase(mode === "package" ? "lookup" : "wizard");
   };
 
   const handleFallbackToSingle = () => {
     setBookingMode("single");
     setPackageClassIds([]);
+    setPackageCredits({});
     setPhase("wizard");
   };
 
   const handlePackageFound = (identifierValue: string, packages: ClientPackage[]) => {
-    const coveredIds = new Set<string>();
+    const credits: Record<string, number> = {};
     for (const pkg of packages) {
       for (const c of pkg.classes || []) {
         if (c.sessionsRemaining > 0) {
-          coveredIds.add(typeof c.classId === "object" ? c.classId._id : c.classId);
+          const cId = typeof c.classId === "object" ? c.classId._id : c.classId;
+          credits[cId] = Math.max(credits[cId] ?? 0, c.sessionsRemaining);
         }
       }
     }
-    setPackageClassIds(Array.from(coveredIds));
+    setPackageClassIds(Object.keys(credits));
+    setPackageCredits(credits);
     if (identifierField === "phone") {
       setAttendee((prev) => ({ ...prev, phone_e164: identifierValue, phone: identifierValue }));
     } else if (identifierField === "email") {
@@ -233,7 +242,7 @@ export default function ClassBookingWizard() {
   // ── Validaciones por paso ──────────────────────────
   const canNext: Record<number, boolean> = {
     0: !!selectedClass,
-    1: !!selectedSession,
+    1: selectedSessions.length > 0,
     2: !!attendee.name.trim() && attendeeHasIdentifier(attendee) &&
        (!companion || (!!companion.name.trim() && attendeeHasIdentifier(companion))),
     3: true,
@@ -251,7 +260,7 @@ export default function ClassBookingWizard() {
 
   // ── Envío ──────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!organization?._id || !selectedSession) return;
+    if (!organization?._id || selectedSessions.length === 0) return;
     setSubmitting(true);
     try {
       const attendeePayload = {
@@ -277,7 +286,6 @@ export default function ClassBookingWizard() {
       // Pay-to-confirm: si la org exige depósito de clase y tiene MP conectado
       // (y el cupo NO se cubre con un paquete), redirigir al checkout de Mercado
       // Pago en vez de crear la inscripción directamente.
-      const usingPackage = usePkg && !!pkgId;
       const depositConfigured =
         !usingPackage &&
         !!organization.requireClassDeposit &&
@@ -290,7 +298,7 @@ export default function ClassBookingWizard() {
 
       const classCheckoutPayload = {
         organizationId: organization._id,
-        sessionId: selectedSession._id,
+        sessionIds: selectedSessions.map((s) => s._id),
         attendee: attendeePayload,
         companion: companionPayload,
         notes: attendee.notes || undefined,
@@ -325,8 +333,8 @@ export default function ClassBookingWizard() {
 
       await createPublicEnrollment({
         organizationId: organization._id,
-        sessionId: selectedSession._id,
-        clientPackageId: usePkg && pkgId ? pkgId : undefined,
+        sessionIds: selectedSessions.map((s) => s._id),
+        clientPackageId: usingPackage && pkgId ? pkgId : undefined,
         attendee: attendeePayload,
         companion: companionPayload,
       });
@@ -345,12 +353,13 @@ export default function ClassBookingWizard() {
     setCurrentStep(0);
     setCompleted(false);
     setSelectedClass(null);
-    setSelectedSession(null);
+    setSelectedSessions([]);
     setAttendee(emptyAttendee());
     setCompanion(null);
     setFinishName("");
     setBookingMode(null);
     setPackageClassIds([]);
+    setPackageCredits({});
     setPhase(organization?.enablePackageChoiceStep ? "mode" : "wizard");
   };
 
@@ -371,10 +380,15 @@ export default function ClassBookingWizard() {
           <StepSelectSession
             sessions={sessions}
             loading={loadingSessions}
-            selected={selectedSession}
-            onSelect={(s) => { setSelectedSession(s); setCurrentStep(2); }}
+            selected={selectedSessions}
+            onChange={setSelectedSessions}
             selectedClass={selectedClass}
             timezone={tz}
+            maxSelectable={
+              bookingMode === "package" && selectedClass
+                ? packageCredits[selectedClass._id] ?? null
+                : null
+            }
           />
         );
       case 2:
@@ -393,11 +407,11 @@ export default function ClassBookingWizard() {
         return (
           <StepSummary
             classDoc={selectedClass}
-            session={selectedSession}
+            sessions={selectedSessions}
             attendee={attendee}
             companion={companion}
             timezone={tz}
-            usingPackage={usePkg && !!pkgId}
+            usingPackage={usingPackage}
             deposit={
               classDepositNeeded
                 ? {
@@ -519,13 +533,22 @@ export default function ClassBookingWizard() {
             <Group justify="space-between" wrap="nowrap">
               <div>
                 <Text size="sm" fw={600} c="grape">Tienes un paquete con créditos para esta clase</Text>
-                <Text size="xs" c="dimmed">
-                  Créditos disponibles: {pkgRemaining}. Si lo usas, tu lugar no tendrá costo
-                  (se descuenta 1 crédito). El acompañante usa su propio paquete si tiene.
-                </Text>
+                {pkgCoversAll ? (
+                  <Text size="xs" c="dimmed">
+                    Créditos disponibles: {pkgRemaining}. Si lo usas, tu lugar no tendrá costo
+                    (se descuenta 1 crédito por sesión). El acompañante usa su propio paquete si tiene.
+                  </Text>
+                ) : (
+                  <Text size="xs" c="orange.8">
+                    Te quedan {pkgRemaining} {pkgRemaining === 1 ? "crédito" : "créditos"} y elegiste{" "}
+                    {selectedSessions.length} sesiones. Para usar tu paquete vuelve al paso
+                    «Sesión» y deja como máximo {pkgRemaining}.
+                  </Text>
+                )}
               </div>
               <Switch
-                checked={usePkg}
+                disabled={!pkgCoversAll}
+                checked={usingPackage}
                 onChange={(e) => setUsePkg(e.currentTarget.checked)}
                 label={usePkg ? "Usar paquete" : "No usar"}
               />

@@ -56,7 +56,8 @@ export interface CheckoutCustomerDetails {
 
 export interface ClassCheckoutPayload {
   organizationId: string;
-  sessionId: string;
+  /** Una o varias sesiones de la misma clase (un solo depósito por la suma). */
+  sessionIds: string[];
   attendee: {
     name: string;
     phone: string;

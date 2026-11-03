@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Stack, Card, Text, Badge, Group, Center, Loader,
-  Progress, ThemeIcon, Alert, Paper, Divider,
+  Progress, ThemeIcon, Alert, Paper, Divider, Button, CloseButton,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { DatePicker } from "@mantine/dates";
-import { IconCalendar, IconAlertCircle, IconClock } from "@tabler/icons-react";
+import {
+  IconCalendar, IconAlertCircle, IconClock, IconCheck, IconRepeat,
+} from "@tabler/icons-react";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -16,13 +18,18 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("es");
 
+// Mismo tope que el backend (MAX_SESSIONS_PER_BOOKING en enrollmentService).
+const MAX_SESSIONS_PER_BOOKING = 31;
+
 interface Props {
   sessions: ClassSession[];
   loading: boolean;
-  selected: ClassSession | null;
-  onSelect: (s: ClassSession) => void;
+  selected: ClassSession[];
+  onChange: (sessions: ClassSession[]) => void;
   selectedClass: ClassType | null;
   timezone?: string;
+  /** Créditos del paquete con que se reserva: tope de sesiones a marcar. */
+  maxSelectable?: number | null;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -48,10 +55,18 @@ const dayKeyToDate = (key: string) => {
   return new Date(y, m - 1, d);
 };
 
+const byStart = (a: ClassSession, b: ClassSession) =>
+  new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+
 export default function StepSelectSession({
-  sessions, loading, selected, onSelect, selectedClass, timezone: tz = "America/Bogota",
+  sessions, loading, selected, onChange, selectedClass, timezone: tz = "America/Bogota",
+  maxSelectable = null,
 }: Props) {
   const isMobile = useMediaQuery("(max-width: 48rem)");
+
+  const limit = Math.min(maxSelectable ?? MAX_SESSIONS_PER_BOOKING, MAX_SESSIONS_PER_BOOKING);
+  const selectedIds = useMemo(() => new Set(selected.map((s) => s._id)), [selected]);
+  const atLimit = selected.length >= limit;
 
   const availableSessions = useMemo(
     () => sessions.filter((s) => s.status === "open" && dayjs(s.startDate).isAfter(dayjs())),
@@ -75,18 +90,23 @@ export default function StepSelectSession({
     [sessionsByDay]
   );
 
+  const selectedDays = useMemo(
+    () => new Set(selected.map((s) => dayjs(s.startDate).tz(tz).format("YYYY-MM-DD"))),
+    [selected, tz]
+  );
+
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
-  // Preseleccionar el día de la sesión ya elegida (al volver a este paso) o,
-  // si no hay ninguna, el primer día con disponibilidad.
+  // Preseleccionar el día de la primera sesión marcada (al volver a este paso)
+  // o, si no hay ninguna, el primer día con disponibilidad.
   useEffect(() => {
-    if (selected) {
-      setSelectedDayKey(dayjs(selected.startDate).tz(tz).format("YYYY-MM-DD"));
+    if (selected.length) {
+      setSelectedDayKey(dayjs([...selected].sort(byStart)[0].startDate).tz(tz).format("YYYY-MM-DD"));
       return;
     }
     setSelectedDayKey(availableDays[0] ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?._id, availableDays.join(","), tz]);
+  }, [availableDays.join(","), tz]);
 
   if (loading) {
     return <Center h={200}><Loader /></Center>;
@@ -113,6 +133,41 @@ export default function StepSelectSession({
 
   const sessionsOfSelectedDay = selectedDayKey ? sessionsByDay[selectedDayKey] ?? [] : [];
 
+  const toggle = (s: ClassSession) => {
+    if (selectedIds.has(s._id)) {
+      onChange(selected.filter((x) => x._id !== s._id));
+    } else if (!atLimit) {
+      onChange([...selected, s].sort(byStart));
+    }
+  };
+
+  // Mismo día de la semana y hora que `base`, desde `base` en adelante: hasta
+  // fin de ese mes o, si se reserva con paquete, hasta agotar los créditos.
+  const weeklyMatches = (base: ClassSession) => {
+    const b = dayjs(base.startDate).tz(tz);
+    const monthEnd = b.endOf("month");
+    return availableSessions
+      .filter((s) => {
+        const d = dayjs(s.startDate).tz(tz);
+        return (
+          !d.isBefore(b) &&
+          d.day() === b.day() &&
+          d.format("HH:mm") === b.format("HH:mm") &&
+          (maxSelectable != null || !d.isAfter(monthEnd))
+        );
+      })
+      .sort(byStart);
+  };
+
+  const applyWeekly = (base: ClassSession) => {
+    const next = [...selected];
+    for (const s of weeklyMatches(base)) {
+      if (next.length >= limit) break;
+      if (!next.some((x) => x._id === s._id)) next.push(s);
+    }
+    onChange(next.sort(byStart));
+  };
+
   const getDayProps = (date: Date) => {
     const key = dateToKey(date);
     if (!sessionsByDay[key]) {
@@ -127,6 +182,16 @@ export default function StepSelectSession({
         },
       };
     }
+    if (selectedDays.has(key)) {
+      return {
+        style: {
+          backgroundColor: "var(--mantine-color-blue-1)",
+          color: "var(--mantine-color-blue-8)",
+          fontWeight: 700,
+          boxShadow: "inset 0 0 0 2px var(--mantine-color-blue-5)",
+        },
+      };
+    }
     return {
       style: {
         backgroundColor: "var(--mantine-color-green-1)",
@@ -138,17 +203,30 @@ export default function StepSelectSession({
 
   return (
     <Stack gap="md">
-      <Text fw={600} size="lg">Elige una sesión</Text>
+      <Text fw={600} size="lg">Elige tus sesiones</Text>
       <Text size="sm" c="dimmed">{selectedClass.name} · {selectedClass.duration} min</Text>
       <Text size="xs" c="dimmed">
-        Los días en <Text span c="green" fw={600}>verde</Text> tienen sesiones disponibles.
+        Puedes marcar una o varias sesiones. Los días en{" "}
+        <Text span c="green" fw={600}>verde</Text> tienen sesiones disponibles y los
+        marcados en <Text span c="blue" fw={600}>azul</Text> ya tienen sesiones elegidas.
       </Text>
+
+      {maxSelectable != null && (
+        <Alert color="grape" variant="light" p="xs">
+          <Text size="xs">
+            Tu paquete cubre hasta {maxSelectable} {maxSelectable === 1 ? "sesión" : "sesiones"} de esta clase.
+          </Text>
+        </Alert>
+      )}
 
       <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
         <DatePicker
           value={selectedDayKey ? dayKeyToDate(selectedDayKey) : null}
           onChange={(d) => d && setSelectedDayKey(dateToKey(d))}
-          defaultDate={availableDays[0] ? dayKeyToDate(availableDays[0]) : undefined}
+          defaultDate={
+            selectedDayKey ? dayKeyToDate(selectedDayKey)
+            : availableDays[0] ? dayKeyToDate(availableDays[0]) : undefined
+          }
           minDate={new Date()}
           maxDate={dayKeyToDate(availableDays[availableDays.length - 1])}
           excludeDate={(d) => dayjs(d).isBefore(dayjs(), "day")}
@@ -166,13 +244,16 @@ export default function StepSelectSession({
             labelPosition="left"
           />
           {sessionsOfSelectedDay.map((s) => {
-            const isSelected = selected?._id === s._id;
+            const isSelected = selectedIds.has(s._id);
+            const disabled = !isSelected && atLimit;
             const start = dayjs(s.startDate).tz(tz);
             const end = dayjs(s.endDate).tz(tz);
             const remaining = s.capacity - s.enrolledCount;
             const pct = s.capacity > 0 ? Math.round((s.enrolledCount / s.capacity) * 100) : 0;
             const employee = typeof s.employeeId === "object" ? s.employeeId : null;
             const room = typeof s.roomId === "object" ? s.roomId : null;
+            const weekly = isSelected ? weeklyMatches(s) : [];
+            const weeklyPending = weekly.filter((w) => !selectedIds.has(w._id)).length;
 
             return (
               <Card
@@ -180,9 +261,10 @@ export default function StepSelectSession({
                 withBorder
                 radius="md"
                 p="sm"
-                onClick={() => onSelect(s)}
+                onClick={() => toggle(s)}
                 style={{
-                  cursor: "pointer",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.55 : 1,
                   borderColor: isSelected ? "var(--mantine-color-blue-5)" : undefined,
                   borderWidth: isSelected ? 2 : 1,
                   boxShadow: isSelected ? "0 0 0 2px var(--mantine-color-blue-2)" : undefined,
@@ -193,11 +275,11 @@ export default function StepSelectSession({
                   <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
                     <ThemeIcon
                       size="md"
-                      variant="light"
+                      variant={isSelected ? "filled" : "light"}
                       color={isSelected ? "blue" : "gray"}
                       radius="xl"
                     >
-                      <IconClock size={16} />
+                      {isSelected ? <IconCheck size={16} /> : <IconClock size={16} />}
                     </ThemeIcon>
                     <Stack gap={2} style={{ minWidth: 0 }}>
                       <Text fw={600} size="sm">
@@ -226,14 +308,63 @@ export default function StepSelectSession({
                       </Group>
                     </Stack>
                   </Group>
-                  <Badge size="sm" color={STATUS_COLOR[s.status] ?? "gray"} variant="light">
-                    {STATUS_LABEL[s.status] ?? s.status}
+                  <Badge size="sm" color={isSelected ? "blue" : STATUS_COLOR[s.status] ?? "gray"} variant="light">
+                    {isSelected ? "Elegida" : STATUS_LABEL[s.status] ?? s.status}
                   </Badge>
                 </Group>
+
+                {/* Atajo: el mismo día y hora las demás semanas */}
+                {isSelected && weeklyPending > 0 && !atLimit && (
+                  <Button
+                    mt="sm"
+                    size="xs"
+                    variant="light"
+                    leftSection={<IconRepeat size={14} />}
+                    onClick={(e) => { e.stopPropagation(); applyWeekly(s); }}
+                  >
+                    Repetir cada {start.format("dddd")} a las {start.format("HH:mm")}
+                    {maxSelectable != null ? "" : " este mes"} (+{Math.min(weeklyPending, limit - selected.length)})
+                  </Button>
+                )}
               </Card>
             );
           })}
         </Stack>
+      )}
+
+      {/* Sesiones elegidas */}
+      {selected.length > 0 && (
+        <Paper withBorder radius="md" p="sm">
+          <Group justify="space-between" mb={6}>
+            <Text size="sm" fw={600}>
+              {selected.length} {selected.length === 1 ? "sesión elegida" : "sesiones elegidas"}
+              {maxSelectable != null && ` de ${maxSelectable}`}
+            </Text>
+            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange([])}>
+              Quitar todas
+            </Button>
+          </Group>
+          <Stack gap={4}>
+            {selected.map((s) => {
+              const start = dayjs(s.startDate).tz(tz);
+              return (
+                <Group key={s._id} justify="space-between" wrap="nowrap" gap="xs">
+                  <Text size="xs">
+                    {start.format("ddd D [de] MMM")} · {start.format("HH:mm")}
+                  </Text>
+                  <CloseButton size="sm" aria-label="Quitar sesión" onClick={() => toggle(s)} />
+                </Group>
+              );
+            })}
+          </Stack>
+          {atLimit && (
+            <Text size="xs" c="dimmed" mt={6}>
+              {maxSelectable != null
+                ? "Llegaste al máximo de sesiones de tu paquete."
+                : `Puedes reservar hasta ${MAX_SESSIONS_PER_BOOKING} sesiones a la vez.`}
+            </Text>
+          )}
+        </Paper>
       )}
     </Stack>
   );

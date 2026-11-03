@@ -399,7 +399,8 @@ export const adminCreateEnrollments = async (data: {
 
 export const createPublicEnrollment = async (data: {
   organizationId: string;
-  sessionId: string;
+  /** Una o varias sesiones de la misma clase. */
+  sessionIds: string[];
   attendee: Attendee;
   companion?: Attendee;
   notes?: string;

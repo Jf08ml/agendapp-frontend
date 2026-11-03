@@ -225,6 +225,15 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "⏳ ¡Hola, {{nombre_cliente}}!\n\nHemos recibido tu solicitud de inscripción.\n\n📚 Clase: {{nombre_clase}}\n🗓️ Fecha: {{fecha_clase}}\n⏰ Horario: {{hora_inicio}} - {{hora_fin}}\n📍 Lugar: {{nombre_negocio}}\n💰 Valor: {{precio}}\n\nTu inscripción está pendiente de aprobación. Te avisaremos en cuanto sea confirmada.",
     footerText: "",
   },
+  classEnrollmentSeries: {
+    name: "clases_inscritas",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Tus sesiones",
+    bodyText:
+      "📚 ¡Hola, {{nombre_cliente}}!\n\n{{estado_inscripcion}}\n\n📚 Clase: {{nombre_clase}}\n📍 Lugar: {{nombre_negocio}}\n📍 Dirección: {{direccion}}\n\n🗓️ Tus sesiones:\n{{lista_sesiones}}\n\n💰 Valor: {{precio}}\n\n❌ Puedes cancelar todas tus sesiones o solo algunas aquí:\n{{enlace_cancelacion}}\n\n¡Te esperamos!",
+    footerText: "",
+  },
   classEnrollmentCancelled: {
     name: "clase_cancelada",
     category: "UTILITY",
@@ -323,6 +332,8 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   hora_inicio: "07:00 AM",
   hora_fin: "08:00 AM",
   precio: "$25.000",
+  estado_inscripcion: "Tus 4 sesiones quedaron confirmadas.",
+  lista_sesiones: "• lunes 13 de enero, 7:00 AM - 8:00 AM",
   // 🎂 Cumpleaños
   beneficio: "20% de descuento en tu próximo servicio",
   // 🔁 Recordatorio de seguimiento entre servicios relacionados

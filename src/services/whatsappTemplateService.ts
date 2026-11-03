@@ -28,6 +28,7 @@ export interface WhatsappTemplates {
   // 📚 Módulo de Clases (opcionales: el editor de clases las consume)
   classEnrollmentConfirmed?: WhatsappTemplate;
   classEnrollmentPending?: WhatsappTemplate;
+  classEnrollmentSeries?: WhatsappTemplate;
   classEnrollmentCancelled?: WhatsappTemplate;
   classReminder?: WhatsappTemplate;
   // 🎂 Cumpleaños (siempre presente en la respuesta del backend)
@@ -65,6 +66,7 @@ export interface TemplatesResponse {
     rescheduleAppointmentSeries?: string;
     classEnrollmentConfirmed?: string;
     classEnrollmentPending?: string;
+    classEnrollmentSeries?: string;
     classEnrollmentCancelled?: string;
     classReminder?: string;
     birthdayGreeting?: string;
@@ -97,6 +99,7 @@ export interface WhatsappTemplateSettings {
   // 📚 Módulo de Clases
   classEnrollmentConfirmed?: boolean;
   classEnrollmentPending?: boolean;
+  classEnrollmentSeries?: boolean;
   classEnrollmentCancelled?: boolean;
   classReminder?: boolean;
   // 🎂 Cumpleaños

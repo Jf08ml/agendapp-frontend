@@ -56,6 +56,21 @@ const templateInfo = {
       { name: "{{discount}}", desc: "Texto de descuento (vacío si no aplica)" },
     ],
   },
+  classEnrollmentSeries: {
+    title: "Varias sesiones reservadas",
+    shortTitle: "Varias sesiones",
+    description: "Un solo mensaje cuando el asistente reserva varias sesiones de una clase a la vez (confirmadas o pendientes de aprobación), en vez de uno por sesión.",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del asistente" },
+      { name: "{{statusMessage}}", desc: "Si quedaron confirmadas o pendientes de aprobación" },
+      { name: "{{className}}", desc: "Nombre de la clase" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{address}}", desc: "Dirección del negocio" },
+      { name: "{{sessionsList}}", desc: "Lista de fechas y horas reservadas" },
+      { name: "{{price}}", desc: "Valor total (o \"Incluido en tu paquete\")" },
+      { name: "{{cancelBlock}}", desc: "Bloque con enlace para cancelar todas o algunas" },
+    ],
+  },
   classEnrollmentCancelled: {
     title: "Inscripción cancelada",
     shortTitle: "Inscripción cancelada",
@@ -93,6 +108,7 @@ const CLASS_KEYS = Object.keys(templateInfo) as ClassKey[];
 const META_DEFAULT_NAMES: Record<ClassKey, string> = {
   classEnrollmentConfirmed: "clase_confirmada",
   classEnrollmentPending: "clase_pendiente",
+  classEnrollmentSeries: "clases_inscritas",
   classEnrollmentCancelled: "clase_cancelada",
   classReminder: "recordatorio_clase",
 };
@@ -107,6 +123,7 @@ const META_STATUS_DOT: Record<string, string> = {
 const SETTINGS_LIST: { key: ClassKey; label: string; desc: string }[] = [
   { key: "classEnrollmentConfirmed", label: "Inscripción confirmada", desc: "Al confirmar/aprobar una inscripción" },
   { key: "classEnrollmentPending", label: "Inscripción pendiente", desc: "Cuando la inscripción requiere aprobación" },
+  { key: "classEnrollmentSeries", label: "Varias sesiones reservadas", desc: "Resumen único al reservar varias sesiones a la vez" },
   { key: "classEnrollmentCancelled", label: "Inscripción cancelada", desc: "Cuando se cancela una inscripción" },
   { key: "classReminder", label: "Recordatorio de clase", desc: "Antes de que comience la clase" },
 ];
@@ -133,6 +150,7 @@ export default function ClassWhatsappTemplates() {
   const [templateSettings, setTemplateSettings] = useState<WhatsappTemplateSettings>({
     classEnrollmentConfirmed: true,
     classEnrollmentPending: true,
+    classEnrollmentSeries: true,
     classEnrollmentCancelled: true,
     classReminder: true,
   });
@@ -222,6 +240,7 @@ export default function ClassWhatsappTemplates() {
       const valid: WhatsappTemplateSettings = {
         classEnrollmentConfirmed: templateSettings.classEnrollmentConfirmed,
         classEnrollmentPending: templateSettings.classEnrollmentPending,
+        classEnrollmentSeries: templateSettings.classEnrollmentSeries,
         classEnrollmentCancelled: templateSettings.classEnrollmentCancelled,
         classReminder: templateSettings.classReminder,
       };

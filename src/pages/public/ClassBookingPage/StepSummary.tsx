@@ -16,7 +16,7 @@ dayjs.locale("es");
 
 interface Props {
   classDoc: ClassType | null;
-  session: ClassSession | null;
+  sessions: ClassSession[];
   attendee: AttendeeForm;
   companion: AttendeeForm | null;
   timezone?: string;
@@ -26,10 +26,11 @@ interface Props {
   usingPackage?: boolean;
 }
 
-export default function StepSummary({ classDoc, session, attendee, companion, timezone: tz = "America/Bogota", deposit, usingPackage = false }: Props) {
-  if (!classDoc || !session) return null;
+export default function StepSummary({ classDoc, sessions, attendee, companion, timezone: tz = "America/Bogota", deposit, usingPackage = false }: Props) {
+  if (!classDoc || sessions.length === 0) return null;
 
   const numPeople = companion ? 2 : 1;
+  const numSessions = sessions.length;
   const discount = classDoc.groupDiscount;
   const discountApplies =
     discount?.enabled &&
@@ -38,12 +39,21 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
   const discountPct = discountApplies ? discount!.discountPercent : 0;
   const pricePerPerson = usingPackage ? 0 : classDoc.pricePerPerson;
   const finalPerPerson = usingPackage ? 0 : Math.round(pricePerPerson * (1 - discountPct / 100));
-  const total = usingPackage ? 0 : finalPerPerson * numPeople;
+  const total = usingPackage ? 0 : finalPerPerson * numPeople * numSessions;
+  const subtotal = pricePerPerson * numPeople * numSessions;
 
-  const start = dayjs(session.startDate).tz(tz);
-  const end = dayjs(session.endDate).tz(tz);
-  const employee = typeof session.employeeId === "object" ? session.employeeId : null;
-  const room = typeof session.roomId === "object" ? session.roomId : null;
+  // Instructor y salón: se muestran si son los mismos en todas las sesiones.
+  const first = sessions[0];
+  const start = dayjs(first.startDate).tz(tz);
+  const end = dayjs(first.endDate).tz(tz);
+  const employee = typeof first.employeeId === "object" ? first.employeeId : null;
+  const room = typeof first.roomId === "object" ? first.roomId : null;
+  const sameEmployee = sessions.every(
+    (s) => (typeof s.employeeId === "object" ? s.employeeId?._id : s.employeeId) === employee?._id
+  );
+  const sameRoom = sessions.every(
+    (s) => (typeof s.roomId === "object" ? s.roomId?._id : s.roomId) === room?._id
+  );
 
   const attendees = [attendee, ...(companion ? [companion] : [])];
 
@@ -67,19 +77,41 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
 
           <Divider />
 
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="transparent" color="gray">
-              <IconCalendar size={14} />
-            </ThemeIcon>
-            <Text size="sm">{start.format("dddd D [de] MMMM [de] YYYY")}</Text>
-          </Group>
-          <Group gap="xs">
-            <ThemeIcon size="sm" variant="transparent" color="gray">
-              <IconClock size={14} />
-            </ThemeIcon>
-            <Text size="sm">{start.format("HH:mm")} – {end.format("HH:mm")}</Text>
-          </Group>
-          {employee && (
+          {numSessions === 1 ? (
+            <>
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="transparent" color="gray">
+                  <IconCalendar size={14} />
+                </ThemeIcon>
+                <Text size="sm">{start.format("dddd D [de] MMMM [de] YYYY")}</Text>
+              </Group>
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="transparent" color="gray">
+                  <IconClock size={14} />
+                </ThemeIcon>
+                <Text size="sm">{start.format("HH:mm")} – {end.format("HH:mm")}</Text>
+              </Group>
+            </>
+          ) : (
+            <Stack gap={4}>
+              <Group gap="xs">
+                <ThemeIcon size="sm" variant="transparent" color="gray">
+                  <IconCalendar size={14} />
+                </ThemeIcon>
+                <Text size="sm" fw={600}>{numSessions} sesiones</Text>
+              </Group>
+              {sessions.map((s) => {
+                const sStart = dayjs(s.startDate).tz(tz);
+                const sEnd = dayjs(s.endDate).tz(tz);
+                return (
+                  <Text key={s._id} size="sm" pl={28}>
+                    {sStart.format("ddd D [de] MMMM")} · {sStart.format("HH:mm")} – {sEnd.format("HH:mm")}
+                  </Text>
+                );
+              })}
+            </Stack>
+          )}
+          {employee && sameEmployee && (
             <Group gap="xs">
               <ThemeIcon size="sm" variant="transparent" color="gray">
                 <IconSchool size={14} />
@@ -87,7 +119,7 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
               <Text size="sm">Instructor: {employee.names}</Text>
             </Group>
           )}
-          {room && (
+          {room && sameRoom && (
             <Group gap="xs">
               <ThemeIcon size="sm" variant="transparent" color="gray">
                 <IconUsers size={14} />
@@ -123,7 +155,9 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
           <Group gap={6}>
             <IconPackage size={16} color="var(--mantine-color-green-7)" />
             <Text size="sm" fw={600} c="green.8">
-              Esta inscripción se paga con tu paquete de sesiones — no pagas nada ahora.
+              {numSessions > 1
+                ? `Tus ${numSessions} sesiones se pagan con tu paquete — no pagas nada ahora.`
+                : "Esta inscripción se paga con tu paquete de sesiones — no pagas nada ahora."}
             </Text>
           </Group>
         </Card>
@@ -131,13 +165,18 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
         <Card withBorder radius="md" p="md" bg="var(--mantine-color-green-0)">
           <Stack gap={6}>
             <Group justify="space-between">
-              <Text size="sm">Precio por persona</Text>
+              <Text size="sm">{numSessions > 1 ? "Precio por persona y sesión" : "Precio por persona"}</Text>
               <Text size="sm">${pricePerPerson.toLocaleString("es-CO")}</Text>
             </Group>
-            {numPeople > 1 && (
+            {(numPeople > 1 || numSessions > 1) && (
               <Group justify="space-between">
-                <Text size="sm">{numPeople} personas</Text>
-                <Text size="sm">${(pricePerPerson * numPeople).toLocaleString("es-CO")}</Text>
+                <Text size="sm">
+                  {[
+                    numPeople > 1 ? `${numPeople} personas` : null,
+                    numSessions > 1 ? `${numSessions} sesiones` : null,
+                  ].filter(Boolean).join(" × ")}
+                </Text>
+                <Text size="sm">${subtotal.toLocaleString("es-CO")}</Text>
               </Group>
             )}
             {discountApplies && (
@@ -147,7 +186,7 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
                   <Text size="sm" c="green" fw={500}>Descuento grupal ({discountPct}%)</Text>
                 </Group>
                 <Text size="sm" c="green" fw={500}>
-                  -${(pricePerPerson * numPeople - total).toLocaleString("es-CO")}
+                  -${(subtotal - total).toLocaleString("es-CO")}
                 </Text>
               </Group>
             )}
@@ -158,7 +197,7 @@ export default function StepSummary({ classDoc, session, attendee, companion, ti
             </Group>
             {discountApplies && numPeople > 1 && (
               <Text size="xs" c="dimmed" ta="right">
-                ${finalPerPerson.toLocaleString("es-CO")} por persona
+                ${finalPerPerson.toLocaleString("es-CO")} por persona{numSessions > 1 ? " y sesión" : ""}
               </Text>
             )}
           </Stack>
