@@ -3,30 +3,8 @@ const API_BASE_URL: string =
     ? (import.meta.env.VITE_APP_API_URL as string)
     : (import.meta.env.VITE_APP_API_URL_DEPLOYMENT as string);
 
-export interface CompleteRegistrationCapiPayload {
-  event_id: string;
-  event_source_url: string;
-  fbp?: string;
-  fbc?: string;
-  email?: string;
-  phone?: string;
-}
-
-/**
- * Envía el evento CompleteRegistration al endpoint interno de Conversions API.
- * Usa fetch (no axios) para poder pasar keepalive: true — la petición debe
- * sobrevivir aunque el navegador ya esté redirigiendo a otra página.
- */
-export async function sendCompleteRegistrationCapi(
-  payload: CompleteRegistrationCapiPayload
-): Promise<void> {
-  await fetch(`${API_BASE_URL}/meta-capi/complete-registration`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    keepalive: true,
-    body: JSON.stringify(payload),
-  });
-}
+// El CompleteRegistration ya no sale de aquí: lo envía el backend al crear la
+// cuenta (ver registrationMetaEvent en utils/metaPixel.ts).
 
 export interface ContactCapiPayload {
   event_id: string;

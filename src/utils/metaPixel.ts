@@ -1,4 +1,4 @@
-import { sendCompleteRegistrationCapi, sendContactCapi } from "../services/metaConversionsService";
+import { sendContactCapi } from "../services/metaConversionsService";
 
 declare global {
   interface Window {
@@ -73,32 +73,34 @@ export function trackRegistroIniciado(): void {
   window.fbq?.("trackCustom", "RegistroIniciado", { content_name: "registro_iniciado" });
 }
 
+/** Lo que el registro manda al backend para que él envíe el CompleteRegistration a Meta. */
+export interface RegistrationMetaEvent {
+  event_id: string;
+  event_source_url: string;
+  fbp?: string;
+  fbc?: string;
+}
+
 /**
- * Evento 3 — "Registro Completado" (Pixel + CAPI, evento estándar
- * CompleteRegistration). Llamar SOLO cuando el backend confirmó la creación
- * de la cuenta, nunca en el click de submit.
+ * Datos del navegador para el evento de registro. Se generan ANTES de enviar
+ * el formulario y viajan con él: el backend envía el CompleteRegistration a
+ * la Conversions API solo si la cuenta se crea, y el Pixel usa el mismo
+ * event_id (trackRegistroCompletado) para que Meta lo cuente una vez.
  */
-export async function trackRegistroCompletado(data: { email?: string; phone?: string }): Promise<void> {
-  if (!PIXEL_ID) return;
-
-  const eventId = crypto.randomUUID();
-
-  window.fbq?.("track", "CompleteRegistration", { status: true }, { eventID: eventId });
-
+export function registrationMetaEvent(): RegistrationMetaEvent {
   const { fbp, fbc } = getFbpFbc();
+  return { event_id: crypto.randomUUID(), event_source_url: window.location.href, fbp, fbc };
+}
 
-  try {
-    await sendCompleteRegistrationCapi({
-      event_id: eventId,
-      event_source_url: window.location.href,
-      fbp,
-      fbc,
-      email: data.email,
-      phone: data.phone,
-    });
-  } catch {
-    // Best-effort: el tracking nunca debe bloquear ni afectar el flujo de registro.
-  }
+/**
+ * Evento 3 — "Registro Completado" (Pixel, evento estándar
+ * CompleteRegistration). Llamar SOLO cuando el backend confirmó la creación
+ * de la cuenta, nunca en el click de submit, con el event_id que se envió en
+ * el registro. La parte de servidor (CAPI) la hace el backend.
+ */
+export function trackRegistroCompletado(eventId: string): void {
+  if (!PIXEL_ID) return;
+  window.fbq?.("track", "CompleteRegistration", { status: true }, { eventID: eventId });
 }
 
 /**
