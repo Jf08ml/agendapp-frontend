@@ -245,13 +245,68 @@ export default function ReceiptReviewPage() {
                   </Card>
                 )}
 
+                {/* Paquete vinculado: quién compra y qué nivel */}
+                {order.linkedPackage && (
+                  <Card withBorder p="xs" radius="sm" mb="sm">
+                    <Text size="sm" fw={600}>
+                      {order.linkedPackage.customerName || "Cliente sin nombre"}
+                      {order.linkedPackage.customerPhone && (
+                        <Text span size="xs" c="dimmed" fw={400}>
+                          {"  "}
+                          {order.linkedPackage.customerPhone}
+                        </Text>
+                      )}
+                    </Text>
+                    {order.linkedPackage.customerDocumentId && (
+                      <Text size="xs" c="dimmed">
+                        Doc. {order.linkedPackage.customerDocumentId}
+                      </Text>
+                    )}
+                    <Text size="xs" c="dimmed">
+                      {order.linkedPackage.packageName}
+                      {order.linkedPackage.tierLabel && ` · ${order.linkedPackage.tierLabel}`}
+                    </Text>
+                  </Card>
+                )}
+
+                {/* Clase vinculada: asistentes y sesión */}
+                {order.linkedClass && (
+                  <Card withBorder p="xs" radius="sm" mb="sm">
+                    <Text size="sm" fw={600}>
+                      {order.linkedClass.customerName}
+                      {order.linkedClass.customerPhone && (
+                        <Text span size="xs" c="dimmed" fw={400}>
+                          {"  "}
+                          {order.linkedClass.customerPhone}
+                        </Text>
+                      )}
+                    </Text>
+                    {order.linkedClass.items.map((it) => (
+                      <Text key={it.enrollmentId} size="xs" c="dimmed">
+                        {it.attendee} · {it.className}
+                        {it.startDate && ` · ${formatDateTime(it.startDate)}`}
+                      </Text>
+                    ))}
+                  </Card>
+                )}
+
+                <Text size="xs" c="dimmed" mb="sm">
+                  Comprobante enviado el {formatDateTime(order.receipt?.uploadedAt || order.createdAt)}
+                </Text>
+
                 {order.receipt?.fulfillError && order.status === "in_review" && (
                   <Card bg="red.0" p="xs" radius="sm" mb="sm">
                     <Stack gap={6}>
                       <Group gap={6} wrap="nowrap" align="flex-start">
                         <IconAlertTriangle size={16} color="var(--mantine-color-red-7)" />
                         <Text size="xs" c="red.9">
-                          El pago es válido, pero no se pudo confirmar la reserva: {order.receipt.fulfillError}
+                          El pago es válido, pero no se pudo{" "}
+                          {order.type === "package"
+                            ? "asignar el paquete"
+                            : order.type === "class"
+                              ? "confirmar la inscripción"
+                              : "confirmar la reserva"}
+                          : {order.receipt.fulfillError}
                         </Text>
                       </Group>
                       {order.type === "reservation" && (
