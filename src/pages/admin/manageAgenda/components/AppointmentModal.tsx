@@ -606,7 +606,6 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
       )
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
   };
-  const dayAppointments = appointment ? sameDayClientAppointments(appointment, appoinments) : [];
 
   // Lo que suma cada cita al total del día. Una cancelada no se cobra: solo
   // cuenta lo que se le pagó y sigue registrado (abono retenido). No hay
@@ -707,6 +706,8 @@ ${clientServices}`;
   const organizationId = organization?._id;
   const timezone = organization?.timezone || "America/Bogota"; // 🌍 Timezone de la organización
   const timeFormat = organization?.timeFormat || "12h";
+  // Después de timezone: sameDayClientAppointments lo usa (antes daba "Cannot access before initialization").
+  const dayAppointments = appointment ? sameDayClientAppointments(appointment, appoinments) : [];
 
   // 🚀 Búsqueda asíncrona de clientes con debounce
   useEffect(() => {
