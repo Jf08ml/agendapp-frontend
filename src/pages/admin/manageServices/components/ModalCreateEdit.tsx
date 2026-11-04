@@ -28,6 +28,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { Service, ServiceCost } from "../../../../services/serviceService";
 import { ImageUploadField, PdfAndVideoFields } from "../../components/MediaUploadFields";
+import { FOLLOW_UP_SELF } from "./followUp";
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -530,16 +531,29 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
           <Stack gap="md">
             <Select
               label="Servicio de seguimiento"
-              description="Si el cliente no vuelve a agendar este servicio, se le enviará un recordatorio por WhatsApp"
+              description="Si el cliente no vuelve a agendar ese servicio, se le enviará un recordatorio por WhatsApp. Elige «Este mismo servicio» para recordarle repetirlo (p. ej. retoque o mantenimiento)."
               placeholder="Sin seguimiento configurado"
               clearable
               searchable
-              data={allServices.map((s) => ({ value: s._id, label: s.name }))}
-              value={editingService.followUpServiceId ?? null}
+              data={[
+                { value: FOLLOW_UP_SELF, label: "Este mismo servicio (repetir)" },
+                ...allServices
+                  .filter((s) => s._id !== editingService._id)
+                  .map((s) => ({ value: s._id, label: s.name })),
+              ]}
+              value={
+                editingService.followUpServiceId &&
+                (editingService.followUpServiceId === FOLLOW_UP_SELF ||
+                  (editingService._id && editingService.followUpServiceId === editingService._id))
+                  ? FOLLOW_UP_SELF
+                  : editingService.followUpServiceId ?? null
+              }
               onChange={(value) =>
                 setEditingService({
                   ...editingService,
-                  followUpServiceId: value,
+                  // Editando: el propio _id. Creando: el marcador (se resuelve al guardar).
+                  followUpServiceId:
+                    value === FOLLOW_UP_SELF ? editingService._id || FOLLOW_UP_SELF : value,
                   followUpDays: value ? (editingService.followUpDays ?? 20) : null,
                 })
               }

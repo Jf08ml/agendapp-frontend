@@ -51,6 +51,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { modals } from "@mantine/modals";
 import { exportServicesToExcel, downloadEmptyTemplate } from "./utils/exportToExcel";
+import { FOLLOW_UP_SELF } from "./components/followUp";
 
 const AdminServices: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
@@ -167,12 +168,23 @@ const AdminServices: React.FC = () => {
         });
         updatedServices = services.map((s) => (s._id === service._id ? updated : s));
       } else {
-        const created = await createService({
+        // "Este mismo servicio" como seguimiento: el servicio todavía no tiene
+        // _id, así que se crea sin seguimiento y luego se le asigna el suyo.
+        const followUpSelf = service.followUpServiceId === FOLLOW_UP_SELF;
+        let created = await createService({
           ...service,
           images: finalImages,
           pdfUrl: finalPdfUrl,
           organizationId,
+          ...(followUpSelf && { followUpServiceId: null }),
         } as any);
+        if (followUpSelf && created?._id) {
+          created =
+            (await updateService(created._id, {
+              followUpServiceId: created._id,
+              followUpDays: service.followUpDays ?? 20,
+            })) ?? created;
+        }
         updatedServices = [...services, created];
       }
 
