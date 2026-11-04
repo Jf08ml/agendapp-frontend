@@ -1296,6 +1296,38 @@ const DailyCashbox: React.FC = () => {
   // Arqueo: base + todas las entradas en efectivo − gastos en efectivo
   const cashInDrawer = cashBase + receivedByMethod.cash - totalCashExpenses;
 
+  // Disponible por método = recibido por método − gastos pagados con ese método
+  // (útil en cierres semanales/mensuales). Lo que no tiene método (abono inicial
+  // de la cita, ingresos/gastos históricos con method null) va a "Sin método", así
+  // el total disponible cuadra con Recibido − Gastos registrados. Los costos de
+  // servicio (Service.costs) no son movimientos de caja, así que no se restan aquí.
+  const availableByMethod = useMemo(() => {
+    const spent: Record<"cash" | "card" | "transfer" | "other" | "none", number> = {
+      cash: 0, card: 0, transfer: 0, other: 0, none: 0,
+    };
+    for (const e of expenses) {
+      const m = e.method;
+      if (m === "cash" || m === "card" || m === "transfer" || m === "other") spent[m] += e.amount || 0;
+      else spent.none += e.amount || 0;
+    }
+    const receivedWithMethod =
+      receivedByMethod.cash + receivedByMethod.card + receivedByMethod.transfer + receivedByMethod.other;
+    const receivedNone = Math.max(0, totalReceivedCombined - receivedWithMethod);
+    const rows = (
+      [
+        { key: "cash", label: "Efectivo", icon: IconCash, received: receivedByMethod.cash },
+        { key: "card", label: "Tarjeta", icon: IconCreditCard, received: receivedByMethod.card },
+        { key: "transfer", label: "Transferencia", icon: IconBuildingBank, received: receivedByMethod.transfer },
+        { key: "other", label: "Otro", icon: IconCoin, received: receivedByMethod.other },
+        { key: "none", label: "Sin método", icon: IconCoin, received: receivedNone },
+      ] as const
+    )
+      .map((r) => ({ ...r, spent: spent[r.key], available: r.received - spent[r.key] }))
+      .filter((r) => r.received > 0 || r.spent > 0);
+    const total = rows.reduce((s, r) => s + r.available, 0);
+    return { rows, total };
+  }, [expenses, receivedByMethod, totalReceivedCombined]);
+
   const packagesWithBalance = useMemo(() => {
     const search = packageSearch.trim().toLowerCase();
     return clientPackages
@@ -2129,6 +2161,53 @@ const DailyCashbox: React.FC = () => {
                 </Group>
               )}
             </Stack>
+          </Paper>
+        )}
+
+        {/* ── Disponible por método (recibido − gastos de ese método) ── */}
+        {availableByMethod.rows.length > 0 && (
+          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-teal-6)" }}>
+            <Group justify="space-between" mb={6} wrap="nowrap">
+              <Text size="sm" fw={700}>Disponible por método</Text>
+              <Text size="sm" fw={900} c={availableByMethod.total >= 0 ? "teal" : "red"}>
+                {formatCurrency(availableByMethod.total, currency)}
+              </Text>
+            </Group>
+            <Table verticalSpacing={4} horizontalSpacing="xs" fz="sm">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Método</Table.Th>
+                  <Table.Th ta="right">Recibido</Table.Th>
+                  <Table.Th ta="right">Gastos</Table.Th>
+                  <Table.Th ta="right">Disponible</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {availableByMethod.rows.map(({ key, label, icon: Icon, received, spent, available }) => (
+                  <Table.Tr key={key}>
+                    <Table.Td>
+                      <Group gap={4} wrap="nowrap">
+                        <Icon size={14} />
+                        <Text size="sm">{label}</Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td ta="right" c="green">{formatCurrency(received, currency)}</Table.Td>
+                    <Table.Td ta="right" c="red">{spent > 0 ? `− ${formatCurrency(spent, currency)}` : formatCurrency(0, currency)}</Table.Td>
+                    <Table.Td ta="right" fw={700} c={available >= 0 ? undefined : "red"}>
+                      {formatCurrency(available, currency)}
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+            {availableByMethod.rows.some((r) => r.key === "none") && (
+              <Text size="xs" c="dimmed" mt={6}>
+                "Sin método": abonos iniciales de citas y movimientos registrados sin método de pago.
+              </Text>
+            )}
+            {interval === "daily" && cashBase > 0 && (
+              <Text size="xs" c="dimmed" mt={4}>No incluye la base de caja (ver arqueo de efectivo).</Text>
+            )}
           </Paper>
         )}
 
