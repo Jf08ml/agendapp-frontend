@@ -593,12 +593,38 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     );
   };
 
+  // Citas del mismo cliente el MISMO DÍA (zona de la org) que `appt`. `appoinments`
+  // trae todo lo cargado en la agenda (el mes completo), y antes el detalle, el
+  // resumen de facturación y el total sumaban los tratamientos de otros días.
+  const sameDayClientAppointments = (appt: Appointment, all: Appointment[]) => {
+    const dayKey = formatInTimezone(appt.startDate, timezone, "YYYY-MM-DD");
+    return all
+      .filter(
+        (a) =>
+          a.client?._id === appt.client?._id &&
+          formatInTimezone(a.startDate, timezone, "YYYY-MM-DD") === dayKey,
+      )
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  };
+  const dayAppointments = appointment ? sameDayClientAppointments(appointment, appoinments) : [];
+
+  // Lo que suma cada cita al total del día. Una cancelada no se cobra: solo
+  // cuenta lo que se le pagó y sigue registrado (abono retenido). No hay
+  // registro de "devolución": si se devolvió el abono, se borra ese pago.
+  const isCancelledStatus = (status?: string) => !!status && status.startsWith("cancelled");
+  const paidOnAppointment = (appt: Appointment) =>
+    (appt.advancePayment || 0) + (appt.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+  const billedTotal = (appt: Appointment) => {
+    if (isCancelledStatus(appt.status)) return paidOnAppointment(appt);
+    const additionalTotal = appt.additionalItems?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
+    return (appt.customPrice ?? appt.totalPrice ?? 0) + additionalTotal;
+  };
+
   const generateAppointmentDetails = (
     appt: Appointment,
     allAppointments: Appointment[],
   ) => {
-    const clientServices = allAppointments
-      .filter((a) => a.client._id === appt.client._id)
+    const clientServices = sameDayClientAppointments(appt, allAppointments)
       .map((a) =>
         a.service
           ? `⭐ *Servicio:* ${a.service.name}\n👤 *Profesional:* ${a.employee.names}`
@@ -2523,13 +2549,12 @@ ${clientServices}`;
 
                     <Box>
                       <Group justify="space-between" mb={6}>
-                        <Text fw={700} size="sm">Historial de citas</Text>
+                        <Text fw={700} size="sm">Citas del día</Text>
                         <Text size="xs" c="dimmed">Mismo cliente</Text>
                       </Group>
-                      <ScrollArea h={220} offsetScrollbars>
+                      <ScrollArea.Autosize mah={220} offsetScrollbars>
                         <Flex direction="column" gap="xs">
-                          {appoinments
-                            .filter((appt) => appt.client._id === appointment.client._id)
+                          {dayAppointments
                             .map((appt, index) => {
                               const isCurrentAppointment = appt._id === appointment._id;
                               return (
@@ -2573,7 +2598,7 @@ ${clientServices}`;
                               );
                             })}
                         </Flex>
-                      </ScrollArea>
+                      </ScrollArea.Autosize>
                     </Box>
                   </Flex>
                 </Tabs.Panel>
@@ -2682,7 +2707,7 @@ ${clientServices}`;
                       </Button>
                     </Box>
 
-                    <Text fw={800} size="md">Resumen de facturación</Text>
+                    <Text fw={800} size="md">Resumen de facturación del día</Text>
                     <Table.ScrollContainer minWidth={520}>
                       <Table striped highlightOnHover withTableBorder withColumnBorders verticalSpacing="xs">
                         <Table.Thead>
@@ -2695,20 +2720,23 @@ ${clientServices}`;
                           </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
-                          {appoinments
-                            .filter((appt) => appt.client._id === appointment.client._id)
+                          {dayAppointments
                             .map((appt, index) => {
                               const additionalTotal =
                                 appt.additionalItems?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
                               const usedPrice = appt.customPrice ?? appt.totalPrice ?? 0;
-                              const total = usedPrice + additionalTotal;
+                              const cancelled = isCancelledStatus(appt.status);
+                              const total = billedTotal(appt);
                               return (
-                                <Table.Tr key={index}>
+                                <Table.Tr key={index} style={cancelled ? { opacity: 0.75 } : undefined}>
                                   <Table.Td>
                                     {appt.service ? (
                                       appt.service.name
                                     ) : (
                                       <Text c="red" fw={800} size="sm">Sin servicio</Text>
+                                    )}
+                                    {cancelled && (
+                                      <Badge color="red" size="xs" variant="light" mt={2}>Cancelada</Badge>
                                     )}
                                   </Table.Td>
                                   <Table.Td>
@@ -2722,6 +2750,11 @@ ${clientServices}`;
                                   <Table.Td>{formatCurrency(additionalTotal, organization?.currency || "COP")}</Table.Td>
                                   <Table.Td>
                                     <Text fw={800}>{formatCurrency(total, organization?.currency || "COP")}</Text>
+                                    {cancelled && (
+                                      <Text size="xs" c="dimmed">
+                                        {total > 0 ? "Abono retenido" : "No se cobra"}
+                                      </Text>
+                                    )}
                                   </Table.Td>
                                 </Table.Tr>
                               );
@@ -2736,17 +2769,10 @@ ${clientServices}`;
                       mt="xs"
                       style={{ background: "#e7f5ff", borderRadius: 12, padding: "12px 14px", border: "1px solid #a5d8ff" }}
                     >
-                      <Text fw={900} size="sm">Total general</Text>
+                      <Text fw={900} size="sm">Total del día</Text>
                       <Text fw={900} size="lg">
                         {formatCurrency(
-                          appoinments
-                            .filter((appt) => appt.client._id === appointment.client._id)
-                            .reduce((acc, appt) => {
-                              const additionalTotal =
-                                appt.additionalItems?.reduce((sum, item) => sum + (item.price || 0), 0) || 0;
-                              const total = (appt.customPrice ?? appt.totalPrice ?? 0) + additionalTotal;
-                              return acc + total;
-                            }, 0),
+                          dayAppointments.reduce((acc, appt) => acc + billedTotal(appt), 0),
                           organization?.currency || "COP",
                         )}
                       </Text>
