@@ -21,7 +21,9 @@ import {
   IconPlus,
   IconTrophy,
   IconLock,
+  IconCreditCard,
 } from "@tabler/icons-react";
+import LoyaltyCardDesigner from "../LoyaltyCardDesigner";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
@@ -251,6 +253,24 @@ export default function FidelityTab({
                   </Stack>
                 </Alert>
               )}
+            </Stack>
+
+            <Divider />
+
+            {/* Diseño de la tarjeta virtual */}
+            <Stack gap="xs">
+              <Group gap={6}>
+                <IconCreditCard size={14} color="var(--mantine-color-dimmed)" />
+                <Text fw={500} size="sm" c="dimmed">
+                  Tarjeta virtual de fidelidad
+                </Text>
+              </Group>
+              <Text size="xs" c="dimmed">
+                Cada cliente tiene un enlace personal a su tarjeta con un código QR. La puede guardar en
+                su teléfono y mostrarla al llegar; al escanear el QR con tu sesión iniciada puedes
+                registrar su servicio o referido. Envíala desde la ficha del cliente (Clientes).
+              </Text>
+              <LoyaltyCardDesigner form={form} disabled={!isEditing} />
             </Stack>
           </>
         )}

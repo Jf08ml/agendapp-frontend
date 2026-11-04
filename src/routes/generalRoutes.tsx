@@ -1,5 +1,6 @@
 import SearchClient from "../pages/loyalty/SearchClient";
 import PlanViewer from "../pages/loyalty/PlanViewer";
+import MyLoyaltyCard from "../pages/loyalty/MyLoyaltyCard";
 import ServicesAndPrices from "../components/ServicesAndPrices";
 import LoginAdmin from "../pages/admin/LoginAdmin";
 import ClientManagement from "../pages/admin/manageClients";
@@ -117,6 +118,14 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Buscar Cliente",
       description: "Búsqueda de cliente para el plan de fidelidad.",
+    },
+  },
+  {
+    path: "/mi-tarjeta/:token",
+    component: MyLoyaltyCard,
+    MediaMetadata: {
+      title: "Mi tarjeta de fidelidad",
+      description: "Tu tarjeta de fidelidad: servicios, referidos y premios.",
     },
   },
   {

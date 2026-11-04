@@ -16,7 +16,9 @@ export default async function middleware(request: Request) {
   const host = request.headers.get("host") || "";
   const forwardedFor = request.headers.get("x-forwarded-for") || "";
 
-  const upstream = await fetch("https://api.agenditapp.com/api/manifest.webmanifest", {
+  // Reenviar el query string (?start=/mi-tarjeta/<token> desde la tarjeta de fidelidad).
+  const search = new URL(request.url).search;
+  const upstream = await fetch(`https://api.agenditapp.com/api/manifest.webmanifest${search}`, {
     headers: {
       "X-Tenant-Domain": host,
       ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),

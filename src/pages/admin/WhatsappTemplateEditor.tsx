@@ -232,6 +232,7 @@ const templateInfo = {
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
     ],
   },
   loyaltyReferralReward: {
@@ -242,6 +243,7 @@ const templateInfo = {
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{reward}}", desc: "Descripción de la recompensa ganada" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
     ],
   },
   loyaltyServiceProgress: {
@@ -251,6 +253,7 @@ const templateInfo = {
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
       { name: "{{currentCount}}", desc: "Servicios acumulados hasta ahora" },
       { name: "{{remaining}}", desc: "Cuántos faltan para el próximo premio" },
       { name: "{{nextReward}}", desc: "Descripción del próximo premio" },
@@ -263,6 +266,7 @@ const templateInfo = {
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
       { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
       { name: "{{currentCount}}", desc: "Referidos acumulados hasta ahora" },
       { name: "{{remaining}}", desc: "Cuántos faltan para el próximo premio" },
       { name: "{{nextReward}}", desc: "Descripción del próximo premio" },

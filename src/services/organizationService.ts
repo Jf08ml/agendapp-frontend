@@ -1,5 +1,6 @@
 import { apiGeneral, apiOrganization } from "./axiosConfig";
 import { AxiosResponse } from "axios";
+import type { LoyaltyCardDesign } from "./loyaltyCardService";
 export interface Role {
   name: string;
   permissions: string[];
@@ -171,6 +172,7 @@ export interface Organization {
   serviceReward?: string;
   serviceTiers?: { threshold: number; reward: string }[];
   referralTiers?: { threshold: number; reward: string }[];
+  loyaltyCard?: LoyaltyCardDesign;
   openingHours?: OpeningHours;
   weeklySchedule?: WeeklySchedule;
   clientIdWhatsapp?: string | null;

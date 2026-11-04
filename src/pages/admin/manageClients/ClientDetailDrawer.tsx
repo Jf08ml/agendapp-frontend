@@ -58,6 +58,7 @@ import { formatCurrency } from "../../../utils/formatCurrency";
 import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 import { getLoyaltyProgress } from "./utils/loyaltyProgress";
 import { PendingFollowUpCard, ProcessedFollowUpCard } from "./FollowUpCards";
+import SendLoyaltyCardButton from "./SendLoyaltyCardButton";
 
 interface ClientDetailDrawerProps {
   opened: boolean;
@@ -483,6 +484,10 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                   Registrar referido
                 </Button>
               </SimpleGrid>
+
+              {organization?.showLoyaltyProgram !== false && (
+                <SendLoyaltyCardButton client={client} orgName={organization?.name} />
+              )}
 
               <Paper withBorder radius="md" p="md">
                 <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Información</Text>

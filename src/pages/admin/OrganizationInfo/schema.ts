@@ -138,6 +138,18 @@ export const schema = z.object({
   serviceTiers: z.array(z.object({ threshold: z.number().min(1), reward: z.string() })).optional(),
   referralTiers: z.array(z.object({ threshold: z.number().min(1), reward: z.string() })).optional(),
   showLoyaltyProgram: z.boolean().optional(),
+  loyaltyCard: z
+    .object({
+      template: z.enum(["classic", "gradient", "dark", "pastel", "minimal", "image"]).optional(),
+      primaryColor: z.string().nullable().optional(),
+      textColor: z.enum(["light", "dark"]).optional(),
+      title: z.string().max(40, "El título de la tarjeta admite máximo 40 caracteres").optional(),
+      message: z.string().max(140, "El mensaje de la tarjeta admite máximo 140 caracteres").optional(),
+      showLogo: z.boolean().optional(),
+      serviceBackgroundUrl: z.string().nullable().optional(),
+      referralBackgroundUrl: z.string().nullable().optional(),
+    })
+    .optional(),
   enableOnlineBooking: z.boolean().optional(),
   enableAiBooking: z.boolean().optional(),
   enableManualBooking: z.boolean().optional(),
