@@ -397,11 +397,11 @@ export default function SuperadminOrganizationEdit() {
       }
     } catch (e) {
       console.error(e);
-      const err = e as { response?: { data?: { message?: string } } };
+      const err = e as { message?: string; response?: { data?: { message?: string } } };
       notifications.show({
         title: "Error",
         message:
-          err.response?.data?.message || "No se pudo guardar la organización",
+          err.response?.data?.message || err.message || "No se pudo guardar la organización",
         color: "red",
       });
     } finally {

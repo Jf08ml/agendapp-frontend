@@ -237,8 +237,9 @@ export default function OrganizationInfo() {
       console.error(e);
       showNotification({
         title: "Error",
-        message: "No se pudo guardar",
+        message: e instanceof Error && e.message ? e.message : "No se pudo guardar",
         color: "red",
+        autoClose: 10000,
       });
     } finally {
       setSaving(false);
