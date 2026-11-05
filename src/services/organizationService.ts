@@ -1,6 +1,7 @@
 import { apiGeneral, apiOrganization } from "./axiosConfig";
 import { AxiosResponse } from "axios";
 import type { LoyaltyCardDesign } from "./loyaltyCardService";
+import { handleAxiosError } from "../utils/handleAxiosError";
 export interface Role {
   name: string;
   permissions: string[];
@@ -354,12 +355,15 @@ export const updateOrganization = async (
   organizationId: string,
   updatedData: Partial<Organization>
 ): Promise<Organization | null> => {
+  // Lanza con el mensaje del backend (p. ej. "Horario del domingo: la hora de fin…"):
+  // antes devolvía null y la pantalla solo mostraba "No se pudo guardar".
   try {
     const response: AxiosResponse<{ data: Organization }> =
       await apiOrganization.put(`/${organizationId}`, updatedData);
     return response.data.data;
   } catch (error) {
     console.error("Error al actualizar la organización:", error);
+    handleAxiosError(error, "No se pudo guardar");
     return null;
   }
 };
