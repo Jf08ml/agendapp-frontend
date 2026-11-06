@@ -212,6 +212,11 @@ export interface Organization {
   // Tienda pública de productos (flags públicos expuestos en organization-config)
   storeEnabled?: boolean;
   storeCodEnabled?: boolean;
+  // Modalidades de entrega / vías de pago de la tienda (default true)
+  storePickupEnabled?: boolean;
+  storeDeliveryEnabled?: boolean;
+  storeMpEnabled?: boolean;
+  storeTransferEnabled?: boolean;
   // Depósito para inscripción a clases (config propia, independiente de reservas).
   requireClassDeposit?: boolean;
   classDepositPercentage?: number;

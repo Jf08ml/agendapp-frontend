@@ -39,6 +39,8 @@ export interface StoreCatalogResult {
   mpConnected: boolean;
   paymentMethods?: ReceiptPaymentMethod[];
   codEnabled: boolean;
+  // Modalidades de entrega que ofrece el negocio (ausente = ambas, backend viejo)
+  deliveryModes?: { pickup: boolean; delivery: boolean };
   products: StoreProduct[];
 }
 

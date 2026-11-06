@@ -207,6 +207,7 @@ export default function PublicStorePage() {
   const [mpConnected, setMpConnected] = useState(false);
   const [receiptMethods, setReceiptMethods] = useState<ReceiptPaymentMethod[]>([]);
   const [codEnabled, setCodEnabled] = useState(false);
+  const [deliveryModes, setDeliveryModes] = useState({ pickup: true, delivery: true });
   const [products, setProducts] = useState<StoreProduct[]>([]);
 
   // ── Búsqueda y filtro por categoría (client-side) ──────────────────────────
@@ -276,6 +277,7 @@ export default function PublicStorePage() {
         setMpConnected(res.mpConnected);
         setReceiptMethods(res.paymentMethods || []);
         setCodEnabled(res.codEnabled);
+        setDeliveryModes(res.deliveryModes ?? { pickup: true, delivery: true });
         setProducts(res.products || []);
       }
       setLoading(false);
@@ -362,7 +364,7 @@ export default function PublicStorePage() {
     setEmailError(null);
     setFoundName(null);
     setFormError(null);
-    setDeliveryMode("pickup");
+    setDeliveryMode(deliveryModes.pickup ? "pickup" : "delivery");
     setAddress("");
     setDeliveryNotes("");
     setShowMap(false);
@@ -1296,6 +1298,7 @@ export default function PublicStorePage() {
             aria-label="Modalidad de entrega"
           >
             <Group grow gap="sm" align="stretch">
+              {deliveryModes.pickup && (
               <Radio.Card
                 value="pickup"
                 radius="md"
@@ -1316,6 +1319,8 @@ export default function PublicStorePage() {
                   </div>
                 </Stack>
               </Radio.Card>
+              )}
+              {deliveryModes.delivery && (
               <Radio.Card
                 value="delivery"
                 radius="md"
@@ -1336,6 +1341,7 @@ export default function PublicStorePage() {
                   </div>
                 </Stack>
               </Radio.Card>
+              )}
             </Group>
           </Radio.Group>
           {deliveryMode === "delivery" && (
@@ -1452,7 +1458,7 @@ export default function PublicStorePage() {
                         Contraentrega
                       </Text>
                       <Text size="xs" c="dimmed">
-                        Paga al recibir o recoger
+                        {deliveryMode === "delivery" ? "Paga al recibir tu pedido" : "Paga al recoger tu pedido"}
                       </Text>
                     </div>
                     <Radio.Indicator />

@@ -12,6 +12,7 @@ import {
   Badge,
   Tooltip,
   Switch,
+  Checkbox,
   Table,
   Skeleton,
   Center,
@@ -88,10 +89,22 @@ const InventoryPage: React.FC = () => {
   const [savingStoreConfig, setSavingStoreConfig] = useState(false);
   const storeEnabled = !!organization?.storeEnabled;
   const storeCodEnabled = organization?.storeCodEnabled !== false;
+  const storePickupEnabled = organization?.storePickupEnabled !== false;
+  const storeDeliveryEnabled = organization?.storeDeliveryEnabled !== false;
+  const mpConnected = !!organization?.mpCollect?.connected;
+  const hasTransferAccounts = (organization?.paymentMethods?.length ?? 0) > 0;
+  const storeMpOn = mpConnected && organization?.storeMpEnabled !== false;
+  const storeTransferOn = hasTransferAccounts && organization?.storeTransferEnabled !== false;
+  // Vías de pago que el cliente vería hoy (para no dejar la tienda sin ninguna)
+  const activePayCount = [storeMpOn, storeTransferOn, storeCodEnabled].filter(Boolean).length;
 
   const handleStoreConfigChange = async (patch: {
     storeEnabled?: boolean;
     storeCodEnabled?: boolean;
+    storePickupEnabled?: boolean;
+    storeDeliveryEnabled?: boolean;
+    storeMpEnabled?: boolean;
+    storeTransferEnabled?: boolean;
   }) => {
     if (!organization?._id) return;
     setSavingStoreConfig(true);
@@ -440,18 +453,6 @@ const InventoryPage: React.FC = () => {
                 }
               />
               {storeEnabled && (
-                <Switch
-                  label="Aceptar pago contra entrega"
-                  checked={storeCodEnabled}
-                  disabled={savingStoreConfig}
-                  onChange={(e) =>
-                    handleStoreConfigChange({
-                      storeCodEnabled: e.currentTarget.checked,
-                    })
-                  }
-                />
-              )}
-              {storeEnabled && (
                 <Button
                   variant="light"
                   size="xs"
@@ -470,6 +471,92 @@ const InventoryPage: React.FC = () => {
                   {clipboard.copied ? "Link copiado" : "Copiar link de la tienda"}
                 </Button>
               )}
+            </Group>
+          )}
+
+          {canManage && storeEnabled && (
+            <Group wrap="wrap" gap="xl" align="flex-start">
+              <Stack gap={6}>
+                <Text size="sm" fw={600}>
+                  Entrega
+                </Text>
+                <Tooltip
+                  label="Debe quedar al menos una modalidad de entrega"
+                  disabled={!(storePickupEnabled && !storeDeliveryEnabled)}
+                >
+                  <div>
+                    <Checkbox
+                      label="Retiro en el local"
+                      checked={storePickupEnabled}
+                      disabled={savingStoreConfig || (storePickupEnabled && !storeDeliveryEnabled)}
+                      onChange={(e) =>
+                        handleStoreConfigChange({ storePickupEnabled: e.currentTarget.checked })
+                      }
+                    />
+                  </div>
+                </Tooltip>
+                <Tooltip
+                  label="Debe quedar al menos una modalidad de entrega"
+                  disabled={!(storeDeliveryEnabled && !storePickupEnabled)}
+                >
+                  <div>
+                    <Checkbox
+                      label="Domicilio"
+                      checked={storeDeliveryEnabled}
+                      disabled={savingStoreConfig || (storeDeliveryEnabled && !storePickupEnabled)}
+                      onChange={(e) =>
+                        handleStoreConfigChange({ storeDeliveryEnabled: e.currentTarget.checked })
+                      }
+                    />
+                  </div>
+                </Tooltip>
+              </Stack>
+
+              <Stack gap={6}>
+                <Text size="sm" fw={600}>
+                  Pago
+                </Text>
+                {mpConnected && (
+                  <Checkbox
+                    label="Mercado Pago"
+                    checked={storeMpOn}
+                    disabled={savingStoreConfig || (storeMpOn && activePayCount === 1)}
+                    onChange={(e) =>
+                      handleStoreConfigChange({ storeMpEnabled: e.currentTarget.checked })
+                    }
+                  />
+                )}
+                <Checkbox
+                  label="Transferencia (con comprobante)"
+                  description={
+                    hasTransferAccounts
+                      ? undefined
+                      : "Agrega tus cuentas en Información del negocio → Pagos"
+                  }
+                  checked={storeTransferOn}
+                  disabled={
+                    savingStoreConfig ||
+                    !hasTransferAccounts ||
+                    (storeTransferOn && activePayCount === 1)
+                  }
+                  onChange={(e) =>
+                    handleStoreConfigChange({ storeTransferEnabled: e.currentTarget.checked })
+                  }
+                />
+                <Checkbox
+                  label="Contraentrega"
+                  checked={storeCodEnabled}
+                  disabled={savingStoreConfig || (storeCodEnabled && activePayCount === 1)}
+                  onChange={(e) =>
+                    handleStoreConfigChange({ storeCodEnabled: e.currentTarget.checked })
+                  }
+                />
+                {activePayCount === 1 && (
+                  <Text size="xs" c="dimmed">
+                    Debe quedar al menos una forma de pago activa.
+                  </Text>
+                )}
+              </Stack>
             </Group>
           )}
         </Stack>
