@@ -58,7 +58,8 @@ export interface MetaTemplateStatus {
 // {{reward}}→{{premio}}, {{count}}→{{cantidad_citas}},
 // {{currentCount}}→{{cantidad_actual}}, {{remaining}}→{{faltantes}}, {{nextReward}}→{{proximo_premio}},
 // {{cita_pal}}→{{cita_o_citas}}, {{agendada_pal}}→{{agendada_o_agendadas}},
-// {{recommendations}}→{{recomendaciones}}, {{previousDate}}→{{fecha_anterior}}
+// {{recommendations}}→{{recomendaciones}}, {{previousDate}}→{{fecha_anterior}},
+// {{cardUrl}}→{{enlace_tarjeta}}
 
 const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
   scheduleAppointmentBatch: {
@@ -206,6 +207,16 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "✅ ¡Hola, {{nombre_cliente}}!\n\nSe registró tu referido en *{{nombre_negocio}}*.\n\n📊 Llevas *{{cantidad_actual}}* — te faltan *{{faltantes}}* para tu próximo premio: *{{proximo_premio}}*.\n\n¡Gracias por recomendarnos! 🎁",
     footerText: "",
   },
+  // 💳 Enlace a la tarjeta de fidelidad (el cliente la pide desde la página pública)
+  loyaltyCardLink: {
+    name: "tarjeta_fidelidad",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Tu tarjeta de fidelidad",
+    bodyText:
+      "💳 ¡Hola, {{nombre_cliente}}!\n\nEsta es tu tarjeta de fidelidad de *{{nombre_negocio}}*:\n{{enlace_tarjeta}}\n\nMuéstrala cuando vengas para que registren tu servicio o tus referidos. Puedes guardarla en la pantalla de inicio de tu teléfono para tenerla a la mano.",
+    footerText: "",
+  },
   // 📚 Módulo de Clases
   classEnrollmentConfirmed: {
     name: "clase_confirmada",
@@ -322,6 +333,7 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   cantidad_actual: "3",
   faltantes: "2",
   proximo_premio: "Servicio gratuito",
+  enlace_tarjeta: "https://minegocio.agenditapp.com/mi-tarjeta/abc123",
   recomendaciones: "Evita mojar las pestañas las primeras 24h.",
   cantidad_citas: "2",
   cita_o_citas: "citas",

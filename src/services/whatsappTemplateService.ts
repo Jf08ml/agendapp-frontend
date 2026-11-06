@@ -22,6 +22,8 @@ export interface WhatsappTemplates {
   loyaltyReferralReward: WhatsappTemplate;
   loyaltyServiceProgress: WhatsappTemplate;
   loyaltyReferralProgress: WhatsappTemplate;
+  // 💳 Enlace a la tarjeta de fidelidad (a petición del cliente)
+  loyaltyCardLink: WhatsappTemplate;
   // 🔄 Aviso de reprogramación
   rescheduleAppointment: WhatsappTemplate;
   rescheduleAppointmentSeries: WhatsappTemplate;
@@ -62,6 +64,7 @@ export interface TemplatesResponse {
     loyaltyReferralReward: string;
     loyaltyServiceProgress: string;
     loyaltyReferralProgress: string;
+    loyaltyCardLink?: string;
     rescheduleAppointment?: string;
     rescheduleAppointmentSeries?: string;
     classEnrollmentConfirmed?: string;

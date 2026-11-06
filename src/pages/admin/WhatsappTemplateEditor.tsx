@@ -272,6 +272,16 @@ const templateInfo = {
       { name: "{{nextReward}}", desc: "Descripción del próximo premio" },
     ],
   },
+  loyaltyCardLink: {
+    title: "Enlace a la Tarjeta de Fidelidad",
+    shortTitle: "Tarjeta fidelidad",
+    description: "Mensaje enviado cuando el cliente pide su tarjeta virtual desde la página de fidelidad (siempre activo: solo se envía a petición del cliente)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
+    ],
+  },
   birthdayGreeting: {
     title: "Saludo de Cumpleaños",
     shortTitle: "Cumpleaños",
@@ -339,7 +349,7 @@ const SIDEBAR_GROUPS = [
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
   { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
   { label: "Tienda", keys: ["paymentReceived"] },
-  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress"] },
+  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress", "loyaltyCardLink"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
   { label: "Seguimiento", keys: ["followUpReminder"] },
   { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
@@ -363,6 +373,7 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   loyaltyReferralReward: "premio_referidos",
   loyaltyServiceProgress: "progreso_fidelidad",
   loyaltyReferralProgress: "progreso_referidos",
+  loyaltyCardLink: "tarjeta_fidelidad",
   birthdayGreeting: "cumpleanos_cliente",
   followUpReminder: "recordatorio_seguimiento",
   paymentReceived: "pago_recibido",
