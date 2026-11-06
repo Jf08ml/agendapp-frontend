@@ -36,11 +36,14 @@ export default function Header({ organization }: Props) {
   const navLinks = useMemo(
     () => [
       { label: "Nuestros Servicios", to: "/servicios-precios" },
+      ...(organization?.enableOnlineBooking !== false || organization?.enableClassBooking
+        ? [{ label: "Mis reservas", to: "/mis-reservas" }]
+        : []),
       ...(organization?.showLoyaltyProgram !== false
         ? [{ label: "Plan de fidelidad", to: "/search-client" }]
         : []),
     ],
-    [organization?.showLoyaltyProgram]
+    [organization?.showLoyaltyProgram, organization?.enableOnlineBooking, organization?.enableClassBooking]
   );
 
   const socials = useMemo(

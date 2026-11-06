@@ -282,6 +282,16 @@ const templateInfo = {
       { name: "{{cardUrl}}", desc: "Enlace a la tarjeta virtual de fidelidad del cliente" },
     ],
   },
+  myBookingsLink: {
+    title: "Enlace a Mis Reservas",
+    shortTitle: "Mis reservas",
+    description: "Mensaje enviado cuando el cliente pide consultar sus citas y clases desde la página «Mis reservas» (siempre activo: solo se envía a petición del cliente)",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{bookingsUrl}}", desc: "Enlace personal donde el cliente ve y cancela sus citas y clases" },
+    ],
+  },
   birthdayGreeting: {
     title: "Saludo de Cumpleaños",
     shortTitle: "Cumpleaños",
@@ -347,7 +357,7 @@ const SIDEBAR_GROUPS = [
   { label: "Recordatorios", keys: ["reminder", "secondReminder"] },
   { label: "Reservas", keys: ["statusReservationPending"] },
   { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
-  { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck"] },
+  { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck", "myBookingsLink"] },
   { label: "Tienda", keys: ["paymentReceived"] },
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress", "loyaltyCardLink"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
@@ -374,6 +384,7 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   loyaltyServiceProgress: "progreso_fidelidad",
   loyaltyReferralProgress: "progreso_referidos",
   loyaltyCardLink: "tarjeta_fidelidad",
+  myBookingsLink: "mis_reservas",
   birthdayGreeting: "cumpleanos_cliente",
   followUpReminder: "recordatorio_seguimiento",
   paymentReceived: "pago_recibido",

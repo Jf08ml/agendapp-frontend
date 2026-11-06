@@ -1,6 +1,8 @@
 import SearchClient from "../pages/loyalty/SearchClient";
 import PlanViewer from "../pages/loyalty/PlanViewer";
 import MyLoyaltyCard from "../pages/loyalty/MyLoyaltyCard";
+import MyBookingsRequest from "../pages/myBookings/MyBookingsRequest";
+import MyBookings from "../pages/myBookings/MyBookings";
 import ServicesAndPrices from "../components/ServicesAndPrices";
 import LoginAdmin from "../pages/admin/LoginAdmin";
 import ClientManagement from "../pages/admin/manageClients";
@@ -118,6 +120,22 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Buscar Cliente",
       description: "Búsqueda de cliente para el plan de fidelidad.",
+    },
+  },
+  {
+    path: "/mis-reservas",
+    component: MyBookingsRequest,
+    MediaMetadata: {
+      title: "Mis reservas",
+      description: "Consulta tus citas y clases.",
+    },
+  },
+  {
+    path: "/mis-reservas/:token",
+    component: MyBookings,
+    MediaMetadata: {
+      title: "Mis reservas",
+      description: "Tus próximas citas y clases.",
     },
   },
   {

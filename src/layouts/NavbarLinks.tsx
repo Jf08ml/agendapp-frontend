@@ -18,7 +18,7 @@ import { IoAnalytics } from "react-icons/io5";
 import { FaCrown } from "react-icons/fa";
 import { BsChatText } from "react-icons/bs";
 import { MdCampaign } from "react-icons/md";
-import { IconPackage, IconPackages, IconShieldCheck, IconSchool, IconSettings, IconBell, IconReceipt, IconTruckDelivery, IconBuildingStore } from "@tabler/icons-react";
+import { IconPackage, IconPackages, IconShieldCheck, IconSchool, IconSettings, IconBell, IconReceipt, IconTruckDelivery, IconBuildingStore, IconCalendarSearch } from "@tabler/icons-react";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -122,6 +122,12 @@ export default function NavbarLinks({ closeNavbar }: NavbarLinksProps) {
           to: "/reservar-clase",
           icon: <IconSchool size={18} />,
           canShow: organization?.enableClassBooking ?? false,
+        },
+        {
+          label: "Mis reservas",
+          to: "/mis-reservas",
+          icon: <IconCalendarSearch size={18} />,
+          canShow: (organization?.enableOnlineBooking ?? true) || !!organization?.enableClassBooking,
         },
         {
           label: "Comprar paquetes",

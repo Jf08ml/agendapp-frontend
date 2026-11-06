@@ -59,7 +59,7 @@ export interface MetaTemplateStatus {
 // {{currentCount}}→{{cantidad_actual}}, {{remaining}}→{{faltantes}}, {{nextReward}}→{{proximo_premio}},
 // {{cita_pal}}→{{cita_o_citas}}, {{agendada_pal}}→{{agendada_o_agendadas}},
 // {{recommendations}}→{{recomendaciones}}, {{previousDate}}→{{fecha_anterior}},
-// {{cardUrl}}→{{enlace_tarjeta}}
+// {{cardUrl}}→{{enlace_tarjeta}}, {{bookingsUrl}}→{{enlace_reservas}}
 
 const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
   scheduleAppointmentBatch: {
@@ -217,6 +217,16 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "💳 ¡Hola, {{nombre_cliente}}!\n\nEsta es tu tarjeta de fidelidad de *{{nombre_negocio}}*:\n{{enlace_tarjeta}}\n\nMuéstrala cuando vengas para que registren tu servicio o tus referidos. Puedes guardarla en la pantalla de inicio de tu teléfono para tenerla a la mano.",
     footerText: "",
   },
+  // 📅 Enlace a "Mis reservas" (el cliente lo pide desde /mis-reservas)
+  myBookingsLink: {
+    name: "mis_reservas",
+    category: "UTILITY",
+    language: "es",
+    headerText: "Tus reservas",
+    bodyText:
+      "📅 ¡Hola, {{nombre_cliente}}!\n\nAquí puedes ver tus citas y clases en *{{nombre_negocio}}*:\n{{enlace_reservas}}\n\nDesde ese enlace también puedes cancelar si lo necesitas. Guárdalo para consultarlo cuando quieras.",
+    footerText: "",
+  },
   // 📚 Módulo de Clases
   classEnrollmentConfirmed: {
     name: "clase_confirmada",
@@ -334,6 +344,7 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   faltantes: "2",
   proximo_premio: "Servicio gratuito",
   enlace_tarjeta: "https://minegocio.agenditapp.com/mi-tarjeta/abc123",
+  enlace_reservas: "https://minegocio.agenditapp.com/mis-reservas/abc123",
   recomendaciones: "Evita mojar las pestañas las primeras 24h.",
   cantidad_citas: "2",
   cita_o_citas: "citas",

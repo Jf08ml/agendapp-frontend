@@ -59,6 +59,7 @@ import { getCountryFlag, getCountryName } from "../../../utils/countryHelper";
 import { getLoyaltyProgress } from "./utils/loyaltyProgress";
 import { PendingFollowUpCard, ProcessedFollowUpCard } from "./FollowUpCards";
 import SendLoyaltyCardButton from "./SendLoyaltyCardButton";
+import SendBookingsLinkButton from "./SendBookingsLinkButton";
 
 interface ClientDetailDrawerProps {
   opened: boolean;
@@ -488,6 +489,8 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
               {organization?.showLoyaltyProgram !== false && (
                 <SendLoyaltyCardButton client={client} orgName={organization?.name} />
               )}
+
+              <SendBookingsLinkButton client={client} orgName={organization?.name} />
 
               <Paper withBorder radius="md" p="md">
                 <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Información</Text>

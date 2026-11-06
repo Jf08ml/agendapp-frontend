@@ -5,7 +5,7 @@ import { BiCalendar } from "react-icons/bi";
 import { FaIdeal } from "react-icons/fa";
 import { GiPriceTag } from "react-icons/gi";
 import { GrLocation } from "react-icons/gr";
-import { IconSchool, IconPackage, IconBuildingStore } from "@tabler/icons-react";
+import { IconSchool, IconPackage, IconBuildingStore, IconCalendarSearch } from "@tabler/icons-react";
 import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout, AcademyLandingLayout } from "./HomeLayouts";
 
 export default function Home() {
@@ -33,6 +33,12 @@ export default function Home() {
       icon: <IconSchool size={28} />,
       link: "/reservar-clase",
       show: organization?.enableClassBooking ?? false,
+    },
+    {
+      title: "Mis reservas",
+      icon: <IconCalendarSearch size={28} />,
+      link: "/mis-reservas",
+      show: (organization?.enableOnlineBooking ?? true) || !!organization?.enableClassBooking,
     },
     {
       title: "Comprar paquetes",
