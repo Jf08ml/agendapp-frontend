@@ -73,6 +73,7 @@ export type FollowUpOutcome =
   | 'skipped_already_returned'
   | 'skipped_no_phone'
   | 'skipped_superseded'
+  | 'skipped_no_whatsapp'
   | 'failed_max_retries';
 
 export interface FollowUpProcessedEntry {
@@ -82,6 +83,8 @@ export interface FollowUpProcessedEntry {
   startDate: string;
   outcome: FollowUpOutcome | null;
   processedAt: string | null;
+  // Ack real de WhatsApp/Meta (null = sin confirmación todavía, o histórico)
+  deliveryStatus: 'sent' | 'delivered' | 'failed' | null;
 }
 
 export interface ClientFollowUpStatus {

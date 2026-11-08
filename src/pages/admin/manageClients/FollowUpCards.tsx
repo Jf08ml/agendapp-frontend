@@ -20,8 +20,10 @@ const getFollowUpOutcomeBadge = (outcome: FollowUpOutcome | null) => {
       return { label: "No enviado — sin teléfono", color: "gray" };
     case "skipped_superseded":
       return { label: "No enviado — otra cita tuvo prioridad", color: "gray" };
+    case "skipped_no_whatsapp":
+      return { label: "No enviado — el número no tiene WhatsApp", color: "gray" };
     case "failed_max_retries":
-      return { label: "No enviado — sin confirmación tras varios intentos", color: "red" };
+      return { label: "No enviado — falló tras varios intentos", color: "red" };
     default:
       return { label: "Desconocido (histórico)", color: "gray" };
   }
@@ -115,6 +117,12 @@ export function ProcessedFollowUpCard({
               ? `Procesado el ${formatLongDate(entry.processedAt, timezone)}`
               : "Procesado antes de que se registrara la fecha"}
           </Text>
+          {entry.outcome === "sent" && entry.deliveryStatus === "delivered" && (
+            <Text size="xs" c="teal">✓✓ Entregado</Text>
+          )}
+          {entry.outcome === "sent" && entry.deliveryStatus === "failed" && (
+            <Text size="xs" c="red">WhatsApp no lo entregó — se reintentará</Text>
+          )}
         </Box>
         <Badge size="xs" color={badge.color} variant="filled">{badge.label}</Badge>
       </Group>
