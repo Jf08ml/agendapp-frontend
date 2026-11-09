@@ -46,6 +46,8 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
+import { detectSignupCountry, resolveSignupRegion } from "../../utils/signupRegion";
+import { getCountryData } from "../../utils/geoData";
 import { loadMetaPixel, registrationMetaEvent, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
 
 const signupSchema = z.object({
@@ -82,9 +84,10 @@ const BUSINESS_VERTICALS = [
   { value: "otro", label: "Otro" },
 ];
 
-// Por ahora el registro público solo opera en Colombia; cuando se abran campañas
-// para otros países se creará una página de signup dedicada por país.
-const COLOMBIA_REGION = { default_country: "CO", timezone: "America/Bogota", currency: "COP" } as const;
+// País/zona horaria/moneda se derivan del país del teléfono + la zona del
+// navegador (utils/signupRegion.ts). Antes estaba fijo en Colombia.
+const INITIAL_COUNTRY = detectSignupCountry();
+const INITIAL_REGION = resolveSignupRegion(INITIAL_COUNTRY);
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -214,9 +217,9 @@ export default function SignupPage() {
       email: "",
       password: "",
       phone: "",
-      default_country: COLOMBIA_REGION.default_country,
-      timezone: COLOMBIA_REGION.timezone,
-      currency: COLOMBIA_REGION.currency,
+      default_country: INITIAL_REGION.default_country,
+      timezone: INITIAL_REGION.timezone,
+      currency: INITIAL_REGION.currency,
       referralCode: "",
       businessVertical: "",
     },
@@ -675,11 +678,27 @@ export default function SignupPage() {
                             compact
                             placeholder="300 000 0000"
                             value={form.values.phone}
-                            defaultCountry={"CO" as CountryCode}
-                            onChange={(e164) => form.setFieldValue("phone", e164 || "")}
+                            defaultCountry={INITIAL_COUNTRY as CountryCode}
+                            onChange={(e164, phoneCountry) => {
+                              form.setFieldValue("phone", e164 || "");
+                              // El país del teléfono define la configuración regional del negocio
+                              if (phoneCountry && phoneCountry !== form.values.default_country) {
+                                const region = resolveSignupRegion(phoneCountry);
+                                form.setFieldValue("default_country", region.default_country);
+                                form.setFieldValue("timezone", region.timezone);
+                                form.setFieldValue("currency", region.currency);
+                              }
+                            }}
                             error={form.errors.phone as string | undefined}
                           />
                         </Box>
+                        {form.values.phone && form.values.default_country && (
+                          <Text mt={2} style={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
+                            {getCountryData(form.values.default_country)?.label ?? form.values.default_country}
+                            {" · "}{form.values.currency}{" · "}{form.values.timezone?.replace(/_/g, " ")}
+                            {" — puedes cambiarlo después"}
+                          </Text>
+                        )}
                       </Box>
                       <PasswordInput
                         label={<RLabel>Contraseña</RLabel>}
