@@ -6,6 +6,8 @@ const buildWelcomeMessage = (agentName: string): ChatMessage => ({
   content: `¡Hola! Soy **${agentName}**, tu asistente de AgenditApp. Estoy aquí para ayudarte a configurar tu negocio y responder tus preguntas. ¿Por dónde empezamos?`,
 });
 
+// El backend (chatService.js ONBOARDING_TRIGGER) lo reconoce por el texto exacto
+// para responder el primer mensaje fijo; si cambia aquí, cambiarlo allá.
 const ONBOARDING_TRIGGER = "Hola, quiero comenzar la configuración inicial de mi negocio.";
 
 interface UseChatbotOptions {
@@ -25,8 +27,16 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone, agentName
   const sendInternal = useCallback(async (text: string, isAuto = false) => {
     if (!text.trim() || loading) return;
 
-    const userMessage: ChatMessage = { role: "user", content: text.trim() };
-    setMessages((prev) => [...prev, userMessage]);
+    // El disparador del onboarding viaja al backend pero no se dibuja: no lo
+    // escribió el usuario. Y si lo único que hay es el saludo genérico (el panel
+    // está montado desde antes), se quita para que no quede "¿Por dónde empezamos?"
+    // encima del arranque del onboarding.
+    const userMessage: ChatMessage = { role: "user", content: text.trim(), ...(isAuto && { hidden: true }) };
+    setMessages((prev) => {
+      const base =
+        isAuto && prev.every((m) => m.role === "assistant") ? [] : prev;
+      return [...base, userMessage];
+    });
     setLoading(true);
     setError(null);
 
@@ -35,8 +45,8 @@ export const useChatbot = ({ onInvalidate, autoStart, onAutoStartDone, agentName
         setMessages((prev) => { resolve(prev); return prev; });
       });
       const toSend = current.filter((m) => m.role === "user" || m.role === "assistant");
-      const { reply, invalidates } = await sendMessage(toSend, sessionId.current);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      const { reply, invalidates, widgets } = await sendMessage(toSend, sessionId.current);
+      setMessages((prev) => [...prev, { role: "assistant", content: reply, widget: widgets[0] }]);
       if (invalidates.length > 0) onInvalidate?.(invalidates);
       if (isAuto) onAutoStartDone?.();
     } catch {

@@ -30,6 +30,7 @@ import {
 } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "./useChatbot";
+import ServicePickerWidget from "./ServicePickerWidget";
 import { sendFeedback, FeedbackType } from "./chatbotService";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -83,8 +84,17 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
     setTimeout(() => { setFeedbackSent(false); setFeedbackMessage(""); }, 300);
   };
 
+  // Respuesta nueva del asistente → mostrar su INICIO, no el final: con una
+  // respuesta larga o una tarjeta debajo (lista de servicios), bajar al fondo
+  // dejaba el texto del asistente fuera de la pantalla en el celular.
+  const lastAssistantRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const last = messages[messages.length - 1];
+    if (!loading && last?.role === "assistant" && lastAssistantRef.current) {
+      lastAssistantRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, loading]);
 
   const handleSend = () => {
@@ -102,6 +112,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
   };
 
   const showSuggestions = messages.length <= 1 && !loading && !autoStart;
+  const lastMessage = messages[messages.length - 1];
 
   return (
     <Flex direction="column" h="100%" style={{ background: "var(--mantine-color-gray-0)" }}>
@@ -265,7 +276,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
         <Box maw={720} mx="auto" px="md">
           <Stack gap="lg">
             {messages.map((msg, i) =>
-              msg.role === "user" ? (
+              msg.hidden ? null : msg.role === "user" ? (
                 /* Mensaje del usuario */
                 <Flex key={i} justify="flex-end">
                   <Paper
@@ -285,7 +296,13 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                 </Flex>
               ) : (
                 /* Mensaje del agente */
-                <Flex key={i} align="flex-start" gap="sm">
+                <Flex
+                  key={i}
+                  align="flex-start"
+                  gap="sm"
+                  ref={i === messages.length - 1 ? lastAssistantRef : undefined}
+                  style={{ scrollMarginTop: rem(12) }}
+                >
                   <ThemeIcon
                     size={34} radius="xl"
                     style={{ background: color, flexShrink: 0, marginTop: 2 }}
@@ -319,6 +336,21 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                   </Paper>
                 </Flex>
               )
+            )}
+
+            {/* Tarjeta interactiva del último mensaje (la decide el backend).
+                Desaparece en cuanto el usuario envía algo. */}
+            {!loading && lastMessage?.widget?.type === "service_picker" && (
+              <Box pl={{ base: 0, xs: 42 }}>
+                <ServicePickerWidget
+                  key={messages.length}
+                  suggestions={lastMessage.widget.suggestions}
+                  currency={lastMessage.widget.currency}
+                  color={color}
+                  disabled={loading}
+                  onSubmit={send}
+                />
+              </Box>
             )}
 
             {/* Typing indicator */}

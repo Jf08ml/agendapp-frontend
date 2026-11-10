@@ -333,7 +333,7 @@ export default function SetupWizard() {
   // Pantalla de elección
   if (mode === "choice") {
     return (
-      <Center h="100vh" bg="gray.0">
+      <Center mih="100vh" py="xl" bg="gray.0">
         <Stack align="center" gap="xl" maw={580} px="md">
           <Stack align="center" gap="xs">
             <ThemeIcon size={56} radius="xl" variant="light" color="blue">
@@ -391,7 +391,7 @@ export default function SetupWizard() {
             </Paper>
           )}
 
-          <SimpleGrid cols={2} spacing="md" w="100%">
+          <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md" w="100%">
             <Paper
               withBorder
               p="xl"
