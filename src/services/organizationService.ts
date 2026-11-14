@@ -252,6 +252,10 @@ export interface Organization {
   currency?: string;
   timeFormat?: '12h' | '24h';
   aiAssistantName?: string;
+  // Información del negocio para el asistente de reservas (web + WhatsApp)
+  aiAssistantInfo?: string;
+  // Horas que el bot de WhatsApp se calla con un cliente cuando el negocio le responde a mano
+  waHumanTakeoverHours?: number;
   clientFormConfig?: ClientFormConfig;
   storeFormConfig?: ClientFormConfig;
   // Sistema de membresías

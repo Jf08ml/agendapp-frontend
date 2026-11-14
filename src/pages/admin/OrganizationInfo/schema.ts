@@ -327,6 +327,8 @@ export const schema = z.object({
       z.undefined(),
     ])
     .optional(),
+  // Información del negocio que usa el asistente de reservas (web + WhatsApp)
+  aiAssistantInfo: z.string().max(4000, "Máximo 4000 caracteres").optional(),
 });
 
 export type FormValues = z.infer<typeof schema>;

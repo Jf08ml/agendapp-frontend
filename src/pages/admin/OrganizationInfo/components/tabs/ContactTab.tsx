@@ -220,7 +220,7 @@ export default function ContactTab({
 
       <SectionCard
         title="Asistente IA"
-        description="Personaliza el nombre del asistente inteligente que aparece en el panel de administración."
+        description="Personaliza el nombre del asistente inteligente y la información de tu negocio que usa para responder a tus clientes."
         icon={<IconRobot size={16} />}
       >
         <Stack gap="xs">
@@ -234,6 +234,21 @@ export default function ContactTab({
           />
           <Text size="xs" c="dimmed">
             Este nombre se mostrará en el botón del footer, en el encabezado del chat y en el mensaje de bienvenida del asistente.
+          </Text>
+          <Textarea
+            mt="sm"
+            label="Información del negocio para el asistente de reservas"
+            description="El asistente que atiende a tus clientes (reservas en línea y WhatsApp) responde con esto. Escribe lo que siempre te preguntan: cada cuánto es el retoque, contraindicaciones (embarazo, lactancia, medicamentos), cuidados después del servicio, promociones vigentes, zonas que atiendes, formas de pago… Lo que no esté aquí, el asistente se lo pasa a tu equipo."
+            placeholder={"Ej:\n- El retoque de cejas se hace entre 30 y 45 días después; está incluido en el precio.\n- No realizamos micropigmentación a embarazadas ni en lactancia.\n- Después de las cejas: no mojar ni maquillar la zona por 7 días.\n- Promoción de noviembre: 10% en limpieza facial los martes."}
+            autosize
+            minRows={5}
+            maxRows={14}
+            maxLength={4000}
+            {...form.getInputProps("aiAssistantInfo")}
+            disabled={!isEditing}
+          />
+          <Text size="xs" c="dimmed" ta="right">
+            {(form.values.aiAssistantInfo ?? "").length}/4000
           </Text>
         </Stack>
       </SectionCard>

@@ -9,6 +9,7 @@ import {
   Loader,
   PinInput,
   Radio,
+  Select,
   Stack,
   Switch,
   Text,
@@ -200,6 +201,33 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
       notifications.show({ color: "red", message: "Error al guardar. Intenta de nuevo." });
     } finally {
       setSavingBookingAgent(false);
+    }
+  }
+
+  // Cuánto se calla el asistente con un cliente cuando el negocio le responde a mano
+  const [takeoverHours, setTakeoverHours] = useState<string>(
+    String(organization?.waHumanTakeoverHours ?? 2)
+  );
+  const [savingTakeover, setSavingTakeover] = useState(false);
+
+  useEffect(() => {
+    setTakeoverHours(String(organization?.waHumanTakeoverHours ?? 2));
+  }, [organization?.waHumanTakeoverHours]);
+
+  async function handleTakeoverHoursChange(value: string | null) {
+    if (!value || value === takeoverHours) return;
+    const previous = takeoverHours;
+    setTakeoverHours(value);
+    setSavingTakeover(true);
+    try {
+      await updateOrganization(organizationId, { waHumanTakeoverHours: Number(value) });
+      await dispatch(fetchOrganizationConfig());
+      notifications.show({ color: "green", message: "Pausa del asistente actualizada." });
+    } catch {
+      setTakeoverHours(previous); // revertir
+      notifications.show({ color: "red", message: "Error al guardar. Intenta de nuevo." });
+    } finally {
+      setSavingTakeover(false);
     }
   }
 
@@ -459,6 +487,27 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
             disabled={savingBookingAgent}
             onChange={(e) => handleToggleBookingAgent(e.currentTarget.checked)}
           />
+
+          {bookingAgentEnabled && (
+            <Select
+              label="Cuando le respondes a un cliente desde tu WhatsApp"
+              description="El asistente deja de contestarle a ese cliente por este tiempo, para no interrumpir tu conversación. Cada respuesta tuya reinicia el tiempo."
+              data={[
+                { value: "0.5", label: "30 minutos" },
+                { value: "1", label: "1 hora" },
+                { value: "2", label: "2 horas (recomendado)" },
+                { value: "4", label: "4 horas" },
+                { value: "8", label: "8 horas" },
+                { value: "12", label: "12 horas" },
+                { value: "24", label: "24 horas" },
+              ]}
+              value={takeoverHours}
+              onChange={handleTakeoverHoursChange}
+              disabled={savingTakeover}
+              allowDeselect={false}
+              maw={360}
+            />
+          )}
 
           <Group justify="flex-end">
             <Button color="red" variant="subtle" size="sm" leftSection={<BiX size={16} />}

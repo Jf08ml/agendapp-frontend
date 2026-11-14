@@ -115,6 +115,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
   currency: response.currency ?? "COP",
   timeFormat: response.timeFormat ?? "12h",
   aiAssistantName: response.aiAssistantName ?? "Roxi",
+  aiAssistantInfo: response.aiAssistantInfo ?? "",
   reschedulePolicy: {
     enabled: response.reschedulePolicy?.enabled ?? false,
     maxReschedules: response.reschedulePolicy?.maxReschedules ?? 1,
