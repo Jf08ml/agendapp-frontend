@@ -18,6 +18,8 @@ import {
   Divider,
   UnstyledButton,
   Modal,
+  Image,
+  CloseButton,
   rem,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
@@ -31,6 +33,10 @@ import {
   IconHeart,
   IconNotes,
   IconMoodSmile,
+  IconPhoto,
+  IconMicrophone,
+  IconPlayerStopFilled,
+  IconX,
 } from "@tabler/icons-react";
 import ReactMarkdown from "react-markdown";
 import { useSelector } from "react-redux";
@@ -40,8 +46,21 @@ import {
   sendBookingFeedback,
   markBookingConverted,
   BookingChatMessage,
+  BookingChatAttachment,
   BookingPayload,
 } from "../../services/bookingChatService";
+import {
+  IMAGE_PREFIX,
+  VOICE_PREFIX,
+  VOICE_FAILED,
+  MAX_RECORDING_SECONDS,
+  prepareImage,
+  blobToBase64,
+  canRecordAudio,
+  useVoiceRecorder,
+  formatSeconds,
+  type PreparedImage,
+} from "./chatMedia";
 import { createMultipleReservations, createReservationCheckout } from "../../services/reservationService";
 import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
 import { useNavigate } from "react-router-dom";
@@ -81,6 +100,66 @@ Por ejemplo: *"Corte de cabello, mañana por la tarde, Juan Pérez, +57300123456
 
 ¡Con eso te agendo en un momento!`;
 };
+
+// Contenido de la burbuja del cliente: foto, nota de voz (con su transcripción)
+// o texto. Los prefijos son los que usa el backend en el historial.
+function UserBubbleContent({ msg }: { msg: BookingChatMessage }) {
+  if (msg.content === VOICE_PREFIX) {
+    return (
+      <Flex align="center" gap={6}>
+        <IconMicrophone size={15} color="white" />
+        <Text size="sm" c="white">Nota de voz</Text>
+        <Loader size="xs" color="white" type="dots" />
+      </Flex>
+    );
+  }
+  if (msg.content === VOICE_FAILED) {
+    return (
+      <Flex align="center" gap={6}>
+        <IconMicrophone size={15} color="white" />
+        <Text size="sm" c="white" fs="italic">Nota de voz (no se pudo escuchar)</Text>
+      </Flex>
+    );
+  }
+  if (msg.content.startsWith(VOICE_PREFIX)) {
+    return (
+      <Stack gap={2}>
+        <Flex align="center" gap={4} style={{ opacity: 0.85 }}>
+          <IconMicrophone size={12} color="white" />
+          <Text size="xs" c="white">Nota de voz</Text>
+        </Flex>
+        <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+          {msg.content.slice(VOICE_PREFIX.length).trim()}
+        </Text>
+      </Stack>
+    );
+  }
+  if (msg.content.startsWith(IMAGE_PREFIX)) {
+    const caption = msg.content.slice(IMAGE_PREFIX.length).trim();
+    return (
+      <Stack gap={6}>
+        {msg.imagePreview ? (
+          <Image src={msg.imagePreview} alt="Foto enviada" radius="md" maw={220} mah={260} fit="contain" />
+        ) : (
+          <Flex align="center" gap={6}>
+            <IconPhoto size={15} color="white" />
+            <Text size="sm" c="white">Foto</Text>
+          </Flex>
+        )}
+        {caption && (
+          <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+            {caption}
+          </Text>
+        )}
+      </Stack>
+    );
+  }
+  return (
+    <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+      {msg.content}
+    </Text>
+  );
+}
 
 const RATINGS: { value: 1|3|5; emoji: string; label: string }[] = [
   { value: 5, emoji: "😊", label: "¡Excelente!" },
@@ -149,10 +228,12 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return;
+  // Foto adjunta esperando a enviarse (con o sin texto)
+  const [attachedImage, setAttachedImage] = useState<PreparedImage | null>(null);
+  const [preparingImage, setPreparingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const userMsg: BookingChatMessage = { role: "user", content: text };
+  const submit = async (userMsg: BookingChatMessage, attachment?: BookingChatAttachment) => {
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
@@ -164,15 +245,73 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       const history = next.filter(
         (m) => !(m.role === "assistant" && m.content === greeting)
       );
-      const res = await sendBookingMessage(history, sessionId.current);
-      setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
+      const res = await sendBookingMessage(history, sessionId.current, attachment);
+      setMessages((prev) => {
+        // El backend devuelve cómo quedó el mensaje del cliente (ej. la
+        // transcripción de la nota de voz): se actualiza su burbuja.
+        const updated = res.userContent
+          ? prev.map((m) => (m === userMsg ? { ...m, content: res.userContent as string } : m))
+          : prev;
+        return [...updated, { role: "assistant", content: res.reply }];
+      });
       if (res.bookingPayload) setPendingPayload(res.bookingPayload);
     } catch {
+      // Sin respuesta, la nota de voz queda marcada como no enviada.
+      if (attachment?.type === "audio") {
+        setMessages((prev) => prev.map((m) => (m === userMsg ? { ...m, content: VOICE_FAILED } : m)));
+      }
       setError("Error de conexión. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
   };
+
+  const send = async (text: string) => {
+    if (loading) return;
+    if (attachedImage) {
+      const image = attachedImage;
+      setAttachedImage(null);
+      const caption = text.trim();
+      await submit(
+        { role: "user", content: `${IMAGE_PREFIX}${caption ? ` ${caption}` : ""}`, imagePreview: image.preview },
+        { type: "image", mimeType: image.mimeType, data: image.data }
+      );
+      return;
+    }
+    if (!text.trim()) return;
+    await submit({ role: "user", content: text });
+  };
+
+  const handlePickImage = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Solo puedes enviar fotos.");
+      return;
+    }
+    setPreparingImage(true);
+    setError(null);
+    try {
+      setAttachedImage(await prepareImage(file));
+      inputRef.current?.focus();
+    } catch {
+      setError("No pude abrir esa foto. Intenta con otra.");
+    } finally {
+      setPreparingImage(false);
+    }
+  };
+
+  const sendVoice = async (blob: Blob) => {
+    try {
+      const data = await blobToBase64(blob);
+      // Burbuja provisional hasta que vuelve la transcripción
+      await submit({ role: "user", content: VOICE_PREFIX }, { type: "audio", mimeType: blob.type, data });
+    } catch {
+      setError("No pude enviar la nota de voz. Intenta de nuevo.");
+    }
+  };
+
+  const recorder = useVoiceRecorder(sendVoice, setError);
+  const micAvailable = canRecordAudio();
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -488,9 +627,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                     wordBreak: "break-word",
                   }}
                 >
-                  <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
-                    {msg.content}
-                  </Text>
+                  <UserBubbleContent msg={msg} />
                 </Paper>
               </Flex>
             ) : (
@@ -626,43 +763,121 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         bg="white" px="md" pb="md" pt="sm"
         style={{ borderTop: "1px solid var(--mantine-color-gray-2)", flexShrink: 0 }}
       >
+        {attachedImage && (
+          <Flex align="flex-start" gap="xs" mb="xs">
+            <Box pos="relative">
+              <Image src={attachedImage.preview} alt="Foto adjunta" radius="md" w={64} h={64} fit="cover" />
+              <CloseButton
+                size="xs" radius="xl" variant="filled" color="dark"
+                aria-label="Quitar foto"
+                onClick={() => setAttachedImage(null)}
+                style={{ position: "absolute", top: -6, right: -6 }}
+              />
+            </Box>
+            <Text size="xs" c="dimmed" mt={4}>
+              Agrega un mensaje si quieres y toca enviar.
+            </Text>
+          </Flex>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(e) => {
+            handlePickImage(e.currentTarget.files?.[0]);
+            e.currentTarget.value = ""; // permite elegir la misma foto otra vez
+          }}
+        />
         <Paper
           radius="xl"
           style={{ border: `1.5px solid var(--mantine-color-gray-3)`, overflow: "hidden" }}
         >
-          <Flex align="flex-end" gap="xs" px="md" py="xs">
-            <Textarea
-              ref={inputRef}
-              flex={1}
-              placeholder="Escribe un mensaje… (Enter para enviar)"
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              onKeyDown={handleKeyDown}
-              disabled={loading || !!pendingPayload}
-              autosize
-              minRows={1}
-              maxRows={4}
-              variant="unstyled"
-              size="sm"
-              styles={{ input: { padding: "6px 0", fontSize: rem(14), resize: "none" } }}
-            />
-            <ActionIcon
-              onClick={() => send(input)}
-              disabled={!input.trim() || loading || !!pendingPayload}
-              radius="xl" size={34} mb={4}
-              aria-label="Enviar"
-              style={{
-                background: input.trim() && !loading && !pendingPayload
-                  ? color : "var(--mantine-color-gray-2)",
-                transition: "background 0.15s",
-                flexShrink: 0,
-              }}
-            >
-              <IconSend size={15}
-                color={input.trim() && !loading && !pendingPayload
-                  ? "white" : "var(--mantine-color-gray-5)"} />
-            </ActionIcon>
-          </Flex>
+          {recorder.recording ? (
+            <Flex align="center" gap="xs" px="md" py="xs">
+              <ActionIcon
+                variant="subtle" color="gray" radius="xl" size={34}
+                aria-label="Cancelar grabación"
+                onClick={recorder.cancel}
+              >
+                <IconX size={16} />
+              </ActionIcon>
+              <Box w={10} h={10} style={{ borderRadius: "50%", background: "var(--mantine-color-red-6)", flexShrink: 0 }} />
+              <Text size="sm" flex={1}>
+                Grabando {formatSeconds(recorder.seconds)}
+                <Text span size="xs" c="dimmed"> / {formatSeconds(MAX_RECORDING_SECONDS)}</Text>
+              </Text>
+              <ActionIcon
+                onClick={recorder.stop}
+                radius="xl" size={34}
+                aria-label="Enviar nota de voz"
+                style={{ background: color, flexShrink: 0 }}
+              >
+                <IconPlayerStopFilled size={15} color="white" />
+              </ActionIcon>
+            </Flex>
+          ) : (
+            <Flex align="flex-end" gap="xs" pl="xs" pr="md" py="xs">
+              <ActionIcon
+                variant="subtle" color="gray" radius="xl" size={34} mb={4}
+                aria-label="Enviar una foto"
+                loading={preparingImage}
+                disabled={loading || !!pendingPayload}
+                onClick={() => fileInputRef.current?.click()}
+                style={{ flexShrink: 0 }}
+              >
+                <IconPhoto size={18} />
+              </ActionIcon>
+              <Textarea
+                ref={inputRef}
+                flex={1}
+                placeholder={attachedImage ? "Mensaje (opcional)…" : "Escribe un mensaje… (Enter para enviar)"}
+                value={input}
+                onChange={(e) => setInput(e.currentTarget.value)}
+                onKeyDown={handleKeyDown}
+                disabled={loading || !!pendingPayload}
+                autosize
+                minRows={1}
+                maxRows={4}
+                variant="unstyled"
+                size="sm"
+                styles={{ input: { padding: "6px 0", fontSize: rem(14), resize: "none" } }}
+              />
+              {!input.trim() && !attachedImage && micAvailable ? (
+                <ActionIcon
+                  onClick={recorder.start}
+                  disabled={loading || !!pendingPayload}
+                  radius="xl" size={34} mb={4}
+                  aria-label="Grabar nota de voz"
+                  style={{
+                    background: !loading && !pendingPayload ? color : "var(--mantine-color-gray-2)",
+                    transition: "background 0.15s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconMicrophone size={16}
+                    color={!loading && !pendingPayload ? "white" : "var(--mantine-color-gray-5)"} />
+                </ActionIcon>
+              ) : (
+                <ActionIcon
+                  onClick={() => send(input)}
+                  disabled={(!input.trim() && !attachedImage) || loading || !!pendingPayload}
+                  radius="xl" size={34} mb={4}
+                  aria-label="Enviar"
+                  style={{
+                    background: (input.trim() || attachedImage) && !loading && !pendingPayload
+                      ? color : "var(--mantine-color-gray-2)",
+                    transition: "background 0.15s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconSend size={15}
+                    color={(input.trim() || attachedImage) && !loading && !pendingPayload
+                      ? "white" : "var(--mantine-color-gray-5)"} />
+                </ActionIcon>
+              )}
+            </Flex>
+          )}
         </Paper>
       </Box>
 

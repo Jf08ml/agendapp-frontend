@@ -26,11 +26,23 @@ export type BookingChatRole = "user" | "assistant";
 export interface BookingChatMessage {
   role: BookingChatRole;
   content: string;
+  // Solo UI: miniatura de la foto que adjuntó el cliente (no se envía al backend)
+  imagePreview?: string;
+}
+
+// Foto o nota de voz que acompaña al último mensaje (base64 sin el prefijo data:)
+export interface BookingChatAttachment {
+  type: "image" | "audio";
+  mimeType: string;
+  data: string;
 }
 
 export interface BookingChatResponse {
   reply: string;
   bookingPayload: BookingPayload | null;
+  // Texto con el que quedó el último mensaje del cliente en el historial
+  // (ej: "🎤 (nota de voz) <transcripción>"). Solo cuando hubo adjunto.
+  userContent: string | null;
 }
 
 export interface BookingPayload {
@@ -53,12 +65,18 @@ export interface BookingPayload {
 
 export const sendBookingMessage = async (
   messages: BookingChatMessage[],
-  sessionId?: string
+  sessionId?: string,
+  attachment?: BookingChatAttachment
 ): Promise<BookingChatResponse> => {
-  const { data } = await api.post("/", { messages, sessionId });
+  const { data } = await api.post("/", {
+    messages: messages.map(({ role, content }) => ({ role, content })),
+    sessionId,
+    ...(attachment ? { attachment } : {}),
+  });
   return {
     reply: data.data.reply,
     bookingPayload: data.data.bookingPayload ?? null,
+    userContent: data.data.userContent ?? null,
   };
 };
 
