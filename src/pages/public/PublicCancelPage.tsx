@@ -58,6 +58,15 @@ interface CancellationInfo {
   policyBlockedReason?: string; // Para reservaciones
 }
 
+// La política de cancelación (horas mínimas, "ya confirmada") solo limita CANCELAR.
+// Confirmar asistencia es válido para cualquier cita futura no cancelada: los
+// recordatorios suelen llegar dentro de la ventana de la política, así que usar el
+// criterio de cancelación para confirmar dejaba los grupos sin nada seleccionable.
+const isCancellable = (apt: AppointmentInfo) =>
+  !apt.isCancelled && !apt.isPast && !apt.policyBlocked;
+const isConfirmable = (apt: AppointmentInfo) =>
+  !apt.isCancelled && !apt.isPast && !apt.clientConfirmed;
+
 export const PublicCancelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -103,7 +112,7 @@ export const PublicCancelPage: React.FC = () => {
         // Pre-seleccionar citas que se pueden cancelar (no canceladas, futuras y no bloqueadas por política)
         if (response.data.appointments) {
           const cancellableIds = response.data.appointments
-            .filter((apt: AppointmentInfo) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked)
+            .filter(isCancellable)
             .map((apt: AppointmentInfo) => apt.id);
           setSelectedAppointments(cancellableIds);
         }
@@ -145,13 +154,30 @@ export const PublicCancelPage: React.FC = () => {
     loadCancellationInfo();
   }, [token, loadCancellationInfo]);
 
+  const selectableFor = (a: "cancel" | "confirm" | null) =>
+    a === "confirm" ? isConfirmable : isCancellable;
+
+  // Cambia de acción ajustando la selección a lo que esa acción permite:
+  // conserva lo que el cliente ya marcó si sigue siendo válido; si no queda
+  // nada, preselecciona todas las citas elegibles para la nueva acción.
+  const switchAction = (next: "cancel" | "confirm" | null) => {
+    const eligible = (info?.appointments || [])
+      .filter(selectableFor(next))
+      .map((apt) => apt.id);
+    setSelectedAppointments((prev) => {
+      const kept = prev.filter((id) => eligible.includes(id));
+      return kept.length ? kept : eligible;
+    });
+    setAction(next);
+    setError(null);
+  };
+
   const handleCancel = async () => {
     if (!token) return;
 
     // Si no se ha seleccionado acción, solo establecer la acción
     if (action !== "cancel") {
-      setAction("cancel");
-      setError(null);
+      switchAction("cancel");
       return;
     }
 
@@ -189,8 +215,7 @@ export const PublicCancelPage: React.FC = () => {
 
     // Si no se ha seleccionado acción, solo establecer la acción
     if (action !== "confirm") {
-      setAction("confirm");
-      setError(null);
+      switchAction("confirm");
       return;
     }
 
@@ -333,15 +358,18 @@ export const PublicCancelPage: React.FC = () => {
     );
   };
 
+  const isSelectable = selectableFor(action);
+  const selectableCount = (info?.appointments || []).filter(isSelectable).length;
+
   const toggleAll = () => {
-    const cancellableIds = (info?.appointments || [])
-      .filter((apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked)
+    const selectableIds = (info?.appointments || [])
+      .filter(isSelectable)
       .map((apt) => apt.id);
 
-    if (selectedAppointments.length === cancellableIds.length) {
+    if (selectedAppointments.length === selectableIds.length) {
       setSelectedAppointments([]);
     } else {
-      setSelectedAppointments(cancellableIds);
+      setSelectedAppointments(selectableIds);
     }
   };
 
@@ -386,10 +414,7 @@ export const PublicCancelPage: React.FC = () => {
               <Group justify="space-between">
                 <Text fw={600}>Selecciona las citas:</Text>
                 <Button size="xs" variant="subtle" onClick={toggleAll}>
-                  {selectedAppointments.length ===
-                  info.appointments.filter(
-                    (apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked
-                  ).length
+                  {selectedAppointments.length === selectableCount
                     ? "Deseleccionar todas"
                     : "Seleccionar todas"}
                 </Button>
@@ -397,7 +422,9 @@ export const PublicCancelPage: React.FC = () => {
 
               <Stack gap="xs">
                 {info.appointments.map((apt) => {
-                  const isDisabled = apt.isCancelled || apt.isPast || apt.policyBlocked;
+                  const isDisabled = !isSelectable(apt);
+                  // En modo confirmar la restricción de política no aplica; no mostrarla
+                  const showPolicyBlock = apt.policyBlocked && action !== "confirm";
                   return (
                     <Card
                       key={apt.id}
@@ -442,7 +469,7 @@ export const PublicCancelPage: React.FC = () => {
                                 info?.timeFormat === "24h" ? "HH:mm" : "h:mm A"
                               )}
                             </Text>
-                            {apt.policyBlocked && apt.policyBlockedReason && (
+                            {showPolicyBlock && apt.policyBlockedReason && (
                               <Text size="xs" c="orange" fw={500}>
                                 {apt.policyBlockedReason}
                               </Text>
@@ -465,7 +492,7 @@ export const PublicCancelPage: React.FC = () => {
                               Pasada
                             </Badge>
                           )}
-                          {apt.policyBlocked && !apt.isCancelled && !apt.isPast && (
+                          {showPolicyBlock && !apt.isCancelled && !apt.isPast && (
                             <Badge color="orange" size="sm">
                               No cancelable
                             </Badge>
@@ -589,9 +616,7 @@ export const PublicCancelPage: React.FC = () => {
 
                 {/* Botón de cancelar - deshabilitado si no hay citas cancelables */}
                 {(() => {
-                  const cancellableCount = (info?.appointments || []).filter(
-                    (apt) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked
-                  ).length;
+                  const cancellableCount = (info?.appointments || []).filter(isCancellable).length;
                   const isDisabled = cancellableCount === 0 || info?.policyBlocked;
 
                   return (
@@ -671,10 +696,7 @@ export const PublicCancelPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="md"
-                onClick={() => {
-                  setAction(null);
-                  setError(null);
-                }}
+                onClick={() => switchAction(null)}
                 disabled={cancelling || confirming}
                 fullWidth={isMobile}
               >
