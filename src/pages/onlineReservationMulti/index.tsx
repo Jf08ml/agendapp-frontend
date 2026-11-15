@@ -38,11 +38,14 @@ import {
   Badge,
   Divider,
   Center,
+  Alert,
 } from "@mantine/core";
+import { IconAlertCircle } from "@tabler/icons-react";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   createMultipleReservations,
   createReservationCheckout,
+  isSlotTakenError,
   type CreateMultipleReservationsPayload,
   type Reservation,
 } from "../../services/reservationService";
@@ -111,6 +114,8 @@ export default function MultiBookingWizard() {
   // Paso 2: fecha + horario
   const [dates, setDates] = useState<ServiceWithDate[]>([]);
   const [times, setTimes] = useState<MultiServiceBlockSelection | null>(null);
+  // Error al confirmar (p. ej. el horario se ocupó segundos antes: SLOT_TAKEN)
+  const [submitError, setSubmitError] = useState<{ message: string; slotTaken: boolean } | null>(null);
   // Paso 3: datos cliente + resumen
   const [customerDetails, setCustomerDetails] = useState({
     name: "",
@@ -190,6 +195,11 @@ export default function MultiBookingWizard() {
     setRecurrencePattern({ type: 'none', intervalWeeks: 1, weekdays: [], endType: 'count', count: 1 });
     setSeriesPreview(null);
   }, [selected]);
+
+  // Al elegir un horario nuevo, el aviso de "horario ocupado" ya no aplica
+  useEffect(() => {
+    if (times) setSubmitError((e) => (e?.slotTaken ? null : e));
+  }, [times]);
 
   useEffect(() => {
     setTimes(null);
@@ -280,6 +290,7 @@ export default function MultiBookingWizard() {
     if (completed || submitting) return; // evita doble envío post-finish
     try {
       setSubmitting(true);
+      setSubmitError(null);
 
       if (!hasCustomerData) {
         setCurrentStep(2);
@@ -379,6 +390,19 @@ export default function MultiBookingWizard() {
 
       setCompleted(true);
       setCurrentStep(3); // Paso “Finish”
+    } catch (err) {
+      if (isSlotTakenError(err)) {
+        // Otra persona tomó el horario segundos antes: volver a elegir hora
+        // (al montar, el paso de horarios recarga la disponibilidad).
+        setTimes(null);
+        setCurrentStep(1);
+        setSubmitError({ message: (err as Error).message, slotTaken: true });
+      } else {
+        setSubmitError({
+          message: (err as Error)?.message || "No se pudo crear la reserva. Intenta de nuevo.",
+          slotTaken: false,
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -658,6 +682,17 @@ export default function MultiBookingWizard() {
         {/* ======= STEP CONTENT ======= */}
         {currentStep < FINISH_STEP ? (
           <Stack gap={isMobile ? "md" : "xl"}>
+            {submitError && (
+              <Alert
+                color={submitError.slotTaken ? "orange" : "red"}
+                variant="light"
+                icon={<IconAlertCircle size={18} />}
+                withCloseButton
+                onClose={() => setSubmitError(null)}
+              >
+                {submitError.message}
+              </Alert>
+            )}
             {renderStepContent(currentStep)}
           </Stack>
         ) : (

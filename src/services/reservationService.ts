@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import axios from "axios";
 import { apiReservation } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
 import { Service } from "./serviceService";
@@ -216,9 +217,22 @@ export const createMultipleReservations = async (
     }
     return response.data.data;
   } catch (error) {
+    // 409 SLOT_TAKEN: el horario se ocupó al confirmar (otra persona reservó segundos antes)
+    if (axios.isAxiosError(error) && error.response?.data?.data?.code === SLOT_TAKEN_CODE) {
+      const slotErr = new Error(
+        error.response.data.message || "Ese horario se acaba de ocupar. Elige otro horario."
+      ) as Error & { code?: string };
+      slotErr.code = SLOT_TAKEN_CODE;
+      throw slotErr;
+    }
     handleAxiosError(error, "Error al crear reservas múltiples");
   }
 };
+
+export const SLOT_TAKEN_CODE = "SLOT_TAKEN";
+
+export const isSlotTakenError = (err: unknown): boolean =>
+  (err as { code?: string } | null)?.code === SLOT_TAKEN_CODE;
 
 // Obtener una reserva por ID
 export const getReservationById = async (
