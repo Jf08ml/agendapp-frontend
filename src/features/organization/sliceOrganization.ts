@@ -84,10 +84,16 @@ export const fetchOrganizationConfig = createAsyncThunk(
       return organization;
     } catch (error) {
       console.error("Error fetching organization by domain:", error);
-      return rejectWithValue("Error al cargar la organización por dominio");
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      return rejectWithValue(status === 404 ? ORG_CONFIG_NOT_FOUND : ORG_CONFIG_LOAD_FAILED);
     }
   }
 );
+
+// Valores de `state.organization.error` cuando falla la carga por dominio
+// (App.tsx muestra un mensaje con reintento en vez del loader infinito).
+export const ORG_CONFIG_NOT_FOUND = "org_config_not_found";
+export const ORG_CONFIG_LOAD_FAILED = "org_config_load_failed";
 
 export const updateReservationPolicy = createAsyncThunk(
   "organization/updateReservationPolicy",

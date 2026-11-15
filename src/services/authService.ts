@@ -1,5 +1,5 @@
 import { apiAuth, apiGeneral } from "./axiosConfig";
-import { AxiosResponse } from "axios";
+import { AxiosError, AxiosResponse } from "axios";
 
 // Definir el tipo de respuesta para el inicio de sesión
 interface LoginResponse {
@@ -37,8 +37,12 @@ export const login = async (
     );
     return response.data.data;
   } catch (error) {
+    // null = credenciales incorrectas (401). Cualquier otro fallo (red, 429 del
+    // rate limiter, 5xx) se propaga para que la pantalla no diga "credenciales
+    // incorrectas" cuando el problema es otro.
+    if ((error as AxiosError)?.response?.status === 401) return null;
     console.error("Error al iniciar sesión:", error);
-    return null;
+    throw error;
   }
 };
 

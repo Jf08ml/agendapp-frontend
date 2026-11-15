@@ -37,6 +37,7 @@ import CampaignDetail from "../pages/admin/campaigns/CampaignDetail";
 import ManagePackages from "../pages/admin/managePackages";
 import SignupPage from "../pages/public/SignupPage";
 import ExchangePage from "../pages/public/ExchangePage";
+import IngresarPage from "../pages/public/IngresarPage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
@@ -452,6 +453,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Accediendo",
       description: "Configurando tu cuenta",
+    },
+  },
+  // Botón "Ir a mi panel" del WhatsApp de bienvenida → login del subdominio
+  {
+    path: "/ingresar/:slug",
+    component: IngresarPage,
+    MediaMetadata: {
+      title: "Ingresar",
+      description: "Entrar al panel de tu negocio",
     },
   },
   {

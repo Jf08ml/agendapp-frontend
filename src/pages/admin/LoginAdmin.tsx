@@ -16,6 +16,8 @@ import { IoEye, IoEyeOff } from "react-icons/io5";
 import { useMediaQuery } from "@mantine/hooks";
 import { RootState } from "../../app/store";
 import colors from "../../theme/colores";
+import { extractTenantFromHost } from "../../utils/domainUtils";
+import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage } from "../../utils/panelAccess";
 
 const isColorDark = (hexColor: string): boolean => {
   // Calcula el brillo promedio del color (0-255)
@@ -92,15 +94,42 @@ const LoginAdmin: React.FC = () => {
           localStorage.removeItem("rememberedEmail");
         }
       } else {
-        setError("Credenciales incorrectas");
+        setError("Correo o contraseña incorrectos.");
       }
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
-      setError("Error al iniciar sesión. Intenta nuevamente.");
+      setError(loginFailureMessage((error as { response?: { status?: number } })?.response?.status));
     } finally {
       setIsLoading(false);
     }
   };
+
+  // En app.agenditapp.com no hay negocio cargado y el login del dueño necesita
+  // su organización: el formulario solo podía fallar con "No se ha cargado la
+  // organización". Explicar dónde se entra.
+  if (extractTenantFromHost().type === "signup") {
+    return (
+      <Flex justify="center" align="center" style={{ height: "100%" }}>
+        <Card withBorder shadow="md" radius="md" p="xl" style={{ width: isMobile ? "90%" : 440, margin: "auto" }}>
+          <Text size="xl" fw={700} mb="sm">
+            Entra desde el enlace de tu negocio
+          </Text>
+          <Text size="sm" mb="sm">
+            Cada negocio tiene su propio enlace, por ejemplo{" "}
+            <Text span fw={700}>tunegocio.agenditapp.com/login-admin</Text>. Ahí inicias sesión con tu
+            correo y tu contraseña.
+          </Text>
+          <Text size="sm" c="dimmed" mb="lg">
+            Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes,
+            escríbenos y te ayudamos a entrar.
+          </Text>
+          <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth>
+            Escribir a soporte por WhatsApp
+          </Button>
+        </Card>
+      </Flex>
+    );
+  }
 
   return (
     <Flex justify="center" align="center" style={{ height: "100%" }}>
