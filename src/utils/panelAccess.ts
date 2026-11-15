@@ -29,7 +29,11 @@ export function panelLoginUrl(slug: string): string {
  * En local mantiene el tenant con ?slug=. null si el slug no es válido.
  */
 export function ingresarTarget(rawSlug: string | null | undefined, hostname: string): string | null {
-  const slug = normalizeSlug(rawSlug);
+  // La primera versión de la plantilla `cuenta_creada` tenía "{{1}}" literal en
+  // la URL base del botón, así que esos WhatsApp llegaron como
+  // /ingresar/%7B%7B1%7D%7D<slug>. Se quita ese prefijo para que sigan sirviendo.
+  const cleaned = String(rawSlug ?? "").replace(/^(?:\{\{1\}\}|%7B%7B1%7D%7D)+/i, "");
+  const slug = normalizeSlug(cleaned);
   if (!slug) return null;
   if (hostname === "localhost" || hostname === "127.0.0.1") {
     return `/login-admin?slug=${slug}`;

@@ -14,6 +14,12 @@ test("/ingresar/:slug lleva al login del negocio", () => {
   assert.equal(ingresarTarget("  MiBarberia ", "app.agenditapp.com"), "https://mibarberia.agenditapp.com/login-admin");
 });
 
+test("/ingresar/:slug tolera el {{1}} literal de la primera plantilla cuenta_creada", () => {
+  assert.equal(ingresarTarget("{{1}}alejanails", "app.agenditapp.com"), "https://alejanails.agenditapp.com/login-admin");
+  assert.equal(ingresarTarget("%7B%7B1%7D%7Dalejanails", "app.agenditapp.com"), "https://alejanails.agenditapp.com/login-admin");
+  assert.equal(ingresarTarget("{{1}}", "app.agenditapp.com"), null);
+});
+
 test("/ingresar/:slug en local conserva el tenant con ?slug=", () => {
   assert.equal(ingresarTarget("mibarberia", "localhost"), "/login-admin?slug=mibarberia");
 });
