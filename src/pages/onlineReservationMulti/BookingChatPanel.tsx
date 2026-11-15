@@ -61,7 +61,7 @@ import {
   formatSeconds,
   type PreparedImage,
 } from "./chatMedia";
-import { createMultipleReservations, createReservationCheckout } from "../../services/reservationService";
+import { createMultipleReservations, createReservationCheckout, isSlotTakenError } from "../../services/reservationService";
 import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
 import { useNavigate } from "react-router-dom";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
@@ -382,6 +382,16 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       setReservationDone(true);
       setPendingPayload(null);
     } catch (err: any) {
+      if (isSlotTakenError(err)) {
+        // Otra persona tomó el horario segundos antes: cerrar la tarjeta y seguir en el chat
+        setPendingPayload(null);
+        setReservationError(null);
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: "Ese horario se acaba de ocupar: otra persona lo reservó hace un momento. ¿Quieres que te busque otro horario?",
+        }]);
+        return;
+      }
       setReservationError(
         err?.response?.data?.message || err?.message || "No se pudo crear la reserva. Intenta de nuevo."
       );
