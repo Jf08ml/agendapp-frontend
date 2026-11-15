@@ -29,7 +29,13 @@ import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
 import { loginSuccess } from "./features/auth/sliceAuth";
-import { clearOrganization, fetchOrganizationConfig } from "./features/organization/sliceOrganization";
+import {
+  clearOrganization,
+  fetchOrganizationConfig,
+  ORG_CONFIG_LOAD_FAILED,
+  ORG_CONFIG_NOT_FOUND,
+} from "./features/organization/sliceOrganization";
+import OrgLoadError from "./components/OrgLoadError";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
 import WhatsNewModal from "./components/WhatsNewModal";
@@ -60,6 +66,8 @@ function AppContent() {
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
+  const orgLoading = useSelector((state: RootState) => state.organization.loading);
+  const orgError = useSelector((state: RootState) => state.organization.error);
   const [opened, { toggle, close }] = useDisclosure(false);
   const [chatOpen, { open: openChat, toggle: toggleChat, close: closeChat }] = useDisclosure(false);
   // const isMobile = useMediaQuery("(max-width: 768px)");
@@ -219,6 +227,16 @@ function AppContent() {
 
   // Loader mientras carga la organización/branding (no aplica para signup domain, superadmin ni rutas /superadmin*)
   if (!isSignupDomain && !isSuperadmin && !isSuperadminPath && !isSignupPath && !isReservationPaymentPath && !organization) {
+    // Si la carga por dominio falló, mostrar el motivo con reintento en vez del
+    // loader infinito.
+    if (!orgLoading && (orgError === ORG_CONFIG_NOT_FOUND || orgError === ORG_CONFIG_LOAD_FAILED)) {
+      return (
+        <OrgLoadError
+          notFound={orgError === ORG_CONFIG_NOT_FOUND}
+          onRetry={() => dispatch(fetchOrganizationConfig())}
+        />
+      );
+    }
     return <CustomLoaderHtml loadingText="Cargando organización..." />;
   }
 

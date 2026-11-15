@@ -46,6 +46,7 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
+import { AGENDITAPP_SUPPORT_WA_URL, panelLoginUrl } from "../../utils/panelAccess";
 import { detectSignupCountry, resolveSignupRegion } from "../../utils/signupRegion";
 import { getCountryData } from "../../utils/geoData";
 import { loadMetaPixel, registrationMetaEvent, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
@@ -189,8 +190,9 @@ export default function SignupPage() {
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [successInfo, setSuccessInfo] = useState<{ displayUrl: string; redirectUrl: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [emailTaken, setEmailTaken] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<{ displayUrl: string; redirectUrl: string; email: string } | null>(null);
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
   const [countdown, setCountdown] = useState(10);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -332,6 +334,7 @@ export default function SignupPage() {
 
   const handleSubmit = async (values: SignupFormValues) => {
     setError(null);
+    setEmailTaken(false);
     setIsSubmitting(true);
     try {
       let token = turnstileToken;
@@ -366,11 +369,20 @@ export default function SignupPage() {
       // Evento 3 "Registro Completado" — solo tras la confirmación del backend
       trackRegistroCompletado(metaEvent.event_id);
       const redirectUrl = getPostSignupRedirectUrl(values.slug.toLowerCase(), result.exchangeCode);
-      const displayUrl = `https://${values.slug.toLowerCase()}.agenditapp.com`;
-      setSuccessInfo({ displayUrl, redirectUrl });
+      // La raíz del subdominio es la página pública de reservas: el enlace que
+      // se guarda para volver a entrar es el del login.
+      const displayUrl = panelLoginUrl(values.slug.toLowerCase());
+      setSuccessInfo({ displayUrl, redirectUrl, email: values.email.trim().toLowerCase() });
       setIsSubmitting(false);
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string; data?: { reason?: string } } } };
+      if (axiosErr.response?.status === 409 && axiosErr.response.data?.data?.reason === "email_taken") {
+        // La cuenta ya existe (a menudo: se registró, salió del navegador de
+        // Instagram/Facebook y volvió a intentarlo). Explicar cómo entrar.
+        setEmailTaken(true);
+        setIsSubmitting(false); turnstileRef.current?.reset?.(); setTurnstileToken("");
+        return;
+      }
       setError(axiosErr.response?.data?.message || "Error al crear la cuenta. Intenta de nuevo.");
       setIsSubmitting(false); turnstileRef.current?.reset?.(); setTurnstileToken("");
     }
@@ -531,8 +543,9 @@ export default function SignupPage() {
                 <Box>
                   <Title order={3} style={{ color: "#FFFFFF", marginBottom: 8 }}>¡Tu cuenta fue creada!</Title>
                   <Text size="sm" style={{ color: "rgba(255,255,255,0.55)", maxWidth: 380, margin: "0 auto", lineHeight: 1.6 }}>
-                    Este es tu <strong style={{ color: "rgba(255,255,255,0.85)" }}>enlace permanente</strong> para acceder a tu panel.
-                    Guárdalo o agrégalo a tus favoritos — siempre entrarás desde aquí.
+                    Este es el <strong style={{ color: "rgba(255,255,255,0.85)" }}>enlace de tu panel</strong>. Para volver a entrar,
+                    ábrelo e inicia sesión con <strong style={{ color: "rgba(255,255,255,0.85)" }}>{successInfo.email}</strong> y
+                    la contraseña que acabas de crear. También te lo enviamos a tu correo y a tu WhatsApp.
                   </Text>
                 </Box>
 
@@ -557,32 +570,43 @@ export default function SignupPage() {
                         style={{
                           color: "#93C5FD",
                           fontSize: 14,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          wordBreak: "break-all",
+                          textAlign: "left",
+                          userSelect: "text",
                         }}
                       >
                         {successInfo.displayUrl}
                       </Text>
                     </Group>
                     <ActionIcon
-                      variant={copied ? "filled" : "subtle"}
-                      color={copied ? "green" : "blue"}
+                      variant={copied === "ok" ? "filled" : "subtle"}
+                      color={copied === "ok" ? "green" : "blue"}
                       size={36}
                       radius="md"
-                      onClick={() => {
-                        navigator.clipboard.writeText(successInfo.displayUrl);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2500);
+                      onClick={async () => {
+                        // Algunos navegadores integrados (WebView de Android) no
+                        // exponen navigator.clipboard o lo rechazan.
+                        try {
+                          await navigator.clipboard.writeText(successInfo.displayUrl);
+                          setCopied("ok");
+                        } catch {
+                          setCopied("failed");
+                        }
+                        setTimeout(() => setCopied(null), 4000);
                       }}
                       title="Copiar enlace"
                     >
-                      {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                      {copied === "ok" ? <IconCheck size={16} /> : <IconCopy size={16} />}
                     </ActionIcon>
                   </Group>
-                  {copied && (
+                  {copied === "ok" && (
                     <Text size="xs" style={{ color: "#4ADE80", marginTop: 6, textAlign: "left" }}>
                       ¡Enlace copiado!
+                    </Text>
+                  )}
+                  {copied === "failed" && (
+                    <Text size="xs" style={{ color: "#FCD34D", marginTop: 6, textAlign: "left" }}>
+                      No se pudo copiar aquí. Mantén presionado el enlace para copiarlo.
                     </Text>
                   )}
                 </Box>
@@ -623,6 +647,17 @@ export default function SignupPage() {
                 {error && (
                   <Alert icon={<IconAlertCircle size={14} />} title="Error" color="red" withCloseButton onClose={() => setError(null)} styles={{ root: { padding: "8px 12px" } }}>
                     {error}
+                  </Alert>
+                )}
+
+                {emailTaken && (
+                  <Alert icon={<IconAlertCircle size={14} />} title="Ya tienes una cuenta con este correo" color="yellow" withCloseButton onClose={() => setEmailTaken(false)} styles={{ root: { padding: "8px 12px" } }}>
+                    No necesitas registrarte de nuevo. Entra a tu panel desde el enlace del correo o el WhatsApp
+                    de bienvenida de AgenditApp, con este correo y tu contraseña. Si no lo encuentras,{" "}
+                    <Anchor href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fw={700}>
+                      escríbenos por WhatsApp
+                    </Anchor>{" "}
+                    y te ayudamos a entrar.
                   </Alert>
                 )}
 

@@ -510,14 +510,12 @@ export const syncMetaTemplates = async (organizationId: string) => {
 };
 
 // Obtener organización según el dominio actual (branding automático)
+// Lanza en error: antes devolvía null y la app se quedaba para siempre en
+// "Cargando organización..." sin poder reintentar (fetchOrganizationConfig
+// distingue 404 de un fallo de red).
 export const getOrganizationConfig = async (): Promise<Organization | null> => {
-  try {
-    const response: AxiosResponse<Organization> = await apiGeneral.get(
-      "/organization-config"
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error al obtener la organización por dominio:", error);
-    return null;
-  }
+  const response: AxiosResponse<Organization> = await apiGeneral.get(
+    "/organization-config"
+  );
+  return response.data;
 };
