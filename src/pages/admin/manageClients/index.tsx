@@ -34,6 +34,7 @@ import {
   resetAllClientsLoyalty,
   registerReferral,
   registerService,
+  decrementLoyalty,
   Client,
   getClientsByOrganizationId,
 } from "../../../services/clientService";
@@ -170,6 +171,28 @@ const ClientsDashboard = () => {
       showNotification({
         title: "Error al registrar referido",
         message: "No fue posible registrar el referido. Intenta nuevamente.",
+        color: "red",
+        autoClose: 5000,
+        position: "top-right",
+      });
+    }
+  };
+
+  const handleDecrementLoyalty = async (clientId: string, kind: "service" | "referral") => {
+    try {
+      const updated = await decrementLoyalty(clientId, kind);
+      if (updated) handleClientUpdated(updated);
+      showNotification({
+        title: kind === "service" ? "Servicio descontado" : "Referido descontado",
+        message: "Se quitó 1 del contador de fidelidad",
+        color: "blue",
+        autoClose: 1500,
+        position: "top-right",
+      });
+    } catch (error) {
+      showNotification({
+        title: "No se pudo descontar",
+        message: (error as Error).message || "Intenta nuevamente.",
         color: "red",
         autoClose: 5000,
         position: "top-right",
@@ -418,6 +441,7 @@ const ClientsDashboard = () => {
                 onResetClientLoyalty={handleResetClientLoyalty}
                 onRegisterService={handleRegisterService}
                 onReferral={handleReferral}
+                onDecrementLoyalty={handleDecrementLoyalty}
                 onEditClient={handleOpenModal}
                 onClientUpdated={handleClientUpdated}
                 error={error}

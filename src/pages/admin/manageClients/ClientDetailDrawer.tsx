@@ -37,6 +37,7 @@ import {
   IconUserPlus,
   IconCirclePlus,
   IconInfoCircle,
+  IconMinus,
 } from "@tabler/icons-react";
 import { RootState } from "../../../app/store";
 import { selectOrganization } from "../../../features/organization/sliceOrganization";
@@ -67,6 +68,7 @@ interface ClientDetailDrawerProps {
   client: Client | null;
   onRegisterService: (clientId: string) => void;
   onReferral: (clientId: string) => void;
+  onDecrementLoyalty: (clientId: string, kind: "service" | "referral") => void;
   onEditClient: (client: Client) => void;
   onMergeClient: (client: Client) => void;
   onDeleteClient: (id: string) => void;
@@ -122,6 +124,7 @@ function CompactLoyaltyCard({
   tiers,
   legacyThreshold,
   legacyReward,
+  onRemove,
 }: {
   label: string;
   color: string;
@@ -129,14 +132,34 @@ function CompactLoyaltyCard({
   tiers?: { threshold: number; reward: string }[];
   legacyThreshold?: number;
   legacyReward?: string;
+  onRemove: () => void;
 }) {
   const progress = getLoyaltyProgress(count, tiers, legacyThreshold, legacyReward);
+
+  const removeButton = (
+    <Tooltip label={progress.count > 0 ? "Quitar 1 (registro por error)" : "El contador está en 0"} withArrow>
+      <ActionIcon
+        variant="subtle"
+        color="red"
+        size="sm"
+        radius="xl"
+        disabled={progress.count <= 0}
+        onClick={onRemove}
+        aria-label={`Quitar 1 de ${label.toLowerCase()}`}
+      >
+        <IconMinus size={14} />
+      </ActionIcon>
+    </Tooltip>
+  );
 
   if (!progress.configured) {
     return (
       <Group justify="space-between">
         <Text size="sm" c="dimmed">{label}</Text>
-        <Badge variant="light" color={color} size="lg">{progress.count}</Badge>
+        <Group gap={6}>
+          {removeButton}
+          <Badge variant="light" color={color} size="lg">{progress.count}</Badge>
+        </Group>
       </Group>
     );
   }
@@ -145,7 +168,10 @@ function CompactLoyaltyCard({
     <Box>
       <Group justify="space-between" mb={4}>
         <Text size="sm" fw={500}>{label}</Text>
-        <Text size="xs" c="dimmed">{progress.count} / {progress.maxThreshold}</Text>
+        <Group gap={6}>
+          {removeButton}
+          <Text size="xs" c="dimmed">{progress.count} / {progress.maxThreshold}</Text>
+        </Group>
       </Group>
       <Progress value={progress.progressPct} size="lg" radius="xl" color={color} striped animated />
       <Text size="xs" c="dimmed" mt={4}>
@@ -165,6 +191,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
   client,
   onRegisterService,
   onReferral,
+  onDecrementLoyalty,
   onEditClient,
   onMergeClient,
   onDeleteClient,
@@ -454,6 +481,14 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                       tiers={organization?.serviceTiers}
                       legacyThreshold={organization?.serviceCount}
                       legacyReward={organization?.serviceReward}
+                      onRemove={() =>
+                        confirmAction(
+                          () => onDecrementLoyalty(client._id, "service"),
+                          "Quitar un servicio",
+                          `Se quitará 1 servicio del contador de ${client.name}. No se envía ningún mensaje al cliente y los premios ya ganados no cambian (puedes eliminarlos en la pestaña Premios).`,
+                          "red"
+                        )
+                      }
                     />
                     <CompactLoyaltyCard
                       label="Referidos hechos"
@@ -462,6 +497,14 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                       tiers={organization?.referralTiers}
                       legacyThreshold={organization?.referredCount}
                       legacyReward={organization?.referredReward}
+                      onRemove={() =>
+                        confirmAction(
+                          () => onDecrementLoyalty(client._id, "referral"),
+                          "Quitar un referido",
+                          `Se quitará 1 referido del contador de ${client.name}. No se envía ningún mensaje al cliente y los premios ya ganados no cambian (puedes eliminarlos en la pestaña Premios).`,
+                          "red"
+                        )
+                      }
                     />
                   </Stack>
                 </Paper>

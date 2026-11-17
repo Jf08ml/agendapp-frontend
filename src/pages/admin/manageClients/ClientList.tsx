@@ -10,6 +10,7 @@ interface ClientListProps {
   error: string | null;
   onRegisterService: (clientId: string) => void;
   onReferral: (clientId: string) => void;
+  onDecrementLoyalty: (clientId: string, kind: "service" | "referral") => void;
   onEditClient: (client: Client) => void;
   onDeleteClient: (id: string) => void;
   onForceDeleteClient: (id: string) => void;
@@ -23,6 +24,7 @@ const ClientList: React.FC<ClientListProps> = ({
   error,
   onRegisterService,
   onReferral,
+  onDecrementLoyalty,
   onEditClient,
   onDeleteClient,
   onForceDeleteClient,
@@ -113,6 +115,7 @@ const ClientList: React.FC<ClientListProps> = ({
         client={selectedClient}
         onRegisterService={onRegisterService}
         onReferral={onReferral}
+        onDecrementLoyalty={onDecrementLoyalty}
         onEditClient={onEditClient}
         onMergeClient={onMergeClient}
         onDeleteClient={onDeleteClient}

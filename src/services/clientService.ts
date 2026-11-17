@@ -319,6 +319,20 @@ export const registerReferral = async (clientId: string): Promise<void> => {
   }
 };
 
+// Quitar 1 servicio o referido del contador de fidelidad (corrige un registro por error)
+export const decrementLoyalty = async (
+  clientId: string,
+  kind: "service" | "referral"
+): Promise<Client> => {
+  try {
+    const response = await apiClient.post<Response<Client>>(`/${clientId}/loyalty/decrement`, { kind });
+    return response.data.data;
+  } catch (error) {
+    handleAxiosError(error, "Error al descontar del contador");
+    throw error;
+  }
+};
+
 // Fusionar cliente origen (sourceId) en cliente destino (targetId)
 export const mergeClient = async (targetId: string, sourceId: string): Promise<Client> => {
   try {
