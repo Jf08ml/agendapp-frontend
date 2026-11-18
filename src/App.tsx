@@ -39,6 +39,28 @@ import OrgLoadError from "./components/OrgLoadError";
 
 import NotificationsMenu from "./layouts/NotificationsMenu";
 import WhatsNewModal from "./components/WhatsNewModal";
+import { ChristmasDecorations, SantaHat } from "./components/seasonal/ChristmasDecorations";
+import {
+  CHRISTMAS_PREVIEW_KEY,
+  resolveChristmasPreview,
+  shouldShowChristmas,
+} from "./utils/seasonalTheme";
+
+// 🎄 ?preview=navidad — solo en desarrollo (import.meta.env.DEV), nunca en producción.
+function readChristmasPreview(search: string): boolean {
+  if (!import.meta.env.DEV) return false;
+  try {
+    const { preview, store } = resolveChristmasPreview(
+      search,
+      sessionStorage.getItem(CHRISTMAS_PREVIEW_KEY)
+    );
+    if (store === "set") sessionStorage.setItem(CHRISTMAS_PREVIEW_KEY, "1");
+    if (store === "clear") sessionStorage.removeItem(CHRISTMAS_PREVIEW_KEY);
+    return preview;
+  } catch {
+    return false;
+  }
+}
 
 // Función para convertir la clave VAPID de base64url a Uint8Array
 const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
@@ -136,6 +158,15 @@ function AppContent() {
   // Branding dinámico
   const color = organization?.branding?.primaryColor || "#1C3461";
   const logoUrl = organization?.branding?.logoUrl || "/logo-default.png";
+  // 🎄 Tema navideño: solo páginas de clientes, solo en temporada (1 dic – 6 ene)
+  const christmasPreview = readChristmasPreview(location.search);
+  const showChristmas = shouldShowChristmas({
+    seasonalTheme: organization?.seasonalTheme,
+    pathname: location.pathname,
+    now: new Date(),
+    timeZone: organization?.timezone,
+    preview: christmasPreview,
+  });
 
   // Inicializa autenticación en el cliente
   useAuthInitializer();
@@ -270,13 +301,15 @@ function AppContent() {
                   aria-label="Abrir notificaciones"
                   style={{ lineHeight: 0 }}
                 >
-                  <Avatar
-                    src={logoUrl}
-                    alt={organization?.name}
-                    size={36}
-                    radius="xl"
-                    styles={{ image: { objectFit: "cover" } }}
-                  />
+                  <SantaHat show={showChristmas}>
+                    <Avatar
+                      src={logoUrl}
+                      alt={organization?.name}
+                      size={36}
+                      radius="xl"
+                      styles={{ image: { objectFit: "cover" } }}
+                    />
+                  </SantaHat>
                 </UnstyledButton>
               }
               showBadgeOnTarget
@@ -421,6 +454,8 @@ function AppContent() {
           />
         </AppShell.Footer>
       </AppShell>
+
+      {showChristmas && <ChristmasDecorations />}
 
     </>
   );

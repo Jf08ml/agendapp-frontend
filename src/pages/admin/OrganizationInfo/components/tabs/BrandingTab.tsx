@@ -10,10 +10,13 @@ import {
   Paper,
   Select,
   SimpleGrid,
+  Switch,
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconLock } from "@tabler/icons-react";
+import { IconChristmasTree, IconLock } from "@tabler/icons-react";
+import { ChristmasDecorations, SantaHat } from "../../../../../components/seasonal/ChristmasDecorations";
+import { CHRISTMAS_SEASON_LABEL } from "../../../../../utils/seasonalTheme";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
@@ -303,6 +306,72 @@ export default function BrandingTab({
           disabled={brandingDisabled}
         />
       </SimpleGrid>
+
+      <Divider my="md" />
+
+      {/* 🎄 Tema navideño — disponible en todos los planes (no depende de customBranding) */}
+      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
+        <Box>
+          <Group gap={6} mb={4}>
+            <IconChristmasTree size={18} color="#2f9e44" />
+            <Text fw={600}>Decoración navideña</Text>
+          </Group>
+          <Text size="sm" c="dimmed">
+            Nieve, luces y un gorrito en tu logo en las páginas que ven tus clientes
+            (inicio, reservas, tienda, tarjeta de fidelidad). Se muestra solo{" "}
+            {CHRISTMAS_SEASON_LABEL}; tus colores no cambian y tu panel queda igual.
+          </Text>
+        </Box>
+        <Switch
+          size="md"
+          aria-label="Decoración navideña"
+          checked={form.values.seasonalTheme === "christmas"}
+          onChange={(e) =>
+            form.setFieldValue("seasonalTheme", e.currentTarget.checked ? "christmas" : "none")
+          }
+          disabled={!isEditing}
+        />
+      </Group>
+
+      {form.values.seasonalTheme === "christmas" && (
+        <Paper
+          withBorder
+          radius="md"
+          mt="sm"
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            height: 140,
+            background: "linear-gradient(180deg, #1c3461 0%, #2b4c86 100%)",
+          }}
+        >
+          <ChristmasDecorations contained />
+          <Group gap="sm" style={{ position: "absolute", left: 16, bottom: 16 }}>
+            <SantaHat show>
+              <Box
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  overflow: "hidden",
+                }}
+              >
+                {form.values.branding?.logoUrl && (
+                  <img
+                    src={form.values.branding.logoUrl}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
+              </Box>
+            </SantaHat>
+            <Text c="white" fw={600} size="sm">
+              Vista previa
+            </Text>
+          </Group>
+        </Paper>
+      )}
 
       <Alert mt="md" color="gray" variant="light">
         Para iOS agrega también <code>apple-touch-icon</code> en tu HTML.{" "}

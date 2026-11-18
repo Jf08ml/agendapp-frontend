@@ -63,6 +63,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
     response.welcomeDescription ??
     "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨",
   homeLayout: response.homeLayout ?? "modern",
+  seasonalTheme: response.seasonalTheme === "christmas" ? "christmas" : "none",
   analyticsConfig: {
     gaMeasurementId: response.analyticsConfig?.gaMeasurementId ?? "",
     googleAdsId: response.analyticsConfig?.googleAdsId ?? "",

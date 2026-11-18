@@ -1,0 +1,137 @@
+/* Decoración navideña: capa visual sin interacción (pointer-events: none).
+   z-index 150: sobre el contenido, debajo de los modales de Mantine (200). */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 150;
+  overflow: hidden;
+}
+
+.contained {
+  position: absolute;
+}
+
+/* ---------- Nieve ---------- */
+.flake {
+  position: absolute;
+  top: -24px;
+  color: #fff;
+  text-shadow: 0 0 3px rgba(80, 110, 160, 0.55);
+  user-select: none;
+  will-change: transform;
+  animation-name: fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes fall {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(18px, 52vh, 0) rotate(180deg);
+  }
+  100% {
+    transform: translate3d(-12px, 105vh, 0) rotate(360deg);
+  }
+}
+
+.contained .flake {
+  animation-name: fallContained;
+}
+
+@keyframes fallContained {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(10px, 260px, 0);
+  }
+}
+
+/* ---------- Guirnalda de luces ---------- */
+.garland {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 22px;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+}
+
+/* el cable */
+.garland::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 2px;
+  background: #2f4a2f;
+  opacity: 0.8;
+}
+
+.bulb {
+  width: 9px;
+  height: 13px;
+  margin-top: 6px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  position: relative;
+  animation: twinkle 1.6s ease-in-out infinite;
+}
+
+.bulb::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: #3d3d3d;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    filter: brightness(1.15);
+  }
+  50% {
+    opacity: 0.45;
+    filter: brightness(0.8);
+  }
+}
+
+/* ---------- Gorro sobre el logo ---------- */
+.hatWrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.hat {
+  position: absolute;
+  top: -11px;
+  left: -7px;
+  width: 26px;
+  height: 22px;
+  transform: rotate(-22deg);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Sin animaciones para quien las desactivó en el sistema: sin nieve,
+   luces fijas. */
+@media (prefers-reduced-motion: reduce) {
+  .flake {
+    display: none;
+  }
+  .bulb {
+    animation: none;
+  }
+}

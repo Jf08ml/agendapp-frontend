@@ -233,6 +233,8 @@ export interface Organization {
   welcomeTitle?: string;
   welcomeDescription?: string;
   homeLayout?: "modern" | "minimal" | "cards" | "landing" | "academy";
+  // 🎄 Tema de temporada en páginas de clientes (ver utils/seasonalTheme.ts)
+  seasonalTheme?: "none" | "christmas";
   // 📊 Tags de Google que la propia organización configura (GA4 + Google Ads),
   // independientes del gtag propio de AgenditApp. No son secretos.
   analyticsConfig?: {

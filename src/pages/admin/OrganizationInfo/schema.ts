@@ -168,6 +168,7 @@ export const schema = z.object({
   welcomeTitle: optionalString,
   welcomeDescription: optionalString,
   homeLayout: z.enum(["modern", "minimal", "cards", "landing", "academy"]).optional(),
+  seasonalTheme: z.enum(["none", "christmas"]).optional(),
 
   analyticsConfig: z
     .object({
