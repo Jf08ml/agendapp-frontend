@@ -17,7 +17,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { RootState } from "../../app/store";
 import colors from "../../theme/colores";
 import { extractTenantFromHost } from "../../utils/domainUtils";
-import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage, recoverAccessUrl } from "../../utils/panelAccess";
+import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage, RECOVER_ACCESS_PATH } from "../../utils/panelAccess";
 
 const isColorDark = (hexColor: string): boolean => {
   // Calcula el brillo promedio del color (0-255)
@@ -123,7 +123,7 @@ const LoginAdmin: React.FC = () => {
             Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes o
             olvidaste tu contraseña, te enviamos un código para entrar.
           </Text>
-          <Button component="a" href={recoverAccessUrl(window.location.hostname)} fullWidth mb="sm">
+          <Button component="a" href={RECOVER_ACCESS_PATH} fullWidth mb="sm">
             Entrar con un código
           </Button>
           <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth variant="light">
@@ -236,7 +236,7 @@ const LoginAdmin: React.FC = () => {
         {/* Solo dueños: los empleados piden el cambio al administrador. */}
         <Text size="sm" ta="center" mt="md">
           <a
-            href={recoverAccessUrl(window.location.hostname)}
+            href={RECOVER_ACCESS_PATH}
             style={{ color: contrastText, textDecoration: "underline" }}
           >
             ¿Olvidaste tu contraseña?

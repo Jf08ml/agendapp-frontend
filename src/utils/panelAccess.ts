@@ -56,14 +56,32 @@ export function loginFailureMessage(status: number | undefined): string {
 }
 
 /**
- * Página para recuperar el acceso sin contraseña. Vive en app.agenditapp.com
- * (Turnstile está configurado para ese dominio y el enlace del correo apunta
- * ahí); desde el login de un negocio se manda allá. En local, ruta relativa.
+ * Recuperar el acceso sin contraseña. Se abre en el mismo dominio donde está
+ * la persona: en el de un negocio la búsqueda se limita a ese negocio; en
+ * app.agenditapp.com busca en todos (con captcha).
  */
-export function recoverAccessUrl(hostname: string): string {
-  const host = hostname.toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1" || host === `app.${MAIN_DOMAIN}`) {
-    return "/recuperar-acceso";
+export const RECOVER_ACCESS_PATH = "/recuperar-acceso";
+
+/**
+ * A dónde ir tras recuperar el acceso: /exchange con el código de un uso.
+ * - En local o en la página del negocio (scoped): el mismo origen.
+ * - En app.agenditapp.com: el subdominio del negocio, o su dominio propio.
+ * null si no hay a dónde ir.
+ */
+export function recoveryExchangeUrl(params: {
+  hostname: string;
+  scoped: boolean;
+  exchangeCode: string;
+  slug?: string | null;
+  domain?: string | null;
+}): string | null {
+  const { hostname, scoped, exchangeCode, slug, domain } = params;
+  const code = encodeURIComponent(exchangeCode);
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return `/exchange?code=${code}${slug ? `&slug=${slug}` : ""}`;
   }
-  return `https://app.${MAIN_DOMAIN}/recuperar-acceso`;
+  if (scoped) return `/exchange?code=${code}`;
+  if (slug) return `https://${slug}.${MAIN_DOMAIN}/exchange?code=${code}`;
+  if (domain) return `https://${domain}/exchange?code=${code}`;
+  return null;
 }

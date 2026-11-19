@@ -30,14 +30,20 @@ import {
   sendAccessCode,
   verifyAccessCode,
 } from "../../services/accountAccessService";
-import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
-import { AGENDITAPP_SUPPORT_WA_URL, recoverAccessUrl } from "../../utils/panelAccess";
+import { useSelector } from "react-redux";
+import { RootState } from "../../app/store";
+import { extractTenantFromHost } from "../../utils/domainUtils";
+import { AGENDITAPP_SUPPORT_WA_URL, recoveryExchangeUrl } from "../../utils/panelAccess";
 
 /**
  * /recuperar-acceso — el dueño entra a su panel sin la contraseña:
- * correo o celular → elige negocio y canal (destinos enmascarados) → código de
- * 6 dígitos (o enlace del correo) → contraseña nueva opcional → entra por
- * {slug}.agenditapp.com/exchange, como tras el registro.
+ * correo o celular → canal (destinos enmascarados) → código de 6 dígitos (o
+ * enlace del correo) → contraseña nueva opcional → entra por /exchange, como
+ * tras el registro.
+ *
+ * En el dominio o subdominio de un negocio todo pasa ahí mismo y la búsqueda
+ * se limita a ese negocio (sin captcha). En app.agenditapp.com busca en todos
+ * los negocios, con Turnstile.
  * Solo dueños; los empleados piden a su negocio que les cambie la contraseña.
  */
 
@@ -75,13 +81,11 @@ export default function RecoverAccessPage() {
 
   const identifier = mode === "email" ? email.trim() : phone;
 
-  // Turnstile y el enlace del correo están en app.agenditapp.com.
-  useEffect(() => {
-    const target = recoverAccessUrl(window.location.hostname);
-    if (target.startsWith("https://")) {
-      window.location.replace(`${target}${window.location.search}`);
-    }
-  }, []);
+  // Página de un negocio (subdominio, dominio propio o local con ?slug=): la
+  // búsqueda se limita a ese negocio. En app.agenditapp.com, a todos.
+  const organization = useSelector((s: RootState) => s.organization.organization);
+  const isGlobal = extractTenantFromHost().type === "signup";
+  const scopedOrgId = !isGlobal ? organization?._id ?? null : null;
 
   // Cuenta regresiva para "Reenviar código".
   useEffect(() => {
@@ -95,8 +99,6 @@ export default function RecoverAccessPage() {
     const c = searchParams.get("c");
     const t = searchParams.get("t");
     if (!c || !t || linkHandled.current) return;
-    // Fuera de app.agenditapp.com la página redirige allá con la misma URL.
-    if (recoverAccessUrl(window.location.hostname).startsWith("https://")) return;
     linkHandled.current = true;
     window.history.replaceState({}, "", window.location.pathname);
     setLoading(true);
@@ -131,10 +133,18 @@ export default function RecoverAccessPage() {
       setError(mode === "email" ? "Escribe tu correo." : "Escribe tu número de celular.");
       return;
     }
+    if (!isGlobal && !scopedOrgId) {
+      setError("No pudimos cargar los datos del negocio. Recarga la página.");
+      return;
+    }
     setLoading(true);
     try {
-      const token = await getTurnstileToken();
-      const found = await lookupAccounts(identifier, token || undefined);
+      // El captcha solo aplica a la búsqueda general de app.agenditapp.com.
+      const token = isGlobal ? await getTurnstileToken() : "";
+      const found = await lookupAccounts(identifier, {
+        organizationId: scopedOrgId ?? undefined,
+        turnstileToken: token || undefined,
+      });
       setAccounts(found);
       setSelectedOrg(found.length === 1 ? found[0].organizationId : null);
       setStep("choose");
@@ -205,11 +215,13 @@ export default function RecoverAccessPage() {
         newPassword: withPassword ? password : undefined,
       });
       setStep("redirecting");
-      const target = r.slug
-        ? getPostSignupRedirectUrl(r.slug, r.exchangeCode)
-        : r.domain
-          ? `https://${r.domain}/exchange?code=${r.exchangeCode}`
-          : null;
+      const target = recoveryExchangeUrl({
+        hostname: window.location.hostname,
+        scoped: !isGlobal,
+        exchangeCode: r.exchangeCode,
+        slug: r.slug,
+        domain: r.domain,
+      });
       if (!target) {
         setStep("password");
         setError("No encontramos la dirección de tu panel. Escríbenos y te ayudamos.");
@@ -252,10 +264,13 @@ export default function RecoverAccessPage() {
         {step === "identify" && (
           <Stack gap="md">
             <div>
-              <Title order={3}>Entra a tu panel</Title>
+              <Title order={3}>
+                {!isGlobal && organization?.name ? `Entra al panel de ${organization.name}` : "Entra a tu panel"}
+              </Title>
               <Text size="sm" c="dimmed" mt={4}>
-                ¿Olvidaste tu contraseña o el enlace de tu negocio? Escribe el correo o el celular con el que
-                registraste tu negocio y te enviamos un código.
+                {isGlobal
+                  ? "¿Olvidaste tu contraseña o el enlace de tu negocio? Escribe el correo o el celular con el que registraste tu negocio y te enviamos un código."
+                  : "¿Olvidaste tu contraseña? Escribe el correo o el celular con el que registraste el negocio y te enviamos un código."}
               </Text>
             </div>
             <SegmentedControl
@@ -288,18 +303,20 @@ export default function RecoverAccessPage() {
                 placeholder="300 000 0000"
               />
             )}
-            <Turnstile
-              ref={turnstileRef}
-              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-              options={{ size: "invisible" }}
-              onSuccess={(token) => {
-                setTurnstileToken(token);
-                tokenResolverRef.current?.(token);
-                tokenResolverRef.current = null;
-              }}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileToken("")}
-            />
+            {isGlobal && (
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                options={{ size: "invisible" }}
+                onSuccess={(token) => {
+                  setTurnstileToken(token);
+                  tokenResolverRef.current?.(token);
+                  tokenResolverRef.current = null;
+                }}
+                onExpire={() => setTurnstileToken("")}
+                onError={() => setTurnstileToken("")}
+              />
+            )}
             {errorAlert}
             <Button fullWidth onClick={handleLookup} loading={loading}>
               Buscar mi cuenta
@@ -316,8 +333,10 @@ export default function RecoverAccessPage() {
               <>
                 <Title order={3}>No encontramos tu cuenta</Title>
                 <Text size="sm" c="dimmed">
-                  No hay ningún negocio registrado con {mode === "email" ? "ese correo" : "ese celular"}. Revisa que
-                  esté bien escrito o intenta con {mode === "email" ? "tu celular" : "tu correo"}.
+                  {isGlobal
+                    ? `No hay ningún negocio registrado con ${mode === "email" ? "ese correo" : "ese celular"}.`
+                    : `${mode === "email" ? "Ese correo" : "Ese celular"} no es el del dueño de ${organization?.name ?? "este negocio"}.`}{" "}
+                  Revisa que esté bien escrito o intenta con {mode === "email" ? "tu celular" : "tu correo"}.
                 </Text>
                 <Button variant="light" onClick={restart}>
                   Intentar de nuevo
