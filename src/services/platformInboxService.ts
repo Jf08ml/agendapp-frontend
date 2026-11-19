@@ -12,7 +12,7 @@ export interface PlatformConversation {
   organization: PlatformInboxOrg | null;
   lastMessage: string;
   lastDirection: "inbound" | "outbound";
-  lastSource: "inbound" | "retargeting" | "ai_agent" | "manual" | "alert" | "oficina" | "welcome";
+  lastSource: "inbound" | "retargeting" | "ai_agent" | "manual" | "alert" | "oficina" | "welcome" | "access";
   lastMessageAt: string;
   unreadCount: number;
   withinReplyWindow: boolean;
@@ -23,7 +23,7 @@ export interface PlatformWaMessage {
   phone: string;
   organizationId: string | null;
   direction: "inbound" | "outbound";
-  source: "inbound" | "retargeting" | "ai_agent" | "manual" | "alert" | "oficina" | "welcome";
+  source: "inbound" | "retargeting" | "ai_agent" | "manual" | "alert" | "oficina" | "welcome" | "access";
   body: string;
   templateName?: string | null;
   read: boolean;

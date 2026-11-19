@@ -17,7 +17,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { RootState } from "../../app/store";
 import colors from "../../theme/colores";
 import { extractTenantFromHost } from "../../utils/domainUtils";
-import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage } from "../../utils/panelAccess";
+import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage, recoverAccessUrl } from "../../utils/panelAccess";
 
 const isColorDark = (hexColor: string): boolean => {
   // Calcula el brillo promedio del color (0-255)
@@ -120,10 +120,13 @@ const LoginAdmin: React.FC = () => {
             correo y tu contraseña.
           </Text>
           <Text size="sm" c="dimmed" mb="lg">
-            Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes,
-            escríbenos y te ayudamos a entrar.
+            Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes o
+            olvidaste tu contraseña, te enviamos un código para entrar.
           </Text>
-          <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth>
+          <Button component="a" href={recoverAccessUrl(window.location.hostname)} fullWidth mb="sm">
+            Entrar con un código
+          </Button>
+          <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth variant="light">
             Escribir a soporte por WhatsApp
           </Button>
         </Card>
@@ -229,6 +232,16 @@ const LoginAdmin: React.FC = () => {
         >
           {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
         </Button>
+
+        {/* Solo dueños: los empleados piden el cambio al administrador. */}
+        <Text size="sm" ta="center" mt="md">
+          <a
+            href={recoverAccessUrl(window.location.hostname)}
+            style={{ color: contrastText, textDecoration: "underline" }}
+          >
+            ¿Olvidaste tu contraseña?
+          </a>
+        </Text>
       </Card>
     </Flex>
   );

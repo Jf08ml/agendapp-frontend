@@ -38,6 +38,7 @@ import ManagePackages from "../pages/admin/managePackages";
 import SignupPage from "../pages/public/SignupPage";
 import ExchangePage from "../pages/public/ExchangePage";
 import IngresarPage from "../pages/public/IngresarPage";
+import RecoverAccessPage from "../pages/public/RecoverAccessPage";
 import PaymentSuccess from "../pages/public/PaymentSuccess";
 import SuperadminPlans from "../pages/superadmin/SuperadminPlans";
 import SuperadminAgents from "../pages/superadmin/SuperadminAgents";
@@ -462,6 +463,15 @@ const generalRoutes = [
     MediaMetadata: {
       title: "Ingresar",
       description: "Entrar al panel de tu negocio",
+    },
+  },
+  // Recuperar el acceso del dueño sin contraseña (código por correo o WhatsApp)
+  {
+    path: "/recuperar-acceso",
+    component: RecoverAccessPage,
+    MediaMetadata: {
+      title: "Recuperar acceso",
+      description: "Entra a tu panel con un código",
     },
   },
   {

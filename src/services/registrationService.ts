@@ -6,7 +6,7 @@ const API_BASE_URL: string =
     : (import.meta.env.VITE_APP_API_URL_DEPLOYMENT as string);
 
 // Instancia pública: sin auth, sin tenant header
-const apiRegistration = axios.create({ baseURL: API_BASE_URL });
+export const apiRegistration = axios.create({ baseURL: API_BASE_URL });
 
 export interface RegisterData {
   slug: string;

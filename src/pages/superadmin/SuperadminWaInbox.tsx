@@ -49,6 +49,7 @@ const SOURCE_LABEL: Record<PlatformWaMessage["source"], string> = {
   alert: "Alerta",
   oficina: "Oficina IA",
   welcome: "Bienvenida",
+  access: "Acceso",
 };
 
 const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
@@ -59,6 +60,7 @@ const SOURCE_COLOR: Record<PlatformWaMessage["source"], string> = {
   alert: "red",
   oficina: "teal",
   welcome: "green",
+  access: "indigo",
 };
 
 function conversationLabel(c: PlatformConversation) {
