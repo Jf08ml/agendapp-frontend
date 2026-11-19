@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ingresarTarget, loginFailureMessage, normalizeSlug, panelLoginUrl, recoverAccessUrl } from "../src/utils/panelAccess.ts";
+import { ingresarTarget, loginFailureMessage, normalizeSlug, panelLoginUrl, recoveryExchangeUrl } from "../src/utils/panelAccess.ts";
 
 test("el enlace del panel es el login del subdominio, no la página pública de reservas", () => {
   assert.equal(panelLoginUrl("mibarberia"), "https://mibarberia.agenditapp.com/login-admin");
@@ -40,9 +40,15 @@ test("un fallo de red o el límite de intentos no se muestran como credenciales 
   }
 });
 
-test("recuperar el acceso siempre se hace en app.agenditapp.com", () => {
-  assert.equal(recoverAccessUrl("mibarberia.agenditapp.com"), "https://app.agenditapp.com/recuperar-acceso");
-  assert.equal(recoverAccessUrl("www.minegocio.com"), "https://app.agenditapp.com/recuperar-acceso");
-  assert.equal(recoverAccessUrl("app.agenditapp.com"), "/recuperar-acceso");
-  assert.equal(recoverAccessUrl("localhost"), "/recuperar-acceso");
+test("tras recuperar el acceso se entra por /exchange en el dominio correcto", () => {
+  const code = "abc";
+  // En la página del negocio: se queda en su dominio (subdominio o propio).
+  assert.equal(recoveryExchangeUrl({ hostname: "mibarberia.agenditapp.com", scoped: true, exchangeCode: code, slug: "mibarberia" }), "/exchange?code=abc");
+  assert.equal(recoveryExchangeUrl({ hostname: "www.minegocio.com", scoped: true, exchangeCode: code, slug: "minegocio" }), "/exchange?code=abc");
+  // Desde app.agenditapp.com: al subdominio, o al dominio propio si no hay slug.
+  assert.equal(recoveryExchangeUrl({ hostname: "app.agenditapp.com", scoped: false, exchangeCode: code, slug: "mibarberia" }), "https://mibarberia.agenditapp.com/exchange?code=abc");
+  assert.equal(recoveryExchangeUrl({ hostname: "app.agenditapp.com", scoped: false, exchangeCode: code, domain: "www.minegocio.com" }), "https://www.minegocio.com/exchange?code=abc");
+  assert.equal(recoveryExchangeUrl({ hostname: "app.agenditapp.com", scoped: false, exchangeCode: code }), null);
+  // En local se conserva el tenant con ?slug=.
+  assert.equal(recoveryExchangeUrl({ hostname: "localhost", scoped: true, exchangeCode: code, slug: "mibarberia" }), "/exchange?code=abc&slug=mibarberia");
 });

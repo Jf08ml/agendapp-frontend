@@ -39,8 +39,15 @@ export interface CompleteResult {
   passwordChanged: boolean;
 }
 
-export async function lookupAccounts(identifier: string, turnstileToken?: string): Promise<AccessAccount[]> {
-  const res = await apiRegistration.post("/account-access/lookup", { identifier, turnstileToken });
+/**
+ * Con `organizationId` (página de un negocio) la búsqueda se limita a ese
+ * negocio y no lleva captcha; sin él (app.agenditapp.com) busca en todos.
+ */
+export async function lookupAccounts(
+  identifier: string,
+  opts: { organizationId?: string; turnstileToken?: string } = {}
+): Promise<AccessAccount[]> {
+  const res = await apiRegistration.post("/account-access/lookup", { identifier, ...opts });
   return res.data.data?.accounts ?? [];
 }
 
