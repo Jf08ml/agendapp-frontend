@@ -20,6 +20,7 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../utils/zodResolver";
+import { suggestEmailFix } from "../../utils/emailTypo";
 import { z } from "zod";
 import {
   IconAlertCircle,
@@ -191,6 +192,9 @@ export default function SignupPage() {
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [emailTaken, setEmailTaken] = useState(false);
+  // Correo que la persona confirmó que está bien pese a la sugerencia.
+  const [emailTypoAck, setEmailTypoAck] = useState<string | null>(null);
+  const [emailTypoWarn, setEmailTypoWarn] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ displayUrl: string; redirectUrl: string; email: string } | null>(null);
   const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
   const [countdown, setCountdown] = useState(10);
@@ -227,6 +231,8 @@ export default function SignupPage() {
     },
   });
 
+  const emailSuggestion = useMemo(() => suggestEmailFix(form.values.email), [form.values.email]);
+
   const personalStepSchema = z.object({
     ownerName: z.string().min(2, "Mínimo 2 caracteres"),
     email: z.string().email("Email inválido"),
@@ -250,6 +256,12 @@ export default function SignupPage() {
       return;
     }
     form.clearErrors();
+    // Correo con el dominio mal escrito (gamil.com, hotmial.com…): la bienvenida
+    // rebota y no podría recuperar su cuenta por correo. Se pregunta una vez.
+    if (suggestEmailFix(form.values.email) && emailTypoAck !== form.values.email) {
+      setEmailTypoWarn(true);
+      return;
+    }
     setStep("business");
   };
 
@@ -699,12 +711,47 @@ export default function SignupPage() {
                         {...form.getInputProps("ownerName")}
                         styles={inputStyles}
                       />
-                      <TextInput
-                        label={<RLabel>Email</RLabel>}
-                        placeholder="tu@email.com"
-                        {...form.getInputProps("email")}
-                        styles={inputStyles}
-                      />
+                      <Box>
+                        <TextInput
+                          label={<RLabel>Email</RLabel>}
+                          placeholder="tu@email.com"
+                          {...form.getInputProps("email")}
+                          onChange={(e) => { form.getInputProps("email").onChange(e); setEmailTypoWarn(false); }}
+                          styles={inputStyles}
+                        />
+                        {emailSuggestion && emailTypoAck !== form.values.email && (
+                          <Box
+                            mt={4}
+                            p={emailTypoWarn ? 8 : 0}
+                            style={emailTypoWarn ? { background: "rgba(250,204,21,0.12)", border: "1px solid rgba(250,204,21,0.5)", borderRadius: 8 } : undefined}
+                          >
+                            <Text size="xs" c={emailTypoWarn ? "yellow.3" : "rgba(255,255,255,0.75)"}>
+                              ¿Quisiste decir <strong>{emailSuggestion}</strong>?
+                            </Text>
+                            <Group gap={10} mt={2}>
+                              <Anchor
+                                component="button"
+                                type="button"
+                                size="xs"
+                                c="blue.3"
+                                fw={600}
+                                onClick={() => { form.setFieldValue("email", emailSuggestion); setEmailTypoWarn(false); }}
+                              >
+                                Sí, corregir
+                              </Anchor>
+                              <Anchor
+                                component="button"
+                                type="button"
+                                size="xs"
+                                c="rgba(255,255,255,0.6)"
+                                onClick={() => { setEmailTypoAck(form.values.email); setEmailTypoWarn(false); }}
+                              >
+                                No, está bien escrito
+                              </Anchor>
+                            </Group>
+                          </Box>
+                        )}
+                      </Box>
                       <Box>
                         <RLabel>Teléfono</RLabel>
                         <Box mt={3}>

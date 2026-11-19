@@ -67,6 +67,9 @@ export default function ContactTab({
   // Listas completas memoizadas (ya están memoizadas en geoData, pero useMemo
   // evita recalcular el .map() del Select en cada render).
   const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const bouncedAddress = useSelector((s: RootState) => s.organization.organization?.ownerEmailBounce?.address);
+  const emailBounced =
+    !!bouncedAddress && String(form.values.email ?? "").trim().toLowerCase() === bouncedAddress.toLowerCase();
   const canUseLanding = planLimits?.professionalLanding !== false;
 
   const countryData = useMemo(
@@ -105,6 +108,14 @@ export default function ContactTab({
             placeholder="contacto@minegocio.com"
             leftSection={<IconMail size={16} />}
             {...form.getInputProps("email")}
+            description={
+              emailBounced ? (
+                <Text component="span" size="xs" c="orange.7">
+                  Los correos a esta dirección no están llegando. Revisa que esté bien escrita y corrígela: es
+                  donde recibes los avisos de tu cuenta y con la que entras a tu panel.
+                </Text>
+              ) : undefined
+            }
             disabled={!isEditing}
           />
           <TextInput

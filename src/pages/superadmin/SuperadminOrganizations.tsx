@@ -528,7 +528,19 @@ export default function SuperadminOrganizations() {
                   </Table.Td>
                   <Table.Td>
                     <Stack gap={2}>
-                      <Text size="sm">{org.email}</Text>
+                      <Group gap={6} wrap="nowrap">
+                        <Text size="sm">{org.email}</Text>
+                        {org.ownerEmailBounce?.address &&
+                          org.ownerEmailBounce.address.toLowerCase() === String(org.email ?? "").toLowerCase() && (
+                            <Tooltip
+                              label={`Rebota${org.ownerEmailBounce.status ? ` (${org.ownerEmailBounce.status})` : ""}: ${org.ownerEmailBounce.reason || "sin detalle"}`}
+                              multiline
+                              w={280}
+                            >
+                              <Badge color="red" variant="light" size="xs">Correo rebota</Badge>
+                            </Tooltip>
+                          )}
+                      </Group>
                       <Text size="xs" c="dimmed">{org.phoneNumber}</Text>
                     </Stack>
                   </Table.Td>

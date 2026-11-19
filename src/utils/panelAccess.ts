@@ -54,3 +54,16 @@ export function loginFailureMessage(status: number | undefined): string {
   }
   return "Tuvimos un problema al iniciar sesión. Inténtalo de nuevo en un momento.";
 }
+
+/**
+ * Página para recuperar el acceso sin contraseña. Vive en app.agenditapp.com
+ * (Turnstile está configurado para ese dominio y el enlace del correo apunta
+ * ahí); desde el login de un negocio se manda allá. En local, ruta relativa.
+ */
+export function recoverAccessUrl(hostname: string): string {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === `app.${MAIN_DOMAIN}`) {
+    return "/recuperar-acceso";
+  }
+  return `https://app.${MAIN_DOMAIN}/recuperar-acceso`;
+}

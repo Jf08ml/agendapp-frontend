@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ingresarTarget, loginFailureMessage, normalizeSlug, panelLoginUrl } from "../src/utils/panelAccess.ts";
+import { ingresarTarget, loginFailureMessage, normalizeSlug, panelLoginUrl, recoverAccessUrl } from "../src/utils/panelAccess.ts";
 
 test("el enlace del panel es el login del subdominio, no la página pública de reservas", () => {
   assert.equal(panelLoginUrl("mibarberia"), "https://mibarberia.agenditapp.com/login-admin");
@@ -38,4 +38,11 @@ test("un fallo de red o el límite de intentos no se muestran como credenciales 
   for (const status of [undefined, 429, 500]) {
     assert.doesNotMatch(loginFailureMessage(status), /incorrect/i);
   }
+});
+
+test("recuperar el acceso siempre se hace en app.agenditapp.com", () => {
+  assert.equal(recoverAccessUrl("mibarberia.agenditapp.com"), "https://app.agenditapp.com/recuperar-acceso");
+  assert.equal(recoverAccessUrl("www.minegocio.com"), "https://app.agenditapp.com/recuperar-acceso");
+  assert.equal(recoverAccessUrl("app.agenditapp.com"), "/recuperar-acceso");
+  assert.equal(recoverAccessUrl("localhost"), "/recuperar-acceso");
 });
