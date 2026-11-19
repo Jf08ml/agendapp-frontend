@@ -1,5 +1,5 @@
 // components/InternationalPhoneInput.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { TextInput, Select, Group, Text, Box, ComboboxItem, ComboboxParsedItem } from "@mantine/core";
 import { type CountryCode } from "libphonenumber-js";
 import {
@@ -9,6 +9,11 @@ import {
   isValidCountryCode,
 } from "../utils/phoneUtils";
 import { getAllCountries } from "../utils/geoData";
+
+function getCallingCodeDisplay(country: CountryCode): string {
+  const info = getAllCountries().find((c) => c.value === country);
+  return info?.callingCode ?? "+57";
+}
 
 interface InternationalPhoneInputProps {
   value?: string;
@@ -42,9 +47,19 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
   disabled = false,
   compact = false,
 }) => {
-  const [selectedCountry, setSelectedCountry] = useState<CountryCode>("CO");
+  // País inicial desde el primer render (antes arrancaba en CO y luego cambiaba).
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>(
+    () => organizationDefaultCountry || defaultCountry || detectUserCountry()
+  );
   const [nationalNumber, setNationalNumber] = useState("");
-  const [previewE164, setPreviewE164] = useState<string>("");
+  // Último valor que este componente le avisó al padre (E.164 o null). Sirve
+  // para no tratar como "valor nuevo" el eco de nuestro propio onChange: antes
+  // el aviso se hacía en un useEffect (también al montar, con el campo vacío) y
+  // el padre devolvía el valor, que se volvía a copiar al campo → bucle que
+  // borraba y reponía el número (se veía parpadear al volver a una pantalla).
+  const lastEmittedRef = useRef<string | null>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
 
   // Datos de países (~250) memoizados desde geoData
   const countrySelectData = React.useMemo(
@@ -60,69 +75,70 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
     [compact]
   );
 
-  // Determinar país inicial
+  // País actual, también en ref para leerlo dentro de efectos sin esperar al render.
+  const countryRef = useRef<CountryCode>(selectedCountry);
+  const chooseCountry = (country: CountryCode) => {
+    countryRef.current = country;
+    setSelectedCountry(country);
+  };
+
+  /** Valida y avisa al padre (escritura, cambio de país o valor que llega de fuera). */
+  const emit = (national: string, country: CountryCode) => {
+    const result = national.trim() ? normalizePhoneNumber(national, country) : null;
+    const valid = Boolean(result?.isValid && result.phone_e164);
+    const e164 = valid ? result!.phone_e164! : null;
+    lastEmittedRef.current = e164;
+    onChange?.(e164, valid ? result!.phone_country ?? country : null, valid);
+  };
+
+  // País inicial (o cuando cambia el de la organización). Si ya viene un
+  // número en E.164, manda el país de ese número.
   useEffect(() => {
-    let initialCountry: CountryCode = "CO";
-
-    if (organizationDefaultCountry) {
-      initialCountry = organizationDefaultCountry;
-    } else if (defaultCountry) {
-      initialCountry = defaultCountry;
-    } else {
-      initialCountry = detectUserCountry();
-    }
-
-    setSelectedCountry(initialCountry);
+    if (valueRef.current?.startsWith("+")) return;
+    chooseCountry(organizationDefaultCountry || defaultCountry || detectUserCountry());
+     
   }, [organizationDefaultCountry, defaultCountry]);
 
-  // Parsear valor inicial si viene con E.164
+  // Sincronizar con el valor que manda el padre, salvo que sea el eco de lo
+  // que este componente acaba de avisar. Tras leer un valor externo se avisa
+  // una vez con el resultado (los formularios con número precargado saben así
+  // si es válido); su eco vuelve igual a lastEmittedRef y se ignora.
   useEffect(() => {
+    const incoming = value || null;
+    if (incoming === lastEmittedRef.current) return;
+
     if (!value) {
+      lastEmittedRef.current = null;
       setNationalNumber("");
-      setPreviewE164("");
       return;
     }
 
+    let national = value.replace(/[^\d]/g, "");
+    let country = countryRef.current;
     if (value.startsWith("+")) {
       // Es E.164, extraer país y número nacional
-      const country = extractCountryFromE164(value);
-      if (country) {
-        setSelectedCountry(country);
-        const result = normalizePhoneNumber(value, country);
-        if (result.isValid && result.phone_national) {
-          // Limpiar formato nacional (quitar paréntesis, espacios, guiones)
-          const cleanNational = result.phone_national.replace(/[^\d]/g, "");
-          setNationalNumber(cleanNational);
-        }
+      const fromValue = extractCountryFromE164(value);
+      if (fromValue) {
+        country = fromValue;
+        chooseCountry(fromValue);
+        const result = normalizePhoneNumber(value, fromValue);
+        // Limpiar formato nacional (quitar paréntesis, espacios, guiones)
+        national = result.isValid && result.phone_national ? result.phone_national.replace(/[^\d]/g, "") : "";
       }
-      setPreviewE164(value);
-    } else {
-      // Es número nacional, usar tal como viene
-      setNationalNumber(value.replace(/[^\d]/g, ""));
     }
+    setNationalNumber(national);
+    emit(national, country);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  // Actualizar preview y notificar cambios
-  useEffect(() => {
-    if (!nationalNumber.trim()) {
-      setPreviewE164("");
-      onChange?.(null, null, false);
-      return;
-    }
-
+  // Vista previa del número completo (derivada, sin estado propio).
+  const previewE164 = React.useMemo(() => {
+    if (!nationalNumber.trim()) return "";
     const result = normalizePhoneNumber(nationalNumber, selectedCountry);
-
-    if (result.isValid && result.phone_e164) {
-      setPreviewE164(result.phone_e164);
-      onChange?.(result.phone_e164, result.phone_country, true);
-    } else {
-      setPreviewE164(
-        `${getCallingCodeDisplay(selectedCountry)}${nationalNumber} (inválido)`
-      );
-      onChange?.(null, null, false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCountry, nationalNumber]);
+    if (result.isValid && result.phone_e164) return result.phone_e164;
+    return `${getCallingCodeDisplay(selectedCountry)}${nationalNumber} (inválido)`;
+     
+  }, [nationalNumber, selectedCountry]);
 
   // Detectar si el usuario pega un número con +
   const handleNationalNumberChange = (
@@ -134,7 +150,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
     if (inputValue.startsWith("+")) {
       const country = extractCountryFromE164(inputValue);
       if (country && country !== selectedCountry) {
-        setSelectedCountry(country);
+        chooseCountry(country);
       }
       // Extraer solo los dígitos después del código de país
       const result = normalizePhoneNumber(
@@ -144,6 +160,7 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
       if (result.phone_national) {
         const cleanNational = result.phone_national.replace(/[^\d]/g, "");
         setNationalNumber(cleanNational);
+        emit(cleanNational, country || selectedCountry);
         return;
       }
     }
@@ -151,17 +168,14 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
     // Solo permitir dígitos
     const cleanValue = inputValue.replace(/[^\d]/g, "");
     setNationalNumber(cleanValue);
+    emit(cleanValue, selectedCountry);
   };
 
   const handleCountryChange = (countryCode: string | null) => {
     if (countryCode && isValidCountryCode(countryCode)) {
-      setSelectedCountry(countryCode as CountryCode);
+      chooseCountry(countryCode as CountryCode);
+      if (nationalNumber.trim()) emit(nationalNumber, countryCode as CountryCode);
     }
-  };
-
-  const getCallingCodeDisplay = (country: CountryCode): string => {
-    const info = getAllCountries().find((c) => c.value === country);
-    return info?.callingCode ?? "+57";
   };
 
   const callingCode = getCallingCodeDisplay(selectedCountry);

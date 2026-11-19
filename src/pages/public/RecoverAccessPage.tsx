@@ -33,6 +33,8 @@ import {
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { extractTenantFromHost } from "../../utils/domainUtils";
+import { detectSignupCountry } from "../../utils/signupRegion";
+import type { CountryCode } from "libphonenumber-js";
 import { AGENDITAPP_SUPPORT_WA_URL, recoveryExchangeUrl } from "../../utils/panelAccess";
 
 /**
@@ -86,6 +88,11 @@ export default function RecoverAccessPage() {
   const organization = useSelector((s: RootState) => s.organization.organization);
   const isGlobal = extractTenantFromHost().type === "signup";
   const scopedOrgId = !isGlobal ? organization?._id ?? null : null;
+  // País del selector: el del negocio en su página; el del navegador (zona
+  // horaria, como en el registro) en app.agenditapp.com.
+  const phoneDefaultCountry = (
+    (!isGlobal && organization?.default_country) || detectSignupCountry()
+  ).toUpperCase() as CountryCode;
 
   // Cuenta regresiva para "Reenviar código".
   useEffect(() => {
@@ -298,6 +305,8 @@ export default function RecoverAccessPage() {
             ) : (
               <InternationalPhoneInput
                 label="Celular"
+                compact
+                defaultCountry={phoneDefaultCountry}
                 value={phone}
                 onChange={(e164) => setPhone(e164 || "")}
                 placeholder="300 000 0000"
