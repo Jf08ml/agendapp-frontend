@@ -152,6 +152,12 @@ export interface Organization {
   createdAt?: string;
   name: string;
   email: string;
+  /** Perfil del negocio en Google (Place ID → enlace para dejar reseña). */
+  googleBusiness?: {
+    placeId?: string | null;
+    name?: string | null;
+    address?: string | null;
+  } | null;
   /** Rebote permanente del correo del dueño (cron emailBounceJob). Vigente si address === email. */
   ownerEmailBounce?: {
     address?: string | null;

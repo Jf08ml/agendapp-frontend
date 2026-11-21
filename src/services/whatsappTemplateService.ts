@@ -39,6 +39,7 @@ export interface WhatsappTemplates {
   birthdayGreeting: WhatsappTemplate;
   // 🔁 Recordatorio de seguimiento entre servicios relacionados
   followUpReminder: WhatsappTemplate;
+  googleReviewRequest: WhatsappTemplate;
   // 🛍️ Pago recibido (tienda pública)
   paymentReceived: WhatsappTemplate;
   // 🔔 Mensajes del sistema (avisos al admin)
@@ -77,6 +78,7 @@ export interface TemplatesResponse {
     classReminder?: string;
     birthdayGreeting?: string;
     followUpReminder?: string;
+    googleReviewRequest?: string;
     paymentReceived?: string;
     adminPaymentAlert?: string;
     adminNewOrderAlert?: string;
@@ -112,6 +114,7 @@ export interface WhatsappTemplateSettings {
   birthdayGreeting?: boolean;
   // 🔁 Recordatorio de seguimiento entre servicios relacionados
   followUpReminder?: boolean;
+  googleReviewRequest?: boolean;
   // 🛍️ Pago recibido (tienda pública)
   paymentReceived?: boolean;
   // 🔔 Mensajes del sistema (avisos al admin)
