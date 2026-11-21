@@ -117,6 +117,11 @@ export const normalizeOrg = (response: Organization): Organization => ({
   timeFormat: response.timeFormat ?? "12h",
   aiAssistantName: response.aiAssistantName ?? "Roxi",
   aiAssistantInfo: response.aiAssistantInfo ?? "",
+  googleBusiness: {
+    placeId: response.googleBusiness?.placeId ?? null,
+    name: response.googleBusiness?.name ?? null,
+    address: response.googleBusiness?.address ?? null,
+  },
   reschedulePolicy: {
     enabled: response.reschedulePolicy?.enabled ?? false,
     maxReschedules: response.reschedulePolicy?.maxReschedules ?? 1,

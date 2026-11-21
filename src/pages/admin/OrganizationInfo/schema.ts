@@ -130,6 +130,15 @@ export const schema = z.object({
     .object({ lat: z.number(), lng: z.number() })
     .nullable()
     .optional(),
+  // Perfil del negocio en Google (enlace para reseñas)
+  googleBusiness: z
+    .object({
+      placeId: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
+      address: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 
   referredCount: z.union([z.number().min(0), z.null(), z.undefined()]).optional(),
   referredReward: optionalString,

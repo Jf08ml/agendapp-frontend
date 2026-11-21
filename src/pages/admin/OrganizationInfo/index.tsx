@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
-import { Container, Divider, ScrollArea, Tabs, rem } from "@mantine/core";
+import { Container, Divider, ScrollArea, Stack, Tabs, rem } from "@mantine/core";
 import { useDispatch, useSelector } from "react-redux";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../../utils/zodResolver";
@@ -40,6 +40,7 @@ import ContactTab from "./components/tabs/ContactTab";
 import OpeningHoursTab from "./components/tabs/OpeningHoursTab";
 import SocialMediaTab from "./components/tabs/SocialMediaTab";
 import LocationTab from "./components/tabs/LocationTab";
+import GoogleBusinessCard from "./components/GoogleBusinessCard";
 import FidelityTab from "./components/tabs/FidelityTab";
 import BrandingTab from "./components/tabs/BrandingTab";
 import PaymentMethodsTab from "./components/tabs/PaymentMethodsTab";
@@ -319,7 +320,10 @@ export default function OrganizationInfo() {
         </Tabs.Panel>
 
         <Tabs.Panel value="location" pt="md">
-          <LocationTab form={form} isEditing={true} />
+          <Stack gap="md">
+            <LocationTab form={form} isEditing={true} />
+            <GoogleBusinessCard form={form} slug={org.slug} domains={org.domains || []} />
+          </Stack>
         </Tabs.Panel>
 
         <Tabs.Panel value="fidelity" pt="md">

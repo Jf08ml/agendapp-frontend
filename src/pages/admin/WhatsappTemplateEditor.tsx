@@ -314,6 +314,16 @@ const templateInfo = {
       { name: "{{days}}", desc: "Días transcurridos desde el servicio original" },
     ],
   },
+  googleReviewRequest: {
+    title: "Pedido de reseña en Google",
+    shortTitle: "Reseña en Google",
+    description: "Mensaje enviado unas horas después de una cita atendida, con el enlace para dejar una reseña en tu perfil de Google",
+    variables: [
+      { name: "{{names}}", desc: "Nombre del cliente" },
+      { name: "{{organization}}", desc: "Nombre del negocio" },
+      { name: "{{reviewUrl}}", desc: "Enlace para dejar la reseña en Google (se arma con tu perfil de Google de Mi negocio → Ubicación)" },
+    ],
+  },
   paymentReceived: {
     title: "Pago Recibido (Tienda)",
     shortTitle: "Pago recibido",
@@ -362,6 +372,7 @@ const SIDEBAR_GROUPS = [
   { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress", "loyaltyCardLink"] },
   { label: "Cumpleaños", keys: ["birthdayGreeting"] },
   { label: "Seguimiento", keys: ["followUpReminder"] },
+  { label: "Reseñas en Google", keys: ["googleReviewRequest"] },
   { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
 ] as const;
 
@@ -387,6 +398,7 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   myBookingsLink: "mis_reservas",
   birthdayGreeting: "cumpleanos_cliente",
   followUpReminder: "recordatorio_seguimiento",
+  googleReviewRequest: "solicitud_resena",
   paymentReceived: "pago_recibido",
   adminPaymentAlert: "aviso_pago_admin",
   adminNewOrderAlert: "aviso_pedido_admin",
@@ -442,6 +454,7 @@ export default function WhatsappTemplateEditor() {
     loyaltyReferralProgress: false,
     birthdayGreeting: false,
     followUpReminder: false,
+    googleReviewRequest: false,
     paymentReceived: true,
     adminPaymentAlert: true,
     adminNewOrderAlert: true,
@@ -554,6 +567,8 @@ export default function WhatsappTemplateEditor() {
         loyaltyReferralProgress: templateSettings.loyaltyReferralProgress ?? false,
         birthdayGreeting: templateSettings.birthdayGreeting,
         followUpReminder: templateSettings.followUpReminder,
+        // ⭐ Pedido de reseña en Google — apagado por defecto; siempre en el payload
+        googleReviewRequest: templateSettings.googleReviewRequest ?? false,
         // 🛍️ Pago recibido (tienda) — el backend REEMPLAZA todo enabledTypes,
         // así que este toggle DEBE ir siempre en el payload.
         paymentReceived: templateSettings.paymentReceived ?? true,
@@ -1003,6 +1018,37 @@ export default function WhatsappTemplateEditor() {
                                   }}
                                 />
                               </Group>
+                            </Paper>
+
+                            <Divider label="Reseñas en Google" labelPosition="center" />
+
+                            <Paper withBorder p="sm" radius="md">
+                              <Group justify="space-between" wrap="nowrap">
+                                <Box>
+                                  <Text size="sm" fw={500}>Pedir reseña en Google después de la cita</Text>
+                                  <Text size="xs" c="dimmed">
+                                    Unas 2 horas después de que una cita queda como «Asistió» (entre 9:00 a.m. y 8:00 p.m.),
+                                    el cliente recibe el enlace para dejar su reseña. Máximo un mensaje por cliente cada 6 meses.
+                                  </Text>
+                                </Box>
+                                <Switch
+                                  checked={templateSettings.googleReviewRequest ?? false}
+                                  disabled={!organization?.googleBusiness?.placeId && !templateSettings.googleReviewRequest}
+                                  onChange={(e) => {
+                                    const checked = e.currentTarget.checked;
+                                    setTemplateSettings((prev) => ({ ...prev, googleReviewRequest: checked }));
+                                  }}
+                                />
+                              </Group>
+                              {!organization?.googleBusiness?.placeId && (
+                                <Text size="xs" c="orange.7" mt={6}>
+                                  Primero busca tu negocio en Google desde Mi negocio → Ubicación → «Tu perfil de Google».
+                                </Text>
+                              )}
+                              <Text size="xs" c="dimmed" mt={6}>
+                                Se le pide a todos los clientes atendidos por igual: Google no permite pedir reseñas solo a
+                                quienes quedaron contentos.
+                              </Text>
                             </Paper>
 
                             <Divider label="Mensajes del sistema (a tu WhatsApp)" labelPosition="center" />

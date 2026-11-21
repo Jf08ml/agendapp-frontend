@@ -59,7 +59,8 @@ export interface MetaTemplateStatus {
 // {{currentCount}}→{{cantidad_actual}}, {{remaining}}→{{faltantes}}, {{nextReward}}→{{proximo_premio}},
 // {{cita_pal}}→{{cita_o_citas}}, {{agendada_pal}}→{{agendada_o_agendadas}},
 // {{recommendations}}→{{recomendaciones}}, {{previousDate}}→{{fecha_anterior}},
-// {{cardUrl}}→{{enlace_tarjeta}}, {{bookingsUrl}}→{{enlace_reservas}}
+// {{cardUrl}}→{{enlace_tarjeta}}, {{bookingsUrl}}→{{enlace_reservas}},
+// {{reviewUrl}}→{{enlace_resena}}
 
 const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
   scheduleAppointmentBatch: {
@@ -293,6 +294,16 @@ const META_TEMPLATE_DEFAULTS: Record<string, MetaTemplateDraft> = {
       "✨ ¡Hola, {{nombre_cliente}}!\n\nYa pasaron {{dias}} días desde tu {{servicio_original}} en *{{nombre_negocio}}*.\n\nEs un buen momento para agendar tu {{servicio_seguimiento}} y mantener tu resultado al día.\n\nSi tienes alguna pregunta o quieres agendar, responde a este mensaje. ¡Te esperamos! 💖",
     footerText: "",
   },
+  // ⭐ Pedido de reseña en Google tras la cita
+  googleReviewRequest: {
+    name: "solicitud_resena",
+    category: "UTILITY",
+    language: "es",
+    headerText: "",
+    bodyText:
+      "¡Hola, {{nombre_cliente}}! 😊\n\nGracias por visitarnos en *{{nombre_negocio}}*.\n\nTu opinión nos ayuda muchísimo a crecer. Si tienes un minuto, cuéntanos cómo te fue en Google:\n{{enlace_resena}}\n\n¡Gracias por confiar en nosotros! 💖",
+    footerText: "",
+  },
   // 🛍️ Tienda pública
   paymentReceived: {
     name: "pago_recibido",
@@ -363,6 +374,8 @@ const VARIABLE_EXAMPLES: Record<string, string> = {
   servicio_seguimiento: "Retoque de pestañas",
   servicio_original: "Montura de pestañas pelo a pelo",
   dias: "20",
+  // ⭐ Pedido de reseña en Google
+  enlace_resena: "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
   // 🛍️ Tienda pública
   monto: "$45.000",
   detalle_pedido: "2× Shampoo, 1× Cera",
