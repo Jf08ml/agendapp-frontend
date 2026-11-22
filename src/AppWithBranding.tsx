@@ -13,6 +13,7 @@ import { Notifications } from "@mantine/notifications";
 import GoogleMapsProvider from "./utils/GoogleMapsProvider";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { TouchBackend } from "react-dnd-touch-backend";
 import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
 import { extractTenantFromHost } from "./utils/domainUtils";
@@ -22,6 +23,14 @@ import { registerOrgGoogleTags } from "./utils/orgGoogleTags";
 // qué módulo cargara primero y llamara dayjs.locale("es")). Los selectores de
 // @mantine/dates NO leen el locale global de dayjs: usan el de <DatesProvider>.
 dayjs.locale("es");
+
+// Arrastre de citas: con mouse, HTML5; en pantallas táctiles, TouchBackend con
+// pulsación larga (400 ms) para que el scroll no mueva citas sin querer
+// (AgendaMovil). Al soltar se abre el modal de la cita para confirmar.
+const IS_TOUCH_PRIMARY =
+  typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+const DND_BACKEND = IS_TOUCH_PRIMARY ? TouchBackend : HTML5Backend;
+const DND_OPTIONS = IS_TOUCH_PRIMARY ? { delayTouchStart: 400, ignoreContextMenu: true } : undefined;
 
 declare global {
   interface Window {
@@ -190,7 +199,7 @@ export default function AppWithBranding() {
         <ModalsProvider>
           <Notifications />
           <GoogleMapsProvider>
-            <DndProvider backend={HTML5Backend}>
+            <DndProvider backend={DND_BACKEND} options={DND_OPTIONS}>
               <App />
             </DndProvider>
           </GoogleMapsProvider>

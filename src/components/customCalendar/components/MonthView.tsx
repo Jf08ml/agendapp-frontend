@@ -19,13 +19,13 @@ const BRAND = {
   deep: "var(--brand)",
   deepText: "var(--brand-text)",
   onDeep: "var(--on-brand)",
-  cream: "#FAF7F2",
-  surface: "#FFFFFF",
-  ink: "#101526",
-  body: "#404760",
-  muted: "#8B92A6",
-  line: "#E7E2D6",
-  lineSoft: "#F0EBE0",
+  cream: "var(--surface-muted)",
+  surface: "var(--surface-raised)",
+  ink: "var(--ink)",
+  body: "var(--ink-muted)",
+  muted: "var(--ink-subtle)",
+  line: "var(--line)",
+  lineSoft: "var(--line)",
   accent: "#D97A4A",
   accentSoft: "#FDF1E8",
 };
@@ -185,7 +185,7 @@ const MonthView: React.FC<MonthViewProps> = ({
 
           // Day number color
           let numColor = BRAND.ink;
-          if (outside) numColor = "#C9C2B5";
+          if (outside) numColor = "var(--line-strong)";
           else if (selected) numColor = BRAND.onDeep;
           else if (holiday) numColor = BRAND.accent;
           else if (today) numColor = BRAND.deepText;
@@ -223,7 +223,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     ? BRAND.deep
                     : holiday
                     ? "#FBEADC"
-                    : "#F5F1EC";
+                    : "var(--surface-hover)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = cellBg;
@@ -284,7 +284,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         width: 9,
                         height: 9,
                         borderRadius: "50%",
-                        background: hasSpace ? "#2F9E44" : "#CED4DA",
+                        background: hasSpace ? "var(--success)" : "var(--line-strong)",
                         border: selected ? "1px solid rgba(255,255,255,0.7)" : "none",
                         flexShrink: 0,
                       }}
@@ -316,7 +316,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        border: `1.5px solid ${selected ? BRAND.deep : "#fff"}`,
+                        border: `1.5px solid `,
                         marginLeft: i === 0 ? 0 : -4,
                         flexShrink: 0,
                         zIndex: 3 - i,

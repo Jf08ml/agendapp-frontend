@@ -9,12 +9,12 @@ const BRAND = {
   deep: "var(--brand)",
   deepText: "var(--brand-text)",
   onDeep: "var(--on-brand)",
-  cream: "#FAF7F2",
-  surface: "#FFFFFF",
-  ink: "#101526",
-  body: "#404760",
-  muted: "#8B92A6",
-  line: "#E7E2D6",
+  cream: "var(--surface-muted)",
+  surface: "var(--surface-raised)",
+  ink: "var(--ink)",
+  body: "var(--ink-muted)",
+  muted: "var(--ink-subtle)",
+  line: "var(--line)",
 };
 
 interface DayDetailPanelProps {

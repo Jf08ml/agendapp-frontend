@@ -15,7 +15,7 @@ import {
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
-import { HOUR_HEIGHT, CARD_WIDTH } from "./DayModal";
+import { HOUR_HEIGHT, CARD_WIDTH } from "./dayGrid";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezonePlugin from "dayjs/plugin/timezone";
@@ -210,13 +210,13 @@ const WeekView: FC<WeekViewProps> = ({
   const WEEK_BRAND = {
     deep: "var(--brand)",
     deepText: "var(--brand-text)",
-    cream: "#FAF7F2",
-    surface: "#FFFFFF",
-    line: "#E7E2D6",
-    lineSoft: "#F0EBE0",
-    muted: "#8B92A6",
-    body: "#404760",
-    ink: "#101526",
+    cream: "var(--surface-muted)",
+    surface: "var(--surface-raised)",
+    line: "var(--line)",
+    lineSoft: "var(--line)",
+    muted: "var(--ink-subtle)",
+    body: "var(--ink-muted)",
+    ink: "var(--ink)",
   };
 
   return (

@@ -21,8 +21,6 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
@@ -72,7 +70,7 @@ import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
 import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
-import { IconShieldCog, IconCalendarOff } from "@tabler/icons-react";
+import { IconShieldCog, IconCalendarOff, IconPlus } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
 
@@ -1363,50 +1361,18 @@ const ScheduleView: React.FC = () => {
           padding: isMobile ? "2px 2px 4px" : "2px 4px 6px",
         }}
       >
-        {/* Left: eyebrow (hidden on mobile) + month title (tipografía del negocio) */}
-        <Box style={{ minWidth: 0 }}>
-          {!isMobile && (
-            <Text
-              style={{
-                fontSize: 10.5,
-                letterSpacing: 2,
-                color: "var(--ink-muted)",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                lineHeight: 1,
-                marginBottom: 3,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: "clamp(160px, 30vw, 340px)",
-              }}
-            >
-              {organization?.name
-                ? `${organization.name} · Calendario`
-                : "Calendario"}
-            </Text>
-          )}
-          <Text
-            style={{
-              fontFamily: "var(--mantine-font-family)",
-              fontSize: isMobile ? 20 : 24,
-              fontWeight: 600,
-              fontStyle: "normal",
-              letterSpacing: "-0.015em",
-              color: "var(--ink)",
-              lineHeight: 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {format(currentDate, "MMMM", { locale: es }).charAt(0).toUpperCase() +
-              format(currentDate, "MMMM", { locale: es }).slice(1)}
-            {!isMobile && (
-              <span style={{ color: "var(--ink-muted)", fontWeight: 600 }}>
-                {" "}{format(currentDate, "yyyy")}
-              </span>
-            )}
-          </Text>
-        </Box>
+        {/* Título de página (title-2): la fecha y la vista van en la barra del calendario */}
+        <h1
+          style={{
+            margin: 0,
+            font: `600 ${isMobile ? 20 : 24}px/30px var(--mantine-font-family)`,
+            letterSpacing: "-0.015em",
+            color: "var(--ink)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Agenda
+        </h1>
 
         {/* Right: WA pill (compact on mobile) + create btn + actions menu */}
         <Group gap={isMobile ? 6 : 8} align="center" style={{ flexShrink: 0 }}>
@@ -1418,16 +1384,6 @@ const ScheduleView: React.FC = () => {
             blocked={organization?.planLimits?.whatsappIntegration === false}
             compact={isMobile}
           />
-
-          {!isMobile && hasPermission("appointments:create") && (
-            <Button
-              size="xs"
-              onClick={() => openModal(new Date(), new Date())}
-              style={{ borderRadius: 8 }}
-            >
-              Crear cita
-            </Button>
-          )}
 
           {(hasPermission("appointments:create") || hasPermission("appointments:manage_own_blocks")) && employees.length > 0 && (
             isMobile ? (
@@ -1445,11 +1401,9 @@ const ScheduleView: React.FC = () => {
             ) : (
               <Button
                 size="xs"
-                variant="light"
-                color="gray"
+                variant="default"
                 leftSection={<IconCalendarOff size={16} />}
                 onClick={() => setBlockModalOpened(true)}
-                style={{ borderRadius: 8 }}
               >
                 Bloquear
               </Button>
@@ -1507,6 +1461,13 @@ const ScheduleView: React.FC = () => {
             reminderDate={reminderDate}
             onChangeReminderDate={setReminderDate}
           />
+
+          {/* Único botón principal de la página (en móvil va flotante, abajo) */}
+          {!isMobile && hasPermission("appointments:create") && (
+            <Button size="sm" leftSection={<IconPlus size={16} />} onClick={() => openModal(new Date(), new Date())}>
+              Nueva cita
+            </Button>
+          )}
         </Group>
       </Box>
 
@@ -1537,6 +1498,25 @@ const ScheduleView: React.FC = () => {
 
       {/* Reporte de impacto + encuesta (modal una sola vez, auto-gateado en backend) */}
       <ImpactSurveyModal organizationId={organization?._id} />
+
+      {/* Móvil: «Nueva cita» flotante sobre la barra inferior (ag-fab) */}
+      {isMobile && hasPermission("appointments:create") && (
+        <Button
+          size="lg"
+          radius="xl"
+          leftSection={<IconPlus size={18} />}
+          onClick={() => openModal(new Date(), new Date())}
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: "calc(var(--app-shell-footer-offset, 0px) + 16px)",
+            zIndex: 150,
+            boxShadow: "var(--shadow-lg)",
+          }}
+        >
+          Nueva cita
+        </Button>
+      )}
 
       {/* Calendario principal — ocupa todo el alto restante */}
       <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>

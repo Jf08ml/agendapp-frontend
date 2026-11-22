@@ -1,7 +1,7 @@
 import { FC } from "react";
 import { Box, Text, ActionIcon, Tooltip } from "@mantine/core";
 import { Employee } from "../../../../services/employeeService";
-import { CARD_WIDTH } from "../DayModal";
+import { CARD_WIDTH } from "../dayGrid";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 
 interface HeaderProps {
@@ -33,7 +33,7 @@ const DayModalHeader: FC<HeaderProps> = ({
       style={{
         display: "flex",
         borderBottom: "1px solid #F0EBE0",
-        backgroundColor: "#FAF7F2",
+        backgroundColor: "var(--surface-muted)",
       }}
     >
       {/* Espacio reservado para la columna de horas — sticky left para que
@@ -45,7 +45,7 @@ const DayModalHeader: FC<HeaderProps> = ({
           position: "sticky",
           left: 0,
           zIndex: 5,
-          backgroundColor: "#FAF7F2",
+          backgroundColor: "var(--surface-muted)",
         }}
       />
 
@@ -70,7 +70,7 @@ const DayModalHeader: FC<HeaderProps> = ({
               textAlign: "center",
               marginLeft: "2px",
               padding: "6px 4px",
-              backgroundColor: isHidden ? "#F0EBE0" : color,
+              backgroundColor: isHidden ? "var(--surface-hover)" : color,
               borderRadius: 8,
               border: isHidden
                 ? "1px dashed #C9C2B5"
@@ -87,7 +87,7 @@ const DayModalHeader: FC<HeaderProps> = ({
               size="xs"
               fw={600}
               style={{
-                color: isHidden ? "#495057" : textColor,
+                color: isHidden ? "var(--ink-muted)" : textColor,
                 lineHeight: 1.2,
                 textAlign: "center",
                 wordBreak: "break-word",
@@ -114,9 +114,9 @@ const DayModalHeader: FC<HeaderProps> = ({
                   }}
                 >
                   {isHidden ? (
-                    <IoEyeOff size={14} color="#212529" />
+                    <IoEyeOff size={14} color="var(--ink)" />
                   ) : (
-                    <IoEye size={14} color="#212529" />
+                    <IoEye size={14} color="var(--ink)" />
                   )}
                 </ActionIcon>
               </Tooltip>

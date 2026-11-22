@@ -13,7 +13,7 @@ import { removeEmployeeException } from "../../../../services/scheduleService";
 import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../../utils/scheduleUtils";
 import DraggableAppointmentCard from "../DraggableAppointmentCard";
 import { describeRecurrence, exceptionAppliesToDay } from "../../../../utils/scheduleExceptions";
-import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../DayModal";
+import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../dayGrid";
 
 interface DayBlock {
   id?: string;
@@ -186,9 +186,9 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       const mousePos = monitor.getClientOffset();
       if (!mousePos) return;
 
-      const devicePixelRatio = isTouchDevice() ? window.devicePixelRatio : 1;
+      // getClientOffset ya viene en píxeles CSS (mouse y táctil): no se divide por devicePixelRatio
       const scrollOffset = columnRef.current.scrollTop || 0;
-      const correctedY = (mousePos.y - boundingRect.top) / devicePixelRatio;
+      const correctedY = mousePos.y - boundingRect.top;
       const yTop = correctedY - item.offsetY + scrollOffset;
 
       const totalMinutes = Math.round((yTop / HOUR_HEIGHT) * 60);
@@ -401,7 +401,7 @@ const renderGuides = () => {
           top: 0,
           bottom: 0,
           left: 0,              // o right: 0 si la quieres al borde derecho
-          borderLeft: "1px solid #e0e0e0",
+          borderLeft: "1px solid var(--line)",
           pointerEvents: "none",
         }}
       />
@@ -423,7 +423,7 @@ const renderGuides = () => {
                 left: 0,
                 right: 0,
                 borderTop: isMain
-                  ? "2px solid #e0e0e0"
+                  ? "2px solid var(--line-strong)"
                   : "1px dashed rgb(171, 171, 173)",
                 pointerEvents: "none",
               }}
@@ -454,10 +454,10 @@ const renderGuides = () => {
       style={{
         width: `${columnWidth ?? CARD_WIDTH}px`,
         marginLeft: 2,
-        borderRight: "1px solid #e0e0e0",
+        borderRight: "1px solid var(--line)",
         position: "relative",
-        background: isOver ? "rgba(76, 175, 80, 0.04)" : "#fff",
-        outline: isOver ? "2px dashed #4caf50" : "none",
+        background: isOver ? "var(--brand-soft)" : "var(--surface-raised)",
+        outline: isOver ? "2px dashed var(--brand-text)" : "none",
         outlineOffset: -2,
         transition: "background 120ms ease, outline-color 120ms ease",
         cursor: canCreate ? "crosshair" : "default",
