@@ -68,3 +68,18 @@
 .lnd-footer__links a:hover { color: var(--ink); }
 .lnd-footer .ag-iconbtn { color: var(--ink-muted); }
 .lnd-footer .ag-iconbtn:hover { background: var(--surface-hover); color: var(--ink); }
+
+/* Esencial: servicios en lista y «Más opciones» */
+.lnd-svcrow { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4); border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.lnd-svcrow:last-child { border-bottom: 0; }
+.lnd-svcrow:hover { background: var(--surface-hover); }
+.lnd-svcrow__thumb { width: 56px; height: 56px; flex: none; border-radius: var(--radius-md); overflow: hidden; }
+.lnd-svcrow__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.lnd-svcrow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lnd-svcrow__main b { font-weight: 600; font-size: 15px; line-height: 21px; overflow-wrap: anywhere; }
+.lnd-svcrow__dur { display: none; width: 96px; flex: none; }
+.lnd-svcrow__price { flex: none; text-align: right; min-width: 84px; }
+@media (min-width: 48em) { .lnd-svcrow__dur { display: inline-flex; } }
+.lnd-morerow { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 15px; }
+.lnd-morerow:hover { color: var(--brand-text); }
+.lnd-morerow__icon { width: 32px; height: 32px; flex: none; border-radius: var(--radius-full); background: var(--surface-hover); color: var(--ink-muted); display: grid; place-items: center; }

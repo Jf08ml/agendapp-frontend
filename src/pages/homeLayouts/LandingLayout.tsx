@@ -3,28 +3,22 @@
 // fidelidad · horario y ubicación · pie con enlaces. Cada bloque se oculta si
 // no hay datos. Los textos del negocio (welcomeTitle / welcomeDescription) se
 // muestran tal cual. Sin «Próximo horario libre» (Fase 3).
-import { GoogleMap, Marker } from "@react-google-maps/api";
 import { Link, useNavigate } from "react-router-dom";
-import { Anchor, Avatar, Box, Button, Group, SimpleGrid } from "@mantine/core";
+import { Anchor, Avatar, Box, Button, SimpleGrid } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
 import { getEmployeesByOrganizationId, Employee } from "../../services/employeeService";
 import { getAvailableSessions, ClassSession } from "../../services/classService";
 import { formatCurrency } from "../../utils/formatCurrency";
-import { formatTimeFromISO, toSpanishMeridiem } from "../../utils/timeFormatUtils";
+import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 import { useSelector } from "react-redux";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
 import {
   IconArrowRight,
-  IconBrandFacebook,
-  IconBrandInstagram,
-  IconBrandTiktok,
-  IconBrandWhatsapp,
   IconCalendarEvent,
   IconClock,
   IconGift,
   IconMapPin,
-  IconPhone,
   IconPhoto,
   IconStar,
 } from "@tabler/icons-react";
@@ -32,13 +26,13 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import "dayjs/locale/es";
+import { HoursAndLocation, LandingFooter, OpenStatus, useBusinessHours } from "./landingShared";
 import "./landing.css";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("es");
 
-const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 // El landing es un adelanto; el catálogo completo vive en /servicios-precios
 const SERVICES_LIMIT = 8;
 
@@ -57,11 +51,6 @@ interface LandingLayoutProps {
   enableOnlineBooking?: boolean;
 }
 
-const toMinutes = (hhmm: string) => {
-  const [h, m] = hhmm.split(":").map((n) => parseInt(n, 10));
-  return (h || 0) * 60 + (m || 0);
-};
-
 export function LandingLayout({
   features,
   welcomeTitle,
@@ -72,76 +61,12 @@ export function LandingLayout({
   const navigate = useNavigate();
   const org = useSelector(selectOrganization);
   const tf = org?.timeFormat;
-  const fmtHour = (hhmm: string) => toSpanishMeridiem(formatTimeFromISO(hhmm, tf));
 
   const [services, setServices] = useState<Service[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [classSessions, setClassSessions] = useState<ClassSession[]>([]);
 
-  // Horario de hoy: weeklySchedule si está activo; si no, openingHours
-  const todayInfo = useMemo(() => {
-    const tz = org?.timezone || "America/Bogota";
-    const parts = new Intl.DateTimeFormat("en", {
-      timeZone: tz,
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "short",
-      hour12: false,
-    }).formatToParts(new Date());
-    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const todayIndex = dayMap[get("weekday")] ?? new Date().getDay();
-    const cur = parseInt(get("hour")) * 60 + parseInt(get("minute"));
-
-    let start: string | undefined;
-    let end: string | undefined;
-    if (org?.weeklySchedule?.enabled) {
-      const day = org.weeklySchedule.schedule?.find((d) => d.day === todayIndex);
-      if (!day || day.isOpen === false || day.isAvailable === false) return { status: "closed_today" as const };
-      start = day.start;
-      end = day.end;
-    } else {
-      const oh = org?.openingHours;
-      if (!oh?.start || !oh?.end) return null;
-      if (!(oh.businessDays ?? [1, 2, 3, 4, 5]).includes(todayIndex)) return { status: "closed_today" as const };
-      start = oh.start;
-      end = oh.end;
-    }
-    if (!start || !end) return { status: "closed_today" as const };
-    if (cur >= toMinutes(start) && cur < toMinutes(end)) return { status: "open" as const, start, end };
-    if (cur < toMinutes(start)) return { status: "opens_soon" as const, start, end };
-    return { status: "closed_now" as const, start, end };
-  }, [org?.weeklySchedule, org?.openingHours, org?.timezone]);
-
-  // Horario de la semana (misma doble fuente)
-  const weeklyHours = useMemo(() => {
-    const tz = org?.timezone || "America/Bogota";
-    const parts = new Intl.DateTimeFormat("en", { timeZone: tz, weekday: "short" }).formatToParts(new Date());
-    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const todayIndex = dayMap[parts.find((p) => p.type === "weekday")?.value ?? ""] ?? new Date().getDay();
-    // Lunes primero
-    const order = [1, 2, 3, 4, 5, 6, 0];
-
-    if (org?.weeklySchedule?.enabled) {
-      const schedule = org.weeklySchedule.schedule;
-      if (!schedule || schedule.length === 0) return [];
-      return order.map((i) => {
-        const day = schedule.find((d) => d.day === i);
-        const isOpen = !!(day && day.isOpen !== false && day.isAvailable !== false);
-        return { name: DAY_NAMES[i], isToday: i === todayIndex, isOpen, start: day?.start, end: day?.end };
-      });
-    }
-    const oh = org?.openingHours;
-    if (!oh?.start || !oh?.end) return [];
-    const businessDays = oh.businessDays ?? [1, 2, 3, 4, 5];
-    return order.map((i) => ({
-      name: DAY_NAMES[i],
-      isToday: i === todayIndex,
-      isOpen: businessDays.includes(i),
-      start: oh.start,
-      end: oh.end,
-    }));
-  }, [org?.weeklySchedule, org?.openingHours, org?.timezone]);
+  const { weeklyHours, status } = useBusinessHours();
 
   useEffect(() => {
     if (!organizationId) return;
@@ -191,21 +116,6 @@ export function LandingLayout({
   const showLoyalty = org?.showLoyaltyProgram !== false;
   const hasLocation = !!(org?.address || org?.phoneNumber || weeklyHours.length > 0);
 
-  const statusText = (() => {
-    if (!todayInfo) return null;
-    if (todayInfo.status === "open") return { tone: "success", text: `Abierto ahora · cierra a las ${fmtHour(todayInfo.end)}` };
-    if (todayInfo.status === "opens_soon") return { tone: "warning", text: `Cerrado ahora · abre a las ${fmtHour(todayInfo.start)}` };
-    if (todayInfo.status === "closed_now") return { tone: "danger", text: "Cerrado ahora" };
-    return { tone: "danger", text: "Hoy no abrimos" };
-  })();
-
-  const socials = [
-    { url: org?.instagramUrl, label: "Instagram", Icon: IconBrandInstagram },
-    { url: org?.facebookUrl, label: "Facebook", Icon: IconBrandFacebook },
-    { url: org?.tiktokUrl, label: "TikTok", Icon: IconBrandTiktok },
-    { url: org?.whatsappUrl, label: "WhatsApp", Icon: IconBrandWhatsapp },
-  ].filter((s) => !!s.url);
-
   const goToService = (service: Service) => navigate(`/servicio/${service._id}`, { state: { backTo: "/" } });
 
   return (
@@ -213,12 +123,7 @@ export function LandingLayout({
       {/* ─── Hero claro ─────────────────────────────────────────────────── */}
       <section className="lnd-wrap lnd-hero">
         <div className="lnd-hero__text">
-          {statusText && (
-            <span className="ag-open">
-              <i style={{ background: `var(--${statusText.tone})` }} />
-              {statusText.text}
-            </span>
-          )}
+          <OpenStatus status={status} />
           <h1 className="lnd-display">{welcomeTitle}</h1>
           {welcomeDescription && <p className="lnd-lead">{welcomeDescription}</p>}
           <div className="ag-row" style={{ gap: 12 }}>
@@ -404,88 +309,13 @@ export function LandingLayout({
               </div>
             )}
 
-            {hasLocation && (
-              <div className="ag-card lnd-location">
-                {org?.location?.lat && org?.location?.lng ? (
-                  <Link to="/location" className="lnd-location__map" aria-label="Ver la ubicación">
-                    <GoogleMap
-                      mapContainerStyle={{ width: "100%", height: "100%" }}
-                      center={{ lat: org.location.lat, lng: org.location.lng }}
-                      zoom={15}
-                      options={{ disableDefaultUI: true, gestureHandling: "none", clickableIcons: false }}
-                    >
-                      <Marker position={{ lat: org.location.lat, lng: org.location.lng }} />
-                    </GoogleMap>
-                  </Link>
-                ) : null}
-                <div className="lnd-location__body">
-                  <h2 className="ag-h">Horario y ubicación</h2>
-                  {org?.address && (
-                    <div className="ag-row" style={{ alignItems: "flex-start", gap: 10, flexWrap: "nowrap" }}>
-                      <IconMapPin size={18} stroke={1.75} style={{ flex: "none", marginTop: 2, color: "var(--ink-muted)" }} />
-                      <div>
-                        <div>{org.address}</div>
-                        <Anchor component={Link} to="/location" className="ag-link" underline="never">
-                          Cómo llegar
-                        </Anchor>
-                      </div>
-                    </div>
-                  )}
-                  {org?.phoneNumber && (
-                    <div className="ag-row" style={{ gap: 10 }}>
-                      <IconPhone size={18} stroke={1.75} style={{ color: "var(--ink-muted)" }} />
-                      <Anchor href={`tel:${org.phoneNumber}`} c="var(--ink)" underline="never">
-                        {org.phoneNumber}
-                      </Anchor>
-                    </div>
-                  )}
-                  {weeklyHours.length > 0 && (
-                    <dl className="lnd-hours">
-                      {weeklyHours.map((h) => (
-                        <div key={h.name} data-today={h.isToday || undefined}>
-                          <dt>
-                            {h.isToday && <IconClock size={14} stroke={2} style={{ marginRight: 4, verticalAlign: "-2px" }} />}
-                            {h.name}
-                          </dt>
-                          <dd className="ag-num">
-                            {h.isOpen && h.start && h.end ? `${fmtHour(h.start)} – ${fmtHour(h.end)}` : "Cerrado"}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  )}
-                </div>
-              </div>
-            )}
+            {hasLocation && <HoursAndLocation />}
           </div>
         </section>
       )}
 
       {/* ─── Pie: redes, enlaces y acceso del equipo ───────────────────── */}
-      <footer className="lnd-footer">
-        <div className="lnd-wrap lnd-footer__inner">
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <b style={{ fontSize: 15 }}>{org?.name}</b>
-            {socials.length > 0 && (
-              <Group gap={6}>
-                {socials.map(({ url, label, Icon }) => (
-                  <a key={label} href={url!} target="_blank" rel="noopener noreferrer" aria-label={label} className="ag-iconbtn">
-                    <Icon size={20} stroke={1.75} />
-                  </a>
-                ))}
-              </Group>
-            )}
-          </div>
-          <nav aria-label="Enlaces" className="lnd-footer__links">
-            {features.map((f) => (
-              <Link key={f.link} to={f.link}>
-                {f.title}
-              </Link>
-            ))}
-            <Link to="/login-admin">Acceso para el equipo</Link>
-          </nav>
-        </div>
-      </footer>
+      <LandingFooter links={features} />
     </Box>
   );
 }

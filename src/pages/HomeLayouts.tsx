@@ -15,9 +15,11 @@ export interface HomeLayoutProps {
   organizationId?: string;
 }
 
-// Re-exportar todos los layouts desde la carpeta homeLayouts
-export { ModernLayout } from "./homeLayouts/ModernLayout";
-export { MinimalLayout } from "./homeLayouts/MinimalLayout";
-export { CardsLayout } from "./homeLayouts/CardsLayout";
+// Re-exportar todos los layouts desde la carpeta homeLayouts. Minimal, Cards y
+// Modern muestran hoy la misma plantilla Esencial (rediseño); se conservan los
+// nombres para no cambiar qué ve cada negocio según su `homeLayout`.
+export { EssentialLayout as ModernLayout } from "./homeLayouts/EssentialLayout";
+export { EssentialLayout as MinimalLayout } from "./homeLayouts/EssentialLayout";
+export { EssentialLayout as CardsLayout } from "./homeLayouts/EssentialLayout";
 export { LandingLayout } from "./homeLayouts/LandingLayout";
 export { AcademyLandingLayout } from "./homeLayouts/AcademyLandingLayout";

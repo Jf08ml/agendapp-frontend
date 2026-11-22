@@ -72,7 +72,8 @@ export default function Home() {
 
   const features = allFeatures.filter((f) => f.show !== false);
 
-  const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
+  // Sin título propio: el nombre del negocio (LandingEsencial), no un saludo genérico
+  const welcomeTitle = organization?.welcomeTitle || organization?.name || "Bienvenido";
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás!";
   const planLimits = organization?.planLimits;
   const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing" | "academy";
