@@ -46,3 +46,11 @@ function _applyTimeFormat(hour: number, min: string, timeFormat?: string): strin
   const hour12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
   return `${hour12}:${min} ${period}`;
 }
+
+/**
+ * Web pública (design system): «2:00 p. m.» en lugar de «2:00 PM». El formato
+ * 24 h no tiene sufijo, así que respeta la configuración del negocio.
+ */
+export function toSpanishMeridiem(time: string): string {
+  return time.replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
+}

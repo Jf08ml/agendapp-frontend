@@ -30,6 +30,15 @@ interface StepMultiServiceDateProps {
   onDatePicked?: () => void;
 }
 
+// Día sin horarios (pasado, cerrado o lleno): tachado en ink-subtle, no depende solo del color
+const OFF_DAY_STYLE = {
+  color: "var(--ink-subtle)",
+  textDecoration: "line-through",
+  textDecorationColor: "var(--ink-subtle)",
+  opacity: 1,
+  cursor: "not-allowed",
+} as const;
+
 // Cuántos meses avanza solo el calendario buscando el primer día disponible
 const AUTO_SEARCH_MAX_MONTHS = 3;
 
@@ -257,9 +266,9 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
       const isBusinessDay = businessDays.includes(dayjs(date).day());
       const isSelected = selectedDate && dayjs(date).isSame(dayjs(selectedDate), "day");
 
-      // Día pasado o no laborable - sin estilo especial
+      // Día pasado o no laborable: tachado en ink-subtle (ag-day sin cupo)
       if (isPast || !isBusinessDay) {
-        return {};
+        return { style: OFF_DAY_STYLE };
       }
 
       // Seleccionado: relleno de marca (ag-day--selected)
@@ -281,12 +290,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
       if (hasAvailability === false) {
         return {
           disabled: true,
-          style: {
-            color: "var(--ink-subtle)",
-            textDecoration: "line-through",
-            textDecorationColor: "var(--line-strong)",
-            cursor: "not-allowed",
-          },
+          style: OFF_DAY_STYLE,
         };
       }
 
@@ -303,6 +307,40 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
       }
 
       return {};
+    },
+    [availability, businessDays, selectedDate]
+  );
+
+  // Día con horarios: número + punto success abajo (ag-day--free), así no depende solo del color
+  const renderDay = useCallback(
+    (date: Date) => {
+      const day = date.getDate();
+      const dateStr = dayjs(date).format("YYYY-MM-DD");
+      const free =
+        availability[dateStr] === true &&
+        !dayjs(date).isBefore(dayjs(), "day") &&
+        businessDays.includes(dayjs(date).day());
+      const isSelected = !!selectedDate && dayjs(date).isSame(dayjs(selectedDate), "day");
+      return (
+        <span style={{ position: "relative", display: "inline", lineHeight: 1 }}>
+          {day}
+          {free && (
+            <span
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: -7,
+                width: 4,
+                height: 4,
+                marginLeft: -2,
+                borderRadius: "var(--radius-full)",
+                background: isSelected ? "var(--on-brand)" : "var(--success)",
+              }}
+            />
+          )}
+        </span>
+      );
     },
     [availability, businessDays, selectedDate]
   );
@@ -333,6 +371,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
             size="md"
             locale="es"
             getDayProps={getDayProps}
+            renderDay={renderDay}
             excludeDate={isDisabledDay}
           />
         </Center>
@@ -340,6 +379,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
 
       <div className="ag-legend">
         <span><i style={{ background: "var(--success-soft)", boxShadow: "inset 0 0 0 1px var(--success)" }} />Con horarios libres</span>
+        <span style={{ textDecoration: "line-through", textDecorationColor: "var(--ink-subtle)" }}>Sin horarios</span>
         <span><i style={{ background: "var(--brand)" }} />Elegido</span>
       </div>
 

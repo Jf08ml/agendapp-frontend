@@ -12,7 +12,7 @@ import EmployeeAvatarPicker from "./EmployeeAvatarPicker";
 import { missingRequiredEmployee } from "./bookingUtilsMulti";
 import StepMultiServiceDate from "./StepMultiServiceDate";
 import StepMultiServiceTime from "./StepMultiServiceTime";
-import StepMultiServiceSummary, { ConfirmationPhoneNote } from "./StepMultiServiceSummary";
+import StepMultiServiceSummary from "./StepMultiServiceSummary";
 import StepHeading from "./StepHeading";
 import StepCustomerData from "./StepCustomerData";
 import { Service, getServicesByOrganizationId } from "../../services/serviceService";
@@ -46,7 +46,7 @@ import {
 } from "../../services/collectionService";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
 import dayjs from "dayjs";
-import { formatTimeFromISO, getTimeFormatStr } from "../../utils/timeFormatUtils";
+import { formatTimeFromISO, getTimeFormatStr, toSpanishMeridiem } from "../../utils/timeFormatUtils";
 import { formatCurrency } from "../../utils/formatCurrency";
 import CustomLoader from "../../components/customLoader/CustomLoader";
 import { ReservationDepositAlert } from "../../components/ReservationDepositAlert";
@@ -267,18 +267,19 @@ export default function MultiBookingWizard() {
 
   // Hora elegida, sin conversión de zona horaria
   const tf = organization?.timeFormat;
-  const startTimeText = (() => {
+  // Web pública: «2:00 p. m.» (respeta 12 h / 24 h del negocio)
+  const startTimeText = toSpanishMeridiem((() => {
     if (!times) return "";
     if ((times as any).startTimeStr) return formatTimeFromISO((times as any).startTimeStr, tf);
     const start = times.startTime ?? times.intervals[0]?.from;
     return start ? dayjs(start).format(getTimeFormatStr(tf)) : "";
-  })();
-  const endTimeText = (() => {
+  })());
+  const endTimeText = toSpanishMeridiem((() => {
     const last = times?.intervals[times.intervals.length - 1];
     if (!last) return "";
     if (last.endStr) return formatTimeFromISO(last.endStr, tf);
     return dayjs(last.to).format(getTimeFormatStr(tf));
-  })();
+  })());
 
   // Payloads
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
@@ -632,7 +633,6 @@ export default function MultiBookingWizard() {
               onTermsAcceptedChange={setTermsAccepted}
             />
 
-            {customerDetails.phone && <ConfirmationPhoneNote phone={customerDetails.phone} />}
             {depositActive && (
               <MpDepositNotice
                 percentage={depositPct}

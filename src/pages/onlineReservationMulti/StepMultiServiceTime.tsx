@@ -14,7 +14,15 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
+import {
+  formatTimeFromISO as formatTimeFromISOBase,
+  formatTime as formatTimeBase,
+  toSpanishMeridiem,
+} from "../../utils/timeFormatUtils";
+
+// Web pública: «2:00 p. m.» (respeta 12 h / 24 h del negocio)
+const formatTimeFromISO = (iso: string, tf?: string) => toSpanishMeridiem(formatTimeFromISOBase(iso, tf));
+const formatTime = (d: Date | string | null | undefined, tf?: string) => toSpanishMeridiem(formatTimeBase(d, tf));
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import {

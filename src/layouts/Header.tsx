@@ -22,7 +22,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
-import { IconCalendarEvent, IconLayoutDashboard } from "@tabler/icons-react";
+import { IconCalendarEvent, IconLayoutDashboard, IconLogin2 } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -167,27 +167,6 @@ export default function Header({ organization, showChristmas = false, platform =
             ))}
           </Group>
 
-          {/* Redes (escritorio) */}
-          {socials.length > 0 && (
-            <Group gap={2} visibleFrom="md" wrap="nowrap">
-              {socials.map(({ key, url, Icon, label }) => (
-                <Tooltip key={key} label={label} withArrow>
-                  <ActionIcon
-                    component="a"
-                    href={url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="subtle"
-                    color="gray"
-                    aria-label={label}
-                  >
-                    <Icon size={15} />
-                  </ActionIcon>
-                </Tooltip>
-              ))}
-            </Group>
-          )}
-
           <Group gap="xs" wrap="nowrap">
             {showPanelLink && (
               <Button
@@ -210,14 +189,32 @@ export default function Header({ organization, showChristmas = false, platform =
               </Button>
             )}
 
-            {/* Menú: enlaces (en móvil), redes, app y acceso del equipo. Reemplaza el
-                pie fijo que tenía la web pública. */}
-            <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
+            {/* Menú (cuando los enlaces no caben): enlaces, redes, app y acceso del
+                equipo. Reemplaza el pie fijo que tenía la web pública. */}
+            <Box hiddenFrom="lg">
+              <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
+            </Box>
+            {/* Escritorio ancho: los enlaces se ven; queda solo un acceso discreto del equipo */}
+            {!platform && !isAuthenticated && (
+              <Tooltip label="Acceso para el equipo" withArrow>
+                <ActionIcon
+                  component={Link}
+                  to="/login-admin"
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  aria-label="Acceso para el equipo"
+                  visibleFrom="lg"
+                >
+                  <IconLogin2 size={18} stroke={1.75} />
+                </ActionIcon>
+              </Tooltip>
+            )}
           </Group>
         </Group>
       </Group>
 
-      <Drawer opened={menuOpened} onClose={closeMenu} position="right" size={300} title={name || "Menú"}>
+      <Drawer opened={menuOpened} onClose={closeMenu} position="right" size={300} title={name || "Menú"} hiddenFrom="lg">
         <Stack gap={4}>
           {showPanelLink && (
             <UnstyledButton component={Link} to="/gestionar-agenda" onClick={closeMenu} py="xs" fw={600}>
