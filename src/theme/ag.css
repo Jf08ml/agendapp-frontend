@@ -258,3 +258,7 @@
 .ag-modal__foot { display: flex; gap: var(--space-2); justify-content: flex-end; align-items: center; padding: var(--space-3) var(--space-5); border-top: 1px solid var(--line); background: var(--surface-muted); }
 .ag-drawer__body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--space-4); }
 .ag-drawer__foot { flex: none; display: flex; align-items: center; gap: var(--space-2); justify-content: flex-end; margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5)); padding: var(--space-3) var(--space-5); border-top: 1px solid var(--line); background: var(--surface-raised); }
+
+/* Pestañas internas: sin barra de scroll (ni vertical ni horizontal), sin perder el desplazamiento táctil */
+.ag-subtabs { overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.ag-subtabs::-webkit-scrollbar { display: none; }

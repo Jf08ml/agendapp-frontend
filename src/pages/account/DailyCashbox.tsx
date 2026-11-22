@@ -84,6 +84,7 @@ import {
 } from "@tabler/icons-react";
 import { useSearchParams } from "react-router-dom";
 import CashSubtabs from "../../components/cash/CashSubtabs";
+import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 
 import {
   Expense,
@@ -1518,7 +1519,7 @@ const DailyCashbox: React.FC = () => {
                     <StatusBadge status={status} />
                   </Group>
                   <Text size="xs" c="dimmed" lineClamp={1}>
-                    {appointment.service?.name || "—"} · {formatInTimezone(appointment.startDate, timezone, `DD/MM/YY ${timeFmt}`)}
+                    {appointment.service?.name || "—"} · {toSpanishMeridiem(formatInTimezone(appointment.startDate, timezone, `DD/MM/YY ${timeFmt}`))}
                   </Text>
                   <Group gap="xs" mt={4} align="center" wrap="wrap">
                     <Text size="sm" fw={700}>{formatCurrency(total, currency)}</Text>
@@ -1577,7 +1578,7 @@ const DailyCashbox: React.FC = () => {
                   onClick={() => handleOpenApptDetail(appointment)}>
                   <Table.Td>
                     <Text size="sm">{formatInTimezone(appointment.startDate, timezone, `DD/MM/YY`)}</Text>
-                    <Text size="xs" c="dimmed">{formatInTimezone(appointment.startDate, timezone, timeFmt)}</Text>
+                    <Text size="xs" c="dimmed">{toSpanishMeridiem(formatInTimezone(appointment.startDate, timezone, timeFmt))}</Text>
                   </Table.Td>
                   <Table.Td>
                     <Text size="sm" fw={500}>{appointment.client?.name || "—"}</Text>
@@ -1636,7 +1637,7 @@ const DailyCashbox: React.FC = () => {
             <div>
               <Text fw={800} size="sm" lineClamp={1}>{selectedAppt.client?.name || "—"}</Text>
               <Text size="xs" c="dimmed" lineClamp={1}>
-                {selectedAppt.service?.name || "—"} · {formatInTimezone(selectedAppt.startDate, timezone, `DD/MM/YYYY ${timeFmt}`)}
+                {selectedAppt.service?.name || "—"} · {toSpanishMeridiem(formatInTimezone(selectedAppt.startDate, timezone, `DD/MM/YYYY ${timeFmt}`))}
               </Text>
             </div>
           ) : null
@@ -2031,8 +2032,10 @@ const DailyCashbox: React.FC = () => {
               {/* Período como segmento (también en móvil, con scroll horizontal) */}
               {(
                 <SegmentedControl
-                  fullWidth={!isMobile}
-                  style={isMobile ? { overflowX: "auto", maxWidth: "100%" } : undefined}
+                  // ag-segment compacto en escritorio; a todo el ancho en móvil
+                  fullWidth={isMobile}
+                  size={isMobile ? "sm" : "xs"}
+                  style={isMobile ? { overflowX: "auto", maxWidth: "100%" } : { alignSelf: "flex-start" }}
                   value={interval}
                   onChange={(v) => {
                     const next = v as Interval;
@@ -2139,6 +2142,7 @@ const DailyCashbox: React.FC = () => {
             >
               {formatCurrency(netMargin, currency)}
             </span>
+            <span className="ag-subtle">Citas confirmadas, ventas e ingresos, menos costos y gastos</span>
           </div>
         </SimpleGrid>
 
@@ -2538,7 +2542,7 @@ const DailyCashbox: React.FC = () => {
                       <Table.Tr key={sale._id}>
                         <Table.Td>
                           <Text size="sm">{formatInTimezone(sale.date, timezone, "DD/MM/YY")}</Text>
-                          <Text size="xs" c="dimmed">{formatInTimezone(sale.date, timezone, timeFmt)}</Text>
+                          <Text size="xs" c="dimmed">{toSpanishMeridiem(formatInTimezone(sale.date, timezone, timeFmt))}</Text>
                         </Table.Td>
                         <Table.Td>
                           <Text size="sm">
