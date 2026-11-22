@@ -426,7 +426,8 @@ export default function MultiBookingWizard() {
 
   if (mode === "choice") {
     return (
-      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}
+      // En móvil sin marco: la página usa el fondo completo (mockup ReservaMovil)
+      <Card withBorder={!isMobile} radius={isMobile ? 0 : "md"} p={isMobile ? "md" : "xl"}
         style={{ minHeight: FULL_H, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <BookingChoiceScreen
           onSelectAI={() => setMode("chat")}
@@ -441,7 +442,7 @@ export default function MultiBookingWizard() {
       ? services.find((s) => s._id === preselectedServiceId)
       : undefined;
     return (
-      <Card withBorder radius="md" p={0}
+      <Card withBorder={!isMobile} radius={isMobile ? 0 : "md"} p={0}
         style={{ overflow: "hidden", height: FULL_H, display: "flex", flexDirection: "column" }}>
         <BookingChatPanel
           onBack={onlyAiEnabled ? undefined : goToChoice}
@@ -612,8 +613,9 @@ export default function MultiBookingWizard() {
 
   return (
     <Card
-      withBorder
-      radius="md"
+      // En móvil sin marco: la página usa el fondo completo (mockup ReservaMovil)
+      withBorder={!isMobile}
+      radius={isMobile ? 0 : "md"}
       p={isMobile ? "sm" : "xl"}
       // overflow visible: el Card de Mantine trae overflow hidden, que rompe el
       // position: sticky de la barra de botones (abajo)

@@ -100,15 +100,14 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
         minHeight: 0,
       }}
     >
-      {/* Stats card */}
+      {/* Stats card: neutra (la marca se reserva para lo seleccionado y la acción principal) */}
       <Box
         style={{
-          background: BRAND.deep,
-          backgroundImage:
-            "radial-gradient(circle at 90% 0%, rgba(255,255,255,0.08), transparent 60%)",
+          background: "var(--surface-raised)",
+          border: "1px solid var(--line)",
           borderRadius: 16,
           padding: 18,
-          color: BRAND.onDeep,
+          color: "var(--ink)",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -119,7 +118,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
           style={{
             fontSize: 10.5,
             letterSpacing: 2,
-            opacity: 0.7,
+            color: "var(--ink-muted)",
             textTransform: "uppercase",
             fontWeight: 700,
           }}
@@ -159,7 +158,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                 style={{
                   width: 5,
                   height: `${h}%`,
-                  background: "color-mix(in srgb, var(--on-brand) 60%, transparent)",
+                  background: "var(--ink-muted)",
                   borderRadius: 2,
                   minHeight: 3,
                 }}
@@ -167,7 +166,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
             ))}
           </Box>
         </Box>
-        <Text style={{ fontSize: 12, opacity: 0.85, fontWeight: 500 }}>
+        <Text style={{ fontSize: 12, color: "var(--ink-muted)", fontWeight: 500 }}>
           {format(currentDate, "MMMM yyyy", { locale: es })}
         </Text>
       </Box>

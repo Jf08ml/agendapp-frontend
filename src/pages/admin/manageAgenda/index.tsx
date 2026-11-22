@@ -1363,14 +1363,14 @@ const ScheduleView: React.FC = () => {
           padding: isMobile ? "2px 2px 4px" : "2px 4px 6px",
         }}
       >
-        {/* Left: eyebrow (hidden on mobile) + Fraunces month title */}
+        {/* Left: eyebrow (hidden on mobile) + month title (tipografía del negocio) */}
         <Box style={{ minWidth: 0 }}>
           {!isMobile && (
             <Text
               style={{
                 fontSize: 10.5,
                 letterSpacing: 2,
-                color: "#8B92A6",
+                color: "var(--ink-muted)",
                 fontWeight: 700,
                 textTransform: "uppercase",
                 lineHeight: 1,
@@ -1388,11 +1388,12 @@ const ScheduleView: React.FC = () => {
           )}
           <Text
             style={{
-              fontFamily: "'Fraunces', serif",
-              fontSize: isMobile ? 20 : 26,
+              fontFamily: "var(--mantine-font-family)",
+              fontSize: isMobile ? 20 : 24,
               fontWeight: 600,
-              letterSpacing: -1,
-              color: "#101526",
+              fontStyle: "normal",
+              letterSpacing: "-0.015em",
+              color: "var(--ink)",
               lineHeight: 1,
               whiteSpace: "nowrap",
             }}
@@ -1400,7 +1401,7 @@ const ScheduleView: React.FC = () => {
             {format(currentDate, "MMMM", { locale: es }).charAt(0).toUpperCase() +
               format(currentDate, "MMMM", { locale: es }).slice(1)}
             {!isMobile && (
-              <span style={{ color: "#8B92A6", fontStyle: "italic", fontWeight: 400 }}>
+              <span style={{ color: "var(--ink-muted)", fontWeight: 600 }}>
                 {" "}{format(currentDate, "yyyy")}
               </span>
             )}

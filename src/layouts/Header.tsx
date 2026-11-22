@@ -11,6 +11,7 @@ import {
   Box,
   Burger,
   Button,
+  Divider,
   Drawer,
   Group,
   Skeleton,
@@ -23,10 +24,12 @@ import { useDisclosure } from "@mantine/hooks";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
 import { IconCalendarEvent, IconLayoutDashboard } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../features/auth/sliceAuth";
+import { usePwaActions } from "../hooks/usePwaActions";
 import { Organization } from "../services/organizationService";
-import { RootState } from "../app/store";
+import { AppDispatch, RootState } from "../app/store";
 import { SantaHat } from "../components/seasonal/ChristmasDecorations";
 import { orgInitials } from "./navIcons";
 
@@ -65,6 +68,20 @@ export default function Header({ organization, showChristmas = false, platform =
   const [menuOpened, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
   const { isAuthenticated, role } = useSelector((s: RootState) => s.auth);
   const isSuperadmin = role === "superadmin";
+  const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const { canInstall, install, updateAvailable, applyUpdate, clearing, clearCache } = usePwaActions();
+
+  // Antes en el pie fijo: entrar como equipo o cerrar sesión.
+  const handleAuthAction = () => {
+    closeMenu();
+    if (isAuthenticated) {
+      dispatch(logout());
+      navigate("/");
+    } else {
+      navigate("/login-admin");
+    }
+  };
 
   const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding } = organization || {};
   const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
@@ -193,24 +210,14 @@ export default function Header({ organization, showChristmas = false, platform =
               </Button>
             )}
 
-            {/* Menú (móvil y escritorio angosto) */}
-            {(links.length > 0 || socials.length > 0 || showPanelLink) && (
-              <Box hiddenFrom="lg">
-                <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
-              </Box>
-            )}
+            {/* Menú: enlaces (en móvil), redes, app y acceso del equipo. Reemplaza el
+                pie fijo que tenía la web pública. */}
+            <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
           </Group>
         </Group>
       </Group>
 
-      <Drawer
-        opened={menuOpened}
-        onClose={closeMenu}
-        position="right"
-        size={300}
-        title={name || "Menú"}
-        hiddenFrom="lg"
-      >
+      <Drawer opened={menuOpened} onClose={closeMenu} position="right" size={300} title={name || "Menú"}>
         <Stack gap={4}>
           {showPanelLink && (
             <UnstyledButton component={Link} to="/gestionar-agenda" onClick={closeMenu} py="xs" fw={600}>
@@ -232,24 +239,59 @@ export default function Header({ organization, showChristmas = false, platform =
           ))}
           {socials.length > 0 && (
             <Group gap="xs" mt="md">
-                {socials.map(({ key, url, Icon, label }) => (
-                  <ActionIcon
-                    key={key}
-                    component="a"
-                    href={url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="default"
-                    size="lg"
-                    aria-label={label}
-                  >
-                    <Icon size={16} />
-                  </ActionIcon>
-                ))}
-              </Group>
+              {socials.map(({ key, url, Icon, label }) => (
+                <ActionIcon
+                  key={key}
+                  component="a"
+                  href={url!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="default"
+                  size="lg"
+                  aria-label={label}
+                >
+                  <Icon size={16} />
+                </ActionIcon>
+              ))}
+            </Group>
+          )}
+
+          <Divider my="md" color="var(--line)" />
+
+          {canInstall && (
+            <UnstyledButton onClick={() => { closeMenu(); void install(); }} py={6} fz="sm" c="var(--ink-muted)">
+              Instalar app
+            </UnstyledButton>
+          )}
+          {updateAvailable && (
+            <UnstyledButton onClick={applyUpdate} py={6} fz="sm" c="var(--ink-muted)">
+              Actualizar app
+            </UnstyledButton>
+          )}
+          <UnstyledButton onClick={clearCache} disabled={clearing} py={6} fz="sm" c="var(--ink-muted)">
+            Limpiar caché del sitio
+          </UnstyledButton>
+          <UnstyledButton onClick={handleAuthAction} py={6} fz="sm" c="var(--ink-muted)">
+            {isAuthenticated ? "Cerrar sesión" : "Acceso para el equipo"}
+          </UnstyledButton>
+
+          {organization?.planLimits?.brandingVisible === true && (
+            <Text fz="xs" c="var(--ink-subtle)" mt="md">
+              Impulsado por{" "}
+              <Anchor
+                href="https://www.agenditapp.com?utm_source=app-public&utm_medium=referral&utm_campaign=powered-by"
+                target="_blank"
+                rel="noopener noreferrer"
+                fz="xs"
+                c="var(--platform)"
+              >
+                AgenditApp
+              </Anchor>
+            </Text>
           )}
         </Stack>
       </Drawer>
     </Box>
   );
 }
+            {/* Menú (móvil y escritorio angosto) */}
