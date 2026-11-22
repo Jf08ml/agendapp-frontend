@@ -6,7 +6,9 @@ import { Appointment } from "../../../services/appointmentService";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
 
 const BRAND = {
-  deep: "#1E3A8A",
+  deep: "var(--brand)",
+  deepText: "var(--brand-text)",
+  onDeep: "var(--on-brand)",
   cream: "#FAF7F2",
   surface: "#FFFFFF",
   ink: "#101526",
@@ -106,7 +108,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
             "radial-gradient(circle at 90% 0%, rgba(255,255,255,0.08), transparent 60%)",
           borderRadius: 16,
           padding: 18,
-          color: "#fff",
+          color: BRAND.onDeep,
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -157,7 +159,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                 style={{
                   width: 5,
                   height: `${h}%`,
-                  background: "rgba(255,255,255,0.6)",
+                  background: "color-mix(in srgb, var(--on-brand) 60%, transparent)",
                   borderRadius: 2,
                   minHeight: 3,
                 }}
@@ -367,14 +369,14 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
           onClick={() => onCreateAppointment(selectedDay)}
           style={{
             background: BRAND.deep,
-            color: "#fff",
+            color: BRAND.onDeep,
             borderRadius: 10,
             padding: "11px 14px",
             fontSize: 13,
             fontWeight: 600,
             textAlign: "center",
             cursor: "pointer",
-            boxShadow: "0 2px 6px rgba(30,58,138,0.2)",
+            boxShadow: "var(--shadow-sm)",
             flexShrink: 0,
             transition: "opacity 0.12s",
             userSelect: "none",

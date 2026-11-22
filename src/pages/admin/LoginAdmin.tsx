@@ -15,7 +15,6 @@ import { login } from "../../services/authService";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import { useMediaQuery } from "@mantine/hooks";
 import { RootState } from "../../app/store";
-import colors from "../../theme/colores";
 import { extractTenantFromHost } from "../../utils/domainUtils";
 import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage, RECOVER_ACCESS_PATH } from "../../utils/panelAccess";
 
@@ -210,7 +209,7 @@ const LoginAdmin: React.FC = () => {
         />
 
         {error && (
-          <Text c={contrastText === "#FFFFFF" ? "#FFD2D2" : colors.errorText} mb="md">
+          <Text c={contrastText === "#FFFFFF" ? "#FFD2D2" : "var(--danger)"} mb="md">
             {error}
           </Text>
         )}

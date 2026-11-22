@@ -208,7 +208,8 @@ const WeekView: FC<WeekViewProps> = ({
   const EMP_ROW_H = 32;  // employee name chips
 
   const WEEK_BRAND = {
-    deep: "#1E3A8A",
+    deep: "var(--brand)",
+    deepText: "var(--brand-text)",
     cream: "#FAF7F2",
     surface: "#FFFFFF",
     line: "#E7E2D6",
@@ -296,7 +297,7 @@ const WeekView: FC<WeekViewProps> = ({
                     ? "rgba(30,58,138,0.06)"
                     : "transparent",
                   borderBottom: isCurrentDay
-                    ? `2px solid ${WEEK_BRAND.deep}`
+                    ? `2px solid ${WEEK_BRAND.deepText}`
                     : "2px solid transparent",
                 }}
               >
@@ -306,7 +307,7 @@ const WeekView: FC<WeekViewProps> = ({
                     fontWeight: 700,
                     letterSpacing: 1.5,
                     textTransform: "uppercase",
-                    color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                    color: isCurrentDay ? WEEK_BRAND.deepText : WEEK_BRAND.muted,
                   }}
                 >
                   {format(day, isMobile ? "EEE" : "EEEE", { locale: es })}
@@ -327,7 +328,7 @@ const WeekView: FC<WeekViewProps> = ({
                     style={{
                       fontSize: 14,
                       fontWeight: isCurrentDay ? 700 : 500,
-                      color: isCurrentDay ? "#fff" : WEEK_BRAND.ink,
+                      color: isCurrentDay ? "var(--on-brand)" : WEEK_BRAND.ink,
                       lineHeight: 1,
                     }}
                   >
@@ -341,7 +342,7 @@ const WeekView: FC<WeekViewProps> = ({
                       fontWeight: 500,
                       lineHeight: 1,
                       marginTop: 2,
-                      color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                      color: isCurrentDay ? WEEK_BRAND.deepText : WEEK_BRAND.muted,
                     }}
                   >
                     {dayApts.length} {dayApts.length === 1 ? "cita" : "citas"}
@@ -494,7 +495,7 @@ const WeekView: FC<WeekViewProps> = ({
                       left: 0,
                       right: 0,
                       height: 2,
-                      backgroundColor: WEEK_BRAND.deep,
+                      backgroundColor: WEEK_BRAND.deepText,
                       zIndex: 20,
                       pointerEvents: "none",
                     }}
@@ -507,7 +508,7 @@ const WeekView: FC<WeekViewProps> = ({
                         width: 10,
                         height: 10,
                         borderRadius: "50%",
-                        backgroundColor: WEEK_BRAND.deep,
+                        backgroundColor: WEEK_BRAND.deepText,
                       }}
                     />
                   </Box>

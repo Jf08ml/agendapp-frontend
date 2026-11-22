@@ -45,7 +45,9 @@ import { IconMaximize, IconMinimize, IconPin, IconPinnedFilled } from "@tabler/i
 const STORAGE_KEY = "agenda_default_view";
 
 const BRAND = {
-  deep: "#1E3A8A",
+  deep: "var(--brand)",
+  deepText: "var(--brand-text)",
+  onDeep: "var(--on-brand)",
   surface: "#FFFFFF",
   body: "#404760",
   line: "#E7E2D6",
@@ -293,7 +295,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
             <ActionIcon
               size="sm"
               variant={defaultView === viewMode ? "filled" : "subtle"}
-              color={defaultView === viewMode ? "blue" : "gray"}
+              color={defaultView === viewMode ? "brand" : "gray"}
               onClick={handleSetDefault}
               aria-label="Fijar vista predeterminada"
             >

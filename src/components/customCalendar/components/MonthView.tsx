@@ -16,7 +16,9 @@ import CustomLoader from "../../customLoader/CustomLoader";
 import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
 
 const BRAND = {
-  deep: "#1E3A8A",
+  deep: "var(--brand)",
+  deepText: "var(--brand-text)",
+  onDeep: "var(--on-brand)",
   cream: "#FAF7F2",
   surface: "#FFFFFF",
   ink: "#101526",
@@ -139,7 +141,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                 fontWeight: 700,
                 letterSpacing: 1.5,
                 textTransform: "uppercase",
-                color: i === 0 || i === 6 ? BRAND.deep : BRAND.muted,
+                color: i === 0 || i === 6 ? BRAND.deepText : BRAND.muted,
               }}
             >
               {label}
@@ -184,9 +186,9 @@ const MonthView: React.FC<MonthViewProps> = ({
           // Day number color
           let numColor = BRAND.ink;
           if (outside) numColor = "#C9C2B5";
-          else if (selected) numColor = "#fff";
+          else if (selected) numColor = BRAND.onDeep;
           else if (holiday) numColor = BRAND.accent;
-          else if (today) numColor = BRAND.deep;
+          else if (today) numColor = BRAND.deepText;
           else if (weekend) numColor = BRAND.body;
 
           const numWeight = today && !selected ? 700 : 500;
@@ -253,7 +255,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         fontSize: 7.5,
                         fontWeight: 800,
                         letterSpacing: 1,
-                        color: BRAND.deep,
+                        color: BRAND.deepText,
                         textTransform: "uppercase",
                       }}
                     >
@@ -328,7 +330,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     style={{
                       fontSize: 10,
                       fontWeight: 600,
-                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      color: selected ? "color-mix(in srgb, var(--on-brand) 85%, transparent)" : BRAND.muted,
                       marginLeft: 5,
                       whiteSpace: "nowrap",
                     }}
@@ -345,7 +347,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     style={{
                       fontSize: 9,
                       fontWeight: 600,
-                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      color: selected ? "color-mix(in srgb, var(--on-brand) 85%, transparent)" : BRAND.muted,
                       whiteSpace: "nowrap",
                     }}
                   >

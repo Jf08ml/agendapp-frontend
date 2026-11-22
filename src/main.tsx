@@ -6,6 +6,9 @@ import "@mantine/carousel/styles.css";
 import "@mantine/notifications/styles.css";
 import "@mantine/dropzone/styles.css";
 import "@mantine/dates/styles.css";
+// Rediseño: tokens de plataforma y ajustes globales de Mantine (después de Mantine)
+import "./theme/tokens.css";
+import "./theme/components.css";
 import { Provider } from "react-redux";
 import { store } from "./app/store.ts";
 import AppWithBranding from "./AppWithBranding.tsx";

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchOrganizationConfig } from "./features/organization/sliceOrganization";
 import { AppDispatch, RootState } from "./app/store";
-import { createTheme, MantineProvider, type CSSVariablesResolver } from "@mantine/core";
-import { getReadableBrandColor } from "./utils/brandColor";
+import { MantineProvider } from "@mantine/core";
+import { resolveBrandColor } from "./theme/brandTokens";
+import { createAppTheme, createCssVariablesResolver } from "./theme/mantineTheme";
 import { DatesProvider } from "@mantine/dates";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -37,24 +38,6 @@ const FONT_FAMILY_MAP: Record<string, string> = {
   "outfit": '"Outfit", system-ui, sans-serif',
   "manrope": '"Manrope", system-ui, sans-serif',
 };
-
-// Función para crear paleta de 10 colores iguales con HEX
-function createCustomPalette(
-  hex: string
-): [
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string
-] {
-  return [hex, hex, hex, hex, hex, hex, hex, hex, hex, hex];
-}
 
 function useFavicon(faviconUrl?: string) {
   useEffect(() => {
@@ -171,88 +154,26 @@ export default function AppWithBranding() {
   useAppleTouchIcon(organization?.branding?.pwaIcon || organization?.branding?.logoUrl);
   useAppleWebAppTitle(organization?.branding?.pwaShortName || organization?.name);
 
-  // Lógica para color principal personalizado
-  const colorValue = organization?.branding?.primaryColor || "#1C3461";
-  const isHex = typeof colorValue === "string" && colorValue.startsWith("#");
-
-  // Si es HEX, crea paleta custom, si no, fallback al default Mantine
-  const colors = isHex ? { custom: createCustomPalette(colorValue) } : {}; // O podrías forzar un color fallback
-
-  // El nombre del color primario
-  const primaryColor = isHex ? "custom" : "blue";
+  // Marca del negocio → tokens (--brand, --on-brand, --brand-text, --brand-soft,
+  // --brand-accent) y escala "brand" de Mantine de 10 tonos. Sin color válido, o
+  // si el plan no incluye marca personalizada, se usa el azul AgenditApp
+  // (#1c3461). El backend ya limpia el branding al bajar de plan
+  // (brandingBackup); esto solo lo refuerza.
+  const customBrandingAllowed = organization?.planLimits?.customBranding !== false;
+  const brand = resolveBrandColor(organization?.branding?.primaryColor, customBrandingAllowed);
+  const accent = customBrandingAllowed ? organization?.branding?.secondaryColor : null;
 
   const resolvedFont =
     FONT_FAMILY_MAP[organization?.branding?.fontFamily ?? ""] ??
     FONT_FAMILY_MAP["inter"];
 
-  // Crea el theme dinámico
-  const theme = createTheme({
-    fontFamily: resolvedFont,
+  const theme = useMemo(() => createAppTheme(brand, resolvedFont), [brand, resolvedFont]);
+  const cssVariablesResolver = useMemo(
+    () => createCssVariablesResolver(brand, accent),
+    [brand, accent]
+  );
 
-    // Monospace (para logs / código)
-    fontFamilyMonospace:
-      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-
-    headings: {
-      fontFamily: resolvedFont,
-      sizes: {
-        h1: {
-          fontSize: "clamp(2rem, 2.8vw, 3rem)",
-          fontWeight: "700",
-          lineHeight: "1.1",
-        },
-        h2: {
-          fontSize: "clamp(1.5rem, 2.2vw, 2.25rem)",
-          fontWeight: "700",
-          lineHeight: "1.15",
-        },
-      },
-    },
-
-    // Tamaños opcionales (conserva si te sirven)
-    fontSizes: {
-      xxxs: "8px",
-      xxs: "10px",
-      xs: "12px",
-      sm: "14px",
-      md: "16px",
-      lg: "18px",
-      xl: "20px",
-      xxl: "24px",
-    },
-
-    // Formato por defecto de los selectores de fecha: con locale "es" el default de
-    // Mantine ("MMMM D, YYYY") saldría "septiembre 25, 2026". Los que definen su
-    // propio valueFormat lo conservan.
-    components: {
-      DateInput: { defaultProps: { valueFormat: "DD/MM/YYYY" } },
-      DatePickerInput: { defaultProps: { valueFormat: "DD/MM/YYYY" } },
-    },
-
-    // Branding de color que ya tenías
-    colors,
-    primaryColor,
-
-    // Texto negro (en vez de blanco) sobre botones/badges/checks rellenos cuando
-    // el color de marca es claro (amarillo, rosa pastel…). Expone también
-    // --mantine-primary-color-contrast para estilos propios.
-    autoContrast: true,
-  });
-
-  // Color de marca legible como texto/borde sobre el fondo (enlaces, acentos):
-  // con una marca clara, el color tal cual sobre blanco no se lee.
-  const brandTextLight = isHex ? getReadableBrandColor(colorValue, "light") : null;
-  const brandTextDark = isHex ? getReadableBrandColor(colorValue, "dark") : null;
-  const brandTextVars = (brandText: string | null): Record<string, string> =>
-    brandText
-      ? { "--mantine-color-anchor": brandText, "--brand-text": brandText }
-      : { "--brand-text": "var(--mantine-primary-color-filled)" };
-  const cssVariablesResolver: CSSVariablesResolver = () => ({
-    variables: {},
-    light: brandTextVars(brandTextLight),
-    dark: brandTextVars(brandTextDark),
-  });
-
+  // Lógica para color principal personalizado
   // En signup domain: no loading, no org needed
   // En landing: redirigiendo
   if (domainInfo.type === "landing") {

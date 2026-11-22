@@ -257,7 +257,8 @@ const DayModal: FC<DayModalProps> = ({
   const goToPreviousDay = () => setCurrentDay((prev) => addDays(prev, -1));
 
   const MODAL_BRAND = {
-    deep: "#1E3A8A",
+    deep: "var(--brand)",
+    deepText: "var(--brand-text)",
     cream: "#FAF7F2",
     surface: "#FFFFFF",
     ink: "#101526",
@@ -346,7 +347,7 @@ const DayModal: FC<DayModalProps> = ({
                 background: "rgba(30,58,138,0.08)",
                 fontSize: isSmallScreen ? 10.5 : 11.5,
                 fontWeight: 600,
-                color: MODAL_BRAND.deep,
+                color: MODAL_BRAND.deepText,
                 whiteSpace: "nowrap",
               }}
             >
@@ -445,7 +446,7 @@ const DayModal: FC<DayModalProps> = ({
                       top: `${currentLinePosition}px`,
                       width: "100%",
                       height: 2,
-                      backgroundColor: MODAL_BRAND.deep,
+                      backgroundColor: MODAL_BRAND.deepText,
                       zIndex: 10,
                       display: "flex",
                       alignItems: "center",
@@ -459,7 +460,7 @@ const DayModal: FC<DayModalProps> = ({
                         width: 10,
                         height: 10,
                         borderRadius: "50%",
-                        backgroundColor: MODAL_BRAND.deep,
+                        backgroundColor: MODAL_BRAND.deepText,
                       }}
                     />
                   </div>
