@@ -301,7 +301,7 @@ export default function NotificationsMenu({
     >
       <Menu.Target>
         <Box style={{ touchAction: "manipulation" }}>
-          <UnstyledButton type="button" style={{ lineHeight: 0 }}>
+          <UnstyledButton type="button" aria-label="Notificaciones" style={{ lineHeight: 0 }}>
             {target ? (
               showBadgeOnTarget ? (
                 <Indicator

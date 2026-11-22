@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Container, Divider, ScrollArea, Stack, Tabs, rem } from "@mantine/core";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../../utils/zodResolver";
 import { showNotification } from "@mantine/notifications";
@@ -55,7 +56,13 @@ import SessionsTab from "./components/tabs/SessionsTab";
 import { schema, FormValues } from "./schema";
 import { normalizeOrg } from "./utils";
 
+// Pestañas que se pueden abrir con ?tab= (p. ej. el menú «Fidelidad» del panel).
+const TAB_VALUES = ["contact", "openingsHours", "socialMedia", "location", "fidelity", "branding", "payments", "cancellation", "reminders", "clientForm", "storeForm", "marketing", "sessions"];
+
 export default function OrganizationInfo() {
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab = requestedTab && TAB_VALUES.includes(requestedTab) ? requestedTab : "contact";
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(true);
   const organizationId = useSelector((s: RootState) => s.auth.organizationId);
@@ -257,7 +264,7 @@ export default function OrganizationInfo() {
 
       <Divider my="sm" />
 
-      <Tabs defaultValue="contact" keepMounted={false}>
+      <Tabs key={initialTab} defaultValue={initialTab} keepMounted={false}>
         <ScrollArea>
           <Tabs.List>
             <Tabs.Tab value="contact" leftSection={<IconBuilding size={14} />}>

@@ -1,50 +1,76 @@
+// src/layouts/Header.tsx
+// Header de la web pública (rediseño, LandingNegocio): neutro (--surface) con el
+// logo del negocio, los enlaces públicos y un único botón «Reservar». Los
+// enlaces son los que antes salían en la sección «Explora» del menú lateral,
+// con las mismas condiciones. Sin organización (app.agenditapp.com, superadmin)
+// muestra el nombre de la plataforma.
 import {
-  Text,
-  Box,
-  Group,
-  Menu,
-  SimpleGrid,
-  Anchor,
-  Skeleton,
-  rem,
-  Tooltip,
   ActionIcon,
+  Anchor,
+  Avatar,
+  Box,
+  Burger,
   Button,
+  Drawer,
+  Group,
+  Skeleton,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
-import { IconCalendar } from "@tabler/icons-react";
+import { IconCalendarEvent, IconLayoutDashboard } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { useMediaQuery } from "@mantine/hooks";
-import { Organization } from "../services/organizationService";
+import { Link, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
+import { Organization } from "../services/organizationService";
 import { RootState } from "../app/store";
+import { SantaHat } from "../components/seasonal/ChristmasDecorations";
+import { orgInitials } from "./navIcons";
 
-type Props = { organization: Organization | null };
+type Props = {
+  organization: Organization | null;
+  /** Gorro navideño sobre el logo (solo páginas de clientes en temporada). */
+  showChristmas?: boolean;
+  /** Sin organización: pantallas de la plataforma (registro, superadmin). */
+  platform?: boolean;
+};
 
-export default function Header({ organization }: Props) {
-  const isXS = useMediaQuery("(max-width: 428px)");
+type PublicLink = { label: string; to: string; visible: boolean };
 
+function buildPublicLinks(organization: Organization | null): PublicLink[] {
+  const limits = organization?.planLimits;
+  const onlineBooking = organization?.enableOnlineBooking ?? true;
+  const classBooking = organization?.enableClassBooking ?? false;
+  return [
+    { label: "Servicios", to: "/servicios-precios", visible: true },
+    { label: "Clases", to: "/reservar-clase", visible: classBooking },
+    {
+      label: "Paquetes",
+      to: "/comprar-paquete",
+      visible:
+        limits?.servicePackages !== false &&
+        (!!organization?.mpCollect?.connected || (organization?.paymentMethods?.length ?? 0) > 0),
+    },
+    { label: "Tienda", to: "/tienda", visible: organization?.storeEnabled === true },
+    { label: "Mis reservas", to: "/mis-reservas", visible: onlineBooking || classBooking },
+    { label: "Plan de fidelidad", to: "/search-client", visible: organization?.showLoyaltyProgram ?? true },
+  ].filter((l) => l.visible);
+}
+
+export default function Header({ organization, showChristmas = false, platform = false }: Props) {
+  const location = useLocation();
+  const [menuOpened, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
   const { isAuthenticated, role } = useSelector((s: RootState) => s.auth);
   const isSuperadmin = role === "superadmin";
 
-  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding, enableOnlineBooking } =
-    organization || {};
+  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding } = organization || {};
+  const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
+  const logoUrl = branding?.logoUrl;
 
-  const textColor = branding?.footerTextColor || "white";
-
-  const navLinks = useMemo(
-    () => [
-      { label: "Nuestros Servicios", to: "/servicios-precios" },
-      ...(organization?.enableOnlineBooking !== false || organization?.enableClassBooking
-        ? [{ label: "Mis reservas", to: "/mis-reservas" }]
-        : []),
-      ...(organization?.showLoyaltyProgram !== false
-        ? [{ label: "Plan de fidelidad", to: "/search-client" }]
-        : []),
-    ],
-    [organization?.showLoyaltyProgram, organization?.enableOnlineBooking, organization?.enableClassBooking]
-  );
+  const links = useMemo(() => (platform ? [] : buildPublicLinks(organization)), [organization, platform]);
 
   const socials = useMemo(
     () =>
@@ -57,124 +83,76 @@ export default function Header({ organization }: Props) {
     [facebookUrl, instagramUrl, whatsappUrl, tiktokUrl]
   );
 
+  const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+  const showReserve = !platform && enableOnlineBooking && location.pathname !== "/online-reservation";
+  const showPanelLink = isAuthenticated && !isSuperadmin && !platform;
+
+  const initials = orgInitials(name);
+
+  const brandMark = platform ? (
+    <Text fw={600} fz={15} c="var(--platform)">
+      AgenditApp
+    </Text>
+  ) : (
+    <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+      <SantaHat show={showChristmas}>
+        <Avatar
+          src={logoUrl || undefined}
+          alt={name}
+          size={32}
+          radius="xl"
+          styles={{
+            root: { background: logoUrl ? "transparent" : "var(--brand)", flexShrink: 0 },
+            placeholder: { color: "var(--on-brand)", fontSize: 12, fontWeight: 600 },
+            image: { objectFit: "cover" },
+          }}
+        >
+          {initials}
+        </Avatar>
+      </SantaHat>
+      {name ? (
+        <Text fw={600} fz={15} c="var(--ink)" truncate maw={220}>
+          {name}
+        </Text>
+      ) : (
+        <Skeleton width={130} height={18} radius="sm" />
+      )}
+    </Group>
+  );
+
   return (
-    <Box component="header" px="xs" w="100%" h="100%">
-      <Group justify="space-between" wrap="nowrap" gap="xs" h="100%" align="center">
-        {/* Izquierda: nombre de la organización */}
-        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: "0 1 auto" }}>
-          <Anchor
-            component={Link}
-            to="/"
-            underline="never"
-            style={{ display: "inline-block", minWidth: 0 }}
-          >
-            {name ? (
-              <Text
-                fw={600}
+    <Box
+      component="header"
+      h="100%"
+      px={{ base: "md", md: "xl" }}
+      style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)" }}
+    >
+      <Group justify="space-between" wrap="nowrap" gap="md" h="100%">
+        <Anchor component={Link} to="/" underline="never" style={{ minWidth: 0 }}>
+          {brandMark}
+        </Anchor>
+
+        <Group gap="lg" wrap="nowrap" style={{ flexShrink: 0 }}>
+          {/* Enlaces (escritorio ancho) */}
+          <Group gap="lg" visibleFrom="lg" wrap="nowrap">
+            {links.map((l) => (
+              <Anchor
+                key={l.to}
+                component={Link}
+                to={l.to}
+                underline="never"
                 fz="sm"
-                style={{
-                  color: textColor,
-                  textShadow: "0 1px 2px rgba(0,0,0,.35)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: rem(200),
-                }}
+                fw={isActive(l.to) ? 600 : 500}
+                c={isActive(l.to) ? "var(--ink)" : "var(--ink-muted)"}
               >
-                {name}
-              </Text>
-            ) : (
-              <Skeleton width={130} height={18} radius="sm" />
-            )}
-          </Anchor>
-        </Group>
+                {l.label}
+              </Anchor>
+            ))}
+          </Group>
 
-        {/* Centro: nav links (solo desktop ≥ md) */}
-        <Group gap={4} visibleFrom="md" style={{ flex: "0 0 auto" }}>
-          {navLinks.map((l) => (
-            <Anchor
-              key={l.to}
-              component={Link}
-              to={l.to}
-              underline="never"
-              fz="sm"
-              fw={500}
-              style={{
-                color: textColor,
-                opacity: 0.75,
-                padding: "6px 12px",
-                borderRadius: rem(6),
-                transition: "opacity 0.15s ease, background 0.15s ease",
-                textShadow: "0 1px 2px rgba(0,0,0,.25)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "1";
-                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "0.75";
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              {l.label}
-            </Anchor>
-          ))}
-        </Group>
-
-        {/* Derecha: Reservar + redes */}
-        <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
-          {/* Botón Reservar — solo público y cuando enableOnlineBooking */}
-          {!isAuthenticated && !isSuperadmin && enableOnlineBooking && (
-            <Button
-              component={Link}
-              to="/online-reservation"
-              size="xs"
-              radius="md"
-              visibleFrom="sm"
-              leftSection={<IconCalendar size={12} />}
-              style={{
-                backgroundColor: textColor,
-                color: branding?.primaryColor || "#1C3461",
-                border: "none",
-                fontWeight: 600,
-                height: rem(30),
-                paddingInline: rem(12),
-                fontSize: rem(12),
-              }}
-            >
-              Reservar
-            </Button>
-          )}
-
-          {/* Redes — menú compacto en XS */}
-          {isXS && socials.length > 0 ? (
-            <Menu shadow="md" width={200} position="bottom-end" withArrow>
-              <Menu.Target>
-                <Box style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                  <SimpleGrid cols={2} spacing={3} style={{ width: 28, height: 28 }}>
-                    {socials.slice(0, 4).map(({ key, Icon }) => (
-                      <Icon key={key} size={13} color={textColor} />
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              </Menu.Target>
-              <Menu.Dropdown>
-                {socials.map(({ key, url, Icon, label }) => (
-                  <Menu.Item
-                    key={key}
-                    leftSection={<Icon size={16} />}
-                    component="a"
-                    href={url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {label}
-                  </Menu.Item>
-                ))}
-              </Menu.Dropdown>
-            </Menu>
-          ) : (
-            <Group gap={2} visibleFrom="sm" wrap="nowrap">
+          {/* Redes (escritorio) */}
+          {socials.length > 0 && (
+            <Group gap={2} visibleFrom="md" wrap="nowrap">
               {socials.map(({ key, url, Icon, label }) => (
                 <Tooltip key={key} label={label} withArrow>
                   <ActionIcon
@@ -182,20 +160,96 @@ export default function Header({ organization }: Props) {
                     href={url!}
                     target="_blank"
                     rel="noopener noreferrer"
-                    radius="xl"
-                    size="sm"
                     variant="subtle"
-                    styles={{ root: { color: textColor, background: "transparent" } }}
+                    color="gray"
                     aria-label={label}
                   >
-                    <Icon size={14} />
+                    <Icon size={15} />
                   </ActionIcon>
                 </Tooltip>
               ))}
             </Group>
           )}
+
+          <Group gap="xs" wrap="nowrap">
+            {showPanelLink && (
+              <Button
+                component={Link}
+                to="/gestionar-agenda"
+                variant="default"
+                leftSection={<IconLayoutDashboard size={16} />}
+                visibleFrom="sm"
+              >
+                Ir al panel
+              </Button>
+            )}
+            {showReserve && (
+              <Button
+                component={Link}
+                to="/online-reservation"
+                leftSection={<IconCalendarEvent size={16} />}
+              >
+                Reservar
+              </Button>
+            )}
+
+            {/* Menú (móvil y escritorio angosto) */}
+            {(links.length > 0 || socials.length > 0 || showPanelLink) && (
+              <Box hiddenFrom="lg">
+                <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
+              </Box>
+            )}
+          </Group>
         </Group>
       </Group>
+
+      <Drawer
+        opened={menuOpened}
+        onClose={closeMenu}
+        position="right"
+        size={300}
+        title={name || "Menú"}
+        hiddenFrom="lg"
+      >
+        <Stack gap={4}>
+          {showPanelLink && (
+            <UnstyledButton component={Link} to="/gestionar-agenda" onClick={closeMenu} py="xs" fw={600}>
+              Ir al panel
+            </UnstyledButton>
+          )}
+          {links.map((l) => (
+            <UnstyledButton
+              key={l.to}
+              component={Link}
+              to={l.to}
+              onClick={closeMenu}
+              py="xs"
+              fw={isActive(l.to) ? 600 : 500}
+              c={isActive(l.to) ? "var(--brand-text)" : "var(--ink)"}
+            >
+              {l.label}
+            </UnstyledButton>
+          ))}
+          {socials.length > 0 && (
+            <Group gap="xs" mt="md">
+                {socials.map(({ key, url, Icon, label }) => (
+                  <ActionIcon
+                    key={key}
+                    component="a"
+                    href={url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="default"
+                    size="lg"
+                    aria-label={label}
+                  >
+                    <Icon size={16} />
+                  </ActionIcon>
+                ))}
+              </Group>
+          )}
+        </Stack>
+      </Drawer>
     </Box>
   );
 }

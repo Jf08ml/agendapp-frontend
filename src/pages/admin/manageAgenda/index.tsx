@@ -1339,7 +1339,8 @@ const ScheduleView: React.FC = () => {
     <Box
       pos="relative"
       style={{
-        height: "calc(100dvh - 66px)", // 50px AppShell header + 16px AppShell.Main padding-top
+        // Alto del área del shell: header (60px) y, en móvil, la barra inferior (60px)
+        height: "calc(100dvh - var(--app-shell-header-offset, 0px) - var(--app-shell-footer-offset, 0px))",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",

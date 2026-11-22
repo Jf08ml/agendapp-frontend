@@ -421,8 +421,8 @@ export default function MultiBookingWizard() {
     setCurrentStep(0);
   };
 
-  // Altura disponible = 100dvh - header (50px) - footer (30px) - bordes/padding (~10px)
-  const FULL_H = "calc(100dvh - 90px)";
+  // Altura disponible = 100dvh - header - footer del shell - bordes/padding (~10px)
+  const FULL_H = "calc(100dvh - var(--app-shell-header-offset, 0px) - var(--app-shell-footer-offset, 0px) - 10px)";
 
   if (mode === "choice") {
     return (
