@@ -34,28 +34,28 @@ function ChatPreview() {
     <Stack gap={8}>
       <Flex align="flex-end" gap={6}>
         <ThemeIcon size={22} radius="xl"
-          style={{ background: "rgba(255,255,255,0.2)", flexShrink: 0 }}>
-          <IconRobot size={12} color="white" />
+          style={{ background: "color-mix(in srgb, var(--on-brand) 20%, transparent)", flexShrink: 0 }}>
+          <IconRobot size={12} color="var(--on-brand)" />
         </ThemeIcon>
         <Paper px="sm" py={rem(5)} radius="xl"
-          style={{ background: "rgba(255,255,255,0.18)" }}>
-          <Text size="xs" c="white" lh={1.4}>¿Qué servicio buscas?</Text>
+          style={{ background: "color-mix(in srgb, var(--on-brand) 18%, transparent)" }}>
+          <Text size="xs" c="var(--on-brand)" lh={1.4}>¿Qué servicio buscas?</Text>
         </Paper>
       </Flex>
       <Flex justify="flex-end">
         <Paper px="sm" py={rem(5)} radius="xl"
-          style={{ background: "rgba(255,255,255,0.30)" }}>
-          <Text size="xs" c="white" lh={1.4}>Quiero un corte de cabello</Text>
+          style={{ background: "color-mix(in srgb, var(--on-brand) 30%, transparent)" }}>
+          <Text size="xs" c="var(--on-brand)" lh={1.4}>Quiero un corte de cabello</Text>
         </Paper>
       </Flex>
       <Flex align="flex-end" gap={6}>
         <ThemeIcon size={22} radius="xl"
-          style={{ background: "rgba(255,255,255,0.2)", flexShrink: 0 }}>
-          <IconRobot size={12} color="white" />
+          style={{ background: "color-mix(in srgb, var(--on-brand) 20%, transparent)", flexShrink: 0 }}>
+          <IconRobot size={12} color="var(--on-brand)" />
         </ThemeIcon>
         <Paper px="sm" py={rem(5)} radius="xl"
-          style={{ background: "rgba(255,255,255,0.18)" }}>
-          <Text size="xs" c="white" lh={1.4}>¡Perfecto! Busco horarios...</Text>
+          style={{ background: "color-mix(in srgb, var(--on-brand) 18%, transparent)" }}>
+          <Text size="xs" c="var(--on-brand)" lh={1.4}>¡Perfecto! Busco horarios...</Text>
         </Paper>
       </Flex>
     </Stack>
@@ -91,7 +91,8 @@ const MANUAL_FEATURES = ["Ve toda la disponibilidad", "Elige profesional y horar
 
 export default function BookingChoiceScreen({ onSelectAI, onSelectManual }: BookingChoiceScreenProps) {
   const org      = useSelector((s: RootState) => s.organization.organization);
-  const color    = org?.branding?.primaryColor || "#1C3461";
+  // Marca del negocio por tokens (AppWithBranding); texto encima: --on-brand.
+  const color    = "var(--brand)";
   const orgName  = org?.name;
   const agentName = org?.aiAssistantName || "Roxi";
 
@@ -113,10 +114,10 @@ export default function BookingChoiceScreen({ onSelectAI, onSelectManual }: Book
 
         {/* IA — mobile */}
         <Card withBorder radius="lg" p={0}
-          style={{ cursor: "pointer", overflow: "hidden", borderColor: color, borderWidth: 2,
+          style={{ cursor: "pointer", overflow: "hidden", borderColor: "var(--brand-text)", borderWidth: 2,
             transition: "box-shadow 150ms" }}
           onClick={onSelectAI}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = `0 6px 18px ${color}40`; }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = "none"; }}
         >
           <Flex>
@@ -124,8 +125,8 @@ export default function BookingChoiceScreen({ onSelectAI, onSelectManual }: Book
             <Flex align="center" justify="center"
               style={{ background: color, width: rem(72), flexShrink: 0 }}>
               <ThemeIcon size={40} radius="xl"
-                style={{ background: "rgba(255,255,255,0.2)" }}>
-                <IconRobot size={22} color="white" />
+                style={{ background: "color-mix(in srgb, var(--on-brand) 20%, transparent)" }}>
+                <IconRobot size={22} color="var(--on-brand)" />
               </ThemeIcon>
             </Flex>
             {/* Texto */}
@@ -186,11 +187,11 @@ export default function BookingChoiceScreen({ onSelectAI, onSelectManual }: Book
         {/* IA — desktop */}
         <Card withBorder radius="lg" p={0}
           style={{ cursor: "pointer", overflow: "hidden",
-            borderColor: color, borderWidth: 2,
+            borderColor: "var(--brand-text)", borderWidth: 2,
             transition: "box-shadow 150ms ease, transform 150ms ease" }}
           onClick={onSelectAI}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${color}40`;
+            (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-lg)";
             (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
           }}
           onMouseLeave={(e) => {
@@ -213,7 +214,7 @@ export default function BookingChoiceScreen({ onSelectAI, onSelectManual }: Book
             <Stack gap={6} mt={2}>
               {AI_FEATURES.map((f) => (
                 <Flex key={f} align="center" gap={8}>
-                  <IconCheck size={13} color={color} style={{ flexShrink: 0 }} />
+                  <IconCheck size={13} color="var(--brand-text)" style={{ flexShrink: 0 }} />
                   <Text size="xs" c="dimmed">{f}</Text>
                 </Flex>
               ))}

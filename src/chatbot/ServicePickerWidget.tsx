@@ -87,7 +87,7 @@ export default function ServicePickerWidget({ suggestions, currency, color, disa
             withBorder
             radius="md"
             p="xs"
-            style={{ borderColor: r.checked ? color : undefined }}
+            style={{ borderColor: r.checked ? "var(--brand-text)" : undefined }}
           >
             <Group gap="xs" wrap="nowrap" align="center">
               <Checkbox

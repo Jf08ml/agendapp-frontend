@@ -107,17 +107,17 @@ function UserBubbleContent({ msg }: { msg: BookingChatMessage }) {
   if (msg.content === VOICE_PREFIX) {
     return (
       <Flex align="center" gap={6}>
-        <IconMicrophone size={15} color="white" />
-        <Text size="sm" c="white">Nota de voz</Text>
-        <Loader size="xs" color="white" type="dots" />
+        <IconMicrophone size={15} color="var(--on-brand)" />
+        <Text size="sm" c="var(--on-brand)">Nota de voz</Text>
+        <Loader size="xs" color="var(--on-brand)" type="dots" />
       </Flex>
     );
   }
   if (msg.content === VOICE_FAILED) {
     return (
       <Flex align="center" gap={6}>
-        <IconMicrophone size={15} color="white" />
-        <Text size="sm" c="white" fs="italic">Nota de voz (no se pudo escuchar)</Text>
+        <IconMicrophone size={15} color="var(--on-brand)" />
+        <Text size="sm" c="var(--on-brand)" fs="italic">Nota de voz (no se pudo escuchar)</Text>
       </Flex>
     );
   }
@@ -125,10 +125,10 @@ function UserBubbleContent({ msg }: { msg: BookingChatMessage }) {
     return (
       <Stack gap={2}>
         <Flex align="center" gap={4} style={{ opacity: 0.85 }}>
-          <IconMicrophone size={12} color="white" />
-          <Text size="xs" c="white">Nota de voz</Text>
+          <IconMicrophone size={12} color="var(--on-brand)" />
+          <Text size="xs" c="var(--on-brand)">Nota de voz</Text>
         </Flex>
-        <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+        <Text size="sm" c="var(--on-brand)" style={{ whiteSpace: "pre-wrap" }}>
           {msg.content.slice(VOICE_PREFIX.length).trim()}
         </Text>
       </Stack>
@@ -142,12 +142,12 @@ function UserBubbleContent({ msg }: { msg: BookingChatMessage }) {
           <Image src={msg.imagePreview} alt="Foto enviada" radius="md" maw={220} mah={260} fit="contain" />
         ) : (
           <Flex align="center" gap={6}>
-            <IconPhoto size={15} color="white" />
-            <Text size="sm" c="white">Foto</Text>
+            <IconPhoto size={15} color="var(--on-brand)" />
+            <Text size="sm" c="var(--on-brand)">Foto</Text>
           </Flex>
         )}
         {caption && (
-          <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+          <Text size="sm" c="var(--on-brand)" style={{ whiteSpace: "pre-wrap" }}>
             {caption}
           </Text>
         )}
@@ -155,7 +155,7 @@ function UserBubbleContent({ msg }: { msg: BookingChatMessage }) {
     );
   }
   return (
-    <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+    <Text size="sm" c="var(--on-brand)" style={{ whiteSpace: "pre-wrap" }}>
       {msg.content}
     </Text>
   );
@@ -170,7 +170,8 @@ const RATINGS: { value: 1|3|5; emoji: string; label: string }[] = [
 export default function BookingChatPanel({ onBack, preselectedService }: BookingChatPanelProps) {
   const navigate = useNavigate();
   const org = useSelector((s: RootState) => s.organization.organization);
-  const color = org?.branding?.primaryColor || "#1C3461";
+  // Marca del negocio por tokens (AppWithBranding); texto encima: --on-brand.
+  const color = "var(--brand)";
   const agentName = org?.aiAssistantName || "Roxi";
 
   const identifierField = (org?.clientFormConfig?.identifierField as "phone" | "email" | "documentId") ?? "phone";
@@ -462,7 +463,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         {/* Confirmación */}
         <Center>
           <ThemeIcon size={72} radius="xl" style={{ background: color }}>
-            <IconCheck size={36} color="white" />
+            <IconCheck size={36} color="var(--on-brand)" />
           </ThemeIcon>
         </Center>
         <Stack align="center" gap={6}>
@@ -507,10 +508,10 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                         fontSize: rem(28),
                         lineHeight: 1,
                         border: feedbackRating === value
-                          ? `2px solid ${color}`
+                          ? "2px solid var(--brand-text)"
                           : "2px solid var(--mantine-color-gray-2)",
                         background: feedbackRating === value
-                          ? `${color}18`
+                          ? "var(--brand-soft)"
                           : "var(--mantine-color-gray-0)",
                         transition: "border-color 150ms, background 150ms",
                         cursor: "pointer",
@@ -587,22 +588,22 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       >
         <Flex align="center" gap="sm">
           {onBack && (
-            <ActionIcon variant="transparent" onClick={onBack} aria-label="Volver" style={{ color: "white" }}>
+            <ActionIcon variant="transparent" onClick={onBack} aria-label="Volver" style={{ color: "var(--on-brand)" }}>
               <IconArrowLeft size={18} />
             </ActionIcon>
           )}
-          <ThemeIcon size={34} radius="xl" style={{ background: "rgba(255,255,255,0.18)", flexShrink: 0 }}>
-            <IconRobot size={18} color="white" />
+          <ThemeIcon size={34} radius="xl" style={{ background: "color-mix(in srgb, var(--on-brand) 18%, transparent)", flexShrink: 0 }}>
+            <IconRobot size={18} color="var(--on-brand)" />
           </ThemeIcon>
           <Box flex={1}>
             <Flex align="center" gap={6}>
-              <Text fw={700} c="white" size="sm" lh={1.2}>{agentName}</Text>
+              <Text fw={700} c="var(--on-brand)" size="sm" lh={1.2}>{agentName}</Text>
               <Badge size="xs" color="yellow" variant="light"
                 style={{ textTransform: "uppercase", letterSpacing: "0.04em" }}>
                 Beta
               </Badge>
             </Flex>
-            <Text c="white" size="xs" style={{ opacity: 0.7, lineHeight: 1.3 }}>
+            <Text c="var(--on-brand)" size="xs" style={{ opacity: 0.7, lineHeight: 1.3 }}>
               Asistente de reservas
             </Text>
           </Box>
@@ -613,7 +614,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
             leftSection={<IconMoodSmile size={14} />}
             onClick={openFb}
             styles={{
-              root: { color: "rgba(255,255,255,0.85)", fontWeight: 500, fontSize: rem(11) },
+              root: { color: "color-mix(in srgb, var(--on-brand) 85%, transparent)", fontWeight: 500, fontSize: rem(11) },
             }}
           >
             ¿Cómo te fue?
@@ -644,7 +645,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
               <Flex key={i} align="flex-start" gap="sm">
                 <ThemeIcon size={32} radius="xl"
                   style={{ background: color, flexShrink: 0, marginTop: 2 }}>
-                  <IconRobot size={16} color="white" />
+                  <IconRobot size={16} color="var(--on-brand)" />
                 </ThemeIcon>
                 <Paper
                   px="md" py="sm" maw="78%"
@@ -677,7 +678,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
           {loading && (
             <Flex align="flex-start" gap="sm">
               <ThemeIcon size={32} radius="xl" style={{ background: color, flexShrink: 0, marginTop: 2 }}>
-                <IconRobot size={16} color="white" />
+                <IconRobot size={16} color="var(--on-brand)" />
               </ThemeIcon>
               <Paper px="md" py="sm" shadow="xs"
                 style={{ background: "white", borderRadius: rem(18), borderBottomLeftRadius: rem(4) }}>
@@ -697,12 +698,12 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
             <Box mt="xs">
               <Paper
                 withBorder radius="lg" p="md"
-                style={{ borderColor: color, borderWidth: 2, background: "white" }}
+                style={{ borderColor: "var(--brand-text)", borderWidth: 2, background: "white" }}
               >
                 <Stack gap="sm">
                   <Flex align="center" gap="xs">
                     <ThemeIcon size={28} radius="xl" style={{ background: color }}>
-                      <IconCalendarCheck size={15} color="white" />
+                      <IconCalendarCheck size={15} color="var(--on-brand)" />
                     </ThemeIcon>
                     <Text fw={700} size="sm">¿Confirmas tu reserva?</Text>
                   </Flex>
@@ -823,7 +824,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                 aria-label="Enviar nota de voz"
                 style={{ background: color, flexShrink: 0 }}
               >
-                <IconPlayerStopFilled size={15} color="white" />
+                <IconPlayerStopFilled size={15} color="var(--on-brand)" />
               </ActionIcon>
             </Flex>
           ) : (
@@ -866,7 +867,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                   }}
                 >
                   <IconMicrophone size={16}
-                    color={!loading && !pendingPayload ? "white" : "var(--mantine-color-gray-5)"} />
+                    color={!loading && !pendingPayload ? "var(--on-brand)" : "var(--mantine-color-gray-5)"} />
                 </ActionIcon>
               ) : (
                 <ActionIcon
@@ -883,7 +884,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                 >
                   <IconSend size={15}
                     color={(input.trim() || attachedImage) && !loading && !pendingPayload
-                      ? "white" : "var(--mantine-color-gray-5)"} />
+                      ? "var(--on-brand)" : "var(--mantine-color-gray-5)"} />
                 </ActionIcon>
               )}
             </Flex>
@@ -928,8 +929,8 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
                         p="sm" radius="xl"
                         style={{
                           fontSize: rem(26), lineHeight: 1,
-                          border: fbRating === value ? `2px solid ${color}` : "2px solid var(--mantine-color-gray-2)",
-                          background: fbRating === value ? `${color}18` : "var(--mantine-color-gray-0)",
+                          border: fbRating === value ? "2px solid var(--brand-text)" : "2px solid var(--mantine-color-gray-2)",
+                          background: fbRating === value ? "var(--brand-soft)" : "var(--mantine-color-gray-0)",
                           transition: "border-color 150ms, background 150ms",
                           cursor: "pointer",
                           width: rem(54), height: rem(54),
