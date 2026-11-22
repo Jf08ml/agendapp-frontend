@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Box, Group, Pagination, Select, Stack, Text } from "@mantine/core";
+import { Alert, Box, Group, Pagination, Select, Text } from "@mantine/core";
+import { useSelector } from "react-redux";
+import { RootState } from "../../../app/store";
 import { useMediaQuery } from "@mantine/hooks";
 import { Client } from "../../../services/clientService";
 import ClientListItem from "./ClientListItem";
@@ -33,6 +35,7 @@ const ClientList: React.FC<ClientListProps> = ({
   onClientUpdated,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)") ?? false;
+  const loyaltyEnabled = useSelector((s: RootState) => s.organization.organization?.showLoyaltyProgram !== false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -63,7 +66,7 @@ const ClientList: React.FC<ClientListProps> = ({
       )}
 
       <Group justify="space-between" align="center" mb="xs" wrap="wrap">
-        <Text size="sm" c="dimmed">
+        <Text size="sm" c="var(--ink-muted)">
           Mostrando {clients.length === 0 ? 0 : from}–{to} de {clients.length}
         </Text>
         <Group gap="xs" align="center">
@@ -87,24 +90,60 @@ const ClientList: React.FC<ClientListProps> = ({
       </Group>
 
       {displayedClients.length === 0 ? (
-        <Text c="dimmed" ta="center" py="xl">No hay clientes para mostrar.</Text>
-      ) : (
-        <Stack gap="xs">
+        <div className="ag-card">
+          <div className="ag-empty">
+            <h3>No hay clientes para mostrar</h3>
+          </div>
+        </div>
+      ) : isMobile ? (
+        // Móvil: filas compactas
+        <div className="ag-card" style={{ padding: "0 var(--space-1)" }}>
           {displayedClients.map((client) => (
             <ClientListItem
               key={client._id}
               client={client}
-              isMobile={isMobile}
+              isMobile
+              selected={client._id === selectedClientId}
               onOpenDetail={setSelectedClientId}
               onRegisterService={onRegisterService}
               onReferral={onReferral}
+              onEditClient={onEditClient}
             />
           ))}
-        </Stack>
+        </div>
+      ) : (
+        // Escritorio: tabla limpia (ClientesPanel), fila seleccionada en brand-soft
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                {loyaltyEnabled && <th className="num">Servicios</th>}
+                {loyaltyEnabled && <th className="num">Referidos</th>}
+                {loyaltyEnabled && <th>Fidelidad</th>}
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {displayedClients.map((client) => (
+                <ClientListItem
+                  key={client._id}
+                  client={client}
+                  isMobile={false}
+                  selected={client._id === selectedClientId}
+                  onOpenDetail={setSelectedClientId}
+                  onRegisterService={onRegisterService}
+                  onReferral={onReferral}
+                  onEditClient={onEditClient}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <Group justify="space-between" align="center" mt="md" wrap="wrap">
-        <Text size="sm" c="dimmed">
+        <Text size="sm" c="var(--ink-muted)">
           Mostrando {clients.length === 0 ? 0 : from}–{to} de {clients.length}
         </Text>
       </Group>

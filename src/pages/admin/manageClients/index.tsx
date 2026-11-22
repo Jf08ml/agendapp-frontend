@@ -5,9 +5,7 @@ import {
   Flex,
   TextInput,
   Group,
-  Title,
   Button,
-  Badge,
   Tooltip,
   Skeleton,
   Modal,
@@ -346,7 +344,10 @@ const ClientsDashboard = () => {
   };
 
   return (
-    <Box>
+    <Box p={{ base: "sm", md: "lg" }}>
+      <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
+        Clientes
+      </h1>
       <Tabs value={activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
         <Tabs.List mb="md">
           <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
@@ -354,16 +355,14 @@ const ClientsDashboard = () => {
         </Tabs.List>
 
         <Tabs.Panel value="clientes">
-          <Card
-            withBorder
-            radius="md"
-            p="md"
-            mb="md"
+          <Box
+            py="xs"
+            mb="sm"
             style={{
               position: "sticky",
               top: 0,
               zIndex: 5,
-              background: "var(--mantine-color-body)",
+              background: "var(--surface-muted)",
             }}
           >
             <Flex
@@ -373,12 +372,11 @@ const ClientsDashboard = () => {
               direction={isMobile ? "column" : "row"}
               wrap="wrap"
             >
-              <Group gap="sm">
-                <Title order={2}>Clientes</Title>
-                <Badge variant="light" size="sm">
-                  {filteredClients.length} de {clients.length}
-                </Badge>
-              </Group>
+              <Text size="sm" c="var(--ink-muted)">
+                {filteredClients.length === clients.length
+                  ? `${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}`
+                  : `${filteredClients.length} de ${clients.length} clientes`}
+              </Text>
 
               <Group gap="sm" w={isMobile ? "100%" : "auto"}>
                 <TextInput
@@ -414,7 +412,6 @@ const ClientsDashboard = () => {
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFileUpload size={16} />}
-                      color="blue"
                       onClick={() => setOpenBulkUploadModal(true)}
                     >
                       Carga masiva
@@ -423,7 +420,7 @@ const ClientsDashboard = () => {
                 </Menu>
               </Group>
             </Flex>
-          </Card>
+          </Box>
 
           {isLoading ? (
             <Card withBorder radius="md" p="md">
@@ -432,8 +429,7 @@ const ClientsDashboard = () => {
               <Skeleton height={36} />
             </Card>
           ) : (
-            <Card withBorder radius="md" p="md">
-              <ClientList
+            <ClientList
                 clients={filteredClients}
                 onDeleteClient={handleDeleteClient}
                 onForceDeleteClient={handleForceDeleteClient}
@@ -445,8 +441,7 @@ const ClientsDashboard = () => {
                 onEditClient={handleOpenModal}
                 onClientUpdated={handleClientUpdated}
                 error={error}
-              />
-            </Card>
+            />
           )}
         </Tabs.Panel>
 
