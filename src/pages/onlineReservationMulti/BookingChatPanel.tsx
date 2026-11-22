@@ -61,7 +61,12 @@ import {
   formatSeconds,
   type PreparedImage,
 } from "./chatMedia";
-import { createMultipleReservations, createReservationCheckout, isSlotTakenError } from "../../services/reservationService";
+import {
+  createMultipleReservations,
+  createReservationCheckout,
+  isSlotTakenError,
+  type CreateMultipleReservationsPayload,
+} from "../../services/reservationService";
 import { createReceiptReservationCheckout, type ReservationReceiptPayload } from "../../services/collectionService";
 import { useNavigate } from "react-router-dom";
 import { MpDepositNotice } from "../../components/MpDepositNotice";
@@ -340,7 +345,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
 
       if (useMp) {
         const checkout = await createReservationCheckout({
-          ...(pendingPayload as any),
+          ...(pendingPayload as unknown as CreateMultipleReservationsPayload),
           source: "ai_chatbot",
           chatSessionId: sessionId.current,
         });
@@ -353,7 +358,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
 
       if (useReceipt) {
         const checkout = await createReceiptReservationCheckout({
-          ...(pendingPayload as any),
+          ...pendingPayload,
           source: "ai_chatbot",
         } as unknown as ReservationReceiptPayload);
         if (checkout) {
@@ -372,7 +377,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       }
 
       await createMultipleReservations({
-        ...(pendingPayload as any),
+        ...(pendingPayload as unknown as CreateMultipleReservationsPayload),
         source: "ai_chatbot",
         chatSessionId: sessionId.current, // el backend marca la conversión server-side
       });
@@ -382,7 +387,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       markBookingConverted(sessionId.current).catch(() => {});
       setReservationDone(true);
       setPendingPayload(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isSlotTakenError(err)) {
         // Otra persona tomó el horario segundos antes: cerrar la tarjeta y seguir en el chat
         setPendingPayload(null);
@@ -394,7 +399,9 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
         return;
       }
       setReservationError(
-        err?.response?.data?.message || err?.message || "No se pudo crear la reserva. Intenta de nuevo."
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (err instanceof Error ? err.message : "") ||
+          "No se pudo crear la reserva. Intenta de nuevo."
       );
     } finally {
       setConfirming(false);

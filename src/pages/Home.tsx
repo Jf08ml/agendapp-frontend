@@ -47,7 +47,7 @@ export default function Home() {
       // Si el plan incluye paquetes y hay un medio de cobro online: Mercado Pago
       // conectado o métodos de transferencia (compra vía comprobante con IA).
       show:
-        (organization as any)?.planLimits?.servicePackages !== false &&
+        organization?.planLimits?.servicePackages !== false &&
         (!!organization?.mpCollect?.connected ||
           ((organization?.paymentMethods?.length ?? 0) > 0)),
     },
@@ -76,7 +76,7 @@ export default function Home() {
 
   const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
   const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
-  const planLimits = (organization as any)?.planLimits;
+  const planLimits = organization?.planLimits;
   const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing" | "academy";
   // Si el plan no permite landing (downgrade), caer a modern sin tocar la BD
   const homeLayout =

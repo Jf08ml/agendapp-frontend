@@ -66,7 +66,7 @@ export default function ContactTab({
   };
   // Listas completas memoizadas (ya están memoizadas en geoData, pero useMemo
   // evita recalcular el .map() del Select en cada render).
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const bouncedAddress = useSelector((s: RootState) => s.organization.organization?.ownerEmailBounce?.address);
   const emailBounced =
     !!bouncedAddress && String(form.values.email ?? "").trim().toLowerCase() === bouncedAddress.toLowerCase();

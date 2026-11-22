@@ -51,7 +51,7 @@ export default function BrandingTab({
     key: "logoUrl" | "faviconUrl" | "pwaIcon"
   ) => void;
 }) {
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseBranding = planLimits?.customBranding !== false;
   const brandingDisabled = !isEditing || !canUseBranding;
 

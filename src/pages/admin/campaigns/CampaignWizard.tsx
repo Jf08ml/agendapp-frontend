@@ -47,6 +47,9 @@ export default function CampaignWizard() {
     },
   });
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Bloqueo temprano si no hay conexión Meta
   if (!isMeta) {
     return (
@@ -64,9 +67,6 @@ export default function CampaignWizard() {
       </Container>
     );
   }
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleNext = async () => {
     setError(null);

@@ -15,7 +15,7 @@ export default function ReminderSettingsTab({
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
 }) {
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const timeFormat = useSelector((s: RootState) => s.organization.organization?.timeFormat);
   const canUseReminders = planLimits?.autoReminders !== false;
   const maxReminders = planLimits?.maxRemindersPerAppointment ?? 2;

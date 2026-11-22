@@ -5,6 +5,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
+// Forma mínima de un error de axios con mensaje del backend
+type ApiError = { response?: { data?: { message?: string } } };
+
 interface TimeSlot {
   time: string;
   available: boolean;
@@ -51,8 +54,8 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
 
       setSlots(response.data.data.slots || []);
       return response.data.data.slots || [];
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al cargar horarios disponibles';
+    } catch (err: unknown) {
+      const errorMessage = (err as ApiError).response?.data?.message || 'Error al cargar horarios disponibles';
       setError(errorMessage);
       setSlots([]);
       throw new Error(errorMessage);
@@ -77,8 +80,8 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
       });
 
       return response.data.data;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al validar horario';
+    } catch (err: unknown) {
+      const errorMessage = (err as ApiError).response?.data?.message || 'Error al validar horario';
       throw new Error(errorMessage);
     }
   }, []);
@@ -91,8 +94,8 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
       const response = await axios.get(`/api/schedule/organization/${orgId}/open-days`);
       setOpenDays(response.data.data.openDays || []);
       return response.data.data.openDays || [];
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al cargar días abiertos';
+    } catch (err: unknown) {
+      const errorMessage = (err as ApiError).response?.data?.message || 'Error al cargar días abiertos';
       setError(errorMessage);
       return [];
     }
@@ -105,8 +108,8 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
     try {
       const response = await axios.get(`/api/schedule/employee/${empId}/available-days`);
       return response.data.data.availableDays || [];
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Error al cargar días disponibles';
+    } catch (err: unknown) {
+      const errorMessage = (err as ApiError).response?.data?.message || 'Error al cargar días disponibles';
       setError(errorMessage);
       return [];
     }

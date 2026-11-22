@@ -145,7 +145,7 @@ export default function FidelityTab({
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
 }) {
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseLoyalty = planLimits?.loyaltyProgram !== false;
   const programEnabled = form.values.showLoyaltyProgram;
   const serviceTiers: Tier[] = form.values.serviceTiers ?? [];

@@ -296,7 +296,7 @@ export const getClientByIdentifier = async (
       params: { field, value, organizationId },
     });
     return response.data.data;
-  } catch (error) {
+  } catch {
     return undefined;
   }
 };

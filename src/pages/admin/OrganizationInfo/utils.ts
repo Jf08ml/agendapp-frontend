@@ -18,13 +18,11 @@ export const ensureDomains = (d?: string[]) => (Array.isArray(d) ? d : []);
 // o numéricos que el backend omite (por ser falsy/0) quedarían como
 // `undefined` en el formulario, rompiendo los inputs controlados de Mantine.
 // ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ensureArray = <T,>(arr: T[] | undefined, fallback: T[] = []): T[] =>
   Array.isArray(arr) ? [...arr] : [...fallback];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ensureBreaks = (arr: any[] | undefined) =>
-  Array.isArray(arr) ? arr.map((b: any) => ({ ...b })) : [];
+const ensureBreaks = <T extends object>(arr: T[] | undefined): T[] =>
+  Array.isArray(arr) ? arr.map((b) => ({ ...b })) : [];
 
 export const normalizeOrg = (response: Organization): Organization => ({
   ...response,
@@ -107,7 +105,7 @@ export const normalizeOrg = (response: Organization): Organization => ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? response.weeklySchedule.schedule.map((s: any) => ({
           ...s,
-          breaks: Array.isArray(s.breaks) ? s.breaks.map((b: any) => ({ ...b })) : [],
+          breaks: Array.isArray(s.breaks) ? s.breaks.map((b: object) => ({ ...b })) : [],
         }))
       : [],
   },

@@ -293,7 +293,7 @@ export default function EmployeeScheduleSection({
         message: date ? "Día eliminado del bloqueo" : "Bloqueo eliminado",
         color: "green",
       });
-    } catch (error: any) {
+    } catch {
       showNotification({
         title: "Error",
         message: "No se pudo eliminar el bloqueo",

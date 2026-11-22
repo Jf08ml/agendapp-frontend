@@ -253,17 +253,13 @@ export const updateReservation = async (
   reservationId: string,
   updatedData: Partial<Reservation>
 ): Promise<Reservation | undefined> => {
-  try {
-    const response = await apiReservation.put<Response<Reservation>>(
-      `/${reservationId}`,
-      updatedData
-    );
-    return response.data.data;
-  } catch (error) {
-    // Re-lanzar el error original (con response.data intacto) para que el caller
-    // pueda inspeccionar códigos específicos como CONCURRENCY_LIMIT_REACHED
-    throw error;
-  }
+  // Sin try/catch: el error original (con response.data intacto) llega al caller,
+  // que inspecciona códigos específicos como CONCURRENCY_LIMIT_REACHED.
+  const response = await apiReservation.put<Response<Reservation>>(
+    `/${reservationId}`,
+    updatedData
+  );
+  return response.data.data;
 };
 
 // Cancelar una reserva (soft: cambia status + cancela citas vinculadas)
