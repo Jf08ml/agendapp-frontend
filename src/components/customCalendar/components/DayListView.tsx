@@ -2,16 +2,11 @@
 // cliente, servicio, profesional (punto de su color) y estado en palabra +
 // ícono. Tocar una fila abre la cita, como en las demás vistas.
 import { FC, useMemo } from "react";
-import {
-  IconCalendarOff,
-  IconCheck,
-  IconCircleCheck,
-  IconClock,
-  IconUserX,
-  type Icon,
-} from "@tabler/icons-react";
+import { IconCalendarOff } from "@tabler/icons-react";
+import { appointmentStatus } from "../appointmentStatus";
 import { Appointment } from "../../../services/appointmentService";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
+import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
 
 interface DayListViewProps {
   appointments: Appointment[];
@@ -19,17 +14,6 @@ interface DayListViewProps {
   timezone?: string;
   timeFormat?: string;
 }
-
-// Mismas palabras que el modal de la cita; colores de estado del sistema
-const STATUS: Record<string, { label: string; tone: "success" | "warning" | "danger" | "info"; icon: Icon }> = {
-  pending: { label: "Pendiente", tone: "warning", icon: IconClock },
-  confirmed: { label: "Confirmada", tone: "success", icon: IconCheck },
-  attended: { label: "Asistió", tone: "success", icon: IconCircleCheck },
-  no_show: { label: "No asistió", tone: "danger", icon: IconUserX },
-  cancelled: { label: "Cancelada", tone: "danger", icon: IconCalendarOff },
-  cancelled_by_customer: { label: "Cancelada", tone: "danger", icon: IconCalendarOff },
-  cancelled_by_admin: { label: "Cancelada", tone: "danger", icon: IconCalendarOff },
-};
 
 const DayListView: FC<DayListViewProps> = ({ appointments, onEditAppointment, timezone = "America/Bogota", timeFormat }) => {
   const fmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
@@ -56,7 +40,7 @@ const DayListView: FC<DayListViewProps> = ({ appointments, onEditAppointment, ti
   return (
     <div role="list" style={{ padding: "0 var(--space-4)" }}>
       {rows.map((apt) => {
-        const status = STATUS[apt.status] ?? { label: apt.status, tone: "info" as const, icon: IconClock };
+        const status = appointmentStatus(apt.status);
         const StatusIcon = status.icon;
         return (
           <button
@@ -78,8 +62,8 @@ const DayListView: FC<DayListViewProps> = ({ appointments, onEditAppointment, ti
             }}
           >
             <div className="ag-num" style={{ width: 72, flex: "none", fontSize: 13, lineHeight: "18px", color: "var(--ink-muted)", fontWeight: 500 }}>
-              <div style={{ color: "var(--ink)", fontWeight: 600 }}>{formatInTimezone(apt.startDate, timezone, fmt)}</div>
-              <div>{formatInTimezone(apt.endDate, timezone, fmt)}</div>
+              <div style={{ color: "var(--ink)", fontWeight: 600 }}>{toSpanishMeridiem(formatInTimezone(apt.startDate, timezone, fmt))}</div>
+              <div>{toSpanishMeridiem(formatInTimezone(apt.endDate, timezone, fmt))}</div>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 15, lineHeight: "20px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

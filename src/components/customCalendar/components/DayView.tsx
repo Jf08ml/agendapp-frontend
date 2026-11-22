@@ -25,6 +25,7 @@ import {
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
+import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
 import { HOUR_HEIGHT, CARD_WIDTH } from "./dayGrid";
 
 /* Subcomponentes */
@@ -321,8 +322,8 @@ const DayView: FC<DayViewProps> = ({
                 <Flex justify="space-between" align="center">
                   <Box style={{ cursor: "pointer", flex: 1 }} onClick={() => onEditAppointment(apt)}>
                     <Text size="sm" fw={600} style={{ textDecoration: "line-through" }}>
-                      {formatInTimezone(apt.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")} -{" "}
-                      {formatInTimezone(apt.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A")}
+                      {toSpanishMeridiem(formatInTimezone(apt.startDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A"))} -{" "}
+                      {toSpanishMeridiem(formatInTimezone(apt.endDate, timezone, timeFormat === "24h" ? "HH:mm" : "h:mm A"))}
                     </Text>
                     <Text size="xs" c="dimmed">
                       {apt.client.name} • {apt.employee.names}

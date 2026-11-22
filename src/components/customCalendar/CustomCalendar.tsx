@@ -108,6 +108,12 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   const [defaultView, setDefaultView] = useState<CalendarView>(readDefaultView);
   const [panelDay, setPanelDay] = useState<Date>(new Date());
   const [isMaximized, setIsMaximized] = useState(false);
+  // Filtro de la vista Semana: «Todos» (7 columnas, citas compactas) o un profesional
+  const [weekEmployeeId, setWeekEmployeeId] = useState<string | null>(null);
+  const weekEmployees = useMemo(
+    () => (weekEmployeeId ? employees.filter((e) => e._id === weekEmployeeId) : employees),
+    [employees, weekEmployeeId]
+  );
 
   const handleSetDefault = useCallback(() => {
     try {
@@ -286,6 +292,21 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         </Group>
 
         <Group gap={6} align="center" wrap="nowrap">
+          {viewMode === "week" && employees.length > 1 && (
+            <Select
+              size="xs"
+              aria-label="Profesional"
+              data={[
+                { value: "all", label: "Todos" },
+                ...employees.map((e) => ({ value: e._id, label: e.names.trim() })),
+              ]}
+              value={weekEmployeeId ?? "all"}
+              onChange={(v) => setWeekEmployeeId(!v || v === "all" ? null : v)}
+              allowDeselect={false}
+              w={160}
+              comboboxProps={{ zIndex: 350 }}
+            />
+          )}
           {viewMode === "week" && (
             <Tooltip label={isMaximized ? "Restaurar vista" : "Pantalla completa"} withArrow>
               <ActionIcon variant="subtle" color="gray" size="md" onClick={() => setIsMaximized((v) => !v)} aria-label={isMaximized ? "Restaurar vista" : "Pantalla completa"}>
@@ -478,7 +499,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
             <WeekView
               appointments={appointments}
-              employees={employees}
+              employees={weekEmployees}
               currentDate={currentDate}
               onOpenModal={onOpenModal}
               onEditAppointment={onEditAppointment}
@@ -495,7 +516,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         ) : (
           <WeekView
             appointments={appointments}
-            employees={employees}
+            employees={weekEmployees}
             currentDate={currentDate}
             onOpenModal={onOpenModal}
             onEditAppointment={onEditAppointment}
