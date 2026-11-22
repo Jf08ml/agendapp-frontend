@@ -1,25 +1,23 @@
-import { Stack, Text } from "@mantine/core";
+import type { ReactNode } from "react";
 
 interface StepHeadingProps {
   /** Instrucción principal, corta y directa (ej. "Elige el día") */
   title: string;
   /** Una línea opcional de apoyo */
-  hint?: React.ReactNode;
+  hint?: ReactNode;
 }
 
-// Encabezado común de cada sección del wizard de reserva: una instrucción clara
-// en lugar de párrafos explicativos.
+// Encabezado de cada paso del wizard de reserva (title-2 del design system):
+// una instrucción clara en lugar de párrafos explicativos.
 export default function StepHeading({ title, hint }: StepHeadingProps) {
   return (
-    <Stack gap={2}>
-      <Text fw={700} size="lg" lh={1.25}>
-        {title}
-      </Text>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <h2 className="ag-h-step">{title}</h2>
       {hint && (
-        <Text size="sm" c="dimmed" lh={1.35}>
+        <span className="ag-muted" style={{ fontSize: 14, lineHeight: "20px" }}>
           {hint}
-        </Text>
+        </span>
       )}
-    </Stack>
+    </div>
   );
 }

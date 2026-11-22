@@ -7,7 +7,6 @@ import {
   Group,
   Center,
 } from "@mantine/core";
-import StepHeading from "./StepHeading";
 import { useMediaQuery } from "@mantine/hooks";
 import { DatePicker } from "@mantine/dates";
 import { Service } from "../../services/serviceService";
@@ -263,15 +262,15 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
         return {};
       }
 
-      // Seleccionado: color de marca de la organización
+      // Seleccionado: relleno de marca (ag-day--selected)
       if (isSelected) {
         return {
           style: {
-            backgroundColor: "var(--mantine-primary-color-filled)",
-            color: "var(--mantine-primary-color-contrast)",
+            backgroundColor: "var(--brand)",
+            color: "var(--on-brand)",
             // Anillo legible aunque la marca sea muy clara (amarillo, rosa pastel)
             boxShadow: "inset 0 0 0 2px var(--brand-text)",
-            fontWeight: 700,
+            fontWeight: 600,
           },
         };
       }
@@ -283,21 +282,22 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
         return {
           disabled: true,
           style: {
-            color: "var(--mantine-color-gray-5)",
+            color: "var(--ink-subtle)",
             textDecoration: "line-through",
+            textDecorationColor: "var(--line-strong)",
             cursor: "not-allowed",
           },
         };
       }
 
-      // Con horarios: verde suave
+      // Con horarios: success-soft (ag-day--free); hoy con borde line-control
       if (hasAvailability === true) {
         return {
           style: {
-            backgroundColor: "var(--mantine-color-green-light)",
-            color: "var(--mantine-color-green-light-color)",
-            fontWeight: 700,
-            ...(isToday ? { outline: "1px solid var(--mantine-color-green-5)" } : {}),
+            backgroundColor: "var(--success-soft)",
+            color: "var(--ink)",
+            fontWeight: 600,
+            ...(isToday ? { boxShadow: "inset 0 0 0 1px var(--line-control)" } : {}),
           },
         };
       }
@@ -321,20 +321,7 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
 
   return (
     <Stack gap="sm">
-      <StepHeading
-        title="Elige el día"
-        hint={
-          <>
-            Los días en{" "}
-            <Text span c="green" fw={600} inherit>
-              verde
-            </Text>{" "}
-            tienen horarios libres.
-          </>
-        }
-      />
-
-      <Paper withBorder radius="md" p={isMobile ? 6 : "md"} pos="relative">
+      <Paper radius="lg" p={isMobile ? 0 : "md"} withBorder={!isMobile} pos="relative">
         <Center>
           <DatePicker
             minDate={new Date()}
@@ -350,6 +337,11 @@ const StepMultiServiceDate: React.FC<StepMultiServiceDateProps> = ({
           />
         </Center>
       </Paper>
+
+      <div className="ag-legend">
+        <span><i style={{ background: "var(--success-soft)", boxShadow: "inset 0 0 0 1px var(--success)" }} />Con horarios libres</span>
+        <span><i style={{ background: "var(--brand)" }} />Elegido</span>
+      </div>
 
       {loading && (
         <Group gap="xs" justify="center">

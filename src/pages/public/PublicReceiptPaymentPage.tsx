@@ -27,6 +27,7 @@ import {
   IconX,
   IconReceipt,
   IconCircleX,
+  IconClock,
 } from "@tabler/icons-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -49,6 +50,41 @@ interface ReceiptPaymentState {
   currency: string;
   paymentMethods: ReceiptPaymentMethod[];
   orderType?: "reservation" | "class" | "package" | "store";
+  // Vencimiento de la orden (solo llega al abrir el enlace ?ref=)
+  expiresAt?: string;
+}
+
+// Tiempo para pagar una cita (decisión 7b del rediseño): el horario NO queda
+// apartado mientras se paga. Con expiresAt, cuenta regresiva real; si no, texto fijo.
+function ReservationPaymentWindow({ expiresAt }: { expiresAt?: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!expiresAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  const msLeft = expiresAt ? new Date(expiresAt).getTime() - now : null;
+  const mmss =
+    msLeft !== null && msLeft > 0
+      ? `${Math.floor(msLeft / 60000)}:${String(Math.floor((msLeft % 60000) / 1000)).padStart(2, "0")}`
+      : null;
+  return (
+    <div className="ag-alert ag-alert--warning" role="status">
+      <IconClock size={20} stroke={1.75} />
+      <div>
+        <b>
+          {mmss
+            ? `Te quedan ${mmss} min para completar el pago`
+            : msLeft !== null
+              ? "El tiempo para pagar terminó"
+              : "Completa el pago en 60 min para confirmar tu cita"}
+        </b>
+        <div className="ag-muted" style={{ fontSize: 13, lineHeight: "18px" }}>
+          Mientras tanto el horario no queda apartado: si otra persona lo reserva primero, te avisamos.
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type View = "upload" | "submitting" | "paid" | "review" | "rejected";
@@ -127,6 +163,7 @@ export default function PublicReceiptPaymentPage() {
           currency: info.currency,
           paymentMethods: info.paymentMethods,
           orderType: info.orderType,
+          expiresAt: info.expiresAt,
         });
         // El cliente puede reabrir el enlace después de pagar o de que venza.
         const status: string = info.status;
@@ -301,6 +338,10 @@ export default function PublicReceiptPaymentPage() {
           a una de las cuentas y sube la captura. Validamos el pago al instante.
         </Text>
       </Stack>
+
+      {(state.orderType ?? "reservation") === "reservation" && (
+        <ReservationPaymentWindow expiresAt={state.expiresAt} />
+      )}
 
       {/* Cuentas para pagar */}
       <Card withBorder radius="md" p="md">
