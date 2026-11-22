@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Box,
   Card,
   Title,
   Table,
@@ -74,7 +75,15 @@ import {
   IconBuildingBank,
   IconCoin,
   IconUsersGroup,
+  IconCheck,
+  IconClock,
+  IconAlertCircle,
+  IconGift,
+  IconCalendarOff,
+  type Icon,
 } from "@tabler/icons-react";
+import { useSearchParams } from "react-router-dom";
+import CashSubtabs from "../../components/cash/CashSubtabs";
 
 import {
   Expense,
@@ -180,27 +189,38 @@ const STATUS_META: Record<
   },
 };
 
+// Estado de la cita en palabra + ícono + color de estado (design system)
+const STATUS_TONE: Record<string, { tone: "success" | "warning" | "danger" | "info"; icon: Icon }> = {
+  confirmed: { tone: "success", icon: IconCheck },
+  pending: { tone: "warning", icon: IconClock },
+  cancelled: { tone: "danger", icon: IconCalendarOff },
+  cancelled_by_customer: { tone: "danger", icon: IconCalendarOff },
+  cancelled_by_admin: { tone: "danger", icon: IconCalendarOff },
+  attended: { tone: "success", icon: IconCircleCheck },
+  no_show: { tone: "danger", icon: IconUserX },
+};
+
 function StatusBadge({ status }: { status: ApptStatus }) {
   const meta = STATUS_META[status] || { label: status || "—", color: "gray" };
+  const t = STATUS_TONE[status];
+  const StatusIcon = t?.icon;
   return (
-    <Badge variant="light" color={meta.color} size="sm">
+    <span className={`ag-badge${t ? ` ag-badge--${t.tone}` : ""}`}>
+      {StatusIcon && <StatusIcon size={14} stroke={2} />}
       {meta.label}
-    </Badge>
+    </span>
   );
 }
 
-// Desktop: resaltado MUY suave (opcional)
-function getRowStylesSoft(status: ApptStatus) {
-  const meta = STATUS_META[status];
-  if (!meta?.bg) return {};
-  return { backgroundColor: meta.bg, color: meta.text };
+// Filas y tarjetas neutras: el estado se lee en su badge (palabra + ícono)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getRowStylesSoft(_status: ApptStatus) {
+  return {};
 }
 
-// Mobile: acento en borde, más limpio que pintar el fondo
-function getCardAccentStyle(status: ApptStatus) {
-  const meta = STATUS_META[status];
-  if (!meta?.color) return {};
-  return { borderLeft: `4px solid var(--mantine-color-${meta.color}-6)` };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getCardAccentStyle(_status: ApptStatus) {
+  return {};
 }
 
 function canConfirm(status: ApptStatus) {
@@ -222,21 +242,24 @@ function CustomPriceBadge({ isMobile }: { isMobile: boolean }) {
   );
 }
 
-const PAYMENT_STATUS_META: Record<string, { label: string; color: string }> = {
-  paid:    { label: "Pagado",   color: "green" },
-  partial: { label: "Abono",   color: "yellow" },
-  unpaid:  { label: "Sin pagar", color: "red" },
-  free:    { label: "Gratis",  color: "blue" },
+// Estado del cobro en palabra + ícono (Pagado, Abono, Sin pagar, Incluido en paquete, Gratis)
+const PAYMENT_STATUS_META: Record<string, { label: string; tone: "success" | "warning" | "danger" | "info"; icon: Icon }> = {
+  paid:    { label: "Pagado",    tone: "success", icon: IconCheck },
+  partial: { label: "Abono",     tone: "warning", icon: IconCoin },
+  unpaid:  { label: "Sin pagar", tone: "danger",  icon: IconAlertCircle },
+  free:    { label: "Gratis",    tone: "info",    icon: IconGift },
 };
 
 function PaymentBadge({ status, clientPackageId }: { status?: string; clientPackageId?: string | null }) {
   if (!status) return null;
-  const meta = PAYMENT_STATUS_META[status] || { label: status, color: "gray" };
-  const label = status === "free" && clientPackageId ? "Incluido en paquete" : meta.label;
+  const meta = PAYMENT_STATUS_META[status];
+  const label = status === "free" && clientPackageId ? "Incluido en paquete" : meta?.label ?? status;
+  const PayIcon = status === "free" && clientPackageId ? IconPackage : meta?.icon;
   return (
-    <Badge variant="light" color={meta.color} size="sm">
+    <span className={`ag-badge${meta ? ` ag-badge--${meta.tone}` : ""}`}>
+      {PayIcon && <PayIcon size={14} stroke={2} />}
       {label}
-    </Badge>
+    </span>
   );
 }
 
@@ -318,6 +341,25 @@ const DailyCashbox: React.FC = () => {
   const openTab = (tab: string) => {
     setActiveTab(tab);
     localStorage.setItem("cashbox_tab", tab);
+  };
+
+  // Pestañas de Caja y pagos (CashSubtabs): «Gastos» abre ?tab=movimientos y
+  // «Arqueos» ?tab=arqueo (vista diaria, desplazada al arqueo de efectivo).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (urlTab === "movimientos") {
+      openTab("movimientos");
+    } else if (urlTab === "arqueo") {
+      setInterval("daily");
+      setTimeout(() => document.getElementById("arqueo")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTab]);
+  // Cambiar de pestaña a mano quita el ?tab= para que la pestaña de arriba no quede desfasada
+  const openTabFromUser = (tab: string) => {
+    openTab(tab);
+    if (urlTab) setSearchParams({}, { replace: true });
   };
 
   // Base de caja (monto inicial en efectivo al abrir el día)
@@ -1952,16 +1994,17 @@ const DailyCashbox: React.FC = () => {
       />
 
       <Stack gap="md" mt="xs">
-        {/* ── Barra de control ── */}
-        <Card shadow="sm" radius="md" withBorder p="md">
+        {/* ── Barra de control (CajaPanel: título, pestañas internas y período) ── */}
+        <Box>
           <Stack gap="sm">
             {/* Fila título */}
             <Group justify="space-between" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-                <IconCalendar size={18} style={{ flexShrink: 0 }} />
-                <Text fw={900} size="lg" style={{ flexShrink: 0 }}>Caja</Text>
+              <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+                <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em", whiteSpace: "nowrap" }}>
+                  Caja y pagos
+                </h1>
                 {formattedRangeLabel && (
-                  <Badge variant="light" size="md">{formattedRangeLabel}</Badge>
+                  <span className="ag-badge ag-badge--outline">{formattedRangeLabel}</span>
                 )}
                 {loading && <Loader size="xs" style={{ flexShrink: 0 }} />}
               </Group>
@@ -1985,28 +2028,11 @@ const DailyCashbox: React.FC = () => {
 
             {/* Selector de intervalo */}
             <Tooltip label="La vista seleccionada se recuerda al volver" withArrow position="top">
-              {isMobile ? (
-                <Select
-                  placeholder="Selecciona intervalo"
-                  data={[
-                    { value: "daily", label: "Diario" },
-                    { value: "weekly", label: "Semanal" },
-                    { value: "biweekly", label: "Quincenal" },
-                    { value: "monthly", label: "Mensual" },
-                    { value: "custom", label: "Personalizado" },
-                  ] as any}
-                  value={interval}
-                  onChange={(v) => {
-                    const next = (v || "daily") as Interval;
-                    setInterval(next);
-                    localStorage.setItem("cashbox_interval", next);
-                    if (next === "daily" && !selectedDay) setSelectedDay(new Date());
-                  }}
-                  searchable={false} clearable={false}
-                />
-              ) : (
+              {/* Período como segmento (también en móvil, con scroll horizontal) */}
+              {(
                 <SegmentedControl
-                  fullWidth
+                  fullWidth={!isMobile}
+                  style={isMobile ? { overflowX: "auto", maxWidth: "100%" } : undefined}
                   value={interval}
                   onChange={(v) => {
                     const next = v as Interval;
@@ -2015,10 +2041,10 @@ const DailyCashbox: React.FC = () => {
                     if (next === "daily" && !selectedDay) setSelectedDay(new Date());
                   }}
                   data={[
-                    { value: "daily", label: "Diario" },
-                    { value: "weekly", label: "Semanal" },
-                    { value: "biweekly", label: "Quincenal" },
-                    { value: "monthly", label: "Mensual" },
+                    { value: "daily", label: "Día" },
+                    { value: "weekly", label: "Semana" },
+                    { value: "biweekly", label: "Quincena" },
+                    { value: "monthly", label: "Mes" },
                     { value: "custom", label: "Personalizado" },
                   ]}
                 />
@@ -2081,32 +2107,39 @@ const DailyCashbox: React.FC = () => {
               <Button onClick={() => setFiltersOpened(false)}>Aplicar</Button>
             </Stack>
           </Drawer>
-        </Card>
+        </Box>
 
-        {/* ── KPIs fijos (siempre visibles) ── */}
+        {/* Pestañas internas de Caja y pagos */}
+        <CashSubtabs />
+
+        {/* ── Cifras (StatTile neutros: el color queda para los estados) ── */}
         <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm">
-          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-violet-6)" }}>
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Recibido</Text>
-            <Text fw={900} size="xl" c="violet">{formatCurrency(totalReceivedCombined, currency)}</Text>
-            <Text size="xs" c="dimmed" mt={2}>{totalCount} cita{totalCount !== 1 ? "s" : ""} en el período</Text>
-          </Paper>
+          <div className="ag-card ag-stat" style={{ minWidth: 0, padding: "var(--space-4)" }}>
+            <span className="ag-stat__label">Recibido</span>
+            <span className="ag-stat__value" style={{ fontSize: isMobile ? 22 : 28, lineHeight: 1.15 }}>{formatCurrency(totalReceivedCombined, currency)}</span>
+            <span className="ag-subtle">{totalCount} cita{totalCount !== 1 ? "s" : ""} en el período</span>
+          </div>
 
-          <Paper withBorder p="md" radius="md"
-            style={totalPending > 0 ? { borderLeft: "3px solid var(--mantine-color-orange-6)" } : undefined}>
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Pendiente</Text>
-            <Text fw={900} size="xl" c={totalPending > 0 ? "orange" : "dimmed"}>{formatCurrency(totalPending, currency)}</Text>
-          </Paper>
+          <div className="ag-card ag-stat" style={{ minWidth: 0, padding: "var(--space-4)" }}>
+            <span className="ag-stat__label">Pendiente</span>
+            <span className="ag-stat__value" style={{ fontSize: isMobile ? 22 : 28, lineHeight: 1.15 }}>{formatCurrency(totalPending, currency)}</span>
+            <span className="ag-subtle">Por cobrar</span>
+          </div>
 
-          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-red-6)" }}>
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Gastos</Text>
-            <Text fw={900} size="xl" c="red">{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</Text>
-          </Paper>
+          <div className="ag-card ag-stat" style={{ minWidth: 0, padding: "var(--space-4)" }}>
+            <span className="ag-stat__label">Gastos</span>
+            <span className="ag-stat__value" style={{ fontSize: isMobile ? 22 : 28, lineHeight: 1.15 }}>{formatCurrency(totalCosts + totalGeneralExpenses, currency)}</span>
+          </div>
 
-          <Paper withBorder p="md" radius="md"
-            style={{ borderLeft: `3px solid var(--mantine-color-${netMargin >= 0 ? "teal" : "red"}-6)` }}>
-            <Text size="xs" c="dimmed" fw={500} mb={4}>Margen</Text>
-            <Text fw={900} size="xl" c={netMargin >= 0 ? "teal" : "red"}>{formatCurrency(netMargin, currency)}</Text>
-          </Paper>
+          <div className="ag-card ag-stat" style={{ minWidth: 0, padding: "var(--space-4)" }}>
+            <span className="ag-stat__label">Margen</span>
+            <span
+              className="ag-stat__value"
+              style={{ fontSize: isMobile ? 22 : 28, lineHeight: 1.15, color: netMargin < 0 ? "var(--danger)" : undefined }}
+            >
+              {formatCurrency(netMargin, currency)}
+            </span>
+          </div>
         </SimpleGrid>
 
         {/* ── Desglose de lo recibido: por origen y por método ── */}
@@ -2118,16 +2151,16 @@ const DailyCashbox: React.FC = () => {
                 <Group gap="xs" wrap="wrap">
                   <Text size="xs" c="dimmed" fw={600}>Por origen:</Text>
                   {totalCollected > 0 && (
-                    <Badge variant="light" color="green" size="sm">Citas {formatCurrency(totalCollected, currency)}</Badge>
+                    <Badge variant="light" color="gray" size="sm">Citas {formatCurrency(totalCollected, currency)}</Badge>
                   )}
                   {totalPackagePayments > 0 && (
-                    <Badge variant="light" color="grape" size="sm">Paquetes {formatCurrency(totalPackagePayments, currency)}</Badge>
+                    <Badge variant="light" color="gray" size="sm">Paquetes {formatCurrency(totalPackagePayments, currency)}</Badge>
                   )}
                   {totalProductSales > 0 && (
-                    <Badge variant="light" color="cyan" size="sm">Productos {formatCurrency(totalProductSales, currency)}</Badge>
+                    <Badge variant="light" color="gray" size="sm">Productos {formatCurrency(totalProductSales, currency)}</Badge>
                   )}
                   {totalGeneralIncomes > 0 && (
-                    <Badge variant="light" color="teal" size="sm">Extra {formatCurrency(totalGeneralIncomes, currency)}</Badge>
+                    <Badge variant="light" color="gray" size="sm">Extra {formatCurrency(totalGeneralIncomes, currency)}</Badge>
                   )}
                 </Group>
               )}
@@ -2166,10 +2199,10 @@ const DailyCashbox: React.FC = () => {
 
         {/* ── Disponible por método (recibido − gastos de ese método) ── */}
         {availableByMethod.rows.length > 0 && (
-          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-teal-6)" }}>
+          <Paper withBorder p="md" radius="lg">
             <Group justify="space-between" mb={6} wrap="nowrap">
               <Text size="sm" fw={700}>Disponible por método</Text>
-              <Text size="sm" fw={900} c={availableByMethod.total >= 0 ? "teal" : "red"}>
+              <Text size="sm" fw={700} c={availableByMethod.total >= 0 ? undefined : "var(--danger)"}>
                 {formatCurrency(availableByMethod.total, currency)}
               </Text>
             </Group>
@@ -2191,8 +2224,8 @@ const DailyCashbox: React.FC = () => {
                         <Text size="sm">{label}</Text>
                       </Group>
                     </Table.Td>
-                    <Table.Td ta="right" c="green">{formatCurrency(received, currency)}</Table.Td>
-                    <Table.Td ta="right" c="red">{spent > 0 ? `− ${formatCurrency(spent, currency)}` : formatCurrency(0, currency)}</Table.Td>
+                    <Table.Td ta="right">{formatCurrency(received, currency)}</Table.Td>
+                    <Table.Td ta="right" c="var(--ink-muted)">{spent > 0 ? `− ${formatCurrency(spent, currency)}` : formatCurrency(0, currency)}</Table.Td>
                     <Table.Td ta="right" fw={700} c={available >= 0 ? undefined : "red"}>
                       {formatCurrency(available, currency)}
                     </Table.Td>
@@ -2213,7 +2246,7 @@ const DailyCashbox: React.FC = () => {
 
         {/* ── Arqueo de efectivo (solo vista diaria) ── */}
         {interval === "daily" && (
-          <Paper withBorder p="md" radius="md" style={{ borderLeft: "3px solid var(--mantine-color-blue-6)" }}>
+          <Paper withBorder p="md" radius="lg" id="arqueo" style={{ scrollMarginTop: 16 }}>
             <Group gap="xs" mb={6}>
               <IconCash size={16} />
               <Text size="sm" fw={700}>Arqueo de efectivo</Text>
@@ -2225,22 +2258,22 @@ const DailyCashbox: React.FC = () => {
               </Group>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">+ Entradas en efectivo</Text>
-                <Text size="sm" c="green">{formatCurrency(receivedByMethod.cash, currency)}</Text>
+                <Text size="sm">{formatCurrency(receivedByMethod.cash, currency)}</Text>
               </Group>
               <Group justify="space-between">
                 <Text size="sm" c="dimmed">− Gastos en efectivo</Text>
-                <Text size="sm" c="red">{formatCurrency(totalCashExpenses, currency)}</Text>
+                <Text size="sm">{formatCurrency(totalCashExpenses, currency)}</Text>
               </Group>
-              <Group justify="space-between" pt={4} style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}>
+              <Group justify="space-between" pt={4} style={{ borderTop: "1px solid var(--line)" }}>
                 <Text size="sm" fw={700}>Total en caja</Text>
-                <Text size="sm" fw={900} c="blue">{formatCurrency(cashInDrawer, currency)}</Text>
+                <Text size="sm" fw={700}>{formatCurrency(cashInDrawer, currency)}</Text>
               </Group>
             </Stack>
           </Paper>
         )}
 
         {/* ── Contenido en tabs ── */}
-        <Tabs value={effectiveTab} onChange={(v) => openTab(v || "citas")} radius="md">
+        <Tabs value={effectiveTab} onChange={(v) => openTabFromUser(v || "citas")} radius="md">
           {/* Lista scrolleable horizontal en mobile */}
           <Tabs.List style={{ flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden" }}>
             <Tabs.Tab
