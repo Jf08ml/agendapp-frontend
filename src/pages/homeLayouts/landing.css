@@ -22,6 +22,13 @@
 .lnd-hero__photos--2 { grid-template-columns: 1fr 1fr; }
 .lnd-hero__photos--3 { grid-template-columns: 1.4fr 1fr; grid-template-rows: 1fr 1fr; }
 .lnd-hero__photos--3 img:first-child { grid-row: span 2; }
+/* Móvil: una fila de miniaturas de 120 px para no empujar los servicios */
+@media (max-width: 61.99em) {
+  .lnd-hero__photos { height: 120px; }
+  .lnd-hero__photos--2, .lnd-hero__photos--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 1fr; }
+  .lnd-hero__photos--3 img:first-child { grid-row: auto; }
+  .lnd-hero__photos--1 { height: auto; aspect-ratio: 16 / 9; }
+}
 
 /* Encabezado de sección: eyebrow + title-1 + enlace */
 .lnd-sectionhead { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; justify-content: space-between; margin-bottom: var(--space-5); }
