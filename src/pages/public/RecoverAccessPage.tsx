@@ -6,10 +6,8 @@ import {
   Anchor,
   Button,
   Card,
-  Container,
   Group,
   Loader,
-  Paper,
   PasswordInput,
   PinInput,
   SegmentedControl,
@@ -36,6 +34,7 @@ import { extractTenantFromHost } from "../../utils/domainUtils";
 import { detectSignupCountry } from "../../utils/signupRegion";
 import type { CountryCode } from "libphonenumber-js";
 import { AGENDITAPP_SUPPORT_WA_URL, recoveryExchangeUrl } from "../../utils/panelAccess";
+import AuthCard from "../../components/auth/AuthCard";
 
 /**
  * /recuperar-acceso — el dueño entra a su panel sin la contraseña:
@@ -266,8 +265,9 @@ export default function RecoverAccessPage() {
   );
 
   return (
-    <Container size={460} my={60} px="md">
-      <Paper withBorder shadow="md" p={{ base: "lg", sm: 30 }} radius="md">
+    // AuthCard (rediseño): tarjeta clara sobre surface-muted con el logo del negocio;
+    // en app.agenditapp.com, sin marca de negocio.
+    <AuthCard platform={isGlobal} subtitle="" maxWidth={440}>
         {step === "identify" && (
           <Stack gap="md">
             <div>
@@ -371,8 +371,8 @@ export default function RecoverAccessPage() {
                         <div key={ch.channel}>
                           <Button
                             fullWidth
-                            variant={ch.channel === "whatsapp" ? "filled" : "light"}
-                            color={ch.channel === "whatsapp" ? "green" : "blue"}
+                            variant={ch.channel === "whatsapp" ? "filled" : "default"}
+                            color={ch.channel === "whatsapp" ? "green" : undefined}
                             leftSection={ch.channel === "whatsapp" ? <IconBrandWhatsapp size={18} /> : <IconMail size={18} />}
                             disabled={!ch.available || loading}
                             loading={loading && selectedOrg === acc.organizationId}
@@ -387,7 +387,7 @@ export default function RecoverAccessPage() {
                             {ch.channel === "whatsapp" ? `WhatsApp a ${ch.masked}` : `Correo a ${ch.masked}`}
                           </Button>
                           {!ch.available && ch.reason === "bounced" && (
-                            <Text size="xs" c="orange.7" mt={4}>
+                            <Text size="xs" c="var(--warning)" mt={4}>
                               Los correos a esta dirección no están llegando. Usa WhatsApp y, ya dentro, corrige tu
                               correo en Mi negocio.
                             </Text>
@@ -518,7 +518,6 @@ export default function RecoverAccessPage() {
             </Text>
           </Stack>
         )}
-      </Paper>
-    </Container>
+    </AuthCard>
   );
 }
