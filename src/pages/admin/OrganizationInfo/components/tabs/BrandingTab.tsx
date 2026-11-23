@@ -1,20 +1,11 @@
-import {
-  Alert,
-  Anchor,
-  Box,
-  ColorInput,
-  Divider,
-  FileInput,
-  Group,
-  Loader,
-  Paper,
-  Select,
-  SimpleGrid,
-  Switch,
-  Text,
-  TextInput,
-} from "@mantine/core";
-import { IconChristmasTree, IconLock } from "@tabler/icons-react";
+// Marca y web (rediseño, AjustesMarca / AjustesWeb). La antigua pestaña
+// «Branding» se separa en tres páginas con `part`:
+// - "brand": logo, color principal y secundario (muestras + selector), tipografía en tarjetas.
+// - "pwa": App instalable (ícono, favicon, nombres, descripción, color del navegador).
+// - "season": Temporada (decoración navideña con vista previa y «Ver en mi web»).
+// `branding.footerTextColor` ya no se edita (el pie de la web es neutro); el valor guardado no se toca.
+import { Alert, Box, ColorInput, FileInput, Loader, Paper, SegmentedControl, SimpleGrid, Switch, Text, TextInput } from "@mantine/core";
+import { IconCheck, IconChristmasTree, IconExternalLink, IconLock } from "@tabler/icons-react";
 import { ChristmasDecorations, SantaHat } from "../../../../../components/seasonal/ChristmasDecorations";
 import { CHRISTMAS_SEASON_LABEL } from "../../../../../utils/seasonalTheme";
 import { useSelector } from "react-redux";
@@ -33,6 +24,70 @@ const FONT_OPTIONS = [
   { value: "manrope", label: "Manrope", css: "Manrope" },
 ];
 
+// Muestras sugeridas para el color principal (el selector libre sigue disponible)
+const BRAND_SWATCHES = ["#111111", "#1c7ed6", "#0c8599", "#2f9e44", "#e8590c", "#d6336c", "#7048e8", "#ae3ec9", "#c2255c", "#5f3dc4"];
+
+type UploadKey = "logoUrl" | "faviconUrl" | "pwaIcon";
+
+function ImageField({
+  label,
+  help,
+  url,
+  uploading,
+  size,
+  radius,
+  disabled,
+  onFile,
+  placeholder,
+}: {
+  label: string;
+  help: string;
+  url?: string | null;
+  uploading: boolean;
+  size: number;
+  radius: number;
+  disabled: boolean;
+  onFile: (f: File | null) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="ag-field">
+      <span className="ag-label">{label}</span>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <Box
+          style={{
+            width: size,
+            height: size,
+            flex: "none",
+            borderRadius: radius,
+            border: "1px solid var(--line)",
+            background: "var(--surface-raised)",
+            display: "grid",
+            placeItems: "center",
+            overflow: "hidden",
+          }}
+        >
+          {uploading ? (
+            <Loader size="sm" />
+          ) : url ? (
+            <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          ) : (
+            <span className="ag-subtle" style={{ fontSize: 11 }}>Sin imagen</span>
+          )}
+        </Box>
+        <FileInput
+          accept="image/*"
+          disabled={disabled || uploading}
+          placeholder={uploading ? "Subiendo…" : placeholder}
+          onChange={(f) => onFile(f as File)}
+          style={{ flex: 1 }}
+        />
+      </div>
+      <span className="ag-help">{help}</span>
+    </div>
+  );
+}
+
 export default function BrandingTab({
   form,
   isEditing,
@@ -40,348 +95,231 @@ export default function BrandingTab({
   uploadingFavicon,
   uploadingPwaIcon,
   onUpload,
+  part = "brand",
 }: {
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
   uploadingLogo: boolean;
   uploadingFavicon: boolean;
   uploadingPwaIcon: boolean;
-  onUpload: (
-    file: File | null,
-    key: "logoUrl" | "faviconUrl" | "pwaIcon"
-  ) => void;
+  onUpload: (file: File | null, key: UploadKey) => void;
+  part?: "brand" | "pwa" | "season";
 }) {
   const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseBranding = planLimits?.customBranding !== false;
   const brandingDisabled = !isEditing || !canUseBranding;
+  const b = form.values.branding;
 
-  return (
-    <SectionCard
-      title="Branding"
-      description="Controla identidad visual y datos de la PWA."
-    >
-      {!canUseBranding && (
-        <Alert icon={<IconLock size={14} />} color="violet" variant="light" mb="md">
-          <Text size="sm">La personalización de branding (logo, colores, fuentes) está disponible desde el <strong>Plan Starter</strong>.</Text>
-        </Alert>
-      )}
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="md">
-        {/* LOGO */}
-        <Box>
-          <Text fw={600} mb={6}>
-            Logo
-          </Text>
-          <Group gap="md" align="center">
-            <Box
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 8,
-                border: "1px solid #eee",
-                background: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {uploadingLogo ? (
-                <Loader size="sm" />
-              ) : form.values.branding?.logoUrl ? (
-                <img
-                  src={form.values.branding.logoUrl}
-                  alt="Logo"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    borderRadius: 8,
-                  }}
-                />
-              ) : (
-                <Text size="xs" c="dimmed">
-                  Sin logo
-                </Text>
-              )}
-            </Box>
+  const planAlert = !canUseBranding && (
+    <Alert icon={<IconLock size={14} />} color="gray" variant="light" mb="md">
+      <Text size="sm">
+        Personalizar la marca (logo, colores, tipografía e app instalable) está disponible desde el <strong>Plan Starter</strong>.
+      </Text>
+    </Alert>
+  );
 
-            <FileInput
-              mt="xs"
-              accept="image/*"
-              disabled={brandingDisabled || uploadingLogo}
-              placeholder={uploadingLogo ? "Cargando..." : "Cambiar logo"}
-              onChange={(f) => onUpload(f as File, "logoUrl")}
-              description="Sugerido: 256×256 PNG, fondo blanco o transparente."
+  if (part === "season") {
+    const on = form.values.seasonalTheme === "christmas";
+    // La vista previa de temporada existe solo fuera de producción (?preview=navidad);
+    // en producción se ve la web tal cual.
+    const previewUrl = `${window.location.origin}/?preview=navidad`;
+    return (
+      <SectionCard
+        title="Decoración navideña"
+        description={`Nieve, luces y un gorrito en tu logo en las páginas que ven tus clientes (inicio, reservas, tienda, tarjeta de fidelidad). Se muestra solo ${CHRISTMAS_SEASON_LABEL}; tus colores no cambian y tu panel queda igual.`}
+        icon={<IconChristmasTree size={16} />}
+      >
+        <div className="ag-switchrow" style={{ paddingTop: 0 }}>
+          <div>
+            <b>Mostrar decoración navideña</b>
+            <span>Disponible en todos los planes.</span>
+          </div>
+          <span style={{ flex: "none" }}>
+            <Switch
+              aria-label="Decoración navideña"
+              checked={on}
+              onChange={(e) => form.setFieldValue("seasonalTheme", e.currentTarget.checked ? "christmas" : "none")}
+              disabled={!isEditing}
             />
-          </Group>
-        </Box>
-
-        {/* FAVICON */}
-        <Box>
-          <Text fw={600} mb={6}>
-            Favicon
-          </Text>
-          <Group gap="md" align="center">
-            <Box
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 6,
-                border: "1px solid #eee",
-                background: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {uploadingFavicon ? (
-                <Loader size="xs" />
-              ) : form.values.branding?.faviconUrl ? (
-                <img
-                  src={form.values.branding.faviconUrl}
-                  alt="Favicon"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                    borderRadius: 6,
-                  }}
-                />
-              ) : (
-                <Text size="xs" c="dimmed">
-                  32×32
-                </Text>
-              )}
-            </Box>
-
-            <FileInput
-              mt="xs"
-              accept="image/*"
-              disabled={brandingDisabled || uploadingFavicon}
-              placeholder={uploadingFavicon ? "Cargando..." : "Cambiar favicon"}
-              onChange={(f) => onUpload(f as File, "faviconUrl")}
-              description="Recomendado: 32×32 PNG."
-            />
-          </Group>
-        </Box>
-
-        {/* PWA ICON */}
-        <Box>
-          <Text fw={600} mb={6}>
-            Icono PWA
-          </Text>
-          <Group gap="md" align="center">
-            <Box
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 12,
-                border: "1px solid #eee",
-                background: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {uploadingPwaIcon ? (
-                <Loader size="sm" />
-              ) : (
-                form.values.branding?.pwaIcon && (
-                  <img
-                    src={form.values.branding.pwaIcon}
-                    alt="PWA Icon"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                      borderRadius: 12,
-                    }}
-                  />
-                )
-              )}
-            </Box>
-
-            <FileInput
-              mt="xs"
-              accept="image/*"
-              disabled={brandingDisabled || uploadingPwaIcon}
-              placeholder={uploadingPwaIcon ? "Cargando..." : "Cambiar icono"}
-              onChange={(f) => onUpload(f as File, "pwaIcon")}
-              description="PNG 192×192 o 512×512. Ideal una versión maskable."
-            />
-          </Group>
-        </Box>
-      </SimpleGrid>
-
-      {(() => {
-        const selectedFont = FONT_OPTIONS.find(
-          (f) => f.value === (form.values.branding?.fontFamily ?? "inter")
-        ) ?? FONT_OPTIONS[0];
-        const previewCss = `"${selectedFont.css}", sans-serif`;
-
-        return (
+          </span>
+        </div>
+        {on && (
           <>
-            <Select
-              label="Tipografía"
-              description="Fuente aplicada globalmente en toda la app de tu organización."
-              placeholder="Selecciona una fuente"
-              data={FONT_OPTIONS}
-              value={selectedFont.value}
-              onChange={(val) =>
-                form.setFieldValue("branding.fontFamily", val as BrandingFont)
-              }
-              disabled={brandingDisabled}
-              mb="xs"
-              renderOption={({ option }) => {
-                const font = FONT_OPTIONS.find((f) => f.value === option.value)!;
-                return (
-                  <Box>
-                    <Text style={{ fontFamily: `"${font.css}", sans-serif`, fontWeight: 600, lineHeight: 1.2 }}>
-                      {font.label}
-                    </Text>
-                    <Text style={{ fontFamily: `"${font.css}", sans-serif`, fontSize: 11, color: "#868e96", marginTop: 2 }}>
-                      Aa Bb — Tu cita es a las 10:00 AM
-                    </Text>
+            <Paper
+              withBorder
+              radius="md"
+              mt="sm"
+              style={{ position: "relative", overflow: "hidden", height: 140, background: "linear-gradient(180deg, #1c3461 0%, #2b4c86 100%)" }}
+            >
+              <ChristmasDecorations contained />
+              <div style={{ position: "absolute", left: 16, bottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
+                <SantaHat show>
+                  <Box style={{ width: 36, height: 36, borderRadius: "50%", background: "#fff", overflow: "hidden" }}>
+                    {b?.logoUrl && <img src={b.logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
                   </Box>
-                );
-              }}
-            />
-
-            <Paper withBorder p="md" mb="md" style={{ background: "#fafafa" }}>
-              <Text style={{ fontFamily: previewCss, fontSize: 40, fontWeight: 700, letterSpacing: -1.5, lineHeight: 1, color: "#1a1a2e" }}>
-                Aa
-              </Text>
-              <Text style={{ fontFamily: previewCss, fontSize: 18, fontWeight: 600, marginTop: 8, color: "#1a1a2e" }}>
-                Tu próxima cita es mañana
-              </Text>
-              <Text style={{ fontFamily: previewCss, fontSize: 14, marginTop: 4, color: "#495057" }}>
-                Servicios · Clientes · Agenda · 10:00 AM
-              </Text>
-              <Text style={{ fontFamily: previewCss, fontSize: 11, marginTop: 6, color: "#868e96" }}>
-                {selectedFont.label} — abcdefghijklmnopqrstuvwxyz 0123456789
-              </Text>
+                </SantaHat>
+                <Text c="white" fw={600} size="sm">
+                  Vista previa
+                </Text>
+              </div>
             </Paper>
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "inline-flex", gap: 6, alignItems: "center", marginTop: 10, fontSize: 14, color: "var(--brand-text)" }}
+            >
+              <IconExternalLink size={14} /> Ver en mi web
+            </a>
           </>
-        );
-      })()}
+        )}
+      </SectionCard>
+    );
+  }
 
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-        <ColorInput
-          label="Color primario"
-          {...form.getInputProps("branding.primaryColor")}
-          disabled={brandingDisabled}
-        />
-        <ColorInput
-          label="Color secundario"
-          {...form.getInputProps("branding.secondaryColor")}
-          disabled={brandingDisabled}
-        />
-        <ColorInput
-          label="Theme color (navegador)"
-          {...form.getInputProps("branding.themeColor")}
-          disabled={brandingDisabled}
-        />
-        <ColorInput
-          label="Texto del footer"
-          {...form.getInputProps("branding.footerTextColor")}
-          disabled={brandingDisabled}
-        />
-      </SimpleGrid>
+  if (part === "pwa") {
+    const custom = !!b?.themeColor;
+    return (
+      <SectionCard title="App instalable" description="Así aparece tu web cuando un cliente la agrega a la pantalla de inicio de su celular.">
+        {planAlert}
+        <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <ImageField
+              label="Ícono de la app"
+              help="PNG de 512 × 512. Se ve en la pantalla de inicio del celular."
+              url={b?.pwaIcon}
+              uploading={uploadingPwaIcon}
+              size={64}
+              radius={14}
+              disabled={brandingDisabled}
+              onFile={(f) => onUpload(f, "pwaIcon")}
+              placeholder="Cambiar ícono"
+            />
+            <ImageField
+              label="Favicon"
+              help="PNG de 32 × 32. Se ve en la pestaña del navegador."
+              url={b?.faviconUrl}
+              uploading={uploadingFavicon}
+              size={40}
+              radius={8}
+              disabled={brandingDisabled}
+              onFile={(f) => onUpload(f, "faviconUrl")}
+              placeholder="Cambiar favicon"
+            />
+          </SimpleGrid>
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <TextInput
+              label="Nombre de la app"
+              description="Aparece al instalarla."
+              {...form.getInputProps("branding.pwaName")}
+              disabled={brandingDisabled}
+            />
+            <TextInput
+              label="Nombre corto"
+              description="Debajo del ícono. Mejor 12 letras o menos."
+              {...form.getInputProps("branding.pwaShortName")}
+              disabled={brandingDisabled}
+              rightSection={<span className="ag-subtle ag-num" style={{ fontSize: 11 }}>{(b?.pwaShortName || "").length}</span>}
+            />
+          </SimpleGrid>
+          <TextInput
+            label="Descripción"
+            description="También se usa al compartir el enlace de tu web."
+            {...form.getInputProps("branding.pwaDescription")}
+            disabled={brandingDisabled}
+          />
+          <div className="ag-field">
+            <span className="ag-label">Color de la barra del navegador</span>
+            <SegmentedControl
+              size="xs"
+              style={{ alignSelf: "flex-start" }}
+              value={custom ? "custom" : "auto"}
+              onChange={(v) => form.setFieldValue("branding.themeColor", v === "custom" ? b?.primaryColor || "#111111" : "")}
+              data={[
+                { value: "auto", label: "Automático" },
+                { value: "custom", label: "Personalizado" },
+              ]}
+              disabled={brandingDisabled}
+            />
+            {custom && (
+              <ColorInput {...form.getInputProps("branding.themeColor")} disabled={brandingDisabled} w={220} />
+            )}
+            <span className="ag-help">Automático: el navegador usa su color de siempre.</span>
+          </div>
+        </div>
+      </SectionCard>
+    );
+  }
 
-      <Divider my="md" />
-
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-        <TextInput
-          label="Nombre de la app (PWA)"
-          {...form.getInputProps("branding.pwaName")}
+  // part === "brand"
+  const selectedFont = FONT_OPTIONS.find((f) => f.value === (b?.fontFamily ?? "inter")) ?? FONT_OPTIONS[0];
+  return (
+    <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+      {planAlert}
+      <SectionCard title="Logo" description="Se ve en el encabezado de tu web, en la reserva en línea y en la tarjeta de fidelidad.">
+        <ImageField
+          label="Logo del negocio"
+          help="PNG de 256 × 256, fondo blanco o transparente. Máximo 2 MB."
+          url={b?.logoUrl}
+          uploading={uploadingLogo}
+          size={72}
+          radius={12}
           disabled={brandingDisabled}
+          onFile={(f) => onUpload(f, "logoUrl")}
+          placeholder="Cambiar logo"
         />
-        <TextInput
-          label="Nombre corto (Short name)"
-          {...form.getInputProps("branding.pwaShortName")}
-          disabled={brandingDisabled}
-        />
-        <TextInput
-          label="Descripción (PWA)"
-          {...form.getInputProps("branding.pwaDescription")}
-          disabled={brandingDisabled}
-        />
-      </SimpleGrid>
+      </SectionCard>
 
-      <Divider my="md" />
+      <SectionCard title="Colores" description="El color principal se usa en botones, enlaces y la selección de tu web.">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <ColorInput
+            label="Color principal"
+            swatches={BRAND_SWATCHES}
+            swatchesPerRow={10}
+            {...form.getInputProps("branding.primaryColor")}
+            disabled={brandingDisabled}
+          />
+          <ColorInput
+            label="Color secundario (opcional)"
+            description="Para detalles y fondos suaves."
+            swatches={BRAND_SWATCHES}
+            swatchesPerRow={10}
+            {...form.getInputProps("branding.secondaryColor")}
+            disabled={brandingDisabled}
+          />
+        </SimpleGrid>
+      </SectionCard>
 
-      {/* 🎄 Tema navideño — disponible en todos los planes (no depende de customBranding) */}
-      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="md">
-        <Box>
-          <Group gap={6} mb={4}>
-            <IconChristmasTree size={18} color="#2f9e44" />
-            <Text fw={600}>Decoración navideña</Text>
-          </Group>
-          <Text size="sm" c="dimmed">
-            Nieve, luces y un gorrito en tu logo en las páginas que ven tus clientes
-            (inicio, reservas, tienda, tarjeta de fidelidad). Se muestra solo{" "}
-            {CHRISTMAS_SEASON_LABEL}; tus colores no cambian y tu panel queda igual.
-          </Text>
-        </Box>
-        <Switch
-          size="md"
-          aria-label="Decoración navideña"
-          checked={form.values.seasonalTheme === "christmas"}
-          onChange={(e) =>
-            form.setFieldValue("seasonalTheme", e.currentTarget.checked ? "christmas" : "none")
-          }
-          disabled={!isEditing}
-        />
-      </Group>
-
-      {form.values.seasonalTheme === "christmas" && (
-        <Paper
-          withBorder
-          radius="md"
-          mt="sm"
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            height: 140,
-            background: "linear-gradient(180deg, #1c3461 0%, #2b4c86 100%)",
-          }}
+      <SectionCard title="Tipografía" description="Se aplica en tu web, la reserva en línea y tu panel.">
+        <div
+          role="radiogroup"
+          aria-label="Tipografía"
+          style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}
         >
-          <ChristmasDecorations contained />
-          <Group gap="sm" style={{ position: "absolute", left: 16, bottom: 16 }}>
-            <SantaHat show>
-              <Box
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  background: "#fff",
-                  overflow: "hidden",
-                }}
+          {FONT_OPTIONS.map((f) => {
+            const on = f.value === selectedFont.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={brandingDisabled}
+                className="ag-opt"
+                onClick={() => form.setFieldValue("branding.fontFamily", f.value as BrandingFont)}
+                style={{ cursor: brandingDisabled ? "default" : "pointer", textAlign: "left", flexDirection: "column", gap: 2, font: "inherit", color: "inherit" }}
               >
-                {form.values.branding?.logoUrl && (
-                  <img
-                    src={form.values.branding.logoUrl}
-                    alt=""
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                )}
-              </Box>
-            </SantaHat>
-            <Text c="white" fw={600} size="sm">
-              Vista previa
-            </Text>
-          </Group>
-        </Paper>
-      )}
-
-      <Alert mt="md" color="gray" variant="light">
-        Para iOS agrega también <code>apple-touch-icon</code> en tu HTML.{" "}
-        <Anchor
-          href="https://web.dev/articles/apple-touch-icon?hl=es"
-          target="_blank"
-        >
-          Ver guía
-        </Anchor>
-      </Alert>
-    </SectionCard>
+                <span style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontFamily: `"${f.css}", sans-serif`, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>Aa</span>
+                  {on && <IconCheck size={16} />}
+                </span>
+                <b style={{ fontFamily: `"${f.css}", sans-serif` }}>{f.label}</b>
+                <span className="d" style={{ fontFamily: `"${f.css}", sans-serif` }}>Tu cita es mañana a las 10:00</span>
+              </button>
+            );
+          })}
+        </div>
+      </SectionCard>
+    </div>
   );
 }

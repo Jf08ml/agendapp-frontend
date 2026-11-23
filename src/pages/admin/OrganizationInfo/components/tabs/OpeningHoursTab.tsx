@@ -110,7 +110,10 @@ export default function OpeningHoursTab({
   form,
   isEditing,
   hideClassBooking = false,
+  part,
 }: {
+  /** "schedule": Reservas › Horario; "rules": Reservas › Reglas de reserva. */
+  part?: "schedule" | "rules";
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
   hideClassBooking?: boolean;
@@ -195,6 +198,7 @@ export default function OpeningHoursTab({
   return (
     <Stack gap="xl">
       {/* ── SECCIÓN 1: Horario base ────────────────────────────────────────── */}
+      {part !== "rules" && (
       <SectionCard
         title="Horario base de atención"
         description={
@@ -348,8 +352,10 @@ export default function OpeningHoursTab({
           </Table>
         </Box>
       </SectionCard>
+      )}
 
       {/* ── SECCIÓN 2: Horarios personalizados por día ────────────────────── */}
+      {part !== "rules" && (
       <SectionCard
         title="Horarios personalizados por día"
         description="Cuando los días de la semana tienen horarios distintos (ej: lunes a viernes 8AM–8PM, sábado 8AM–2PM, domingo cerrado), activa esta opción para configurarlos individualmente. Al activarlos, reemplazan completamente el horario base."
@@ -373,8 +379,10 @@ export default function OpeningHoursTab({
           disabled={!isEditing}
         />
       </SectionCard>
+      )}
 
       {/* ── SECCIÓN 3: Reserva en línea ───────────────────────────────────── */}
+      {part !== "schedule" && (
       <SectionCard
         title="Reserva en línea"
         description="Configura cómo los clientes reservan desde tu página pública. Los horarios disponibles provienen del sistema de horarios configurado arriba."
@@ -533,6 +541,7 @@ export default function OpeningHoursTab({
           </Collapse>
         </Stack>
       </SectionCard>
+      )}
     </Stack>
   );
 }

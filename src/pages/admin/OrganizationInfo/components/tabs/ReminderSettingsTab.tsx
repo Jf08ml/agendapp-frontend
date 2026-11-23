@@ -11,7 +11,10 @@ import type { FormValues } from "../../schema";
 export default function ReminderSettingsTab({
   form,
   isEditing,
+  part,
 }: {
+  /** "reminders": Reservas › Recordatorios; "attendance": «Después de la cita» en Reglas de reserva. */
+  part?: "reminders" | "attendance";
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
 }) {
@@ -35,6 +38,7 @@ export default function ReminderSettingsTab({
 
   return (
     <Stack gap="md">
+      {part !== "attendance" && (
       <SectionCard
         title="Recordatorios automáticos"
         description="Envía mensajes por WhatsApp a tus clientes antes de sus citas para reducir inasistencias."
@@ -268,9 +272,11 @@ export default function ReminderSettingsTab({
           )}
         </Stack>
       </SectionCard>
+      )}
 
+      {part !== "reminders" && (
       <SectionCard
-        title="Gestión de asistencia"
+        title="Después de la cita"
         description="Define cómo se registra la asistencia de las citas pasadas para el cálculo de nómina y comisiones."
         icon={<IconUserCheck size={16} />}
         iconColor="teal"
@@ -296,6 +302,7 @@ export default function ReminderSettingsTab({
           />
         </Stack>
       </SectionCard>
+      )}
     </Stack>
   );
 }

@@ -33,7 +33,10 @@ export default function ContactTab({
   isEditing,
   domains,
   slug,
+  part,
 }: {
+  /** "profile": Perfil › Datos del negocio; "home": Marca y web › Página de inicio. */
+  part?: "profile" | "home";
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
   domains: string[];
@@ -89,6 +92,7 @@ export default function ContactTab({
 
   return (
     <Stack gap="md">
+      {part !== "home" && (
       <SectionCard
         title="Nombre y contacto"
         description="Estos datos se usan en tu encabezado, recibos y comunicaciones con clientes."
@@ -172,7 +176,9 @@ export default function ContactTab({
           />
         </SimpleGrid>
       </SectionCard>
+      )}
 
+      {part !== "home" && (
       <SectionCard
         title="Reserva en línea: enlace y código QR"
         description="Comparte este enlace o el código QR para que tus clientes agenden citas directamente, sin pasar por tu página de inicio."
@@ -228,7 +234,9 @@ export default function ContactTab({
           </Alert>
         )}
       </SectionCard>
+      )}
 
+      {part !== "home" && (
       <SectionCard
         title="Asistente IA"
         description="Personaliza el nombre del asistente inteligente y la información de tu negocio que usa para responder a tus clientes."
@@ -263,7 +271,9 @@ export default function ContactTab({
           </Text>
         </Stack>
       </SectionCard>
+      )}
 
+      {part !== "profile" && (
       <SectionCard
         title="Mensaje de bienvenida"
         description="Personaliza el mensaje que verán tus clientes en la página de inicio pública."
@@ -312,7 +322,9 @@ export default function ContactTab({
           />
         </Stack>
       </SectionCard>
+      )}
 
+      {part !== "profile" && (
       <SectionCard
         title="Tarjetas de acceso rápido"
         description="Controla qué tarjetas de acceso rápido ven tus clientes en la página de inicio (diseños Moderno, Minimalista y Tarjetas)."
@@ -334,6 +346,7 @@ export default function ContactTab({
           />
         </Stack>
       </SectionCard>
+      )}
     </Stack>
   );
 }
