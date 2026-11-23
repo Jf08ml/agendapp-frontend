@@ -18,7 +18,6 @@ import {
   Divider,
   Collapse,
   Badge,
-  Alert,
   Loader,
   Modal,
   TextInput,
@@ -26,7 +25,6 @@ import {
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { BiPlus, BiTrash, BiSave, BiChevronDown, BiChevronUp } from "react-icons/bi";
-import { IoInformationCircleOutline } from "react-icons/io5";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
@@ -127,7 +125,6 @@ const listDaysInRange = (startDate: string, endDate: string): string[] => {
 
 export default function EmployeeScheduleSection({
   employeeId,
-  employeeName,
 }: EmployeeScheduleSectionProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -472,23 +469,11 @@ export default function EmployeeScheduleSection({
 
   return (
     <Box>
-      <Alert
-        icon={<IoInformationCircleOutline size={20} />}
-        title={`Horario de Disponibilidad${employeeName ? ` - ${employeeName}` : ""}`}
-        color="blue"
-        variant="light"
-        mb="md"
-      >
-        <Text size="sm">
-          Configura los días y horarios en que este profesional estará disponible para atender
-          clientes. Si no se activa, seguirá el horario general de la organización.
-        </Text>
-      </Alert>
 
       <Group mb="lg" justify="space-between">
         <Switch
-          label="Activar horario personalizado para este profesional"
-          description="Si está desactivado, usará el horario de la organización"
+          label="Usar un horario propio"
+          description="Si está apagado, sigue el horario del negocio."
           checked={schedule.enabled}
           onChange={(e) => handleToggleEnabled(e.currentTarget.checked)}
         />
@@ -496,8 +481,10 @@ export default function EmployeeScheduleSection({
           leftSection={<BiSave size={16} />}
           onClick={saveSchedule}
           loading={saving}
+          variant="default"
+          size="xs"
         >
-          Guardar Horario
+          Guardar horario
         </Button>
       </Group>
 
@@ -513,18 +500,14 @@ export default function EmployeeScheduleSection({
               <Paper key={daySchedule.day} p="md" withBorder>
                 <Group justify="space-between" mb={isExpanded ? "md" : 0}>
                   <Group>
-                    <Text fw={600} size="lg">
+                    <Text fw={600} size="sm">
                       {dayInfo.label}
                     </Text>
                     {!daySchedule.isAvailable && (
-                      <Badge color="gray" variant="light">
-                        No disponible
-                      </Badge>
+                      <span className="ag-badge">No disponible</span>
                     )}
                     {daySchedule.isAvailable && (
-                      <Badge color="green" variant="light">
-                        {formatTimeLabel(daySchedule.start, is24h)} - {formatTimeLabel(daySchedule.end, is24h)}
-                      </Badge>
+                      <span className="ag-subtle ag-num">{formatTimeLabel(daySchedule.start, is24h)} - {formatTimeLabel(daySchedule.end, is24h)}</span>
                     )}
                   </Group>
                   <Group>
@@ -537,9 +520,11 @@ export default function EmployeeScheduleSection({
                     />
                     <ActionIcon
                       variant="subtle"
+                      color="gray"
+                      aria-label="Ver detalle del día"
                       onClick={() => toggleDay(daySchedule.day)}
                     >
-                      {isExpanded ? "▲" : "▼"}
+                      {isExpanded ? <BiChevronUp size={16} /> : <BiChevronDown size={16} />}
                     </ActionIcon>
                   </Group>
                 </Group>
@@ -590,8 +575,8 @@ export default function EmployeeScheduleSection({
                           />
                         </Box>
                         <ActionIcon
-                          color="red"
-                          variant="light"
+                          color="gray"
+                          variant="subtle"
                           onClick={() => handleRemoveBreak(daySchedule.day, breakIndex)}
                         >
                           <BiTrash size={16} />
@@ -617,11 +602,10 @@ export default function EmployeeScheduleSection({
 
       {/* Sección de Bloqueos Temporales */}
       <Box mt="xl">
-        <Divider mb="lg" />
-        <Group justify="space-between" mb="md">
+                <Group justify="space-between" mb="md">
           <div>
-            <Text fw={600} size="lg">
-              Bloqueos Temporales
+            <Text fw={600} size="sm">
+              Bloqueos
             </Text>
             <Text size="sm" c="dimmed">
               Fechas u horas específicas donde el profesional no estará disponible para reservas online
@@ -629,8 +613,8 @@ export default function EmployeeScheduleSection({
           </div>
           <Button
             leftSection={<BiPlus size={16} />}
-            variant="light"
-            color="orange"
+            variant="default"
+            size="xs"
             onClick={() => setExceptionModalOpen(true)}
           >
             Agregar bloqueo
@@ -668,11 +652,11 @@ export default function EmployeeScheduleSection({
                             : formatDisplayDate(exc.startDate)}
                         </Text>
                         {exc.allDay ? (
-                          <Badge size="xs" color="red" variant="light">
+                          <Badge size="xs" color="gray" variant="light">
                             Todo el día
                           </Badge>
                         ) : (
-                          <Badge size="xs" color="orange" variant="light">
+                          <Badge size="xs" color="gray" variant="light">
                             {exc.startTime} - {exc.endTime}
                           </Badge>
                         )}
@@ -706,8 +690,8 @@ export default function EmployeeScheduleSection({
                     </div>
                     <Tooltip label={isRecurring ? "Eliminar toda la repetición" : isMultiDay ? "Eliminar todo el bloqueo" : "Eliminar bloqueo"}>
                       <ActionIcon
-                        color="red"
-                        variant="light"
+                        color="gray"
+                        variant="subtle"
                         onClick={() => handleRemoveException(exc._id!)}
                       >
                         <BiTrash size={16} />
