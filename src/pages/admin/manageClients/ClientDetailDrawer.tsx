@@ -27,6 +27,7 @@ import {
 import { openConfirmModal } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   IconPencil,
@@ -472,7 +473,10 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             <Stack gap="md">
               {organization?.showLoyaltyProgram !== false && (
                 <Paper withBorder radius="md" p="md">
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Fidelidad</Text>
+                  <Group justify="space-between" mb="sm">
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed">Fidelidad</Text>
+                    <Link to="/fidelidad" className="ag-link">Ver en Fidelidad</Link>
+                  </Group>
                   <Stack gap="md">
                     <CompactLoyaltyCard
                       label="Servicios tomados"

@@ -52,7 +52,7 @@ export interface PlanLimitsLike {
 
 export interface NavLeaf {
   label: string;
-  /** Ruta, con query opcional (p. ej. "/informacion-negocio?tab=fidelity"). */
+  /** Ruta, con query opcional (p. ej. "/gestion-caja?tab=arqueo"). */
   to: string;
   visible: boolean;
   /** Punto rojo de «hay novedades». */
@@ -111,8 +111,8 @@ export function buildAdminNav(can: NavPermissions): NavGroup[] {
       title: "Clientes",
       items: [
         { key: "clients", label: "Clientes", icon: "clients", links: [{ label: "Clientes", to: "/gestionar-clientes", visible: can.clientsRead }] },
-        // Los niveles de fidelidad viven hoy en Configuración del negocio → Fidelidad.
-        { key: "loyalty", label: "Fidelidad", icon: "loyalty", links: [{ label: "Fidelidad", to: "/informacion-negocio?tab=fidelity", visible: can.businessInfo }] },
+        // Módulo único de fidelidad: clientes, programa, tarjeta y mensajes (decisión 6).
+        { key: "loyalty", label: "Fidelidad", icon: "loyalty", links: [{ label: "Fidelidad", to: "/fidelidad", visible: can.businessInfo }] },
       ],
     },
     {
@@ -233,7 +233,7 @@ const ACTIVE_ALIASES = [{ path: "/pedidos", param: "desde", value: "caja", to: "
 
 /**
  * Ruta del menú que corresponde a la página actual. Un enlace con query
- * (Fidelidad → ?tab=fidelity) gana sobre uno de la misma ruta sin query (Ajustes).
+ * gana sobre uno de la misma ruta sin query.
  */
 export function findActiveLink(links: NavLeaf[], pathname: string, search: string): string | null {
   const current = new URLSearchParams(search);
@@ -269,6 +269,7 @@ const ADMIN_PATHS = [
   "/gestionar-agenda",
   "/gestionar-reservas-online",
   "/gestionar-clientes",
+  "/fidelidad",
   "/gestion-caja",
   "/gestionar-pagos",
   "/inventario",

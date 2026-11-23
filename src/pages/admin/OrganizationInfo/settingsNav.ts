@@ -17,14 +17,11 @@ export type SectionKey =
   | "formulario-tienda"
   | "marca"
   | "inicio"
-  | "tarjeta"
   | "app"
   | "temporada"
   | "analitica"
   | "sesiones"
-  | "equipo"
-  // Fuera de la navegación de Ajustes: es Clientes › Fidelidad (decisión 6)
-  | "fidelidad";
+  | "equipo";
 
 export interface SettingsPage {
   key: SectionKey;
@@ -75,7 +72,6 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     pages: [
       { key: "marca", label: "Marca", description: "Logo, colores y tipografía." },
       { key: "inicio", label: "Página de inicio", description: "Plantilla, mensaje de bienvenida y bloques de tu web." },
-      { key: "tarjeta", label: "Tarjeta de fidelidad", description: "Diseño de la tarjeta virtual de tus clientes." },
       { key: "app", label: "App instalable", description: "Ícono y nombre al instalar tu web en el celular." },
       { key: "temporada", label: "Temporada", description: "Decoración de temporada en tu web." },
       { key: "analitica", label: "Analítica y píxeles", description: "Google Analytics y Google Ads." },
@@ -91,13 +87,21 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   },
 ];
 
-export const FIDELITY_PAGE: SettingsPage = {
-  key: "fidelidad",
-  label: "Fidelidad",
-  description: "Programa de fidelidad: niveles y premios por servicios y referidos.",
-};
+const ALL_PAGES: SettingsPage[] = SETTINGS_GROUPS.flatMap((g) => g.pages);
 
-const ALL_PAGES: SettingsPage[] = [...SETTINGS_GROUPS.flatMap((g) => g.pages), FIDELITY_PAGE];
+/** Ruta del módulo de fidelidad (Clientes › Fidelidad, decisión 6). */
+export const LOYALTY_PATH = "/fidelidad";
+
+/**
+ * Enlaces viejos de Ajustes que ahora viven en Clientes › Fidelidad:
+ * ?tab=fidelity, ?seccion=fidelidad (programa) y ?seccion=tarjeta (diseño).
+ * Devuelve la ruta a la que hay que redirigir, o null si no aplica.
+ */
+export function loyaltyRedirect(seccion: string | null, tab: string | null): string | null {
+  if (seccion === "tarjeta") return `${LOYALTY_PATH}?tab=tarjeta`;
+  if (seccion === "fidelidad" || tab === "fidelity") return `${LOYALTY_PATH}?tab=programa`;
+  return null;
+}
 
 /** Pestañas viejas (?tab=) → sección nueva. */
 const LEGACY_TABS: Record<string, SectionKey> = {
@@ -105,7 +109,6 @@ const LEGACY_TABS: Record<string, SectionKey> = {
   openingsHours: "horario",
   socialMedia: "redes",
   location: "ubicacion",
-  fidelity: "fidelidad",
   branding: "marca",
   payments: "metodos",
   cancellation: "cancelacion",

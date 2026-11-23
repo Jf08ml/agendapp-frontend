@@ -46,7 +46,23 @@ import { useDebouncedValue, useDisclosure, useMediaQuery } from "@mantine/hooks"
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
-const ClientsDashboard = () => {
+type LoyaltyFilter = "todos" | "premio" | "progreso";
+
+const hasReward = (c: Client) => !!(c.hasServiceDiscount || c.hasReferralBenefit);
+const inProgress = (c: Client) =>
+  !hasReward(c) && ((c.servicesTaken ?? 0) > 0 || (c.referralsMade ?? 0) > 0);
+
+interface ClientsDashboardProps {
+  /**
+   * "loyalty": la lista se usa dentro de Clientes › Fidelidad (sin título ni
+   * pestañas propias, con filtros de premio listo / en progreso).
+   */
+  variant?: "default" | "loyalty";
+}
+
+const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
+  const isLoyalty = variant === "loyalty";
+  const [loyaltyFilter, setLoyaltyFilter] = useState<LoyaltyFilter>("todos");
   const [activeTab, setActiveTab] = useState<string>("clientes");
   const [openModal, setOpenModal] = useState(false);
   const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
@@ -129,6 +145,21 @@ const ClientsDashboard = () => {
       );
     });
   }, [debounced, clients]);
+
+  // Clientes › Fidelidad: premio listo = tiene un beneficio por servicios o por
+  // referidos sin canjear (los mismos campos que muestran «Premio listo» en la fila).
+  const loyaltyCounts = useMemo(
+    () => ({
+      todos: filteredClients.length,
+      premio: filteredClients.filter(hasReward).length,
+      progreso: filteredClients.filter(inProgress).length,
+    }),
+    [filteredClients]
+  );
+  const visibleClients = useMemo(() => {
+    if (!isLoyalty || loyaltyFilter === "todos") return filteredClients;
+    return filteredClients.filter(loyaltyFilter === "premio" ? hasReward : inProgress);
+  }, [filteredClients, isLoyalty, loyaltyFilter]);
 
   const handleRegisterService = async (clientId: string) => {
     try {
@@ -343,16 +374,44 @@ const ClientsDashboard = () => {
     }
   };
 
+  const loyaltyChips = isLoyalty && (
+    <div className="ag-tabs" style={{ marginBottom: "var(--space-3)" }} role="tablist" aria-label="Filtrar clientes del programa">
+      {(
+        [
+          ["todos", "Todos"],
+          ["premio", "Premio listo"],
+          ["progreso", "En progreso"],
+        ] as [LoyaltyFilter, string][]
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          className="ag-chip"
+          aria-selected={loyaltyFilter === key}
+          onClick={() => setLoyaltyFilter(key)}
+          style={{ cursor: "pointer" }}
+        >
+          {label} <span className="count">{loyaltyCounts[key]}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <Box p={{ base: "sm", md: "lg" }}>
-      <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
-        Clientes
-      </h1>
-      <Tabs value={activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
-          <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
-        </Tabs.List>
+    <Box p={isLoyalty ? 0 : { base: "sm", md: "lg" }}>
+      {!isLoyalty && (
+        <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
+          Clientes
+        </h1>
+      )}
+      <Tabs value={isLoyalty ? "clientes" : activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
+        {!isLoyalty && (
+          <Tabs.List mb="md">
+            <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
+            <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
+          </Tabs.List>
+        )}
 
         <Tabs.Panel value="clientes">
           <Box
@@ -387,14 +446,16 @@ const ClientsDashboard = () => {
                   w={isMobile ? "100%" : 320}
                   radius="md"
                 />
-                <Tooltip label="Crear nuevo cliente">
-                  <Button
-                    leftSection={<IoAddCircleOutline />}
-                    onClick={() => handleOpenModal(null)}
-                  >
-                    {isMobile ? "Crear" : "Crear cliente"}
-                  </Button>
-                </Tooltip>
+                {!isLoyalty && (
+                  <Tooltip label="Crear nuevo cliente">
+                    <Button
+                      leftSection={<IoAddCircleOutline />}
+                      onClick={() => handleOpenModal(null)}
+                    >
+                      {isMobile ? "Crear" : "Crear cliente"}
+                    </Button>
+                  </Tooltip>
+                )}
                 <Menu shadow="sm" width={240} withinPortal>
                   <Menu.Target>
                     <ActionIcon variant="default" size="lg" radius="md">
@@ -410,17 +471,21 @@ const ClientsDashboard = () => {
                     >
                       Restablecer todo
                     </Menu.Item>
-                    <Menu.Item
-                      leftSection={<IconFileUpload size={16} />}
-                      onClick={() => setOpenBulkUploadModal(true)}
-                    >
-                      Carga masiva
-                    </Menu.Item>
+                    {!isLoyalty && (
+                      <Menu.Item
+                        leftSection={<IconFileUpload size={16} />}
+                        onClick={() => setOpenBulkUploadModal(true)}
+                      >
+                        Carga masiva
+                      </Menu.Item>
+                    )}
                   </Menu.Dropdown>
                 </Menu>
               </Group>
             </Flex>
           </Box>
+
+          {loyaltyChips}
 
           {isLoading ? (
             <Card withBorder radius="md" p="md">
@@ -430,7 +495,7 @@ const ClientsDashboard = () => {
             </Card>
           ) : (
             <ClientList
-                clients={filteredClients}
+                clients={visibleClients}
                 onDeleteClient={handleDeleteClient}
                 onForceDeleteClient={handleForceDeleteClient}
                 onMergeClient={handleOpenMerge}

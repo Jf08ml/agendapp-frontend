@@ -12,6 +12,7 @@ import { JSX } from "react/jsx-runtime";
 import AdminServices from "../pages/admin/manageServices";
 import AdminEmployees from "../pages/admin/manageEmployees";
 import OrganizationInfo from "../pages/admin/OrganizationInfo/index";
+import LoyaltyModule from "../pages/admin/loyalty/LoyaltyModule";
 import EmployeeInfo from "../pages/account/EmployeeInfo";
 import DailyCashbox from "../pages/account/DailyCashbox";
 // import Booking from "../pages/onlineReservation/Booking";
@@ -322,6 +323,15 @@ const generalRoutes = [
     component: (props: JSX.IntrinsicAttributes) => (
       <ProtectedRoute>
         <OrganizationInfo {...props} />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    // Clientes › Fidelidad: programa, tarjeta, mensajes y clientes del programa
+    path: "/fidelidad",
+    component: () => (
+      <ProtectedRoute>
+        <LoyaltyModule />
       </ProtectedRoute>
     ),
   },
