@@ -101,7 +101,10 @@ export default function Header({ organization, showChristmas = false, platform =
   );
 
   const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
-  const showReserve = !platform && enableOnlineBooking && location.pathname !== "/online-reservation";
+  // Plantilla Academia: el CTA del header es «Reservar clase».
+  const academy = organization?.homeLayout === "academy" && !!organization?.enableClassBooking;
+  const reserveTo = academy ? "/reservar-clase" : "/online-reservation";
+  const showReserve = !platform && (academy || enableOnlineBooking) && location.pathname !== reserveTo;
   const showPanelLink = isAuthenticated && !isSuperadmin && !platform;
 
   const initials = orgInitials(name);
@@ -182,10 +185,10 @@ export default function Header({ organization, showChristmas = false, platform =
             {showReserve && (
               <Button
                 component={Link}
-                to="/online-reservation"
+                to={reserveTo}
                 leftSection={<IconCalendarEvent size={16} />}
               >
-                Reservar
+                {academy ? "Reservar clase" : "Reservar"}
               </Button>
             )}
 

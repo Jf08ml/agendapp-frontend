@@ -1,55 +1,45 @@
-import { GoogleMap, Marker } from "@react-google-maps/api";
+// Landing del negocio, plantilla Academia (rediseño, LandingAcademia), para
+// negocios de clases y programas. Bloques en orden: hero claro · nuestras
+// clases · próximas clases (con cupos) · paquetes · servicios en lista ·
+// instructores · fidelidad + horario y ubicación · pie. Cada bloque se oculta
+// si no hay datos; un error de carga se queda en su bloque con «Reintentar».
+// El CTA «Reservar clase» va en el header (ver Header.tsx).
 import { Link, useNavigate } from "react-router-dom";
+import { Avatar, Button } from "@mantine/core";
+import { ReactNode, useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useSelector } from "react-redux";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import "dayjs/locale/es";
 import {
-  Container,
-  Title,
-  Text,
-  Card,
-  Box,
-  SimpleGrid,
-  useMantineTheme,
-  rem,
-  Stack,
-  Grid,
-  Group,
-  Button,
-  Anchor,
-  AspectRatio,
-  Center,
-  Image,
-  Badge,
-  List,
-  ThemeIcon,
-} from "@mantine/core";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+  IconArrowRight,
+  IconBrandWhatsapp,
+  IconChevronRight,
+  IconClock,
+  IconGift,
+  IconInfoCircle,
+  IconPhoto,
+  IconStar,
+} from "@tabler/icons-react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
 import { getEmployeesByOrganizationId, Employee } from "../../services/employeeService";
-import { getClassesByOrganization, ClassType } from "../../services/classService";
+import { getAvailableSessions, getClassesByOrganization, ClassSession, ClassType } from "../../services/classService";
 import { listPublicPackages, PublicPackageItem } from "../../services/collectionService";
-import { findPackageForClass, buildClassReserveLink, buildPackageBuyLink } from "../../utils/programPurchase";
-import { buildWhatsappQuoteLink } from "../../utils/whatsappLink";
+import { buildClassReserveLink, buildPackageBuyLink } from "../../utils/programPurchase";
 import { formatCurrency } from "../../utils/formatCurrency";
-import { useSelector } from "react-redux";
+import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
-import {
-  IconMapPin,
-  IconArrowRight,
-  IconGift,
-  IconClock,
-  IconSparkles,
-  IconUserCircle,
-  IconSchool,
-  IconBrandWhatsapp,
-  IconCheck,
-  IconShoppingCart,
-  IconTicket,
-} from "@tabler/icons-react";
+import { HoursAndLocation, LandingFooter, OpenStatus, useBusinessHours } from "./landingShared";
+import "./landing.css";
 
-const DAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.locale("es");
 
-const hasTiers = (pkg: PublicPackageItem) => (pkg.tiers?.length ?? 0) > 0;
-const minTierPrice = (pkg: PublicPackageItem) =>
-  Math.min(...(pkg.tiers || []).map((t) => t.price));
+const CLASSES_LIMIT = 6;
+const SESSIONS_LIMIT = 6;
+const SERVICES_LIMIT = 6;
 
 interface Feature {
   title: string;
@@ -66,1030 +56,473 @@ interface AcademyLandingLayoutProps {
   enableOnlineBooking?: boolean;
 }
 
-// Variante de landing enfocada en negocios tipo "academia": programas
-// (clases vendidas como paquete/sesión) primero, servicios "a la carta"
-// después. Es un archivo independiente de LandingLayout.tsx — mismo
-// lenguaje visual, sin compartir código, para no arriesgar a las
-// organizaciones que ya usan homeLayout: "landing" en producción.
-export function AcademyLandingLayout({
-  features,
-  welcomeTitle,
-  welcomeDescription,
-  organizationId,
-  enableOnlineBooking = true,
-}: AcademyLandingLayoutProps) {
+type Load<T> = { status: "loading" | "ok" | "error"; data: T };
+
+const minTierPrice = (pkg: PublicPackageItem) => Math.min(...(pkg.tiers || []).map((t) => t.price));
+
+const cuposBadge = (remaining: number) =>
+  remaining <= 0
+    ? { cls: "ag-badge--danger", text: "Sin cupos" }
+    : remaining === 1
+      ? { cls: "ag-badge--warning", text: "1 cupo" }
+      : { cls: "ag-badge--success", text: `${remaining} cupos` };
+
+export function AcademyLandingLayout({ features, welcomeTitle, welcomeDescription, organizationId }: AcademyLandingLayoutProps) {
   const navigate = useNavigate();
-  const theme = useMantineTheme();
-  const primary = theme.colors[theme.primaryColor][6];
-  const primaryDark = theme.colors[theme.primaryColor][8];
-
-  const [services, setServices] = useState<Service[]>([]);
-  const [classes, setClasses] = useState<ClassType[]>([]);
-  const [packages, setPackages] = useState<PublicPackageItem[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loadingClasses, setLoadingClasses] = useState(true);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [loadingEmployees, setLoadingEmployees] = useState(true);
-
   const org = useSelector(selectOrganization);
+  const currency = org?.currency || "COP";
+  const tz = org?.timezone || "America/Bogota";
+  const tf = org?.timeFormat;
+  const classBooking = !!org?.enableClassBooking;
+  const { weeklyHours, status } = useBusinessHours();
 
-  const initials = useMemo(() => {
-    if (!org?.name) return "?";
-    return org.name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w: string) => w[0])
-      .join("")
-      .toUpperCase();
-  }, [org?.name]);
+  const [classes, setClasses] = useState<Load<ClassType[]>>({ status: "loading", data: [] });
+  const [packages, setPackages] = useState<Load<PublicPackageItem[]>>({ status: "loading", data: [] });
+  const [sessions, setSessions] = useState<ClassSession[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
-  // Estado de hoy (abierto/cierra pronto/cerrado) — lee weeklySchedule si está
-  // activo, si no cae a openingHours legacy. Mismo cálculo que LandingLayout.
-  const todayInfo = useMemo(() => {
-    const tz = org?.timezone || "America/Bogota";
-    const now = new Date();
+  const loadClasses = useCallback(() => {
+    if (!organizationId) return;
+    setClasses((c) => ({ ...c, status: "loading" }));
+    getClassesByOrganization(organizationId)
+      .then((all) => setClasses({ status: "ok", data: all.filter((c) => c.isActive) }))
+      .catch(() => setClasses({ status: "error", data: [] }));
+  }, [organizationId]);
 
-    const parts = new Intl.DateTimeFormat("en", {
-      timeZone: tz,
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "short",
-      hour12: false,
-    }).formatToParts(now);
-    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const todayIndex = dayMap[get("weekday")] ?? now.getDay();
-    const curMinutes = parseInt(get("hour")) * 60 + parseInt(get("minute"));
+  const loadPackages = useCallback(() => {
+    if (!organizationId) return;
+    setPackages((p) => ({ ...p, status: "loading" }));
+    listPublicPackages(organizationId)
+      .then((res) => setPackages({ status: "ok", data: res?.packages || [] }))
+      .catch(() => setPackages({ status: "error", data: [] }));
+  }, [organizationId]);
 
-    type Status = "open" | "opens_soon" | "closed_now" | "closed_today";
+  useEffect(() => {
+    if (classBooking) loadClasses();
+  }, [classBooking, loadClasses]);
 
-    function getStatus(start: string, end: string): Status {
-      const startMin = start.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
-      const endMin = end.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
-      if (curMinutes >= startMin && curMinutes < endMin) return "open";
-      if (curMinutes < startMin) return "opens_soon";
-      return "closed_now";
-    }
+  useEffect(() => {
+    loadPackages();
+  }, [loadPackages]);
 
-    if (org?.weeklySchedule?.enabled) {
-      const schedule = org.weeklySchedule.schedule;
-      if (!schedule) return null;
-      const day = schedule.find((d) => d.day === todayIndex);
-      if (!day || day.isOpen === false || day.isAvailable === false)
-        return { status: "closed_today" as Status, hours: null };
-      const status = day.start && day.end ? getStatus(day.start, day.end) : ("closed_today" as Status);
-      return { status, hours: `${day.start} – ${day.end}` };
-    }
-
-    const oh = org?.openingHours;
-    if (!oh?.start || !oh?.end) return null;
-    const businessDays = oh.businessDays ?? [1, 2, 3, 4, 5];
-    if (!businessDays.includes(todayIndex))
-      return { status: "closed_today" as Status, hours: null };
-    return { status: getStatus(oh.start, oh.end), hours: `${oh.start} – ${oh.end}` };
-  }, [org?.weeklySchedule, org?.openingHours, org?.timezone]);
-
-  const weeklyHours = useMemo(() => {
-    const tz = org?.timezone || "America/Bogota";
-    const parts = new Intl.DateTimeFormat("en", { timeZone: tz, weekday: "short" }).formatToParts(
-      new Date()
-    );
-    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const todayIndex = dayMap[parts.find((p) => p.type === "weekday")?.value ?? ""] ?? new Date().getDay();
-
-    if (org?.weeklySchedule?.enabled) {
-      const schedule = org.weeklySchedule.schedule;
-      if (!schedule || schedule.length === 0) return [];
-      return DAY_NAMES.map((name, i) => {
-        const day = schedule.find((d) => d.day === i);
-        const isOpen = !!(day && day.isOpen !== false && day.isAvailable !== false);
-        return { name, isToday: i === todayIndex, hours: isOpen ? `${day!.start} – ${day!.end}` : "Cerrado", isOpen };
+  useEffect(() => {
+    if (!organizationId || !classBooking) return;
+    // Sesiones de los próximos 7 días, incluidas las llenas (se ven «Sin cupos»).
+    const limit = dayjs().add(7, "day");
+    getAvailableSessions(organizationId, { includeFull: true })
+      .then((all) =>
+        setSessions(
+          all
+            .filter((s) => s.status !== "cancelled" && dayjs(s.startDate).isAfter(dayjs()) && dayjs(s.startDate).isBefore(limit))
+            .sort((a, b) => a.startDate.localeCompare(b.startDate))
+            .slice(0, SESSIONS_LIMIT)
+        )
+      )
+      .catch(() => {
+        /* bloque opcional: si falla, no se muestra */
       });
-    }
-    const oh = org?.openingHours;
-    if (!oh?.start || !oh?.end) return [];
-    const businessDays = oh.businessDays ?? [1, 2, 3, 4, 5];
-    return DAY_NAMES.map((name, i) => ({
-      name,
-      isToday: i === todayIndex,
-      hours: businessDays.includes(i) ? `${oh.start} – ${oh.end}` : "Cerrado",
-      isOpen: businessDays.includes(i),
-    }));
-  }, [org?.weeklySchedule, org?.openingHours, org?.timezone]);
+  }, [organizationId, classBooking]);
 
   useEffect(() => {
     if (!organizationId) return;
-    void (async () => {
-      try {
-        const [allClasses, packagesResult] = await Promise.all([
-          getClassesByOrganization(organizationId),
-          listPublicPackages(organizationId),
-        ]);
-        setClasses(allClasses.filter((c) => c.isActive));
-        setPackages(packagesResult?.packages || []);
-      } finally {
-        setLoadingClasses(false);
-      }
-    })();
+    getServicesByOrganizationId(organizationId)
+      .then((all) => setServices(all.filter((s) => s.isActive !== false)))
+      .catch(() => {
+        /* silencioso */
+      });
+    getEmployeesByOrganizationId(organizationId)
+      .then((all) => setEmployees(all.filter((e) => e.isActive !== false).slice(0, 8)))
+      .catch(() => {
+        /* silencioso */
+      });
   }, [organizationId]);
 
-  useEffect(() => {
-    if (!organizationId) return;
-    void (async () => {
-      try {
-        const all = await getServicesByOrganizationId(organizationId);
-        setServices(all.filter((s) => s.isActive !== false));
-      } finally {
-        setLoadingServices(false);
-      }
-    })();
-  }, [organizationId]);
-
-  useEffect(() => {
-    if (!organizationId) return;
-    void (async () => {
-      try {
-        const all = await getEmployeesByOrganizationId(organizationId);
-        setEmployees(all.filter((e) => e.isActive !== false).slice(0, 8));
-      } finally {
-        setLoadingEmployees(false);
-      }
-    })();
-  }, [organizationId]);
-
-  // Teaser: destacados primero, máximo 6 programas / 6 servicios.
-  const teaserClasses = useMemo(() => {
-    const featured = classes.filter((c) => c.featured);
-    const rest = classes.filter((c) => !c.featured);
-    return [...featured, ...rest].slice(0, 6);
-  }, [classes]);
-
-  const teaserServices = useMemo(() => {
-    const featured = services.filter((s) => s.featured);
-    const rest = services.filter((s) => !s.featured);
-    return [...featured, ...rest].slice(0, 6);
-  }, [services]);
+  // Destacadas primero
+  const shownClasses = useMemo(
+    () => [...classes.data.filter((c) => c.featured), ...classes.data.filter((c) => !c.featured)].slice(0, CLASSES_LIMIT),
+    [classes.data]
+  );
+  const shownServices = useMemo(
+    () => [...services.filter((s) => s.featured), ...services.filter((s) => !s.featured)].slice(0, SERVICES_LIMIT),
+    [services]
+  );
+  const heroPhotos = useMemo(
+    () =>
+      shownClasses
+        .map((c) => c.images?.[0])
+        .filter((u): u is string => !!u)
+        .filter((u, i, arr) => arr.indexOf(u) === i)
+        .slice(0, 3),
+    [shownClasses]
+  );
 
   const showLoyalty = org?.showLoyaltyProgram !== false;
   const hasLocation = !!(org?.address || org?.phoneNumber || weeklyHours.length > 0);
+  const hasPackages = packages.status === "ok" && packages.data.length > 0;
+
+  const fmtTime = (d: dayjs.Dayjs) => toSpanishMeridiem(d.format(tf === "24h" ? "HH:mm" : "h:mm A"));
+  const dayLabel = (d: dayjs.Dayjs) => {
+    const today = dayjs().tz(tz).startOf("day");
+    const diff = d.startOf("day").diff(today, "day");
+    if (diff === 0) return "Hoy";
+    if (diff === 1) return "Mañana";
+    return d.format("dddd D").replace(/^./, (c) => c.toUpperCase());
+  };
+
+  const sectionHead = (eyebrow: string, title: string, link?: { to: string; label: string }) => (
+    <div className="lnd-sectionhead">
+      <div>
+        <div className="ag-slots__group" style={{ margin: "0 0 8px" }}>
+          {eyebrow}
+        </div>
+        <h2 className="lnd-title">{title}</h2>
+      </div>
+      {link && (
+        <Link to={link.to} className="ag-link" style={{ fontSize: 15 }}>
+          {link.label} <IconArrowRight size={16} style={{ verticalAlign: "-3px" }} />
+        </Link>
+      )}
+    </div>
+  );
+
+  const blockError = (text: string, retry: () => void) => (
+    <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+      <IconInfoCircle size={20} />
+      <div style={{ flex: 1 }}>{text}</div>
+      <Button size="xs" variant="default" onClick={retry}>
+        Reintentar
+      </Button>
+    </div>
+  );
 
   return (
-    <Box style={{ minHeight: "100%", backgroundColor: theme.white }}>
-      {/* ─── Hero ─────────────────────────────────────────────────────────── */}
-      <Box
-        style={{
-          background: `linear-gradient(135deg, ${primary} 0%, ${primaryDark} 100%)`,
-          position: "relative",
-          overflow: "hidden",
-        }}
-        py={{ base: rem(56), md: rem(80) }}
-      >
-        <Box
-          style={{
-            position: "absolute",
-            top: -120,
-            right: -120,
-            width: 420,
-            height: 420,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.06)",
-            filter: "blur(80px)",
-            pointerEvents: "none",
-          }}
-        />
-        <Container size="lg" style={{ position: "relative", zIndex: 1 }}>
-          <Grid gutter={{ base: "xl", md: rem(64) }} align="center">
-            <Grid.Col span={{ base: 12, md: 7 }}>
-              <Stack gap="lg">
-                {todayInfo && (
-                  <Group gap="xs">
-                    <Box
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background:
-                          todayInfo.status === "open"
-                            ? "#2ec27e"
-                            : todayInfo.status === "opens_soon"
-                            ? "#fab005"
-                            : todayInfo.status === "closed_now"
-                            ? "#fa5252"
-                            : "#adb5bd",
-                        boxShadow:
-                          todayInfo.status === "open"
-                            ? "0 0 0 4px rgba(46,194,126,0.2)"
-                            : todayInfo.status === "opens_soon"
-                            ? "0 0 0 4px rgba(250,176,5,0.2)"
-                            : todayInfo.status === "closed_now"
-                            ? "0 0 0 4px rgba(250,82,82,0.2)"
-                            : "none",
-                      }}
-                    />
-                    <Text fz="sm" c="rgba(255,255,255,0.75)" fw={500}>
-                      {todayInfo.status === "open"
-                        ? `Abierto ahora · ${todayInfo.hours}`
-                        : todayInfo.status === "opens_soon"
-                        ? `Abre pronto · ${todayInfo.hours}`
-                        : todayInfo.status === "closed_now"
-                        ? `Cerrado ahora · ${todayInfo.hours}`
-                        : "Cerrado hoy"}
-                    </Text>
-                  </Group>
-                )}
-
-                <Title
-                  c="white"
-                  fw={500}
-                  fz={{ base: rem(36), sm: rem(48), md: rem(56) }}
-                  style={{ lineHeight: 1.05, letterSpacing: "-0.03em", textWrap: "balance" }}
-                >
-                  {welcomeTitle}
-                </Title>
-
-                <Text c="rgba(255,255,255,0.8)" fz={{ base: "md", sm: "lg" }} style={{ lineHeight: 1.6, maxWidth: rem(520) }}>
-                  {welcomeDescription}
-                </Text>
-
-                <Group gap="sm" mt="xs">
-                  {org?.enableClassBooking && (
-                    <Button
-                      component="a"
-                      href="#clases"
-                      size="md"
-                      radius="md"
-                      leftSection={<IconSchool size={16} />}
-                      style={{ backgroundColor: "white", color: primary, fontWeight: 600, border: "none" }}
-                    >
-                      Ver clases
-                    </Button>
-                  )}
-                  <Button
-                    component="a"
-                    href="#servicios"
-                    size="md"
-                    radius="md"
-                    variant={org?.enableClassBooking ? "outline" : undefined}
-                    rightSection={<IconArrowRight size={15} />}
-                    style={
-                      org?.enableClassBooking
-                        ? { borderColor: "rgba(255,255,255,0.4)", color: "white", fontWeight: 500 }
-                        : { backgroundColor: "white", color: primary, fontWeight: 600, border: "none" }
-                    }
-                  >
-                    Ver servicios
-                  </Button>
-                  {packages.length > 0 && (
-                    <Button
-                      component="a"
-                      href="#paquetes"
-                      size="md"
-                      radius="md"
-                      variant="outline"
-                      leftSection={<IconTicket size={16} />}
-                      style={{ borderColor: "rgba(255,255,255,0.4)", color: "white", fontWeight: 500 }}
-                    >
-                      Ver paquetes
-                    </Button>
-                  )}
-                </Group>
-              </Stack>
-            </Grid.Col>
-
-            <Grid.Col span={{ base: 12, md: 5 }} visibleFrom="md">
-              <Box
-                style={{
-                  aspectRatio: "4 / 5",
-                  borderRadius: rem(20),
-                  background: "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  position: "relative",
-                  overflow: "hidden",
-                  padding: rem(24),
-                  paddingBottom: todayInfo?.status === "open" ? rem(96) : rem(24),
-                }}
-              >
-                <Stack gap="sm" style={{ position: "relative", height: "100%" }}>
-                  {/* Logo + nombre + badge de estado */}
-                  <Group gap="xs" justify="space-between" align="center" mb={4}>
-                    <Group gap="xs" style={{ minWidth: 0 }}>
-                      <Box
-                        style={{
-                          width: rem(34),
-                          height: rem(34),
-                          borderRadius: rem(10),
-                          background: "rgba(255,255,255,0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          overflow: "hidden",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {org?.branding?.logoUrl ? (
-                          <img
-                            src={org.branding.logoUrl}
-                            alt=""
-                            style={{ width: "80%", height: "80%", objectFit: "contain" }}
-                          />
-                        ) : (
-                          <Text fw={700} fz="xs" style={{ color: "rgba(255,255,255,0.9)" }}>
-                            {initials}
-                          </Text>
-                        )}
-                      </Box>
-                      <Text fz="sm" fw={600} c="rgba(255,255,255,0.9)" lineClamp={1}>
-                        {org?.name || ""}
-                      </Text>
-                    </Group>
-
-                    {todayInfo && (
-                      <Box
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: rem(5),
-                          background:
-                            todayInfo.status === "open"
-                              ? "rgba(46,194,126,0.18)"
-                              : todayInfo.status === "opens_soon"
-                              ? "rgba(250,176,5,0.18)"
-                              : "rgba(250,82,82,0.18)",
-                          border: `1px solid ${
-                            todayInfo.status === "open"
-                              ? "rgba(46,194,126,0.35)"
-                              : todayInfo.status === "opens_soon"
-                              ? "rgba(250,176,5,0.35)"
-                              : "rgba(250,82,82,0.35)"
-                          }`,
-                          borderRadius: rem(999),
-                          padding: `${rem(3)} ${rem(9)}`,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <Box
-                          style={{
-                            width: 5,
-                            height: 5,
-                            borderRadius: "50%",
-                            background:
-                              todayInfo.status === "open"
-                                ? "#2ec27e"
-                                : todayInfo.status === "opens_soon"
-                                ? "#fab005"
-                                : "#fa5252",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Text fz={rem(10)} fw={600} c="rgba(255,255,255,0.9)">
-                          {todayInfo.status === "open"
-                            ? "Abierto"
-                            : todayInfo.status === "opens_soon"
-                            ? "Abre pronto"
-                            : "Cerrado"}
-                        </Text>
-                      </Box>
-                    )}
-                  </Group>
-
-                  {/* Mini tarjetas de programas */}
-                  {org?.enableClassBooking && teaserClasses.slice(0, 3).map((cls, i) => (
-                    <Box
-                      key={cls._id}
-                      style={{
-                        background: "rgba(255,255,255,0.95)",
-                        borderRadius: rem(10),
-                        padding: `${rem(8)} ${rem(10)}`,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: rem(8),
-                        backdropFilter: "blur(10px)",
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                        transform: i === 1 ? `translateX(${rem(12)})` : "none",
-                      }}
-                    >
-                      <Box
-                        style={{
-                          width: rem(36),
-                          height: rem(36),
-                          borderRadius: rem(7),
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          backgroundImage: cls.images?.[0] ? `url(${cls.images[0]})` : undefined,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          backgroundColor: cls.images?.[0] ? undefined : `${primary}18`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {!cls.images?.[0] && <IconSchool size={15} style={{ color: primary, opacity: 0.7 }} />}
-                      </Box>
-                      <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text fz="xs" fw={600} c={theme.colors.gray[9]} lineClamp={1}>
-                          {cls.name}
-                        </Text>
-                        {!cls.hidePrice && (
-                          <Text fz={rem(10)} c={theme.colors.gray[5]}>
-                            {cls.pricePerPerson === 0
-                              ? "Gratis"
-                              : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
-                          </Text>
-                        )}
-                      </Box>
-                    </Box>
-                  ))}
-
-                  {/* Horarios */}
-                  {weeklyHours.length > 0 && (
-                    <Box
-                      style={{
-                        borderTop: "1px solid rgba(255,255,255,0.15)",
-                        marginTop: rem(2),
-                        paddingTop: rem(6),
-                      }}
-                    >
-                      <Text
-                        fz={rem(10)}
-                        fw={600}
-                        tt="uppercase"
-                        style={{ letterSpacing: "0.1em", color: "rgba(255,255,255,0.4)" }}
-                        mb={4}
-                      >
-                        Horarios
-                      </Text>
-                      {weeklyHours.map((h) => (
-                        <Group key={h.name} justify="space-between" align="center" style={{ padding: `${rem(4)} 0` }}>
-                          <Group gap={6} align="center">
-                            {h.isToday ? (
-                              <Box
-                                style={{
-                                  width: 5,
-                                  height: 5,
-                                  borderRadius: "50%",
-                                  background:
-                                    todayInfo?.status === "open"
-                                      ? "#2ec27e"
-                                      : todayInfo?.status === "opens_soon"
-                                      ? "#fab005"
-                                      : "#fa5252",
-                                  flexShrink: 0,
-                                }}
-                              />
-                            ) : (
-                              <Box style={{ width: 5, flexShrink: 0 }} />
-                            )}
-                            <Text
-                              fz={rem(11)}
-                              fw={h.isToday ? 600 : 400}
-                              c={h.isToday ? "rgba(255,255,255,0.95)" : h.isOpen ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.25)"}
-                            >
-                              {h.name}
-                            </Text>
-                          </Group>
-                          <Text
-                            fz={rem(11)}
-                            fw={h.isToday ? 600 : 400}
-                            c={h.isToday ? "rgba(255,255,255,0.95)" : h.isOpen ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.2)"}
-                            style={{ fontFamily: "monospace" }}
-                          >
-                            {h.hours}
-                          </Text>
-                        </Group>
-                      ))}
-                    </Box>
-                  )}
-                </Stack>
-
-                {/* Tarjeta flotante de disponibilidad */}
-                {todayInfo?.status === "open" && (
-                  <Box
-                    style={{
-                      position: "absolute",
-                      bottom: rem(24),
-                      left: rem(20),
-                      right: rem(20),
-                      background: "rgba(255,255,255,0.95)",
-                      borderRadius: rem(12),
-                      padding: `${rem(12)} ${rem(16)}`,
-                      backdropFilter: "blur(10px)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: rem(10),
-                    }}
-                  >
-                    <Box style={{ width: rem(8), height: rem(8), borderRadius: "50%", background: "#2ec27e", flexShrink: 0 }} />
-                    <Box style={{ flex: 1 }}>
-                      <Text fz="xs" fw={600} c={theme.colors.gray[9]} style={{ lineHeight: 1.3 }}>
-                        Abierto ahora
-                      </Text>
-                      <Text fz="xs" c={theme.colors.gray[6]}>
-                        {todayInfo.hours}
-                      </Text>
-                    </Box>
-                    <Box
-                      style={{
-                        width: rem(28),
-                        height: rem(28),
-                        borderRadius: "50%",
-                        background: primary,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <IconSchool size={14} color="white" />
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-            </Grid.Col>
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* ─── Clases ───────────────────────────────────────────────────────── */}
-      {org?.enableClassBooking && (
-      <Container id="clases" size="lg" py={{ base: rem(64), sm: rem(88) }}>
-        <Stack gap="xl">
-          <Box>
-            <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }} mb="xs">
-              Clases
-            </Text>
-            <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-              Nuestras clases.
-            </Title>
-            <Text c={theme.colors.gray[6]} fz={{ base: "md", sm: "lg" }} mt="xs">
-              Clases con cupos limitados. Compra tu paquete o reserva directamente.
-            </Text>
-          </Box>
-
-          {loadingClasses ? (
-            <Text ta="center" c="dimmed" py="xl">Cargando clases...</Text>
-          ) : teaserClasses.length > 0 ? (
-            <SimpleGrid cols={{ base: 2, sm: 2, md: 3 }} spacing="md">
-              {teaserClasses.map((cls) => {
-                const packageId = findPackageForClass(cls._id, packages);
-                const isFree = cls.pricePerPerson === 0;
-                return (
-                  <Card
-                    key={cls._id}
-                    shadow="xs"
-                    padding={0}
-                    radius="lg"
-                    withBorder
-                    style={{ overflow: "hidden", borderColor: theme.colors.gray[2] }}
-                  >
-                    <AspectRatio ratio={4 / 3}>
-                      {cls.images && cls.images.length > 0 ? (
-                        <Image src={cls.images[0]} fit="cover" alt={cls.name} />
-                      ) : (
-                        <Center bg={theme.colors.gray[1]}>
-                          <IconSchool size={36} stroke={1.2} style={{ color: theme.colors.gray[4] }} />
-                        </Center>
-                      )}
-                    </AspectRatio>
-                    <Stack gap={6} p="sm">
-                      <Group justify="space-between" align="flex-start" wrap="nowrap">
-                        <Text fw={600} fz="sm" c={theme.colors.gray[9]} lineClamp={1}>
-                          {cls.name}
-                        </Text>
-                        {cls.featured && (
-                          <Badge size="xs" color="yellow" variant="filled">
-                            ⭐
-                          </Badge>
-                        )}
-                      </Group>
-                      <Group justify="space-between" align="center" gap={6}>
-                        {!cls.hidePrice && (
-                          <Text fw={600} fz="sm" c={isFree ? "green" : primary}>
-                            {isFree ? "Gratis" : formatCurrency(cls.pricePerPerson, org?.currency || "COP")}
-                          </Text>
-                        )}
-                        <Group gap={4} align="center" wrap="nowrap">
-                          <IconClock size={11} color={theme.colors.gray[5]} />
-                          <Text fz="xs" c={theme.colors.gray[5]}>{cls.duration} min</Text>
-                        </Group>
-                      </Group>
-                      <Stack gap={4} mt={2} align="center">
-                        <Button
-                          component={Link}
-                          to={buildClassReserveLink(cls._id)}
-                          size="xs"
-                          variant="light"
-                          color={theme.primaryColor}
-                          radius="md"
-                          fullWidth
-                        >
-                          Reservar clase
-                        </Button>
-                        {packageId && (
-                          <Button
-                            component={Link}
-                            to={buildPackageBuyLink(packageId)}
-                            size="xs"
-                            variant="outline"
-                            color={theme.primaryColor}
-                            radius="md"
-                            fullWidth
-                          >
-                            Comprar paquete
-                          </Button>
-                        )}
-                        <Anchor component={Link} to={`/programa/${cls._id}`} state={{ backTo: "/" }} fz="xs" fw={600}>
-                          Ver más →
-                        </Anchor>
-                      </Stack>
-                    </Stack>
-                  </Card>
-                );
-              })}
-            </SimpleGrid>
-          ) : (
-            <Text ta="center" c="dimmed" py="xl">No hay clases disponibles</Text>
+    <div className="lnd" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+      {/* ─── Hero claro ─────────────────────────────────────────────────── */}
+      <section className="lnd-wrap lnd-hero">
+        <div className="lnd-hero__text">
+          <OpenStatus status={status} />
+          <h1 className="lnd-display">{welcomeTitle}</h1>
+          {welcomeDescription && <p className="lnd-lead">{welcomeDescription}</p>}
+          {(classBooking || hasPackages) && (
+            <div className="ag-row" style={{ gap: 12 }}>
+              {classBooking && (
+                <Button component={Link} to="/reservar-clase" size="lg">
+                  Reservar clase
+                </Button>
+              )}
+              {hasPackages && (
+                <Button component="a" href="#paquetes" size="lg" variant="default">
+                  Ver paquetes
+                </Button>
+              )}
+            </div>
           )}
+        </div>
+        {heroPhotos.length > 0 && (
+          <div className={`lnd-hero__photos lnd-hero__photos--${heroPhotos.length}`} aria-hidden="true">
+            {heroPhotos.map((src) => (
+              <img key={src} src={src} alt="" loading="lazy" />
+            ))}
+          </div>
+        )}
+      </section>
 
-          <Group justify="space-between" align="center" mt="xs">
-            <Button component={Link} to="/programas" size="md" variant="outline" color={theme.primaryColor} radius="md" rightSection={<IconArrowRight size={15} />}>
-              Ver todas las clases
-            </Button>
-          </Group>
-        </Stack>
-      </Container>
+      {/* ─── Nuestras clases ────────────────────────────────────────────── */}
+      {classBooking && (
+        <section id="clases" className="lnd-band">
+          <div className="lnd-wrap">
+            {sectionHead(
+              "Clases",
+              "Nuestras clases",
+              classes.data.length > shownClasses.length ? { to: "/programas", label: `Ver las ${classes.data.length} clases` } : undefined
+            )}
+            {classes.status === "error" ? (
+              blockError("No pudimos cargar las clases.", loadClasses)
+            ) : classes.status === "loading" ? (
+              <div className="lnd-services" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="ag-card ag-service" style={{ width: "auto" }}>
+                    <span className="ag-skeleton ag-service__img" style={{ borderRadius: 0 }} />
+                    <div className="ag-service__body">
+                      <span className="ag-skeleton" style={{ width: "60%" }} />
+                      <span className="ag-skeleton" style={{ width: "35%" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : shownClasses.length === 0 ? (
+              <div className="ag-card" style={{ padding: "32px 16px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <b style={{ fontSize: 15 }}>Pronto publicaremos el horario</b>
+                <div className="ag-muted" style={{ fontSize: 14 }}>Escríbenos y te contamos qué clases vienen.</div>
+                {org?.whatsappUrl && (
+                  <Button component="a" href={org.whatsappUrl} target="_blank" rel="noopener noreferrer" variant="default" mt={8} leftSection={<IconBrandWhatsapp size={16} />}>
+                    Escribir por WhatsApp
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="lnd-services">
+                {shownClasses.map((cls) => (
+                  <ClassCard
+                    key={cls._id}
+                    cls={cls}
+                    currency={currency}
+                    onOpen={() => navigate(`/programa/${cls._id}`, { state: { backTo: "/" } })}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
-      {/* ─── Servicios (diversión) ────────────────────────────────────────── */}
-      <Box style={{ background: theme.colors.gray[0], borderTop: `1px solid ${theme.colors.gray[2]}`, borderBottom: `1px solid ${theme.colors.gray[2]}` }} py={{ base: rem(64), sm: rem(88) }}>
-        <Container id="servicios" size="lg">
-          <Stack gap="xl">
-            <Box>
-              <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }} mb="xs">
-                Servicios
-              </Text>
-              <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-                También para pasarla bien.
-              </Title>
-              <Text c={theme.colors.gray[6]} fz={{ base: "md", sm: "lg" }} mt="xs">
-                Pasadía, fiestas y más — pregúntanos lo que necesites.
-              </Text>
-            </Box>
+      {/* ─── Próximas clases ────────────────────────────────────────────── */}
+      {classBooking && sessions.length > 0 && (
+        <section className="lnd-wrap lnd-section">
+          {sectionHead("Esta semana", "Próximas clases", { to: "/reservar-clase", label: "Ver horario" })}
+          <div className="lnd-services">
+            {sessions.map((s) => {
+              const classDoc = typeof s.classId === "string" ? null : s.classId;
+              const classId = typeof s.classId === "string" ? s.classId : s.classId._id;
+              const employee = typeof s.employeeId === "string" ? null : s.employeeId;
+              const start = dayjs(s.startDate).tz(tz);
+              const remaining = s.capacity - s.enrolledCount;
+              const cupos = cuposBadge(remaining);
+              const full = remaining <= 0;
+              const body = (
+                <>
+                  <div className="ag-row" style={{ justifyContent: "space-between", gap: 8 }}>
+                    <span className="ag-num" style={{ fontWeight: 600, fontSize: 15 }}>
+                      {dayLabel(start)} · {fmtTime(start)}
+                    </span>
+                    <span className={`ag-badge ${cupos.cls}`}>{cupos.text}</span>
+                  </div>
+                  <b style={{ fontSize: 15 }}>{classDoc?.name ?? "Clase"}</b>
+                  <span className="ag-subtle">
+                    {[employee && `Con ${employee.names}`, classDoc?.duration && `${classDoc.duration} min`].filter(Boolean).join(" · ")}
+                  </span>
+                </>
+              );
+              const style = { padding: "var(--space-4)", display: "flex", flexDirection: "column" as const, gap: 4, width: "auto", textDecoration: "none", color: "inherit" };
+              return full ? (
+                <div key={s._id} className="ag-card" style={{ ...style, opacity: 0.55 }}>
+                  {body}
+                </div>
+              ) : (
+                <Link key={s._id} to={`/reservar-clase?classId=${classId}&sessionId=${s._id}`} className="ag-card ag-card--hover" style={style}>
+                  {body}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
-            {loadingServices ? (
-              <Text ta="center" c="dimmed" py="xl">Cargando servicios...</Text>
-            ) : teaserServices.length > 0 ? (
-              <SimpleGrid cols={{ base: 2, sm: 2, md: 3 }} spacing="md">
-                {teaserServices.map((service) => (
-                  <Card key={service._id} shadow="xs" padding={0} radius="lg" withBorder style={{ overflow: "hidden", borderColor: theme.colors.gray[2] }}>
-                    <AspectRatio ratio={4 / 3}>
-                      {service.images && service.images.length > 0 ? (
-                        <Image src={service.images[0]} fit="cover" alt={service.name} />
-                      ) : (
-                        <Center bg={theme.colors.gray[1]}>
-                          <IconSparkles size={32} stroke={1.2} style={{ color: theme.colors.gray[4] }} />
-                        </Center>
-                      )}
-                    </AspectRatio>
-                    <Stack gap={6} p="sm">
-                      <Text fw={500} fz="sm" c={theme.colors.gray[9]} lineClamp={2}>
-                        {service.name}
-                      </Text>
-                      {!service.hidePrice && service.ctaMode !== "whatsapp_quote" && (
-                        <Text fw={600} fz="sm" c={primary}>
-                          {service.price === 0 ? "Gratis" : formatCurrency(service.price, org?.currency || "COP")}
-                        </Text>
-                      )}
-                      <Stack gap={4} mt={2} align="center" onClick={(e) => e.stopPropagation()}>
-                        {service.ctaMode === "whatsapp_quote" ? (
-                          org?.whatsappUrl && (
-                            <Button
-                              component="a"
-                              href={buildWhatsappQuoteLink(org.whatsappUrl, service.whatsappQuoteMessage)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              size="xs"
-                              variant="light"
-                              color="green"
-                              leftSection={<IconBrandWhatsapp size={14} />}
-                              radius="md"
-                              fullWidth
-                            >
-                              Cotizar
-                            </Button>
-                          )
-                        ) : (
-                          enableOnlineBooking && (
-                            <Button
-                              component={Link}
-                              to={`/online-reservation?serviceId=${service._id}`}
-                              size="xs"
-                              variant="light"
-                              color={theme.primaryColor}
-                              radius="md"
-                              fullWidth
-                            >
-                              Reservar
-                            </Button>
-                          )
-                        )}
-                        <Anchor component={Link} to={`/servicio/${service._id}`} state={{ backTo: "/" }} fz="xs" fw={600}>
-                          Ver más →
-                        </Anchor>
-                      </Stack>
-                    </Stack>
-                  </Card>
-                ))}
-              </SimpleGrid>
+      {/* ─── Paquetes ───────────────────────────────────────────────────── */}
+      {(hasPackages || packages.status === "error") && (
+        <section id="paquetes" className={classBooking && sessions.length > 0 ? "lnd-band" : "lnd-wrap lnd-section"}>
+          <div className={classBooking && sessions.length > 0 ? "lnd-wrap" : undefined}>
+            {sectionHead("Paquetes", "Ahorra con un paquete")}
+            {packages.status === "error" ? (
+              blockError("No pudimos cargar los paquetes.", loadPackages)
             ) : (
-              <Text ta="center" c="dimmed" py="xl">No hay servicios disponibles</Text>
-            )}
-
-            <Group justify="space-between" align="center" mt="xs">
-              <Button component={Link} to="/servicios-precios" size="md" variant="outline" color={theme.primaryColor} radius="md" rightSection={<IconArrowRight size={15} />}>
-                Ver catálogo completo
-              </Button>
-            </Group>
-          </Stack>
-        </Container>
-      </Box>
-
-      {/* ─── Comprar paquetes ─────────────────────────────────────────────── */}
-      {packages.length > 0 && (
-        <Container id="paquetes" size="lg" py={{ base: rem(64), sm: rem(88) }}>
-          <Stack gap="xl">
-            <Box>
-              <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }} mb="xs">
-                Paquetes
-              </Text>
-              <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-                Comprar paquetes.
-              </Title>
-              <Text c={theme.colors.gray[6]} fz={{ base: "md", sm: "lg" }} mt="xs">
-                Ahorra comprando varias sesiones de una vez, con tarifa preferencial.
-              </Text>
-            </Box>
-
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {packages.map((pkg) => {
-                const tiered = hasTiers(pkg);
-                return (
-                  <Card key={pkg._id} withBorder radius="lg" p="lg" style={{ borderColor: theme.colors.gray[2] }}>
-                    <Stack gap="sm" h="100%">
-                      <Group gap="xs" wrap="nowrap">
-                        <ThemeIcon size={32} radius="xl" variant="light" color={theme.primaryColor}>
-                          <IconTicket size={18} />
-                        </ThemeIcon>
-                        <Text fw={600} fz="md" c={theme.colors.gray[9]} style={{ flex: 1 }}>
-                          {pkg.name}
-                        </Text>
-                      </Group>
-
-                      {pkg.description && (
-                        <Text size="sm" c={theme.colors.gray[6]} lineClamp={2}>
-                          {pkg.description}
-                        </Text>
-                      )}
-
-                      <Text fw={700} fz="lg" c={primary}>
-                        {tiered
-                          ? `Desde ${formatCurrency(minTierPrice(pkg), org?.currency || "COP")}`
-                          : formatCurrency(pkg.price ?? 0, org?.currency || "COP")}
-                      </Text>
-
+              <div className="lnd-services">
+                {packages.data.map((pkg) => {
+                  const tiered = (pkg.tiers?.length ?? 0) > 0;
+                  const included = [
+                    ...(pkg.classes || []).map((c) => c.classId?.name).filter(Boolean),
+                    ...(pkg.services || []).map((s) => s.serviceId?.name).filter(Boolean),
+                  ] as string[];
+                  return (
+                    <div key={pkg._id} className="ag-card" style={{ padding: "var(--space-5)", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div>
+                        <b style={{ fontSize: 16, lineHeight: "22px", display: "block" }}>{pkg.name}</b>
+                        {pkg.description && (
+                          <div className="ag-muted" style={{ fontSize: 14, marginTop: 2 }}>
+                            {pkg.description}
+                          </div>
+                        )}
+                      </div>
+                      <span className="ag-price" style={{ fontSize: 20, lineHeight: "26px" }}>
+                        {tiered ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}` : formatCurrency(pkg.price ?? 0, currency)}
+                      </span>
                       {tiered && (
-                        <Group gap={6}>
+                        <div className="ag-row" style={{ gap: 6 }}>
                           {pkg.tiers!.map((t) => (
-                            <Badge key={t._id} variant="outline" color={theme.primaryColor} size="sm">
+                            <span key={t._id} className="ag-badge ag-badge--outline">
                               {t.label}
-                            </Badge>
+                            </span>
                           ))}
-                        </Group>
+                        </div>
                       )}
-
-                      <List
-                        spacing={4}
-                        size="sm"
-                        icon={<ThemeIcon color="teal" size={16} radius="xl"><IconCheck size={11} /></ThemeIcon>}
-                      >
-                        {(pkg.services || []).map((s, i) => (
-                          <List.Item key={`s-${i}`}>{s.serviceId?.name || "Servicio"}</List.Item>
-                        ))}
-                        {(pkg.classes || []).map((c, i) => (
-                          <List.Item key={`c-${i}`}>{c.classId?.name || "Clase"}</List.Item>
-                        ))}
-                      </List>
-
-                      <Button
-                        mt="auto"
-                        component={Link}
-                        to={buildPackageBuyLink(pkg._id)}
-                        fullWidth
-                        radius="md"
-                        color={theme.primaryColor}
-                        leftSection={<IconShoppingCart size={16} />}
-                      >
-                        Comprar
+                      {included.length > 0 && <div className="ag-subtle">Incluye: {included.join(", ")}</div>}
+                      {pkg.validityDays > 0 && <div className="ag-subtle">Vigencia de {pkg.validityDays} días desde la compra.</div>}
+                      <Button component={Link} to={buildPackageBuyLink(pkg._id)} variant="default" mt="auto">
+                        Comprar paquete
                       </Button>
-                    </Stack>
-                  </Card>
-                );
-              })}
-            </SimpleGrid>
-          </Stack>
-        </Container>
-      )}
-
-      {/* ─── Equipo ───────────────────────────────────────────────────────── */}
-      {(loadingEmployees || employees.length > 0) && (
-        <Container id="equipo" size="lg" py={{ base: rem(64), sm: rem(88) }}>
-          <Stack gap="xl">
-            <Box>
-              <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }} mb="xs">
-                Equipo
-              </Text>
-              <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-                Conoce a nuestros especialistas.
-              </Title>
-            </Box>
-
-            {loadingEmployees ? (
-              <Text ta="center" c="dimmed">Cargando equipo...</Text>
-            ) : (
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing={{ base: "sm", sm: "md" }}>
-                {employees.map((emp) => (
-                  <Card key={emp._id} padding={0} radius="lg" withBorder style={{ borderColor: theme.colors.gray[2], overflow: "hidden" }}>
-                    <Box
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        backgroundImage: emp.profileImage ? `url(${emp.profileImage})` : undefined,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundColor: emp.profileImage ? undefined : theme.colors.gray[1],
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {!emp.profileImage && <IconUserCircle size={64} stroke={1.2} style={{ color: theme.colors.gray[4] }} />}
-                    </Box>
-                    <Box p="sm">
-                      <Text fw={500} fz="sm" c={theme.colors.gray[9]} lineClamp={1}>{emp.names}</Text>
-                      <Text fz="xs" c={theme.colors.gray[6]} lineClamp={1}>{emp.position}</Text>
-                    </Box>
-                  </Card>
-                ))}
-              </SimpleGrid>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </Stack>
-        </Container>
+          </div>
+        </section>
       )}
 
-      {/* ─── Acciones rápidas ─────────────────────────────────────────────── */}
-      {features.length > 0 && (
-        <Box style={{ background: theme.colors.gray[0], borderTop: `1px solid ${theme.colors.gray[2]}` }} py={{ base: rem(64), sm: rem(88) }}>
-          <Container size="lg">
-            <Stack gap="xl">
-              <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-                ¿Qué deseas hacer?
-              </Title>
-              <SimpleGrid cols={{ base: 1, sm: 2, md: features.length >= 3 ? 3 : 2 }} spacing="md">
-                {features.map((f) => (
-                  <Card
-                    key={f.link}
-                    component={Link}
-                    to={f.link}
-                    withBorder
-                    radius="lg"
-                    p="xl"
-                    shadow="xs"
-                    style={{ backgroundColor: theme.white, borderColor: theme.colors.gray[2], textDecoration: "none" }}
-                  >
-                    <Stack align="center" gap="md">
-                      <Box
-                        style={{
-                          width: rem(72),
-                          height: rem(72),
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          backgroundColor: primary,
-                          color: theme.white,
-                        }}
-                      >
-                        {f.icon}
-                      </Box>
-                      <Text fz="lg" fw={500} c={theme.colors.gray[9]} ta="center">{f.title}</Text>
-                    </Stack>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            </Stack>
-          </Container>
-        </Box>
+      {/* ─── Servicios (lista, como la plantilla Esencial) ──────────────── */}
+      {shownServices.length > 0 && (
+        <section className="lnd-wrap lnd-section">
+          {sectionHead(
+            "Servicios",
+            "También ofrecemos",
+            services.length > shownServices.length ? { to: "/servicios-precios", label: `Ver los ${services.length} servicios` } : undefined
+          )}
+          <div className="ag-card">
+            {shownServices.map((s) => {
+              const img = s.images?.[0];
+              const showPrice = !s.hidePrice && s.ctaMode !== "whatsapp_quote" && Number(s.price) > 0;
+              return (
+                <button key={s._id} type="button" className="lnd-svcrow" onClick={() => navigate(`/servicio/${s._id}`, { state: { backTo: "/" } })}>
+                  <span className="ag-photo lnd-svcrow__thumb">{img ? <img src={img} alt="" loading="lazy" /> : <IconPhoto size={18} stroke={1.75} />}</span>
+                  <span className="lnd-svcrow__main">
+                    <b>{s.name}</b>
+                    {s.type && <span className="ag-subtle">{s.type}</span>}
+                  </span>
+                  <span className="ag-duration lnd-svcrow__dur">
+                    <IconClock size={14} stroke={1.75} /> {s.duration} min
+                  </span>
+                  <span className="ag-price lnd-svcrow__price">{showPrice ? formatCurrency(Number(s.price), currency) : ""}</span>
+                  <IconChevronRight size={18} stroke={1.75} style={{ color: "var(--ink-subtle)", flex: "none" }} />
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      {/* ─── Fidelidad + Ubicación ────────────────────────────────────────── */}
+      {/* ─── Instructores ───────────────────────────────────────────────── */}
+      {employees.length > 0 && (
+        <section className="lnd-wrap lnd-section">
+          {sectionHead("Equipo", "Instructores")}
+          <div className="lnd-team">
+            {employees.map((emp) => (
+              <div key={emp._id} className="lnd-team__item">
+                <Avatar
+                  src={emp.profileImage || undefined}
+                  size={88}
+                  radius="xl"
+                  styles={{ root: { background: "var(--surface-hover)" }, placeholder: { color: "var(--ink-muted)", fontWeight: 600 } }}
+                >
+                  {emp.names
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w) => w[0]?.toUpperCase())
+                    .join("")}
+                </Avatar>
+                <b style={{ fontSize: 15, lineHeight: "20px" }}>{emp.names}</b>
+                {emp.position && <span className="ag-subtle">{emp.position}</span>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ─── Fidelidad · Horario y ubicación ───────────────────────────── */}
       {(showLoyalty || hasLocation) && (
-        <Container id="ubicacion" size="lg" py={{ base: rem(64), sm: rem(88) }}>
-          <Stack gap="xl">
-            <Title fw={500} fz={{ base: rem(28), sm: rem(38) }} c={theme.colors.gray[9]} style={{ letterSpacing: "-0.025em", lineHeight: 1.1 }}>
-              {showLoyalty && hasLocation ? "Fidelidad y ubicación." : showLoyalty ? "Plan de fidelidad." : "Encuéntranos."}
-            </Title>
-
-            <Grid gutter="lg">
-              {showLoyalty && (
-                <Grid.Col span={{ base: 12, md: hasLocation ? 6 : 12 }}>
-                  <Box
-                    id="fidelidad"
-                    style={{
-                      padding: rem(36),
-                      background: `linear-gradient(135deg, ${primary} 0%, ${primaryDark} 100%)`,
-                      color: "white",
-                      borderRadius: rem(20),
-                      height: "100%",
-                      minHeight: rem(220),
-                    }}
-                  >
-                    <Stack gap="lg">
-                      <Group justify="space-between" align="flex-start">
-                        <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: "rgba(255,255,255,0.55)" }}>
-                          Plan de Fidelidad
-                        </Text>
-                        <IconGift size={28} stroke={1.4} style={{ opacity: 0.8 }} />
-                      </Group>
-                      <Text fz="sm" style={{ opacity: 0.85 }}>
-                        {org?.serviceReward
-                          ? `Al completar ${org?.serviceCount || "X"} servicios: ${org.serviceReward}`
-                          : "Acumula puntos por cada visita y canjéalos por recompensas exclusivas."}
-                      </Text>
-                      <Button component={Link} to="/search-client" variant="outline" size="sm" radius="md" style={{ borderColor: "rgba(255,255,255,0.35)", color: "white", alignSelf: "flex-start" }}>
-                        Ver mis puntos
-                      </Button>
-                    </Stack>
-                  </Box>
-                </Grid.Col>
-              )}
-
-              {hasLocation && (
-                <Grid.Col span={{ base: 12, md: showLoyalty ? 6 : 12 }}>
-                  <Card withBorder radius="lg" p="xl" style={{ borderColor: theme.colors.gray[2], height: "100%", minHeight: rem(220) }}>
-                    <Stack gap="lg" h="100%">
-                      <Text fz="xs" fw={600} tt="uppercase" style={{ letterSpacing: "0.12em", color: theme.colors.gray[6] }}>
-                        Ubicación
-                      </Text>
-
-                      {org?.location?.lat && org?.location?.lng ? (
-                        <Box style={{ flex: 1, minHeight: rem(140), borderRadius: rem(12), overflow: "hidden", cursor: "pointer" }} onClick={() => navigate("/location")}>
-                          <GoogleMap
-                            mapContainerStyle={{ width: "100%", height: "100%", minHeight: rem(140) }}
-                            center={{ lat: org.location.lat, lng: org.location.lng }}
-                            zoom={15}
-                            options={{ disableDefaultUI: true, gestureHandling: "none", clickableIcons: false }}
-                          >
-                            <Marker position={{ lat: org.location.lat, lng: org.location.lng }} />
-                          </GoogleMap>
-                        </Box>
-                      ) : null}
-
-                      <Stack gap="md">
-                        {org?.address && (
-                          <Group gap="sm" align="flex-start">
-                            <IconMapPin size={15} style={{ color: primary, flexShrink: 0, marginTop: 3 }} />
-                            <Box style={{ flex: 1 }}>
-                              <Text fw={500} fz="sm" c={theme.colors.gray[9]}>{org.address}</Text>
-                              <Anchor component={Link} to="/location" fz="xs" c={theme.colors.gray[6]}>
-                                Cómo llegar →
-                              </Anchor>
-                            </Box>
-                          </Group>
-                        )}
-                        {weeklyHours.length > 0 && (
-                          <Stack gap={4}>
-                            {weeklyHours.map((h) => (
-                              <Group key={h.name} justify="space-between" style={{ padding: `${rem(4)} 0` }}>
-                                <Text fz="xs" c={h.isToday ? theme.colors.gray[9] : theme.colors.gray[7]} fw={h.isToday ? 600 : 400}>
-                                  {h.name}
-                                </Text>
-                                <Text fz="xs" c={h.isOpen ? theme.colors.gray[7] : theme.colors.gray[5]} style={{ fontFamily: "monospace" }}>
-                                  {h.hours}
-                                </Text>
-                              </Group>
-                            ))}
-                          </Stack>
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Card>
-                </Grid.Col>
-              )}
-            </Grid>
-          </Stack>
-        </Container>
+        <section className="lnd-band">
+          <div className="lnd-wrap lnd-split">
+            {showLoyalty && (
+              <div className="lnd-loyalty">
+                <span className="lnd-loyalty__icon">
+                  <IconGift size={22} stroke={1.75} />
+                </span>
+                <div>
+                  <div className="ag-slots__group" style={{ margin: "0 0 6px", color: "inherit", opacity: 0.8 }}>
+                    Fidelidad
+                  </div>
+                  <h2 className="lnd-title" style={{ color: "inherit", fontSize: 28, lineHeight: "32px" }}>
+                    Cada visita suma
+                  </h2>
+                </div>
+                {org?.serviceTiers && org.serviceTiers.length > 0 ? (
+                  <ul className="lnd-loyalty__list">
+                    {org.serviceTiers.slice(0, 3).map((tier, i) => (
+                      <li key={i}>
+                        {tier.threshold} servicios: {tier.reward}
+                      </li>
+                    ))}
+                  </ul>
+                ) : org?.serviceReward ? (
+                  <p style={{ margin: 0 }}>
+                    Al completar {org?.serviceCount || "X"} servicios: {org.serviceReward}
+                  </p>
+                ) : (
+                  <p style={{ margin: 0 }}>Acumula visitas y canjéalas por recompensas.</p>
+                )}
+                <Button component={Link} to="/search-client" variant="white" color="dark" style={{ alignSelf: "flex-start" }}>
+                  Ver mi tarjeta
+                </Button>
+              </div>
+            )}
+            {hasLocation && <HoursAndLocation />}
+          </div>
+        </section>
       )}
-    </Box>
+
+      <LandingFooter links={features} />
+    </div>
+  );
+}
+
+// Tarjeta de clase (ServiceCard): toda la tarjeta abre el detalle; «Reservar
+// clase» entra a la reserva con esa clase elegida.
+function ClassCard({ cls, currency, onOpen }: { cls: ClassType; currency: string; onOpen: () => void }) {
+  const img = cls.images?.[0];
+  return (
+    <article
+      className="ag-card ag-card--hover ag-service"
+      style={{ width: "auto" }}
+      role="link"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onOpen();
+      }}
+    >
+      <div className="ag-service__img ag-photo">
+        {img ? <img src={img} alt={cls.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <IconPhoto size={28} stroke={1.5} />}
+        {cls.featured && (
+          <span className="ag-badge">
+            <IconStar size={14} stroke={2} /> Destacada
+          </span>
+        )}
+      </div>
+      <div className="ag-service__body">
+        <h3 className="ag-service__name">{cls.name}</h3>
+        <div className="ag-service__meta">
+          {!cls.hidePrice ? (
+            <span className="ag-price">{cls.pricePerPerson === 0 ? "Gratis" : `${formatCurrency(cls.pricePerPerson, currency)} / persona`}</span>
+          ) : (
+            <span />
+          )}
+          <span className="ag-duration">
+            <IconClock size={14} stroke={1.75} /> {cls.duration} min
+          </span>
+        </div>
+        <Button
+          component={Link}
+          to={buildClassReserveLink(cls._id)}
+          variant="default"
+          size="sm"
+          mt="xs"
+          fullWidth
+          onClick={(e: MouseEvent) => e.stopPropagation()}
+        >
+          Reservar clase
+        </Button>
+      </div>
+    </article>
   );
 }
