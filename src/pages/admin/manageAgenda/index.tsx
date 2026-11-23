@@ -124,6 +124,8 @@ const ScheduleView: React.FC = () => {
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
+  // Cambio propuesto al arrastrar (el modal lo aplica sobre la cita original)
+  const [pendingMove, setPendingMove] = useState<AppointmentMove | null>(null);
   const [editModalInitialTab, setEditModalInitialTab] = useState<
     string | undefined
   >(undefined);
@@ -516,6 +518,7 @@ const ScheduleView: React.FC = () => {
     setNewAppointment({ services: [] });
     setModalOpenedAppointment(false);
     setSelectedAppointment(null);
+    setPendingMove(null);
     setFilteredServices([]);
     setEditModalInitialTab(undefined);
   }, []);
@@ -530,6 +533,7 @@ const ScheduleView: React.FC = () => {
   const handleEditAppointment = useCallback(
     (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => {
       setSelectedAppointment(appointment);
+      setPendingMove(move ?? null);
       setNewAppointment({
         service: appointment.service,
         services: appointment.service ? [appointment.service] : [],
@@ -1561,6 +1565,7 @@ const ScheduleView: React.FC = () => {
             opened={modalOpenedAppointment}
             onClose={closeModal}
             appointment={selectedAppointment}
+            move={pendingMove}
             newAppointment={newAppointment}
             setNewAppointment={setNewAppointment}
             services={filteredServices}

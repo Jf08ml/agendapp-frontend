@@ -79,6 +79,7 @@ import SeriesPreview from "../../../../components/customCalendar/components/Seri
 import CustomDatesSelector from "../../../../components/customCalendar/components/CustomDatesSelector";
 import {
   RecurrencePattern,
+  type AppointmentMove,
   SeriesPreview as SeriesPreviewType,
   createAppointmentSeries,
 } from "../../../../services/appointmentService";
@@ -262,6 +263,8 @@ interface AppointmentModalProps {
   opened: boolean;
   onClose: () => void;
   appointment: Appointment | null;
+  /** Cambio propuesto al arrastrar la cita: se precarga sobre la cita original. */
+  move?: AppointmentMove | null;
   newAppointment: Partial<CreateAppointmentPayload>;
   setNewAppointment: React.Dispatch<
     React.SetStateAction<Partial<CreateAppointmentPayload>>
@@ -287,6 +290,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   opened,
   onClose,
   appointment,
+  move,
   newAppointment,
   setNewAppointment,
   services,
@@ -752,8 +756,10 @@ ${clientServices}`;
     if (appointment) {
       // Parse dates in organization timezone and create local Date with same hour values
       // This prevents TimeSelector from showing wrong time due to browser timezone conversion
-      const startParsed = dayjs.tz(appointment.startDate, timezone);
-      const endParsed = dayjs.tz(appointment.endDate, timezone);
+      // Si viene de arrastrar, el formulario arranca con la hora y el profesional donde se soltó
+      // (antes este efecto lo pisaba con la hora original y el modal no mostraba el cambio).
+      const startParsed = dayjs.tz(move?.startDate ?? appointment.startDate, timezone);
+      const endParsed = dayjs.tz(move?.endDate ?? appointment.endDate, timezone);
 
       const startDate = new Date(
         startParsed.year(),
@@ -775,7 +781,7 @@ ${clientServices}`;
         ...appointment,
         startDate,
         endDate,
-        employee: appointment?.employee || newAppointment.employee,
+        employee: move?.employee ?? appointment?.employee ?? newAppointment.employee,
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
       });
@@ -788,7 +794,7 @@ ${clientServices}`;
         setSearchedClients((prev) => [appointment.client, ...prev]);
       }
     }
-  }, [appointment, setNewAppointment]);
+  }, [appointment, move, setNewAppointment]);
 
   useEffect(() => {
     // MODO CREACIÓN: recalcular endDate basado en duración de servicios
