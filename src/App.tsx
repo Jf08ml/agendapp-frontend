@@ -347,7 +347,6 @@ function AppContent() {
     <>
       <Analytics />
 
-      {/* Modal automático de novedades (solo admin/org, no superadmin) */}
 
       {useAdminShell ? (
         <AdminShell banners={banners} chatOpen={chatOpen} onToggleChat={toggleChat}>
