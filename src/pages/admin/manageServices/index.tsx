@@ -2,40 +2,27 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { computeServiceDeposit } from "../../../utils/deposit";
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Box,
-  Title,
-  Card,
-  Group,
-  Button,
-  Text,
-  ActionIcon,
-  Table,
-  Avatar,
-  TextInput,
-  Badge,
-  Tooltip,
-  SegmentedControl,
-  Select,
-  Skeleton,
-  Center,
-  Stack,
-} from "@mantine/core";
+import { ActionIcon, Avatar, Button, Menu, SegmentedControl, Select, Text } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import {
-  BsTrash,
-  BsPencil,
-  BsSearch,
-  BsImage,
-  BsPlusCircle,
-  BsCheckCircle,
-  BsXCircle,
-  BsDownload,
-  BsStar,
-  BsStarFill,
-  BsEyeSlash,
-} from "react-icons/bs";
-import { IconFileUpload } from "@tabler/icons-react";
+  IconBrandWhatsapp,
+  IconCircleCheck,
+  IconCircleOff,
+  IconDots,
+  IconDownload,
+  IconEyeOff,
+  IconFileUpload,
+  IconPencil,
+  IconPhoto,
+  IconPlus,
+  IconRepeat,
+  IconSearch,
+  IconStar,
+  IconStarOff,
+  IconTrash,
+} from "@tabler/icons-react";
+import { formatCurrency } from "../../../utils/formatCurrency";
+import CatalogTabs from "../../../components/catalog/CatalogTabs";
 import { showNotification } from "@mantine/notifications";
 import {
   createService,
@@ -208,13 +195,13 @@ const AdminServices: React.FC = () => {
     }
   };
 
-  const confirmDelete = (serviceId: string, index: number) => {
+  const confirmDelete = (service: Service) => {
     modals.openConfirmModal({
       title: "Eliminar servicio",
-      children: <Text size="sm">¿Seguro que deseas eliminar este servicio? Esta acción no se puede deshacer.</Text>,
-      labels: { confirm: "Eliminar", cancel: "Cancelar" },
+      children: <Text size="sm">¿Seguro que deseas eliminar «{service.name}»? Esta acción no se puede deshacer.</Text>,
+      labels: { confirm: "Eliminar servicio", cancel: "Cancelar" },
       confirmProps: { color: "red" },
-      onConfirm: () => handleDeleteService(serviceId, index),
+      onConfirm: () => handleDeleteService(service._id),
     });
   };
 
@@ -236,10 +223,11 @@ const AdminServices: React.FC = () => {
     }
   };
 
-  const handleDeleteService = async (serviceId: string, index: number) => {
+  const handleDeleteService = async (serviceId: string) => {
     try {
       await deleteService(serviceId);
-      setServices((prev) => prev.filter((_, i) => i !== index));
+      // Por id (antes por índice de la lista filtrada: con filtros quitaba otro servicio de la vista)
+      setServices((prev) => prev.filter((s) => s._id !== serviceId));
       showNotification({ title: "Servicio eliminado", message: "Se eliminó correctamente", color: "green" });
     } catch (error: any) {
       console.error(error);
@@ -288,217 +276,190 @@ const AdminServices: React.FC = () => {
     }
   };
 
-  const rows = filtered.map((service, index) => (
-    <Table.Tr key={service._id} style={{ opacity: service.isActive ? 1 : 0.6 }}>
-      <Table.Td>
-        <Group gap="sm" wrap="nowrap">
-          <Avatar
-            src={typeof service.images?.[0] === "string" ? (service.images[0] as string) : undefined}
-            alt={service.name}
-            size={44}
-            radius="sm"
-            color="gray"
-          >
-            <BsImage size={18} />
-          </Avatar>
-          <Box>
-            <Group gap={6} wrap="nowrap">
-              <Text fw={600} size="sm" lineClamp={1}>
-                {service.name}
-              </Text>
-              {!service.isActive && (
-                <Badge color="gray" size="xs" variant="light">
-                  Inactivo
-                </Badge>
-              )}
-              {service.featured && (
-                <Badge color="yellow" size="xs" variant="light" leftSection={<BsStarFill size={9} />}>
-                  Destacado
-                </Badge>
-              )}
-            </Group>
-            {service.description && (
-              <Text size="xs" c="dimmed" lineClamp={1} style={{ maxWidth: 320 }}>
-                {service.description}
-              </Text>
-            )}
-          </Box>
-        </Group>
-      </Table.Td>
-      <Table.Td>
-        <Badge variant="dot" color="violet" size="sm">
-          {service.type}
-        </Badge>
-      </Table.Td>
-      <Table.Td>
-        <Text size="sm">{service.duration} min</Text>
-      </Table.Td>
-      <Table.Td>
-        <Group gap={6} wrap="nowrap">
-          <Text size="sm" fw={600}>
-            {service.price === 0 ? "Gratis" : `$${service.price.toLocaleString()}`}
-          </Text>
-          {organization?.requireReservationDeposit && service.price > 0 && (
-            <Tooltip
-              label={
-                service.deposit && service.deposit.mode !== "inherit"
-                  ? "Abono propio de este servicio (editable en el formulario del servicio)"
-                  : "Abono según la regla general de la organización"
-              }
-              withArrow
-            >
-              <Badge
-                variant={service.deposit && service.deposit.mode !== "inherit" ? "filled" : "light"}
-                color="orange"
-                size="xs"
-              >
-                Abono ${computeServiceDeposit(organization, service).toLocaleString()}
-              </Badge>
-            </Tooltip>
-          )}
-          {service.hidePrice && (
-            <Tooltip label="El precio no se muestra a los clientes (aparece 'Consultar')" withArrow>
-              <Badge
-                variant="light"
-                color="gray"
-                size="xs"
-                leftSection={<BsEyeSlash size={9} />}
-              >
-                Oculto
-              </Badge>
-            </Tooltip>
-          )}
-        </Group>
-      </Table.Td>
-      <Table.Td>
-        <Group gap={6} wrap="nowrap">
-          <Tooltip label={service.featured ? "Quitar destacado" : "Marcar como destacado"} withArrow>
-            <ActionIcon
-              variant={service.featured ? "filled" : "light"}
-              color="yellow"
-              onClick={() => toggleFeatured(service._id)}
-            >
-              {service.featured ? <BsStarFill size={14} /> : <BsStar size={14} />}
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label={service.isActive ? "Desactivar" : "Activar"} withArrow>
-            <ActionIcon
-              variant="light"
-              color={service.isActive ? "orange" : "green"}
-              onClick={() => toggleStatus(service._id)}
-            >
-              {service.isActive ? <BsXCircle size={14} /> : <BsCheckCircle size={14} />}
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Editar" withArrow>
-            <ActionIcon
-              variant="light"
-              color="blue"
-              onClick={() => { setIsModalOpen(true); setEditingService(service); }}
-            >
-              <BsPencil size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Eliminar" withArrow>
-            <ActionIcon variant="light" color="red" onClick={() => confirmDelete(service._id, index)}>
-              <BsTrash size={14} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
+  // Categorías (service.type) con conteo, para los chips
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    services.forEach((s) => {
+      if (status !== "all" && (status === "active" ? !s.isActive : s.isActive)) return;
+      const t = s.type || "Sin categoría";
+      map.set(t, (map.get(t) ?? 0) + 1);
+    });
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
+  }, [services, status]);
 
-  const Toolbar = (
-    <Card withBorder radius="md" p="md" mb="md" shadow="sm">
-      <Stack gap="md">
-        <Group justify="space-between" align="center" wrap="nowrap">
-          <Title order={isMobile ? 3 : 2}>Administrar Servicios</Title>
-          <Group gap="xs">
-            <Tooltip label="Descargar plantilla con servicios">
-              <Button
-                leftSection={<BsDownload size={18} />}
-                onClick={handleExportServices}
-                variant="light"
-                color="green"
-                size={isMobile ? "sm" : "md"}
-              >
-                {isMobile ? "Exportar" : "Descargar Servicios"}
-              </Button>
-            </Tooltip>
-            <Tooltip label="Carga masiva desde Excel">
-              <Button
-                leftSection={<IconFileUpload size={18} />}
-                onClick={() => setIsBulkUploadModalOpen(true)}
-                variant="light"
-                color="blue"
-                size={isMobile ? "sm" : "md"}
-              >
-                {isMobile ? "Excel" : "Carga masiva"}
-              </Button>
-            </Tooltip>
-            <Button 
-              leftSection={<BsPlusCircle size={18} />}
-              onClick={() => { setIsModalOpen(true); setEditingService(null); }}
-              size={isMobile ? "sm" : "md"}
-            >
-              {isMobile ? "Nuevo" : "Nuevo servicio"}
-            </Button>
-          </Group>
-        </Group>
+  // Tabla agrupada por categoría (en el orden elegido dentro de cada grupo)
+  const grouped = useMemo(() => {
+    const map = new Map<string, Service[]>();
+    filtered.forEach((s) => {
+      const t = s.type || "Sin categoría";
+      if (!map.has(t)) map.set(t, []);
+      map.get(t)!.push(s);
+    });
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
+  }, [filtered]);
 
-        <Group wrap="wrap" gap="sm" align="end">
-          <TextInput
-            leftSection={<BsSearch />}
-            placeholder="Buscar por nombre, tipo o descripción…"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.currentTarget.value)}
-            style={{ flex: isMobile ? '1 1 100%' : '1 1 280px', minWidth: isMobile ? '100%' : 240 }}
-          />
+  const money = (n: number) => formatCurrency(n, organization?.currency);
 
-          <Select
-            label="Tipo"
-            data={[{ value: "__all__", label: "Todos los tipos" }, ...allTypes.map((t) => ({ value: t, label: t }))]}
-            value={typeFilter ?? "__all__"}
-            onChange={(v) => setTypeFilter(v ?? "__all__")}
-            clearable={false}
-            w={isMobile ? "48%" : 180}
-          />
+  const ServiceActions = ({ service }: { service: Service }) => (
+    <Menu position="bottom-end" withinPortal shadow="lg">
+      <Menu.Target>
+        <ActionIcon variant="subtle" color="gray" aria-label={`Acciones de ${service.name}`} onClick={(e) => e.stopPropagation()}>
+          <IconDots size={18} />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+        <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => { setIsModalOpen(true); setEditingService(service); }}>
+          Editar
+        </Menu.Item>
+        <Menu.Item leftSection={service.featured ? <IconStarOff size={16} /> : <IconStar size={16} />} onClick={() => toggleFeatured(service._id)}>
+          {service.featured ? "Quitar destacado" : "Destacar"}
+        </Menu.Item>
+        <Menu.Item leftSection={service.isActive ? <IconCircleOff size={16} /> : <IconCircleCheck size={16} />} onClick={() => toggleStatus(service._id)}>
+          {service.isActive ? "Desactivar" : "Activar"}
+        </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={() => confirmDelete(service)}>
+          Eliminar
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
 
-          <Box style={{ flex: isMobile ? '1 1 100%' : '0 0 auto' }}>
-            <Text size="xs" fw={500} mb={4}>Estado</Text>
-            <SegmentedControl
-              value={status}
-              onChange={(v: any) => setStatus(v)}
-              data={[
-                { label: "Todos", value: "all" },
-                { label: "Activos", value: "active" },
-                { label: "Inactivos", value: "inactive" },
-              ]}
-              size={isMobile ? "xs" : "sm"}
-              fullWidth={isMobile}
-            />
-          </Box>
+  // Publicación: destacado, precio oculto, cotiza por WhatsApp, seguimiento
+  const PublishBadges = ({ service }: { service: Service }) => (
+    <div className="ag-row" style={{ gap: 4 }}>
+      {service.featured && (
+        <span className="ag-badge ag-badge--brand">
+          <IconStar size={12} stroke={2} /> Destacado
+        </span>
+      )}
+      {service.hidePrice && (
+        <span className="ag-badge">
+          <IconEyeOff size={12} stroke={2} /> Precio oculto
+        </span>
+      )}
+      {service.ctaMode === "whatsapp_quote" && (
+        <span className="ag-badge">
+          <IconBrandWhatsapp size={12} stroke={2} /> Cotiza por WhatsApp
+        </span>
+      )}
+      {service.followUpServiceId && (
+        <span className="ag-badge">
+          <IconRepeat size={12} stroke={2} /> Seguimiento
+        </span>
+      )}
+    </div>
+  );
 
-          <Select
-            label="Ordenar por"
-            data={[
-              { value: "alpha", label: "Nombre (A–Z)" },
-              { value: "price", label: "Precio (mayor)" },
-              { value: "duration", label: "Duración (mayor)" },
-            ]}
-            value={sortBy}
-            onChange={(v) => setSortBy((v as any) ?? "alpha")}
-            w={isMobile ? "48%" : 180}
-          />
-        </Group>
-      </Stack>
-    </Card>
+  const StatusBadge = ({ active }: { active: boolean }) =>
+    active ? (
+      <span className="ag-badge ag-badge--success">
+        <IconCircleCheck size={12} stroke={2} /> Activo
+      </span>
+    ) : (
+      <span className="ag-badge">
+        <IconCircleOff size={12} stroke={2} /> Inactivo
+      </span>
+    );
+
+  const PriceCell = ({ service }: { service: Service }) => (
+    <div>
+      <b className="ag-num">{service.price === 0 ? "Gratis" : money(service.price)}</b>
+      {organization?.requireReservationDeposit && service.price > 0 && (
+        <div className="ag-subtle">
+          Abono {money(computeServiceDeposit(organization, service))}
+          {service.deposit && service.deposit.mode !== "inherit" ? " (propio)" : ""}
+        </div>
+      )}
+    </div>
+  );
+
+  const thumb = (service: Service) => (
+    <Avatar
+      src={typeof service.images?.[0] === "string" ? (service.images[0] as string) : undefined}
+      alt=""
+      size={40}
+      radius="md"
+      styles={{ root: { background: "var(--surface-hover)", flex: "none" }, placeholder: { color: "var(--ink-subtle)" } }}
+    >
+      <IconPhoto size={18} stroke={1.75} />
+    </Avatar>
   );
 
   return (
-    <Box>
-      {Toolbar}
+    <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
+      <CatalogTabs counts={{ services: services.length }} />
+
+      {/* Acciones: una sola en filled */}
+      <div className="ag-pagehead">
+        <span className="ag-muted" style={{ fontSize: 14 }}>
+          {services.length} {services.length === 1 ? "servicio" : "servicios"}
+        </span>
+        <span className="grow" />
+        <Button variant="default" leftSection={<IconDownload size={16} />} onClick={handleExportServices} size={isMobile ? "xs" : "sm"}>
+          Exportar
+        </Button>
+        <Button variant="default" leftSection={<IconFileUpload size={16} />} onClick={() => setIsBulkUploadModalOpen(true)} size={isMobile ? "xs" : "sm"}>
+          Cargar desde Excel
+        </Button>
+        {!isMobile && (
+          <Button leftSection={<IconPlus size={16} />} onClick={() => { setIsModalOpen(true); setEditingService(null); }}>
+            Nuevo servicio
+          </Button>
+        )}
+      </div>
+
+      {/* Filtros: buscador, chips de categoría, estado y orden */}
+      <div className="ag-row" style={{ gap: 8 }}>
+        <div className="ag-search" style={{ flex: isMobile ? "1 1 100%" : "0 1 320px" }}>
+          <input
+            className="ag-input"
+            type="search"
+            placeholder="Buscar por nombre, categoría o descripción"
+            aria-label="Buscar servicios"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.currentTarget.value)}
+          />
+          <span aria-hidden="true">
+            <IconSearch size={16} stroke={1.75} />
+          </span>
+        </div>
+        <SegmentedControl
+          value={status}
+          onChange={(v: any) => setStatus(v)}
+          data={[
+            { label: "Activos", value: "active" },
+            { label: "Inactivos", value: "inactive" },
+            { label: "Todos", value: "all" },
+          ]}
+          size="xs"
+        />
+        <Select
+          aria-label="Ordenar por"
+          data={[
+            { value: "alpha", label: "Nombre (A–Z)" },
+            { value: "price", label: "Precio (mayor)" },
+            { value: "duration", label: "Duración (mayor)" },
+          ]}
+          value={sortBy}
+          onChange={(v) => setSortBy((v as any) ?? "alpha")}
+          allowDeselect={false}
+          size="xs"
+          w={160}
+        />
+      </div>
+      {categoryCounts.length > 1 && (
+        <div className="ag-tabs" role="tablist" aria-label="Categorías" style={{ scrollbarWidth: "none" }}>
+          <button type="button" role="tab" className="ag-chip" aria-selected={!typeFilter || typeFilter === "__all__"} onClick={() => setTypeFilter("__all__")}>
+            Todas <span className="count">{categoryCounts.reduce((n, [, c]) => n + c, 0)}</span>
+          </button>
+          {categoryCounts.map(([t, n]) => (
+            <button key={t} type="button" role="tab" className="ag-chip" aria-selected={typeFilter === t} onClick={() => setTypeFilter(t)}>
+              {t} <span className="count">{n}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <ModalCreateEdit
         isOpen={isModalOpen}
@@ -509,39 +470,143 @@ const AdminServices: React.FC = () => {
         allServices={services}
       />
 
-      {/* Cargando inicial -> skeletons bonitos */}
       {!initialLoaded ? (
-        <Card withBorder radius="md" p="md">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} height={40} mb="sm" />
+        <div className="ag-card" aria-busy="true">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+              <span className="ag-skeleton" style={{ width: 40, height: 40, borderRadius: "var(--radius-md)" }} />
+              <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="ag-skeleton" style={{ width: "40%" }} />
+                <span className="ag-skeleton" style={{ width: "25%" }} />
+              </span>
+            </div>
           ))}
-        </Card>
+        </div>
+      ) : services.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <h3>Aún no tienes servicios</h3>
+            <p>Crea el primero o cárgalos desde Excel.</p>
+            <div className="ag-row" style={{ justifyContent: "center" }}>
+              <Button onClick={() => { setIsModalOpen(true); setEditingService(null); }}>Nuevo servicio</Button>
+              <Button variant="default" onClick={() => setIsBulkUploadModalOpen(true)}>Cargar desde Excel</Button>
+            </div>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
-        <Center mih={240}>
-          <Stack align="center" gap="xs">
-            <Text c="dimmed">No hay servicios para los filtros aplicados.</Text>
-            <Button variant="light" onClick={() => { setSearchTerm(""); setTypeFilter("__all__"); setStatus("all"); }}>
+        <div className="ag-card">
+          <div className="ag-empty">
+            <h3>No hay servicios con estos filtros</h3>
+            <Button variant="default" onClick={() => { setSearchTerm(""); setTypeFilter("__all__"); setStatus("all"); }}>
               Limpiar filtros
             </Button>
-          </Stack>
-        </Center>
+          </div>
+        </div>
+      ) : isMobile ? (
+        // Móvil: lista por categoría
+        <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+          {grouped.map(([type, list]) => (
+            <div key={type}>
+              <div className="ag-slots__group" style={{ margin: "0 0 6px" }}>
+                {type} · {list.length}
+              </div>
+              <div className="ag-card">
+                {list.map((service) => (
+                  <div
+                    key={service._id}
+                    className="ag-list-row"
+                    style={{ padding: "var(--space-3)", cursor: "pointer", opacity: service.isActive ? 1 : 0.65 }}
+                    onClick={() => { setIsModalOpen(true); setEditingService(service); }}
+                  >
+                    {thumb(service)}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <b style={{ fontSize: 15 }}>{service.name}</b>
+                      <span className="ag-subtle ag-num">
+                        {service.duration} min · {service.price === 0 ? "Gratis" : money(service.price)}
+                      </span>
+                      <div className="ag-row" style={{ gap: 4 }}>
+                        <StatusBadge active={!!service.isActive} />
+                        <PublishBadges service={service} />
+                      </div>
+                    </div>
+                    <ServiceActions service={service} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {/* Botón flotante «Nuevo servicio» sobre la barra inferior */}
+          <Button
+            size="lg"
+            radius="xl"
+            leftSection={<IconPlus size={18} />}
+            onClick={() => { setIsModalOpen(true); setEditingService(null); }}
+            style={{ position: "fixed", right: 16, bottom: "calc(var(--app-shell-footer-offset, 0px) + 16px)", zIndex: 150, boxShadow: "var(--shadow-lg)" }}
+          >
+            Nuevo servicio
+          </Button>
+        </div>
       ) : (
-        <Card withBorder radius="md" p={0}>
-          <Table.ScrollContainer minWidth={720}>
-            <Table striped highlightOnHover verticalSpacing="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Servicio</Table.Th>
-                  <Table.Th>Tipo</Table.Th>
-                  <Table.Th>Duración</Table.Th>
-                  <Table.Th>Precio</Table.Th>
-                  <Table.Th>Acciones</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>{rows}</Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        </Card>
+        // Escritorio: tabla agrupada por categoría
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th className="num">Duración</th>
+                <th className="num">Precio</th>
+                <th>Publicación</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            {grouped.map(([type, list]) => (
+              <tbody key={type}>
+                <tr>
+                  <td colSpan={6} style={{ background: "var(--surface-muted)", padding: "8px var(--space-4)" }}>
+                    <span className="ag-slots__group" style={{ margin: 0 }}>
+                      {type} · {list.length}
+                    </span>
+                  </td>
+                </tr>
+                {list.map((service) => (
+                  <tr
+                    key={service._id}
+                    style={{ cursor: "pointer", opacity: service.isActive ? 1 : 0.65 }}
+                    onClick={() => { setIsModalOpen(true); setEditingService(service); }}
+                  >
+                    <td>
+                      <div className="ag-who">
+                        {thumb(service)}
+                        <div style={{ minWidth: 0 }}>
+                          <b>{service.name}</b>
+                          {service.description && (
+                            <span style={{ display: "block", maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {service.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="num">{service.duration} min</td>
+                    <td className="num">
+                      <PriceCell service={service} />
+                    </td>
+                    <td>
+                      <PublishBadges service={service} />
+                    </td>
+                    <td>
+                      <StatusBadge active={!!service.isActive} />
+                    </td>
+                    <td style={{ width: 48, textAlign: "right" }}>
+                      <ServiceActions service={service} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
       )}
 
       <BulkUploadModal
@@ -549,7 +614,7 @@ const AdminServices: React.FC = () => {
         onClose={() => setIsBulkUploadModalOpen(false)}
         onUploadComplete={loadServices}
       />
-    </Box>
+    </div>
   );
 };
 

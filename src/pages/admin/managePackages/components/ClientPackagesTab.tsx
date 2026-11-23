@@ -312,7 +312,7 @@ function PackageCard({
               {remaining} de {total} disponibles
             </Text>
           </Group>
-          <Progress value={sessionPct} color={remaining > 0 ? "teal" : "red"} size="sm" radius="xl" />
+          <Progress value={sessionPct} color={remaining > 0 ? "gray.7" : "red"} size="sm" radius="xl" aria-label="Sesiones usadas" />
         </Box>
 
         {/* ── Financial stats ── */}
@@ -416,7 +416,7 @@ function PackageCard({
                           {svcRemaining}/{svcTotal} restantes
                         </Badge>
                       </Group>
-                      <Progress value={pct} color={svcRemaining > 0 ? "teal" : "red"} size="xs" radius="xl" />
+                      <Progress value={pct} color={svcRemaining > 0 ? "gray.7" : "red"} size="xs" radius="xl" />
                     </Box>
                   );
                 })}
@@ -449,7 +449,7 @@ function PackageCard({
                           {clsRemaining}/{clsTotal} restantes
                         </Badge>
                       </Group>
-                      <Progress value={pct} color={clsRemaining > 0 ? "grape" : "red"} size="xs" radius="xl" />
+                      <Progress value={pct} color={clsRemaining > 0 ? "gray.7" : "red"} size="xs" radius="xl" />
                     </Box>
                   );
                 })}
@@ -1022,14 +1022,14 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       {allPackages.length > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
           <Paper withBorder p="sm" radius="md">
-            <Text size="xs" c="dimmed">Pendiente por cobrar</Text>
-            <Text size="xl" fw={700} c={kpis.totalPending > 0 ? "red" : "dimmed"}>
+            <Text size="sm" c="var(--ink-muted)">Pendiente por cobrar</Text>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2}>
               {formatCurrency(kpis.totalPending, currency)}
             </Text>
           </Paper>
           <Paper withBorder p="sm" radius="md">
-            <Text size="xs" c="dimmed">Cobrado (histórico)</Text>
-            <Text size="xl" fw={700} c="teal">
+            <Text size="sm" c="var(--ink-muted)">Cobrado (histórico)</Text>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2}>
               {formatCurrency(kpis.totalCollected, currency)}
             </Text>
           </Paper>
@@ -1042,10 +1042,10 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
             style={{ cursor: "pointer", textAlign: "left", width: "100%" }}
           >
             <Group gap={6} wrap="nowrap">
-              <IconClockExclamation size={14} color="var(--mantine-color-orange-6)" />
-              <Text size="xs" c="dimmed">Vencen en 7 días</Text>
+              <IconClockExclamation size={14} color="var(--warning)" />
+              <Text size="sm" c="var(--ink-muted)">Vencen en 7 días</Text>
             </Group>
-            <Text size="xl" fw={700} c={kpis.expiringSoon > 0 ? "orange" : "dimmed"}>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2} c={kpis.expiringSoon > 0 ? "var(--warning)" : undefined}>
               {kpis.expiringSoon}
             </Text>
           </Paper>

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Box, Group, Pagination, Select, Text } from "@mantine/core";
+import { ActionIcon, Alert, Box, Group, Pagination, Select, Text } from "@mantine/core";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { useMediaQuery } from "@mantine/hooks";
@@ -65,13 +66,16 @@ const ClientList: React.FC<ClientListProps> = ({
         </Alert>
       )}
 
-      <Group justify="space-between" align="center" mb="xs" wrap="wrap">
-        <Text size="sm" c="var(--ink-muted)">
-          Mostrando {clients.length === 0 ? 0 : from}–{to} de {clients.length}
-        </Text>
-        <Group gap="xs" align="center">
+      {/* Conteo, tamaño de página y paginación (en móvil: «‹ 1 de 32 ›») */}
+      <Group justify="space-between" align="center" mb="xs" wrap={isMobile ? "nowrap" : "wrap"} gap="xs">
+        <Group gap="xs" align="center" wrap="nowrap">
+          <Text size="sm" c="var(--ink-muted)" style={{ whiteSpace: "nowrap" }}>
+            {isMobile
+              ? `${clients.length === 0 ? 0 : from}–${to} de ${clients.length}`
+              : `Mostrando ${clients.length === 0 ? 0 : from}–${to} de ${clients.length}`}
+          </Text>
           <Select
-            placeholder="Seleccione"
+            aria-label="Clientes por página"
             data={[
               { value: "5", label: "5" },
               { value: "10", label: "10" },
@@ -83,10 +87,36 @@ const ClientList: React.FC<ClientListProps> = ({
               setPageSize(Number(value));
               setCurrentPage(1);
             }}
-            w={120}
+            allowDeselect={false}
+            w={isMobile ? 76 : 120}
+            size={isMobile ? "xs" : "sm"}
           />
-          <Pagination total={Math.max(totalPages, 1)} value={currentPage} onChange={setCurrentPage} />
         </Group>
+        {isMobile ? (
+          <Group gap={4} align="center" wrap="nowrap">
+            <ActionIcon
+              variant="default"
+              aria-label="Página anterior"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              <IconChevronLeft size={16} />
+            </ActionIcon>
+            <Text size="sm" className="ag-num" style={{ whiteSpace: "nowrap" }}>
+              {currentPage} de {Math.max(totalPages, 1)}
+            </Text>
+            <ActionIcon
+              variant="default"
+              aria-label="Página siguiente"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(Math.max(totalPages, 1), p + 1))}
+            >
+              <IconChevronRight size={16} />
+            </ActionIcon>
+          </Group>
+        ) : (
+          <Pagination total={Math.max(totalPages, 1)} value={currentPage} onChange={setCurrentPage} />
+        )}
       </Group>
 
       {displayedClients.length === 0 ? (

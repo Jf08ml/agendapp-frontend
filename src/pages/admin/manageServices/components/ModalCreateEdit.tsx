@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import {
-  Modal,
+  Drawer,
   Stack,
   TextInput,
   NumberInput,
@@ -19,16 +19,16 @@ import {
   Switch,
   Title,
   Divider,
-  ThemeIcon,
   SegmentedControl,
   Select,
 } from "@mantine/core";
-import { BsImage, BsTrash, BsPlusCircle } from "react-icons/bs";
+import { BsTrash, BsPlusCircle } from "react-icons/bs";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import { Service, ServiceCost } from "../../../../services/serviceService";
 import { ImageUploadField, PdfAndVideoFields } from "../../components/MediaUploadFields";
 import { FOLLOW_UP_SELF } from "./followUp";
+import { useMediaQuery } from "@mantine/hooks";
 
 interface ModalCreateEditProps {
   isOpen: boolean;
@@ -47,6 +47,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
   allTypes,
   allServices,
 }) => {
+  const isMobile = useMediaQuery("(max-width: 48em)");
   const requireDeposit = useSelector((s: RootState) => !!s.organization.organization?.requireReservationDeposit);
   const [editingService, setEditingService] = useState<Service>({
     _id: "",
@@ -150,26 +151,18 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
   return (
     <>
-    <Modal
+    {/* Editor en panel lateral (ServiciosPanel); a pantalla completa en móvil */}
+    <Drawer
       opened={isOpen}
       onClose={onClose}
-      title={
-        <Group gap="xs">
-          <ThemeIcon variant="light" size="lg" radius="md">
-            <BsImage size={20} />
-          </ThemeIcon>
-          <Title order={3}>{service ? "Editar Servicio" : "Crear Nuevo Servicio"}</Title>
-        </Group>
-      }
-      size="xl"
-      centered
-      radius="md"
-      overlayProps={{ blur: 2 }}
+      position="right"
+      size={isMobile ? "100%" : 520}
+      title={service ? "Editar servicio" : "Nuevo servicio"}
     >
       <Stack gap="lg">
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+        <SimpleGrid cols={1} spacing="md">
           <Paper withBorder p="md" radius="md" shadow="xs">
-            <Title order={5} mb="sm">Información Básica</Title>
+            <Title order={5} mb="sm">Información básica</Title>
             <Divider mb="md" />
             <Stack gap="md">
               <TextInput
@@ -312,7 +305,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 autosize
               />
               <Textarea
-                label="📋 Recomendaciones para el cliente"
+                label="Recomendaciones para el cliente"
                 description="Se incluirán en los recordatorios de WhatsApp"
                 placeholder="Ej: Llegar sin maquillaje, no consumir cafeína 2h antes, traer ropa cómoda..."
                 value={editingService.recommendations ?? ""}
@@ -331,14 +324,14 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
                 onChange={(e) => setEditingService({ ...editingService, hidePrice: e.currentTarget.checked })}
               />
               <Switch
-                label="⭐ Servicio destacado"
+                label="Servicio destacado"
                 description="Se muestra de primero en la página pública, la reserva en línea y el asistente IA"
                 checked={editingService.featured ?? false}
                 onChange={(e) => setEditingService({ ...editingService, featured: e.currentTarget.checked })}
               />
                 <Box>
                   <NumberInput
-                    label="👥 Citas simultáneas que puede atender"
+                    label="Citas simultáneas que puede atender"
                     description="Número de clientes que el profesional puede atender en el mismo horario (ej: doctor con 2 pacientes)"
                     value={editingService.maxConcurrentAppointments ?? 1}
                     onChange={(value) => setEditingService({ ...editingService, maxConcurrentAppointments: typeof value === "number" ? value : 1 })}
@@ -363,7 +356,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
 
                 <Divider />
                 <Switch
-                  label="💸 Registrar gastos del servicio"
+                  label="Registrar gastos del servicio"
                   description="Insumos, materiales o costos internos por servicio prestado"
                   checked={hasCosts}
                   onChange={(e) => {
@@ -483,7 +476,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         </SimpleGrid>
 
         <Paper withBorder p="md" radius="md" shadow="xs">
-          <Title order={5} mb="sm">📄 Material adicional (opcional)</Title>
+          <Title order={5} mb="sm">Fotos, video y material adicional (opcional)</Title>
           <Divider mb="md" />
           <PdfAndVideoFields
             pdfFile={pdfFile}
@@ -495,7 +488,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         </Paper>
 
         <Paper withBorder p="md" radius="md" shadow="xs">
-          <Title order={5} mb="sm">💬 Botón de acción (CTA)</Title>
+          <Title order={5} mb="sm">En tu web</Title>
           <Divider mb="md" />
           <Stack gap="md">
             <SegmentedControl
@@ -526,7 +519,7 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         </Paper>
 
         <Paper withBorder p="md" radius="md" shadow="xs">
-          <Title order={5} mb="sm">🔁 Recordatorio de seguimiento (opcional)</Title>
+          <Title order={5} mb="sm">Recordatorio de seguimiento (opcional)</Title>
           <Divider mb="md" />
           <Stack gap="md">
             <Select
@@ -589,17 +582,17 @@ const ModalCreateEdit: React.FC<ModalCreateEditProps> = ({
         <Divider />
         <Group justify="space-between">
           <Text size="sm" c="dimmed">
-            {!canSave && "Completa todos los campos requeridos (*)"}
+            {!canSave && "Completa los campos obligatorios (*) para guardar."}
           </Text>
           <Group>
             <Button variant="default" onClick={onClose} size="md">Cancelar</Button>
             <Button onClick={handleSave} loading={saving} disabled={!canSave} size="md">
-              {service ? "💾 Guardar cambios" : "✨ Crear servicio"}
+              Guardar servicio
             </Button>
           </Group>
         </Group>
       </Stack>
-    </Modal>
+    </Drawer>
     </>
   );
 };
