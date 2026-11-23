@@ -137,7 +137,9 @@ const LoyaltyCardFace: React.FC<LoyaltyCardFaceProps> = ({
       {/* Pie: cliente + siguiente premio */}
       <Group justify="space-between" wrap="nowrap" align="flex-end" style={{ position: "relative" }}>
         <Box style={{ minWidth: 0 }}>
-          <Text size="10px" c={fgMuted} tt="uppercase" style={{ letterSpacing: 1.2 }}>Cliente</Text>
+          <Text size="10px" c={fgMuted} tt="uppercase" style={{ letterSpacing: 1.2 }}>
+            Cliente{max > 0 && max <= MAX_STAMPS ? ` · ${current} / ${max}` : ""}
+          </Text>
           <Text fw={700} size="sm" c={fg} tt="uppercase" truncate="end" style={{ letterSpacing: 1 }}>
             {clientName || "—"}
           </Text>
@@ -152,7 +154,7 @@ const LoyaltyCardFace: React.FC<LoyaltyCardFaceProps> = ({
                 <Text size="xs" fw={700} c={fg} truncate="end">{nextTier.reward || "tu premio"}</Text>
               </>
             ) : (
-              <Text size="xs" fw={800} c={fg}>🎉 ¡Completaste todos los niveles!</Text>
+              <Text size="xs" fw={800} c={fg}>Completaste todos los niveles</Text>
             )}
           </Box>
         )}
