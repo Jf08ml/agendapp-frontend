@@ -157,7 +157,7 @@ export default function MessageComposer({
   return (
     <Box>
       <Title order={3} mb="md">
-        {isMeta ? "📋 Seleccionar plantilla" : "✍️ Compón tu mensaje"}
+        {isMeta ? "Elige la plantilla" : "Escribe tu mensaje"}
       </Title>
 
       {/* Título de la campaña (siempre visible) */}

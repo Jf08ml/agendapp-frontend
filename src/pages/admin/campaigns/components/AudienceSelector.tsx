@@ -20,6 +20,7 @@ import {
   Button,
 } from "@mantine/core";
 import { BsSearch } from "react-icons/bs";
+import { showNotification } from "@mantine/notifications";
 import type { CampaignRecipient, AudienceSuggestion } from "../../../../types/campaign";
 import campaignService from "../../../../services/campaignService";
 import { parsePhoneText, validatePhoneList, formatPhoneDisplay } from "../../../../utils/campaignValidations";
@@ -120,10 +121,10 @@ export default function AudienceSelector({
       });
       
       // Mostrar mensaje de confirmación
-      alert(`✅ ${result.total} clientes seleccionados`);
+      showNotification({ color: "green", message: `${result.total} clientes seleccionados.` });
     } catch (error) {
       console.error("Error seleccionando todos:", error);
-      alert("Error al seleccionar todos los clientes");
+      showNotification({ color: "red", message: "No pudimos seleccionar todos los clientes. Inténtalo de nuevo." });
     } finally {
       setLoadingClients(false);
     }
@@ -163,7 +164,7 @@ export default function AudienceSelector({
   return (
     <Box>
       <Title order={3} mb="md">
-        📋 Selecciona tu audiencia
+        ¿A quién se la envías?
       </Title>
 
       <Tabs value={tab} onChange={setTab} mb="lg">
@@ -175,7 +176,7 @@ export default function AudienceSelector({
         <Tabs.Panel value="clients" pt="md">
           <Group justify="space-between" mb="md">
             <TextInput
-              placeholder="🔍 Buscar por nombre o teléfono..."
+              placeholder="Buscar por nombre o teléfono"
               value={clientSearch}
               onChange={(e) => setClientSearch(e.currentTarget.value)}
               style={{ flex: 1 }}
@@ -284,7 +285,7 @@ export default function AudienceSelector({
       {/* Resumen de audiencia */}
       <Paper withBorder p="md" bg="gray.0">
         <Title order={4} mb="sm">
-          📊 Resumen
+          Resumen
         </Title>
         
         <Group gap="sm">
