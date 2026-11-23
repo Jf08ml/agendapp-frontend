@@ -1,4 +1,8 @@
-import { Button, Card, Group, Text, rem } from "@mantine/core";
+// Barra fija de guardado de Ajustes (rediseño, SettingsLayout): aparece solo con
+// cambios. «Tienes cambios sin guardar · Descartar · Guardar». En móvil queda
+// sobre la barra inferior del panel.
+import { Button } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 
 export default function StickyActionBar({
   isDirty,
@@ -11,37 +15,35 @@ export default function StickyActionBar({
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const isMobile = useMediaQuery("(max-width: 48rem)");
+  if (!isDirty) return null;
   return (
-    <Card
-      withBorder
-      radius="lg"
-      shadow="sm"
+    <div
+      role="region"
+      aria-label="Cambios sin guardar"
       style={{
         position: "sticky",
-        bottom: 8,
-        zIndex: 5,
-        marginTop: rem(16),
-        backdropFilter: "blur(6px)",
+        bottom: isMobile ? "calc(var(--app-shell-footer-offset, 0px) + 8px)" : 16,
+        zIndex: 20,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        padding: "10px 10px 10px 16px",
+        borderRadius: "var(--radius-lg)",
+        background: "var(--ink)",
+        color: "var(--ink-inverse)",
+        boxShadow: "var(--shadow-lg)",
+        marginTop: "var(--space-4)",
       }}
     >
-      <Group justify="space-between">
-        <Text size="sm" c={isDirty ? "yellow.7" : "dimmed"}>
-          {isDirty ? "Tienes cambios sin guardar" : "Sin cambios"}
-        </Text>
-        <Group>
-          <Button
-            variant="light"
-            color="gray"
-            onClick={onCancel}
-            disabled={saving}
-          >
-            Cancelar
-          </Button>
-          <Button color="green" onClick={onSave} loading={saving}>
-            Guardar cambios
-          </Button>
-        </Group>
-      </Group>
-    </Card>
+      <b style={{ fontSize: 14, flex: 1, minWidth: 160 }}>Tienes cambios sin guardar</b>
+      <Button variant="subtle" color="gray" onClick={onCancel} disabled={saving} styles={{ root: { color: "var(--ink-inverse)" } }}>
+        Descartar
+      </Button>
+      <Button variant="white" color="dark" onClick={onSave} loading={saving}>
+        Guardar
+      </Button>
+    </div>
   );
 }
