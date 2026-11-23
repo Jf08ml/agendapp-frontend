@@ -161,7 +161,7 @@ export default function FidelityTab({
     return (
       <SectionCard
         title="Tarjeta de fidelidad"
-        description="El diseño de la tarjeta virtual que recibe cada cliente. Los niveles y premios se configuran en la pestaña Programa."
+        description="El diseño de la tarjeta virtual que recibe cada cliente. Los niveles y premios se configuran en la pestaña Programa de fidelidad."
       >
         <LoyaltyCardDesigner form={form} disabled={!isEditing} />
       </SectionCard>

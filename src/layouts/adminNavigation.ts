@@ -110,9 +110,9 @@ export function buildAdminNav(can: NavPermissions): NavGroup[] {
     {
       title: "Clientes",
       items: [
-        { key: "clients", label: "Clientes", icon: "clients", links: [{ label: "Clientes", to: "/gestionar-clientes", visible: can.clientsRead }] },
-        // Módulo único de fidelidad: clientes, programa, tarjeta y mensajes (decisión 6).
-        { key: "loyalty", label: "Fidelidad", icon: "loyalty", links: [{ label: "Fidelidad", to: "/fidelidad", visible: can.businessInfo }] },
+        // Clientes y fidelidad en una sola sección (decisión 6): lista de clientes con
+        // sus filtros de fidelidad, seguimientos, programa de fidelidad y tarjeta.
+        { key: "clients", label: "Clientes y fidelidad", icon: "clients", links: [{ label: "Clientes y fidelidad", to: "/gestionar-clientes", visible: can.clientsRead }] },
       ],
     },
     {
@@ -269,7 +269,6 @@ const ADMIN_PATHS = [
   "/gestionar-agenda",
   "/gestionar-reservas-online",
   "/gestionar-clientes",
-  "/fidelidad",
   "/gestion-caja",
   "/gestionar-pagos",
   "/inventario",

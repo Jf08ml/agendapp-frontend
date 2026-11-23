@@ -76,10 +76,10 @@ test("tabbar móvil: Agenda, Clientes, Caja, WhatsApp", () => {
   assert.deepEqual(buildTabbar(ALL).map((t) => t.label), ["Agenda", "Clientes", "Caja", "WhatsApp"]);
 });
 
-test("enlace activo: subrutas, Fidelidad como módulo propio y Ajustes", () => {
+test("enlace activo: subrutas, fidelidad dentro de Clientes y Ajustes", () => {
   const links = allNavLinks(buildAdminNav(ALL));
   assert.equal(findActiveLink(links, "/admin/campaigns/new", ""), "/admin/campaigns");
-  assert.equal(findActiveLink(links, "/fidelidad", "?tab=programa"), "/fidelidad");
+  assert.equal(findActiveLink(links, "/gestionar-clientes", "?tab=programa"), "/gestionar-clientes");
   assert.equal(findActiveLink(links, "/informacion-negocio", ""), "/informacion-negocio");
   assert.equal(findActiveLink(links, "/servicios-precios", ""), null);
   assert.equal(findActiveLink(links, "/pedidos", "?desde=caja"), "/gestion-caja");

@@ -25,10 +25,10 @@ test("resolveSection: ?seccion= y ?tab= viejo", () => {
   assert.equal(resolveSection("nada", "nada"), null);
 });
 
-test("loyaltyRedirect: enlaces viejos de fidelidad van a Clientes › Fidelidad", () => {
-  assert.equal(loyaltyRedirect(null, "fidelity"), "/fidelidad?tab=programa");
-  assert.equal(loyaltyRedirect("fidelidad", null), "/fidelidad?tab=programa");
-  assert.equal(loyaltyRedirect("tarjeta", null), "/fidelidad?tab=tarjeta");
+test("loyaltyRedirect: enlaces viejos de fidelidad van a Clientes y fidelidad", () => {
+  assert.equal(loyaltyRedirect(null, "fidelity"), "/gestionar-clientes?tab=programa");
+  assert.equal(loyaltyRedirect("fidelidad", null), "/gestionar-clientes?tab=programa");
+  assert.equal(loyaltyRedirect("tarjeta", null), "/gestionar-clientes?tab=tarjeta");
   assert.equal(loyaltyRedirect("marca", null), null);
   assert.equal(loyaltyRedirect(null, "branding"), null);
 });

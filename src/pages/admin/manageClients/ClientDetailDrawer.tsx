@@ -475,7 +475,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
                 <Paper withBorder radius="md" p="md">
                   <Group justify="space-between" mb="sm">
                     <Text size="xs" fw={700} tt="uppercase" c="dimmed">Fidelidad</Text>
-                    <Link to="/fidelidad" className="ag-link">Ver en Fidelidad</Link>
+                    <Link to="/gestionar-clientes?tab=programa" className="ag-link">Ver programa</Link>
                   </Group>
                   <Stack gap="md">
                     <CompactLoyaltyCard

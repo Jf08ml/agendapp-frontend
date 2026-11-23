@@ -41,10 +41,8 @@ import {
   IconMessage,
   IconClock,
   IconBell,
-  IconExternalLink,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import { RootState } from "../../app/store";
 import whatsappTemplateService, {
   WhatsappTemplates,
@@ -418,29 +416,11 @@ const templateKeys = Object.keys(templateInfo) as TemplateType[];
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
-const LOYALTY_GROUP = "Fidelidad";
-
-interface WhatsappTemplateEditorProps {
-  /**
-   * "loyalty": solo las plantillas de fidelidad, dentro de Clientes › Fidelidad
-   * (sin la cabecera ni la configuración de envíos). "all" (por defecto): todas,
-   * y la categoría Fidelidad se reemplaza por un enlace al módulo.
-   */
-  scope?: "all" | "loyalty";
-}
-
-export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTemplateEditorProps = {}) {
+export default function WhatsappTemplateEditor() {
   const { organization } = useSelector((state: RootState) => state.organization);
   const isMobile = useMediaQuery("(max-width: 768px)");
-  const navigate = useNavigate();
-  const isLoyaltyScope = scope === "loyalty";
-  const sidebarGroups = SIDEBAR_GROUPS.filter((g) =>
-    isLoyaltyScope ? g.label === LOYALTY_GROUP : g.label !== LOYALTY_GROUP
-  );
 
-  const [selectedKey, setSelectedKey] = useState<string>(
-    isLoyaltyScope ? "loyaltyServiceReward" : "scheduleAppointmentBatch"
-  );
+  const [selectedKey, setSelectedKey] = useState<string>("scheduleAppointmentBatch");
   const [mobileView, setMobileView] = useState<"list" | "editor">("list");
 
   const [templates, setTemplates] = useState<WhatsappTemplates | null>(null);
@@ -661,11 +641,10 @@ export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTempla
 
   return (
     <>
-      <Container size="xl" py={isLoyaltyScope ? 0 : "md"} px={isLoyaltyScope ? 0 : undefined}>
+      <Container size="xl" py="md">
         <Stack gap="md">
 
           {/* ── Cabecera ─────────────────────────────────────────── */}
-          {!isLoyaltyScope && (
           <Group align="center" gap="sm">
             <ThemeIcon size="lg" radius="md" variant="light" color="green">
               <IconMessage size={18} />
@@ -680,7 +659,6 @@ export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTempla
               <Badge color="green" size="sm" ml="auto">Baileys</Badge>
             )}
           </Group>
-          )}
 
           {message && (
             <Alert
@@ -721,7 +699,7 @@ export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTempla
                   </Box>
 
                   <ScrollArea style={{ flex: 1 }}>
-                    {sidebarGroups.map((group, gi) => (
+                    {SIDEBAR_GROUPS.map((group, gi) => (
                       <Box key={group.label}>
                         {gi > 0 && <Divider />}
                         <Group px="md" pt="sm" pb={rem(4)} gap={6} wrap="nowrap">
@@ -796,20 +774,7 @@ export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTempla
                       </Box>
                     ))}
 
-                    {!isLoyaltyScope && (
-                      <>
-                        <Divider />
-                        <NavLink
-                          label={<Text size="sm">Fidelidad</Text>}
-                          description={<Text size="xs" c="dimmed">Se editan en Clientes › Fidelidad</Text>}
-                          leftSection={<IconExternalLink size={15} />}
-                          onClick={() => navigate("/fidelidad?tab=mensajes")}
-                          styles={{ root: { paddingInline: rem(12) } }}
-                        />
-                      </>
-                    )}
-
-                    {isMeta && !isLoyaltyScope && (
+                    {isMeta && (
                       <>
                         <Divider my="xs" />
                         <NavLink
@@ -822,18 +787,14 @@ export default function WhatsappTemplateEditor({ scope = "all" }: WhatsappTempla
                       </>
                     )}
 
-                    {!isLoyaltyScope && (
-                      <>
-                        <Divider my="xs" />
-                        <NavLink
-                          label={<Text size="sm">Configuración de envíos</Text>}
-                          leftSection={<IconSettings size={15} />}
-                          active={selectedKey === "settings"}
-                          onClick={() => handleSelectKey("settings")}
-                          styles={{ root: { paddingInline: rem(12) } }}
-                        />
-                      </>
-                    )}
+                    <Divider my="xs" />
+                    <NavLink
+                      label={<Text size="sm">Configuración de envíos</Text>}
+                      leftSection={<IconSettings size={15} />}
+                      active={selectedKey === "settings"}
+                      onClick={() => handleSelectKey("settings")}
+                      styles={{ root: { paddingInline: rem(12) } }}
+                    />
                   </ScrollArea>
 
                   {/* Leyenda dots — solo Meta */}

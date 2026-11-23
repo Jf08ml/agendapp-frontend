@@ -89,11 +89,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
 
 const ALL_PAGES: SettingsPage[] = SETTINGS_GROUPS.flatMap((g) => g.pages);
 
-/** Ruta del módulo de fidelidad (Clientes › Fidelidad, decisión 6). */
-export const LOYALTY_PATH = "/fidelidad";
+/** Sección «Clientes y fidelidad» (decisión 6): ahí viven el programa y la tarjeta. */
+export const LOYALTY_PATH = "/gestionar-clientes";
 
 /**
- * Enlaces viejos de Ajustes que ahora viven en Clientes › Fidelidad:
+ * Enlaces viejos de Ajustes que ahora viven en Clientes y fidelidad:
  * ?tab=fidelity, ?seccion=fidelidad (programa) y ?seccion=tarjeta (diseño).
  * Devuelve la ruta a la que hay que redirigir, o null si no aplica.
  */

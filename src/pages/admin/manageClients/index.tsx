@@ -21,9 +21,14 @@ import ClientFormModal from "./ClientFormModal";
 import BulkUploadModal from "./BulkUploadModal";
 import ClientList from "./ClientList";
 import FollowUpsTab from "./FollowUpsTab";
+import LoyaltySettingsPart from "./LoyaltySettingsPart";
+import { CLIENTS_TABS, resolveClientsTab } from "./clientsTabs";
+import { useSearchParams } from "react-router-dom";
+import { usePermissions } from "../../../hooks/usePermissions";
+import { computeNavPermissions } from "../../../layouts/adminNavigation";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
-import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical } from "@tabler/icons-react";
+import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical, IconInfoCircle } from "@tabler/icons-react";
 import {
   deleteClient,
   forceDeleteClient,
@@ -52,18 +57,25 @@ const hasReward = (c: Client) => !!(c.hasServiceDiscount || c.hasReferralBenefit
 const inProgress = (c: Client) =>
   !hasReward(c) && ((c.servicesTaken ?? 0) > 0 || (c.referralsMade ?? 0) > 0);
 
-interface ClientsDashboardProps {
-  /**
-   * "loyalty": la lista se usa dentro de Clientes › Fidelidad (sin título ni
-   * pestañas propias, con filtros de premio listo / en progreso).
-   */
-  variant?: "default" | "loyalty";
-}
-
-const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
-  const isLoyalty = variant === "loyalty";
+// «Clientes y fidelidad» (decisión 6): una sola lista de clientes con sus
+// filtros de fidelidad, más Seguimientos, Programa de fidelidad y Tarjeta.
+// Las pestañas van en la URL (?tab=) para que los enlaces viejos de Ajustes
+// lleguen directo a Programa o Tarjeta.
+const ClientsDashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { hasPermission } = usePermissions();
+  const organization = useSelector((s: RootState) => s.organization.organization);
+  const can = computeNavPermissions(hasPermission, organization?.planLimits);
+  const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
+  const allowedTabs = CLIENTS_TABS.filter((t) => (t.key === "programa" || t.key === "tarjeta" ? can.businessInfo : true));
+  const activeTab = resolveClientsTab(searchParams.get("tab"), allowedTabs.map((t) => t.key));
+  const setActiveTab = (key: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (!key || key === "clientes") next.delete("tab");
+    else next.set("tab", key);
+    setSearchParams(next, { replace: true });
+  };
   const [loyaltyFilter, setLoyaltyFilter] = useState<LoyaltyFilter>("todos");
-  const [activeTab, setActiveTab] = useState<string>("clientes");
   const [openModal, setOpenModal] = useState(false);
   const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -146,7 +158,7 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
     });
   }, [debounced, clients]);
 
-  // Clientes › Fidelidad: premio listo = tiene un beneficio por servicios o por
+  // Filtros de fidelidad: premio listo = tiene un beneficio por servicios o por
   // referidos sin canjear (los mismos campos que muestran «Premio listo» en la fila).
   const loyaltyCounts = useMemo(
     () => ({
@@ -157,9 +169,9 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
     [filteredClients]
   );
   const visibleClients = useMemo(() => {
-    if (!isLoyalty || loyaltyFilter === "todos") return filteredClients;
+    if (!loyaltyEnabled || loyaltyFilter === "todos") return filteredClients;
     return filteredClients.filter(loyaltyFilter === "premio" ? hasReward : inProgress);
-  }, [filteredClients, isLoyalty, loyaltyFilter]);
+  }, [filteredClients, loyaltyEnabled, loyaltyFilter]);
 
   const handleRegisterService = async (clientId: string) => {
     try {
@@ -374,7 +386,7 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
     }
   };
 
-  const loyaltyChips = isLoyalty && (
+  const loyaltyChips = loyaltyEnabled && (
     <div className="ag-tabs" style={{ marginBottom: "var(--space-3)" }} role="tablist" aria-label="Filtrar clientes del programa">
       {(
         [
@@ -399,18 +411,31 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
   );
 
   return (
-    <Box p={isLoyalty ? 0 : { base: "sm", md: "lg" }}>
-      {!isLoyalty && (
-        <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
-          Clientes
-        </h1>
-      )}
-      <Tabs value={isLoyalty ? "clientes" : activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
-        {!isLoyalty && (
-          <Tabs.List mb="md">
-            <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
-            <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
-          </Tabs.List>
+    <Box p={{ base: "sm", md: "lg" }}>
+      <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
+        Clientes y fidelidad
+      </h1>
+      <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
+        <Tabs.List mb="md">
+          {allowedTabs.map((t) => (
+            <Tabs.Tab key={t.key} value={t.key}>
+              {t.label}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+
+        {!loyaltyEnabled && activeTab !== "programa" && activeTab !== "seguimientos" && (
+          <div className="ag-alert ag-alert--info" style={{ marginBottom: "var(--space-3)" }}>
+            <IconInfoCircle size={20} />
+            <div>
+              El programa de fidelidad está oculto para tus clientes.{" "}
+              {can.businessInfo && (
+                <a href="?tab=programa" className="ag-link" onClick={(e) => { e.preventDefault(); setActiveTab("programa"); }}>
+                  Actívalo en Programa de fidelidad
+                </a>
+              )}
+            </div>
+          </div>
         )}
 
         <Tabs.Panel value="clientes">
@@ -446,16 +471,14 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
                   w={isMobile ? "100%" : 320}
                   radius="md"
                 />
-                {!isLoyalty && (
-                  <Tooltip label="Crear nuevo cliente">
-                    <Button
-                      leftSection={<IoAddCircleOutline />}
-                      onClick={() => handleOpenModal(null)}
-                    >
-                      {isMobile ? "Crear" : "Crear cliente"}
-                    </Button>
-                  </Tooltip>
-                )}
+                <Tooltip label="Crear nuevo cliente">
+                  <Button
+                    leftSection={<IoAddCircleOutline />}
+                    onClick={() => handleOpenModal(null)}
+                  >
+                    {isMobile ? "Crear" : "Crear cliente"}
+                  </Button>
+                </Tooltip>
                 <Menu shadow="sm" width={240} withinPortal>
                   <Menu.Target>
                     <ActionIcon variant="default" size="lg" radius="md">
@@ -471,14 +494,12 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
                     >
                       Restablecer todo
                     </Menu.Item>
-                    {!isLoyalty && (
-                      <Menu.Item
-                        leftSection={<IconFileUpload size={16} />}
-                        onClick={() => setOpenBulkUploadModal(true)}
-                      >
-                        Carga masiva
-                      </Menu.Item>
-                    )}
+                    <Menu.Item
+                      leftSection={<IconFileUpload size={16} />}
+                      onClick={() => setOpenBulkUploadModal(true)}
+                    >
+                      Carga masiva
+                    </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
               </Group>
@@ -512,6 +533,14 @@ const ClientsDashboard = ({ variant = "default" }: ClientsDashboardProps) => {
 
         <Tabs.Panel value="seguimientos">
           <FollowUpsTab />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="programa">
+          <LoyaltySettingsPart part="program" />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="tarjeta">
+          <LoyaltySettingsPart part="card" />
         </Tabs.Panel>
       </Tabs>
 
