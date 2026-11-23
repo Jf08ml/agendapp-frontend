@@ -1,42 +1,17 @@
+// Registro de un negocio nuevo en la plataforma (rediseño, RegistroPlataforma):
+// pantalla de AgenditApp sin marca de negocio (color --platform). Paso 1 «Tus
+// datos», paso 2 «Tu negocio» con la dirección del panel validada en vivo y,
+// al final, «Tu cuenta está lista» con el enlace de acceso. En escritorio, a la
+// derecha, «Cómo funciona» y «Estamos contigo».
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
-import {
-  Title,
-  Text,
-  TextInput,
-  PasswordInput,
-  Button,
-  Stack,
-  Group,
-  Loader,
-  Alert,
-  Anchor,
-  Box,
-  Image,
-  ThemeIcon,
-  ActionIcon,
-  Select,
-  SimpleGrid,
-} from "@mantine/core";
+import { Button, Loader, PasswordInput, Select, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../utils/zodResolver";
 import { suggestEmailFix } from "../../utils/emailTypo";
 import { z } from "zod";
-import {
-  IconAlertCircle,
-  IconCheck,
-  IconX,
-  IconRocket,
-  IconCalendar,
-  IconArrowRight,
-  IconArrowLeft,
-  IconUser,
-  IconBuildingStore,
-  IconLink,
-  IconBrandWhatsapp,
-  IconCopy,
-  IconStarFilled,
-} from "@tabler/icons-react";
+import { IconBrandWhatsapp, IconCheck, IconCopy, IconInfoCircle, IconLink, IconUserCheck, IconX } from "@tabler/icons-react";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import { type CountryCode } from "libphonenumber-js";
 import {
@@ -47,7 +22,7 @@ import {
   getAgentPublicInfo,
 } from "../../services/registrationService";
 import { getPostSignupRedirectUrl } from "../../utils/domainUtils";
-import { AGENDITAPP_SUPPORT_WA_URL, panelLoginUrl } from "../../utils/panelAccess";
+import { RECOVER_ACCESS_PATH, panelLoginUrl } from "../../utils/panelAccess";
 import { detectSignupCountry, resolveSignupRegion } from "../../utils/signupRegion";
 import { getCountryData } from "../../utils/geoData";
 import { loadMetaPixel, registrationMetaEvent, trackRegistroIniciado, trackRegistroCompletado, trackContactApp } from "../../utils/metaPixel";
@@ -94,96 +69,28 @@ const INITIAL_REGION = resolveSignupRegion(INITIAL_COUNTRY);
 type SignupFormValues = z.infer<typeof signupSchema>;
 
 const SUPPORT_WA_BASE = "https://wa.me/573506674686";
-const SUPPORT_AUTO_COLLAPSE_MS = 3000;
 
-// Inputs compactos sobre panel oscuro
-const INPUT_SM: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#334155",
-  borderColor: "rgba(255,255,255,0.18)",
-  borderRadius: 7,
-  fontSize: 13,
-  height: 34,
-};
-
-const inputStyles = {
-  input: INPUT_SM,
-  label: { marginBottom: 3, color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 },
-  description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 },
-} as const;
-
-const selectStyles = {
-  input: INPUT_SM,
-  label: { marginBottom: 3, color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 },
-  dropdown: {
-    background: "#16286b",
-    border: "1px solid rgba(255,255,255,0.14)",
-  },
-  option: { color: "rgba(255,255,255,0.88)", fontSize: 13 },
-} as const;
-
-function RLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <Group gap={3} wrap="nowrap">
-      <span style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 }}>
-        {children}
-      </span>
-      <span style={{ color: "#EF4444", fontWeight: 800, fontSize: 11 }}>*</span>
-    </Group>
-  );
-}
-
-function SecHeader({ label, icon }: { label: string; icon: React.ReactNode }) {
-  return (
-    <Group justify="space-between" align="center" mt={12} mb={2}>
-      <Text
-        size="xs"
-        fw={700}
-        tt="uppercase"
-        style={{ color: "rgba(255,255,255,0.50)", letterSpacing: 1, fontSize: 10 }}
-      >
-        {label}
-      </Text>
-      <ThemeIcon size={26} radius="lg" variant="light" color="blue">
-        {icon}
-      </ThemeIcon>
-    </Group>
-  );
-}
-
-function StepIndicator({ step }: { step: "personal" | "business" }) {
-  const steps: { key: "personal" | "business"; label: string }[] = [
-    { key: "personal", label: "Tus datos" },
-    { key: "business", label: "Tu negocio" },
-  ];
-  const activeIdx = steps.findIndex((s) => s.key === step);
-  return (
-    <Group gap={10} mb={20} wrap="nowrap">
-      {steps.map((s, idx) => {
-        const isActive = idx === activeIdx;
-        const isDone = idx < activeIdx;
-        return (
-          <Group key={s.key} gap={6} wrap="nowrap" align="center">
-            <ThemeIcon
-              size={22}
-              radius="xl"
-              variant={isActive || isDone ? "filled" : "light"}
-              color={isActive || isDone ? "blue" : "gray"}
-            >
-              {isDone ? <IconCheck size={12} /> : <Text size="xs" fw={800}>{idx + 1}</Text>}
-            </ThemeIcon>
-            <Text size="xs" fw={700} style={{ color: isActive ? "#FFFFFF" : "rgba(255,255,255,0.45)" }}>
-              {s.label}
-            </Text>
-            {idx < steps.length - 1 && (
-              <Box style={{ width: 20, height: 1, background: "rgba(255,255,255,0.2)" }} />
-            )}
-          </Group>
-        );
-      })}
-    </Group>
-  );
-}
+// Pantalla completa sobre el shell (la ruta /signup no carga negocio).
+const SIGNUP_STYLES = `
+  .su-root { position: fixed; inset: 0; z-index: 9999; overflow-y: auto; background: var(--surface-muted); color: var(--ink); }
+  .su-top { height: 60px; display: flex; align-items: center; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .su-main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 48px; display: grid; gap: 24px; align-items: start; }
+  @media (min-width: 62em) { .su-main { grid-template-columns: minmax(0, 520px) minmax(0, 1fr); padding-top: 48px; gap: 40px; } }
+  .su-card { padding: 24px; box-shadow: var(--shadow-sm); }
+  @media (min-width: 48em) { .su-card { padding: 32px; } }
+  .su-h1 { margin: 0; font: 600 24px/30px var(--font-sans); letter-spacing: -.015em; }
+  .su-aside { display: flex; flex-direction: column; gap: 16px; }
+  .su-how { display: none; }
+  @media (min-width: 62em) { .su-how { display: block; padding-top: 8px; } }
+  .su-steps { list-style: none; counter-reset: su; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+  .su-steps li { counter-increment: su; display: grid; grid-template-columns: 32px 1fr; column-gap: 12px; font-size: 14px; line-height: 20px; }
+  .su-steps li::before { content: counter(su); grid-row: span 2; width: 32px; height: 32px; border-radius: 999px; background: var(--surface-raised); border: 1px solid var(--line-strong); display: grid; place-items: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .su-steps b { font-size: 15px; }
+  .su-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-muted); font-size: 14px; }
+  .su-suffix { font-size: 13px; color: var(--ink-subtle); white-space: nowrap; padding-right: 10px; }
+  .su-textbtn { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--platform); cursor: pointer; }
+  .su-textbtn--muted { color: var(--ink-muted); font-weight: 500; }
+`;
 
 export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,8 +111,6 @@ export default function SignupPage() {
   const turnstileRef = useRef<TurnstileInstance>(null);
   const tokenResolverRef = useRef<((t: string) => void) | null>(null);
 
-  const [supportState, setSupportState] = useState<"expanded" | "collapsed" | "hidden">("expanded");
-  const supportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [agentName, setAgentName] = useState<string | null>(null);
 
   const supportWaUrl = useMemo(() => {
@@ -327,14 +232,6 @@ export default function SignupPage() {
   }, []);
 
   useEffect(() => {
-    if (supportTimer.current) clearTimeout(supportTimer.current);
-    if (supportState === "expanded") {
-      supportTimer.current = setTimeout(() => setSupportState("collapsed"), SUPPORT_AUTO_COLLAPSE_MS);
-    }
-    return () => { if (supportTimer.current) clearTimeout(supportTimer.current); };
-  }, [supportState]);
-
-  useEffect(() => {
     if (!successInfo) return;
     if (countdown === 0) { window.location.href = successInfo.redirectUrl; return; }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -359,7 +256,7 @@ export default function SignupPage() {
         }).catch(() => "");
       }
       if (!token) {
-        setError("Verificación de captcha fallida. Intenta de nuevo.");
+        setError("No pudimos verificar que eres una persona. Intenta de nuevo.");
         turnstileRef.current?.reset?.(); setTurnstileToken(""); setIsSubmitting(false); return;
       }
       // El backend envía el CompleteRegistration a Meta (CAPI) al crear la cuenta;
@@ -395,572 +292,349 @@ export default function SignupPage() {
         setIsSubmitting(false); turnstileRef.current?.reset?.(); setTurnstileToken("");
         return;
       }
-      setError(axiosErr.response?.data?.message || "Error al crear la cuenta. Intenta de nuevo.");
+      setError(axiosErr.response?.data?.message || "No pudimos crear la cuenta. Intenta de nuevo.");
       setIsSubmitting(false); turnstileRef.current?.reset?.(); setTurnstileToken("");
     }
   };
 
   const slugRightSection = () => {
-    if (slugStatus === "checking") return <Loader size="xs" color="white" />;
-    if (slugStatus === "available") return <IconCheck size={14} style={{ color: "#10B981" }} />;
-    if (slugStatus === "taken" || slugStatus === "invalid") return <IconX size={14} style={{ color: "#EF4444" }} />;
+    if (slugStatus === "checking") return <Loader size={14} />;
+    if (slugStatus === "available") return <IconCheck size={16} color="var(--success)" />;
+    if (slugStatus === "taken" || slugStatus === "invalid") return <IconX size={16} color="var(--danger)" />;
     return null;
   };
 
-  const slugHelpText = form.values.slug && slugStatus !== "invalid" ? `${form.values.slug}.agenditapp.com` : "";
+  const slugError =
+    form.errors.slug ||
+    (slugStatus === "taken" ? "Este nombre ya está en uso" : slugStatus === "invalid" ? "Solo letras minúsculas, sin números, guiones ni espacios." : null);
+
+  const copyLink = async () => {
+    if (!successInfo) return;
+    // Algunos navegadores integrados (WebView de Android) no exponen
+    // navigator.clipboard o lo rechazan.
+    try {
+      await navigator.clipboard.writeText(successInfo.displayUrl);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+    }
+    setTimeout(() => setCopied(null), 4000);
+  };
+
+  const stepIdx = step === "personal" ? 0 : 1;
+
+  const supportCard = (
+    <div className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+      <b style={{ fontSize: 15 }}>Estamos contigo</b>
+      <div className="ag-muted" style={{ fontSize: 14 }}>
+        ¿Dudas para registrarte? Escríbenos y te ayudamos a dejar tu agenda lista.
+      </div>
+      <Button
+        component="a"
+        href={supportWaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        variant="default"
+        leftSection={<IconBrandWhatsapp size={16} />}
+        onClick={() => trackContactApp()}
+        style={{ alignSelf: "flex-start" }}
+      >
+        Escribir por WhatsApp
+      </Button>
+    </div>
+  );
 
   return (
-    <>
-      <style>{`
-        .sp-grid {
-          display: flex;
-          height: 100%;
-        }
-        .sp-left {
-          width: 44%;
-          flex-shrink: 0;
-          overflow-y: auto;
-          padding: 36px 40px;
-          background: linear-gradient(155deg, #EEF4FF 0%, #DCE9FF 60%, #C3D4F8 100%);
-          display: flex;
-          flex-direction: column;
-        }
-        .sp-right {
-          flex: 1;
-          overflow-y: auto;
-          padding: 28px 36px 48px;
-          background: #192f6e;
-        }
-        .sp-features { display: flex; flex-direction: column; gap: 18px; flex: 1; }
-        @media (max-width: 900px) {
-          .sp-root  { overflow: hidden auto !important; }
-          .sp-grid  { flex-direction: column; height: auto; min-height: 100%; }
-          .sp-left  { width: 100%; height: auto; padding: 22px 18px; overflow-y: visible; }
-          .sp-right { height: auto; padding: 22px 18px 48px; overflow-y: visible; }
-          .sp-features { display: none; }
-        }
-      `}</style>
+    <div className="su-root">
+      <style>{SIGNUP_STYLES}</style>
 
-      <Box className="sp-root" style={{ position: "fixed", inset: 0, zIndex: 9999, overflow: "hidden" }}>
-        <div className="sp-grid">
+      <header className="su-top">
+        <img src="/images/logo-text.png" alt="AgenditApp" style={{ height: 28, width: "auto" }} />
+      </header>
 
-          {/* ── LEFT ── */}
-          <div className="sp-left">
-            <Image src="/images/logo-text.png" alt="AgenditApp" w={130} fit="contain" style={{ marginBottom: 28 }} />
+      <main className="su-main">
+        <section className="ag-card su-card">
+          {successInfo ? (
+            <div className="ag-stack" style={{ gap: 16, alignItems: "center", textAlign: "center" }}>
+              <span style={{ width: 56, height: 56, borderRadius: 999, display: "grid", placeItems: "center", background: "var(--success-soft)", color: "var(--success)" }}>
+                <IconCheck size={28} />
+              </span>
+              <div>
+                <h1 className="su-h1">Tu cuenta está lista</h1>
+                <div className="ag-muted" style={{ fontSize: 14, marginTop: 6 }}>
+                  Este es el enlace de tu panel. Para volver a entrar, ábrelo e inicia sesión con <b style={{ color: "var(--ink)" }}>{successInfo.email}</b> y la
+                  contraseña que creaste. También te lo enviamos a tu correo y a tu WhatsApp.
+                </div>
+              </div>
 
-            <Title
-              order={1}
-              style={{ color: "#0F172A", letterSpacing: -0.5, lineHeight: 1.15, marginBottom: 24, fontSize: "clamp(1.6rem, 2.6vw, 2.2rem)" }}
-            >
-              Crea tu panel con tu{" "}
-              <span style={{ color: "#1D4ED8", fontWeight: 900 }}>enlace propio</span>{" "}
-              en minutos.
-            </Title>
+              <div style={{ width: "100%", textAlign: "left" }}>
+                <div className="ag-subtle" style={{ marginBottom: 6 }}>Tu enlace de acceso</div>
+                <div className="su-link">
+                  <IconLink size={16} style={{ flex: "none", color: "var(--ink-muted)" }} />
+                  <span style={{ flex: 1, minWidth: 0, wordBreak: "break-all", userSelect: "text", fontWeight: 600 }}>{successInfo.displayUrl}</span>
+                  <Button size="xs" variant="default" leftSection={copied === "ok" ? <IconCheck size={14} /> : <IconCopy size={14} />} onClick={copyLink}>
+                    {copied === "ok" ? "Copiado" : "Copiar"}
+                  </Button>
+                </div>
+                {copied === "ok" && <div style={{ fontSize: 13, color: "var(--success)", marginTop: 6 }}>¡Enlace copiado!</div>}
+                {copied === "failed" && <div style={{ fontSize: 13, color: "var(--warning)", marginTop: 6 }}>No se pudo copiar aquí. Mantén presionado el enlace para copiarlo.</div>}
+              </div>
 
-            {/* Features — ocultas en mobile */}
-            <div className="sp-features">
-              {[
-                {
-                  icon: <IconRocket size={18} />,
-                  color: "blue" as const,
-                  label: "Cómo funciona",
-                  items: [
-                    "Creas tu organización y eliges tu URL.",
-                    "Te redirigimos automáticamente al panel de tu negocio.",
-                    "Empiezas a gestionar y agendar clientes desde tu panel.",
-                  ],
-                },
-                {
-                  icon: <IconBrandWhatsapp size={18} />,
-                  color: "green" as const,
-                  label: "Mensajes y recordatorios",
-                  text: "Envía mensajes y recordatorios a tus clientes desde tu WhatsApp Business.",
-                },
-                {
-                  icon: <IconCalendar size={18} />,
-                  color: "blue" as const,
-                  label: "Listo para operar",
-                  text: "Al finalizar, tu panel queda activo en tu URL para configurar servicios, horarios y reservas.",
-                },
-              ].map(({ icon, color, label, items, text }) => (
-                <Group key={label} align="flex-start" gap={12} wrap="nowrap">
-                  <ThemeIcon radius="xl" size={38} variant="light" color={color} style={{ flexShrink: 0, marginTop: 1 }}>
-                    {icon}
-                  </ThemeIcon>
-                  <Box>
-                    <Text size="xs" fw={700} tt="uppercase" style={{ color: "#64748B", letterSpacing: 0.7, marginBottom: 4 }}>
-                      {label}
-                    </Text>
-                    {items ? (
-                      <Stack gap={3}>
-                        {items.map((item) => (
-                          <Group key={item} gap={7} wrap="nowrap" align="flex-start">
-                            <IconArrowRight size={11} style={{ color: "#1D4ED8", flexShrink: 0, marginTop: 4 }} />
-                            <Text size="sm" c="#334155" lh={1.5}>{item}</Text>
-                          </Group>
-                        ))}
-                      </Stack>
-                    ) : (
-                      <Text size="sm" c="#334155" lh={1.5}>{text}</Text>
-                    )}
-                  </Box>
-                </Group>
-              ))}
+              <Button fullWidth size="md" color="var(--platform)" onClick={() => (window.location.href = successInfo.redirectUrl)}>
+                Ingresar a mi panel
+              </Button>
+              <div className="ag-subtle">Te llevamos a tu panel en {countdown} s.</div>
             </div>
+          ) : (
+            <form onSubmit={form.onSubmit(handleSubmit)} className="ag-stack" style={{ gap: 16 }} noValidate>
+              <div>
+                <div className="ag-row" style={{ justifyContent: "space-between", fontSize: 13 }}>
+                  <b>{stepIdx === 0 ? "Tus datos" : "Tu negocio"}</b>
+                  <span className="ag-subtle">Paso {stepIdx + 1} de 2</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 999, background: "var(--surface-hover)", marginTop: 6, overflow: "hidden" }}>
+                  <div style={{ width: `${(stepIdx + 1) * 50}%`, height: "100%", background: "var(--platform)", transition: "width 160ms ease" }} />
+                </div>
+              </div>
 
-            {/* CTA */}
-            <Box style={{ marginTop: 28 }}>
-              <Text fw={600} style={{ color: "#0F172A", fontSize: "clamp(0.95rem, 1.6vw, 1.1rem)", lineHeight: 1.4, marginBottom: 4 }}>
-                Al finalizar,{" "}
-                <span style={{ color: "#1D4ED8", fontWeight: 800 }}>podrás entrar desde el enlace de tu negocio</span>
-              </Text>
-              <Text size="sm" c="#64748B" mb={16}>Si necesitas ayuda, contáctanos.</Text>
+              <div>
+                <h1 className="su-h1">{stepIdx === 0 ? "Crea tu cuenta" : "Cuéntanos de tu negocio"}</h1>
+                <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+                  {stepIdx === 0 ? "Empieza gratis. Tu agenda queda lista en minutos." : "Con esto armamos tu panel y su dirección."}
+                </div>
+              </div>
 
-              <Anchor href={supportWaUrl} target="_blank" onClick={() => trackContactApp()} style={{ textDecoration: "none" }}>
-                <Group
-                  gap={10}
-                  style={{
-                    display: "inline-flex",
-                    background: "#0F172A",
-                    borderRadius: 40,
-                    padding: "7px 20px 7px 7px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Box
-                    style={{
-                      width: 34, height: 34, borderRadius: "50%",
-                      background: "#25D366",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >
-                    <IconBrandWhatsapp size={18} color="#FFFFFF" />
-                  </Box>
-                  <Text size="xs" fw={900} tt="uppercase" style={{ color: "#FFFFFF", letterSpacing: 1 }}>
-                    Estamos contigo
-                  </Text>
-                </Group>
-              </Anchor>
-            </Box>
-          </div>
+              {agentName && (
+                <div className="ag-alert ag-alert--success">
+                  <IconUserCheck size={20} />
+                  <div>
+                    <b>Invitado por {agentName}</b>
+                    <div style={{ fontSize: 13 }}>Gracias por confiar en AgenditApp. Tu período de prueba está listo para comenzar.</div>
+                  </div>
+                </div>
+              )}
 
-          {/* ── RIGHT ── */}
-          <div className="sp-right">
-            {successInfo ? (
-              <Stack align="center" justify="center" style={{ minHeight: "100%", textAlign: "center" }} gap={24} py={40}>
-                <ThemeIcon size={72} radius="xl" variant="light" color="green">
-                  <IconCheck size={40} />
-                </ThemeIcon>
+              {emailTaken && (
+                <div className="ag-alert ag-alert--warning">
+                  <IconInfoCircle size={20} />
+                  <div>
+                    <b>Ya tienes una cuenta con este correo</b>
+                    <div style={{ fontSize: 13 }}>
+                      No necesitas registrarte de nuevo. Entra con el enlace del correo o del WhatsApp de bienvenida.{" "}
+                      <Link to={RECOVER_ACCESS_PATH} className="ag-link">
+                        Recuperar acceso
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                <Box>
-                  <Title order={3} style={{ color: "#FFFFFF", marginBottom: 8 }}>¡Tu cuenta fue creada!</Title>
-                  <Text size="sm" style={{ color: "rgba(255,255,255,0.55)", maxWidth: 380, margin: "0 auto", lineHeight: 1.6 }}>
-                    Este es el <strong style={{ color: "rgba(255,255,255,0.85)" }}>enlace de tu panel</strong>. Para volver a entrar,
-                    ábrelo e inicia sesión con <strong style={{ color: "rgba(255,255,255,0.85)" }}>{successInfo.email}</strong> y
-                    la contraseña que acabas de crear. También te lo enviamos a tu correo y a tu WhatsApp.
-                  </Text>
-                </Box>
-
-                <Box
-                  style={{
-                    background: "rgba(255,255,255,0.07)",
-                    border: "1px solid rgba(96,165,250,0.35)",
-                    borderRadius: 12,
-                    padding: "14px 18px",
-                    width: "100%",
-                    maxWidth: 420,
-                  }}
-                >
-                  <Text size="xs" fw={700} tt="uppercase" style={{ color: "rgba(255,255,255,0.4)", letterSpacing: 0.9, marginBottom: 10 }}>
-                    Tu enlace de acceso
-                  </Text>
-                  <Group justify="space-between" align="center" wrap="nowrap" gap={8}>
-                    <Group gap={8} align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                      <IconLink size={15} style={{ color: "#60A5FA", flexShrink: 0 }} />
-                      <Text
-                        fw={700}
-                        style={{
-                          color: "#93C5FD",
-                          fontSize: 14,
-                          wordBreak: "break-all",
-                          textAlign: "left",
-                          userSelect: "text",
-                        }}
-                      >
-                        {successInfo.displayUrl}
-                      </Text>
-                    </Group>
-                    <ActionIcon
-                      variant={copied === "ok" ? "filled" : "subtle"}
-                      color={copied === "ok" ? "green" : "blue"}
-                      size={36}
-                      radius="md"
-                      onClick={async () => {
-                        // Algunos navegadores integrados (WebView de Android) no
-                        // exponen navigator.clipboard o lo rechazan.
-                        try {
-                          await navigator.clipboard.writeText(successInfo.displayUrl);
-                          setCopied("ok");
-                        } catch {
-                          setCopied("failed");
-                        }
-                        setTimeout(() => setCopied(null), 4000);
+              {step === "personal" ? (
+                <>
+                  <TextInput label="Tu nombre" placeholder="Juan Pérez" required autoComplete="name" {...form.getInputProps("ownerName")} />
+                  <div>
+                    <TextInput
+                      label="Correo electrónico"
+                      placeholder="tu@correo.com"
+                      type="email"
+                      required
+                      autoComplete="email"
+                      {...form.getInputProps("email")}
+                      onChange={(e) => {
+                        form.getInputProps("email").onChange(e);
+                        setEmailTypoWarn(false);
                       }}
-                      title="Copiar enlace"
-                    >
-                      {copied === "ok" ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                    </ActionIcon>
-                  </Group>
-                  {copied === "ok" && (
-                    <Text size="xs" style={{ color: "#4ADE80", marginTop: 6, textAlign: "left" }}>
-                      ¡Enlace copiado!
-                    </Text>
-                  )}
-                  {copied === "failed" && (
-                    <Text size="xs" style={{ color: "#FCD34D", marginTop: 6, textAlign: "left" }}>
-                      No se pudo copiar aquí. Mantén presionado el enlace para copiarlo.
-                    </Text>
-                  )}
-                </Box>
-
-                <Button
-                  size="md"
-                  onClick={() => { window.location.href = successInfo.redirectUrl; }}
-                  rightSection={<IconArrowRight size={16} />}
-                  style={{ maxWidth: 420, width: "100%" }}
-                  styles={{
-                    root: {
-                      backgroundColor: "#FFFFFF",
-                      color: "#1D4ED8",
-                      fontWeight: 900,
-                      borderRadius: 10,
-                      letterSpacing: 0.3,
-                    },
-                  }}
-                >
-                  Ingresar a mi panel
-                </Button>
-
-                <Text size="xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-                  Redirigiendo automáticamente en {countdown}s…
-                </Text>
-              </Stack>
-            ) : (
-              <>
-            {/* Indicador de paso */}
-            <StepIndicator step={step} />
-
-            {/* Form */}
-            <form onSubmit={form.onSubmit(handleSubmit)}>
-              <Stack
-                gap={8}
-                style={{ "--mantine-color-placeholder": "rgba(100,116,139,0.9)" } as React.CSSProperties}
-              >
-                {error && (
-                  <Alert icon={<IconAlertCircle size={14} />} title="Error" color="red" withCloseButton onClose={() => setError(null)} styles={{ root: { padding: "8px 12px" } }}>
-                    {error}
-                  </Alert>
-                )}
-
-                {emailTaken && (
-                  <Alert icon={<IconAlertCircle size={14} />} title="Ya tienes una cuenta con este correo" color="yellow" withCloseButton onClose={() => setEmailTaken(false)} styles={{ root: { padding: "8px 12px" } }}>
-                    No necesitas registrarte de nuevo. Entra a tu panel desde el enlace del correo o el WhatsApp
-                    de bienvenida de AgenditApp, con este correo y tu contraseña. Si no lo encuentras,{" "}
-                    <Anchor href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fw={700}>
-                      escríbenos por WhatsApp
-                    </Anchor>{" "}
-                    y te ayudamos a entrar.
-                  </Alert>
-                )}
-
-                {/* Banner de referido — solo si hay agente, visible en ambos pasos */}
-                {agentName && (
-                  <Box
-                    style={{
-                      background: "linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(5,150,105,0.10) 100%)",
-                      border: "1px solid rgba(16,185,129,0.35)",
-                      borderRadius: 10,
-                      padding: "10px 14px",
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 10,
-                    }}
-                  >
-                    <IconStarFilled size={18} style={{ color: "#10B981", flexShrink: 0, marginTop: 2 }} />
-                    <Box>
-                      <Text size="xs" fw={700} style={{ color: "#10B981", lineHeight: 1.3 }}>
-                        Invitado por {agentName}
-                      </Text>
-                      <Text size="xs" style={{ color: "rgba(255,255,255,0.55)", lineHeight: 1.4, marginTop: 2 }}>
-                        Gracias por confiar en AgenditApp. Tu período de prueba está listo para comenzar.
-                      </Text>
-                    </Box>
-                  </Box>
-                )}
-
-                {step === "personal" ? (
-                  <>
-                    {/* ── Tus datos ── */}
-                    <SecHeader label="Tus datos" icon={<IconUser size={13} />} />
-
-                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
-                      <TextInput
-                        label={<RLabel>Tu nombre</RLabel>}
-                        placeholder="Juan Pérez"
-                        leftSection={<IconUser size={13} style={{ color: "#64748B" }} />}
-                        {...form.getInputProps("ownerName")}
-                        styles={inputStyles}
-                      />
-                      <Box>
-                        <TextInput
-                          label={<RLabel>Email</RLabel>}
-                          placeholder="tu@email.com"
-                          {...form.getInputProps("email")}
-                          onChange={(e) => { form.getInputProps("email").onChange(e); setEmailTypoWarn(false); }}
-                          styles={inputStyles}
-                        />
-                        {emailSuggestion && emailTypoAck !== form.values.email && (
-                          <Box
-                            mt={4}
-                            p={emailTypoWarn ? 8 : 0}
-                            style={emailTypoWarn ? { background: "rgba(250,204,21,0.12)", border: "1px solid rgba(250,204,21,0.5)", borderRadius: 8 } : undefined}
-                          >
-                            <Text size="xs" c={emailTypoWarn ? "yellow.3" : "rgba(255,255,255,0.75)"}>
-                              ¿Quisiste decir <strong>{emailSuggestion}</strong>?
-                            </Text>
-                            <Group gap={10} mt={2}>
-                              <Anchor
-                                component="button"
-                                type="button"
-                                size="xs"
-                                c="blue.3"
-                                fw={600}
-                                onClick={() => { form.setFieldValue("email", emailSuggestion); setEmailTypoWarn(false); }}
-                              >
-                                Sí, corregir
-                              </Anchor>
-                              <Anchor
-                                component="button"
-                                type="button"
-                                size="xs"
-                                c="rgba(255,255,255,0.6)"
-                                onClick={() => { setEmailTypoAck(form.values.email); setEmailTypoWarn(false); }}
-                              >
-                                No, está bien escrito
-                              </Anchor>
-                            </Group>
-                          </Box>
-                        )}
-                      </Box>
-                      <Box>
-                        <RLabel>Teléfono</RLabel>
-                        <Box mt={3}>
-                          <InternationalPhoneInput
-                            label=""
-                            compact
-                            placeholder="300 000 0000"
-                            value={form.values.phone}
-                            defaultCountry={INITIAL_COUNTRY as CountryCode}
-                            onChange={(e164, phoneCountry) => {
-                              form.setFieldValue("phone", e164 || "");
-                              // El país del teléfono define la configuración regional del negocio
-                              if (phoneCountry && phoneCountry !== form.values.default_country) {
-                                const region = resolveSignupRegion(phoneCountry);
-                                form.setFieldValue("default_country", region.default_country);
-                                form.setFieldValue("timezone", region.timezone);
-                                form.setFieldValue("currency", region.currency);
-                              }
-                            }}
-                            error={form.errors.phone as string | undefined}
-                          />
-                        </Box>
-                        {form.values.phone && form.values.default_country && (
-                          <Text mt={2} style={{ color: "rgba(255,255,255,0.5)", fontSize: 10 }}>
-                            {getCountryData(form.values.default_country)?.label ?? form.values.default_country}
-                            {" · "}{form.values.currency}{" · "}{form.values.timezone?.replace(/_/g, " ")}
-                            {" — puedes cambiarlo después"}
-                          </Text>
-                        )}
-                      </Box>
-                      <PasswordInput
-                        label={<RLabel>Contraseña</RLabel>}
-                        placeholder="Mínimo 6 caracteres"
-                        {...form.getInputProps("password")}
-                        styles={inputStyles}
-                      />
-                    </SimpleGrid>
-
-                    <Button
-                      type="button"
-                      fullWidth
-                      mt={6}
-                      onClick={goToBusinessStep}
-                      rightSection={<IconArrowRight size={16} />}
-                      styles={{
-                        root: {
-                          height: 40,
-                          fontWeight: 900,
-                          letterSpacing: 0.4,
-                          backgroundColor: "#FFFFFF",
-                          color: "#1D4ED8",
-                          borderRadius: 9,
-                        },
-                      }}
-                    >
-                      Continuar
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    {/* ── Datos del negocio ── */}
-                    <SecHeader label="Datos del negocio" icon={<IconBuildingStore size={13} />} />
-
-                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing={8}>
-                      <TextInput
-                        label={<RLabel>Nombre del negocio</RLabel>}
-                        placeholder="Mi Salón de Belleza"
-                        value={form.values.businessName}
-                        onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
-                        error={form.errors.businessName}
-                        styles={inputStyles}
-                      />
-
-                      <Box>
-                        <TextInput
-                          label={<RLabel>Enlace de tu panel</RLabel>}
-                          description="No es una página web pública: es la dirección para entrar a tu panel"
-                          placeholder="misalon"
-                          value={form.values.slug}
-                          onChange={(e) => handleSlugChange(e.currentTarget.value)}
-                          error={
-                            form.errors.slug ||
-                            (slugStatus === "taken" && "Este nombre ya está en uso") ||
-                            (slugStatus === "invalid" && "Solo letras minúsculas, sin números ni guiones")
-                          }
-                          rightSection={slugRightSection()}
-                          styles={inputStyles}
-                        />
-                        {slugHelpText && (
-                          <Box
-                            mt={4} px={8} py={5}
-                            style={{
-                              background: slugStatus === "available" ? "rgba(16,185,129,0.10)" : "rgba(255,255,255,0.05)",
-                              border: slugStatus === "available" ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(255,255,255,0.10)",
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Group gap={6} align="center">
-                              {slugStatus === "available" && <IconCheck size={12} style={{ color: "#10B981", flexShrink: 0 }} />}
-                              <Text size="xs" fw={700} style={{ color: "rgba(255,255,255,0.85)", fontSize: 11 }}>{slugHelpText}</Text>
-                            </Group>
-                          </Box>
-                        )}
-                        {slugSuggestions.length > 0 && (
-                          <Group gap={6} mt={4} wrap="wrap">
-                            <Text style={{ color: "rgba(255,255,255,0.45)", fontSize: 11 }}>Sugerencias:</Text>
-                            {slugSuggestions.map((s) => (
-                              <Anchor key={s} style={{ color: "#93C5FD", fontWeight: 700, fontSize: 11 }} onClick={() => { form.setFieldValue("slug", s); checkSlug(s); }}>
-                                {s}
-                              </Anchor>
-                            ))}
-                          </Group>
-                        )}
-                      </Box>
-
-                      <Select
-                        label="Tipo de negocio"
-                        placeholder="Elige tu rubro"
-                        leftSection={<IconBuildingStore size={13} style={{ color: "#64748B" }} />}
-                        value={form.values.businessVertical ?? null}
-                        onChange={(v) => form.setFieldValue("businessVertical", v ?? "")}
-                        data={BUSINESS_VERTICALS}
-                        comboboxProps={{ zIndex: 10001 }}
-                        styles={{ ...selectStyles, description: { color: "rgba(255,255,255,0.5)", fontSize: 10, marginTop: 2 } }}
-                        description="Pre-cargamos servicios de ejemplo de tu rubro para que arranques más rápido"
-                      />
-                    </SimpleGrid>
-
-                    <Box mt={4}>
-                      <Turnstile
-                        ref={turnstileRef}
-                        siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                        options={{ size: "invisible" }}
-                        onSuccess={(token) => { setTurnstileToken(token); tokenResolverRef.current?.(token); tokenResolverRef.current = null; }}
-                        onExpire={() => setTurnstileToken("")}
-                        onError={() => setTurnstileToken("")}
-                      />
-                    </Box>
-
-                    <Group gap={8} mt={6} wrap="nowrap">
-                      <Button
-                        type="button"
-                        variant="subtle"
-                        onClick={() => setStep("personal")}
-                        leftSection={<IconArrowLeft size={14} />}
-                        styles={{ root: { color: "rgba(255,255,255,0.75)" } }}
-                      >
-                        Atrás
-                      </Button>
-                      <Box style={{ flex: 1 }}>
-                        <Button
-                          type="submit"
-                          fullWidth
-                          loading={isSubmitting}
-                          disabled={slugStatus === "taken" || slugStatus === "invalid"}
-                          styles={{
-                            root: {
-                              height: 40,
-                              fontWeight: 900,
-                              letterSpacing: 0.4,
-                              backgroundColor: "#FFFFFF",
-                              color: "#1D4ED8",
-                              borderRadius: 9,
-                            },
+                    />
+                    {emailSuggestion && emailTypoAck !== form.values.email && (
+                      <div className={emailTypoWarn ? "ag-alert ag-alert--warning" : undefined} style={{ marginTop: 6, fontSize: 13, padding: emailTypoWarn ? "8px 12px" : 0, display: "block" }}>
+                        ¿Quisiste decir <b>{emailSuggestion}</b>?{" "}
+                        <button
+                          type="button"
+                          className="su-textbtn"
+                          onClick={() => {
+                            form.setFieldValue("email", emailSuggestion);
+                            setEmailTypoWarn(false);
                           }}
                         >
-                          Crear cuenta
-                        </Button>
-                      </Box>
-                    </Group>
+                          Sí, corregir
+                        </button>
+                        {" · "}
+                        <button
+                          type="button"
+                          className="su-textbtn su-textbtn--muted"
+                          onClick={() => {
+                            setEmailTypoAck(form.values.email);
+                            setEmailTypoWarn(false);
+                          }}
+                        >
+                          No, está bien
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <InternationalPhoneInput
+                      label="WhatsApp"
+                      required
+                      compact
+                      placeholder="300 000 0000"
+                      value={form.values.phone}
+                      defaultCountry={INITIAL_COUNTRY as CountryCode}
+                      onChange={(e164, phoneCountry) => {
+                        form.setFieldValue("phone", e164 || "");
+                        // El país del teléfono define la configuración regional del negocio
+                        if (phoneCountry && phoneCountry !== form.values.default_country) {
+                          const region = resolveSignupRegion(phoneCountry);
+                          form.setFieldValue("default_country", region.default_country);
+                          form.setFieldValue("timezone", region.timezone);
+                          form.setFieldValue("currency", region.currency);
+                        }
+                      }}
+                      error={form.errors.phone as string | undefined}
+                    />
+                    {form.values.phone && form.values.default_country && (
+                      <div className="ag-subtle" style={{ marginTop: 4 }}>
+                        {getCountryData(form.values.default_country)?.label ?? form.values.default_country} · {form.values.currency} ·{" "}
+                        {form.values.timezone?.replace(/_/g, " ")}. Puedes cambiarlo después.
+                      </div>
+                    )}
+                  </div>
+                  <PasswordInput label="Contraseña" placeholder="Mínimo 6 caracteres" required autoComplete="new-password" {...form.getInputProps("password")} />
 
-                    <Text size="xs" ta="center" style={{ color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-                      Al finalizar podrás entrar desde el enlace de tu negocio.
-                    </Text>
-                  </>
-                )}
-              </Stack>
+                  <Button type="button" fullWidth size="md" color="var(--platform)" onClick={goToBusinessStep}>
+                    Continuar
+                  </Button>
+                  <div className="ag-subtle" style={{ textAlign: "center" }}>
+                    ¿Ya tienes cuenta?{" "}
+                    <Link to={RECOVER_ACCESS_PATH} className="ag-link">
+                      Entrar a mi panel
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    label="Nombre del negocio"
+                    placeholder="Mi salón de belleza"
+                    required
+                    value={form.values.businessName}
+                    onChange={(e) => handleBusinessNameChange(e.currentTarget.value)}
+                    error={form.errors.businessName}
+                  />
+                  <Select
+                    label="Tipo de negocio"
+                    placeholder="Elige tu rubro"
+                    description="Cargamos servicios de ejemplo de tu rubro para que arranques más rápido."
+                    value={form.values.businessVertical || null}
+                    onChange={(v) => form.setFieldValue("businessVertical", v ?? "")}
+                    data={BUSINESS_VERTICALS}
+                    comboboxProps={{ zIndex: 10001 }}
+                  />
+                  <div>
+                    <TextInput
+                      label="Dirección de tu panel"
+                      description="Es la dirección para entrar a tu panel, no tu página pública."
+                      placeholder="misalon"
+                      required
+                      value={form.values.slug}
+                      onChange={(e) => handleSlugChange(e.currentTarget.value)}
+                      error={slugError}
+                      rightSection={<span className="su-suffix">.agenditapp.com</span>}
+                      rightSectionWidth={128}
+                    />
+                    {form.values.slug && slugStatus !== "invalid" && slugStatus !== "taken" && (
+                      <div className="ag-row" style={{ gap: 6, marginTop: 6, fontSize: 13 }}>
+                        {slugRightSection()}
+                        <span className="ag-num" style={{ fontWeight: 600 }}>{form.values.slug}.agenditapp.com</span>
+                        {slugStatus === "available" && <span style={{ color: "var(--success)" }}>Disponible</span>}
+                        {slugStatus === "checking" && <span className="ag-subtle">Revisando…</span>}
+                      </div>
+                    )}
+                    {slugSuggestions.length > 0 && (
+                      <div className="ag-row" style={{ gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                        <span className="ag-subtle">Disponibles:</span>
+                        {slugSuggestions.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className="ag-chip"
+                            style={{ cursor: "pointer", height: 28 }}
+                            onClick={() => {
+                              form.setFieldValue("slug", s);
+                              checkSlug(s);
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+                    options={{ size: "invisible" }}
+                    onSuccess={(token) => {
+                      setTurnstileToken(token);
+                      tokenResolverRef.current?.(token);
+                      tokenResolverRef.current = null;
+                    }}
+                    onExpire={() => setTurnstileToken("")}
+                    onError={() => setTurnstileToken("")}
+                  />
+
+                  {error && (
+                    <div className="ag-alert ag-alert--danger">
+                      <IconInfoCircle size={20} />
+                      <div>{error}</div>
+                    </div>
+                  )}
+
+                  <div className="ag-row" style={{ gap: 8, flexWrap: "nowrap" }}>
+                    <Button type="button" variant="subtle" color="gray" onClick={() => setStep("personal")} disabled={isSubmitting}>
+                      Atrás
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="md"
+                      color="var(--platform)"
+                      style={{ flex: 1 }}
+                      loading={isSubmitting}
+                      disabled={slugStatus === "taken" || slugStatus === "invalid"}
+                    >
+                      Crear cuenta
+                    </Button>
+                  </div>
+                </>
+              )}
             </form>
-            </>
-            )}
-          </div>
-        </div>
+          )}
+        </section>
 
-        {/* Botón flotante WA — solo visible en mobile (panels apilados) */}
-        {supportState !== "hidden" && (
-          <Box style={{ position: "fixed", right: 14, bottom: 14, zIndex: 10 }}>
-            {supportState === "collapsed" ? (
-              <Group gap={6}>
-                <ActionIcon
-                  radius="xl" size={44} variant="filled" color="green"
-                  component="a" href={supportWaUrl} target="_blank"
-                  onClick={() => trackContactApp()}
-                  aria-label="Soporte WhatsApp"
-                >
-                  <IconBrandWhatsapp size={22} />
-                </ActionIcon>
-                <ActionIcon
-                  radius="xl" size={28} variant="subtle" color="gray"
-                  style={{ background: "rgba(255,255,255,0.9)" }}
-                  onClick={() => setSupportState("hidden")}
-                >
-                  <IconX size={14} />
-                </ActionIcon>
-              </Group>
-            ) : null}
-          </Box>
-        )}
-      </Box>
-    </>
+        {/* Escritorio: cómo funciona + soporte. En móvil solo el soporte, debajo. */}
+        <aside className="su-aside">
+          <div className="su-how">
+            <h2 className="ag-h" style={{ margin: "0 0 12px" }}>Cómo funciona</h2>
+            <ol className="su-steps">
+              <li>
+                <b>Creas tu cuenta</b>
+                <span className="ag-muted">Tus datos, tu negocio y la dirección de tu panel.</span>
+              </li>
+              <li>
+                <b>Entras a tu panel</b>
+                <span className="ag-muted">Te llevamos directo, con servicios de ejemplo de tu rubro.</span>
+              </li>
+              <li>
+                <b>Empiezas a agendar</b>
+                <span className="ag-muted">Configura horarios, conecta tu WhatsApp y comparte tu enlace de reservas.</span>
+              </li>
+            </ol>
+          </div>
+          {supportCard}
+        </aside>
+      </main>
+    </div>
   );
 }
 

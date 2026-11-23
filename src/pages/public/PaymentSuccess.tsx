@@ -1,31 +1,17 @@
+// Retorno del pago de la membresía (rediseño, RegistroPlataforma): «Verificando
+// tu pago» mientras llega el webhook (polling), «Tu plan está activo» o, si
+// tarda, opciones para verificar de nuevo o escribir a soporte.
 import { useEffect, useRef, useState } from "react";
-import {
-  Stack,
-  Title,
-  Text,
-  Button,
-  ThemeIcon,
-  Loader,
-  Alert,
-  Group,
-  RingProgress,
-  Badge,
-} from "@mantine/core";
-import {
-  IconCircleCheck,
-  IconClock,
-  IconAlertTriangle,
-  IconRefresh,
-} from "@tabler/icons-react";
-import { BsWhatsapp } from "react-icons/bs";
+import { Button, Loader } from "@mantine/core";
+import { IconBrandWhatsapp, IconCheck, IconClock } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { getCurrentMembership } from "../../services/membershipService";
 
 // Configuración del polling
-const POLL_INTERVAL_MS = 4000;   // cada 4 segundos
-const MAX_ATTEMPTS = 15;          // 60 segundos máximo
+const POLL_INTERVAL_MS = 4000; // cada 4 segundos
+const MAX_ATTEMPTS = 15; // 60 segundos máximo
 
 type PageStatus = "waiting" | "activated" | "timeout";
 
@@ -48,32 +34,26 @@ export default function PaymentSuccess() {
     }
   };
 
+  const countAttempt = () =>
+    setAttempts((prev) => {
+      const next = prev + 1;
+      if (next >= MAX_ATTEMPTS) {
+        stopPolling();
+        setPageStatus("timeout");
+      }
+      return next;
+    });
+
   const checkActivation = async () => {
     if (!organizationId) return;
-
     try {
       const membership = await getCurrentMembership(organizationId);
-
-      if (!membership) {
-        setAttempts((prev) => {
-          const next = prev + 1;
-          if (next >= MAX_ATTEMPTS) { stopPolling(); setPageStatus("timeout"); }
-          return next;
-        });
-        return;
-      }
-
-      if (membership.status === "active") {
+      if (membership?.status === "active") {
         stopPolling();
         setPageStatus("activated");
         return;
       }
-
-      setAttempts((prev) => {
-        const next = prev + 1;
-        if (next >= MAX_ATTEMPTS) { stopPolling(); setPageStatus("timeout"); }
-        return next;
-      });
+      countAttempt();
     } catch {
       // Ignorar errores de red en polling, seguir intentando
     }
@@ -84,21 +64,15 @@ export default function PaymentSuccess() {
     // a) Usuario no autenticado → timeout inmediato
     // b) Autenticado pero organizationId aún no hidratado (useAuthInitializer async) → esperar
     if (!organizationId) {
-      if (!isAuthenticated) {
-        setPageStatus("timeout");
-      }
+      if (!isAuthenticated) setPageStatus("timeout");
       return;
     }
-
-    // organizationId disponible: arrancar polling desde cero
     setPageStatus("waiting");
     setAttempts(0);
-
     checkActivation();
     intervalRef.current = setInterval(checkActivation, POLL_INTERVAL_MS);
-
     return () => stopPolling();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, isAuthenticated]);
 
   const handleManualCheck = () => {
@@ -109,136 +83,72 @@ export default function PaymentSuccess() {
     intervalRef.current = setInterval(checkActivation, POLL_INTERVAL_MS);
   };
 
-  const handleWhatsApp = () => {
-    const msg = encodeURIComponent(
-      "Hola! Acabo de realizar un pago en AgenditApp pero mi plan aún no se activó. ¿Pueden verificarlo?"
-    );
-    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${msg}`, "_blank");
-  };
+  const supportUrl = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(
+    "Hola, acabo de pagar mi plan de AgenditApp pero aún no se activa. ¿Pueden verificarlo?"
+  )}`;
 
-  const progressValue = Math.min(100, (attempts / MAX_ATTEMPTS) * 100);
+  const progress = Math.min(100, ((attempts + 1) / MAX_ATTEMPTS) * 100);
 
-  // ── ESTADO: esperando webhook ─────────────────────────────────────────────
-  if (pageStatus === "waiting") {
-    return (
-      <Stack align="center" justify="center" mt={80} gap="xl" maw={480} mx="auto">
-        <RingProgress
-          size={120}
-          thickness={8}
-          roundCaps
-          sections={[{ value: progressValue, color: "blue" }]}
-          label={
-            <Stack align="center" gap={0}>
-              <Loader size="sm" color="blue" />
-            </Stack>
-          }
-        />
+  const icon = (tone: "success" | "warning" | "info", node: React.ReactNode) => (
+    <span style={{ width: 56, height: 56, borderRadius: 999, display: "grid", placeItems: "center", background: `var(--${tone}-soft)`, color: `var(--${tone})` }}>
+      {node}
+    </span>
+  );
 
-        <Stack align="center" gap="xs">
-          <Title order={2} ta="center">
-            Verificando tu pago...
-          </Title>
-          <Text c="dimmed" ta="center" size="sm">
-            Estamos confirmando la activación de tu plan con el procesador de
-            pagos. Esto suele tardar menos de 30 segundos.
-          </Text>
-          <Badge color="blue" variant="light" leftSection={<IconClock size={12} />}>
-            Intento {attempts + 1} de {MAX_ATTEMPTS}
-          </Badge>
-        </Stack>
-
-        <Alert color="gray" variant="light" style={{ width: "100%" }}>
-          <Text size="xs" c="dimmed" ta="center">
-            No cierres esta página. Serás redirigido automáticamente cuando
-            tu membresía esté activa.
-          </Text>
-        </Alert>
-      </Stack>
-    );
-  }
-
-  // ── ESTADO: plan activado ─────────────────────────────────────────────────
-  if (pageStatus === "activated") {
-    return (
-      <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
-        <ThemeIcon size={80} radius="xl" color="teal" variant="light">
-          <IconCircleCheck size={52} />
-        </ThemeIcon>
-
-        <Stack align="center" gap="xs">
-          <Title order={2} ta="center">
-            ¡Plan activado!
-          </Title>
-          <Text c="dimmed" ta="center">
-            Tu membresía está activa. Ya puedes usar todas las funciones de tu
-            nuevo plan.
-          </Text>
-        </Stack>
-
-        <Group>
-          <Button size="md" onClick={() => navigate("/gestionar-agenda")}>
-            Ir a mi agenda
-          </Button>
-          <Button size="md" variant="light" onClick={() => navigate("/my-membership")}>
-            Ver mi membresía
-          </Button>
-        </Group>
-      </Stack>
-    );
-  }
-
-  // ── ESTADO: timeout — no llegó el webhook a tiempo ───────────────────────
   return (
-    <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
-      <ThemeIcon size={80} radius="xl" color="yellow" variant="light">
-        <IconAlertTriangle size={52} />
-      </ThemeIcon>
+    <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "32px 16px" }}>
+      <div className="ag-card" style={{ width: "100%", maxWidth: 440, padding: 28, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, textAlign: "center" }}>
+        {pageStatus === "waiting" && (
+          <>
+            {icon("info", <Loader size={24} color="var(--info)" />)}
+            <h1 style={{ margin: 0, font: "600 22px/28px var(--mantine-font-family)" }}>Verificando tu pago</h1>
+            <div className="ag-muted" style={{ fontSize: 14 }}>
+              Estamos confirmando la activación con el procesador de pagos. Suele tardar menos de 30 segundos; no cierres esta página.
+            </div>
+            <div style={{ width: "100%", height: 6, borderRadius: 999, background: "var(--line)", overflow: "hidden" }} role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
+              <div style={{ width: `${progress}%`, height: "100%", background: "var(--platform)", transition: "width 300ms ease" }} />
+            </div>
+          </>
+        )}
 
-      <Stack align="center" gap="xs">
-        <Title order={2} ta="center">
-          Tu pago está siendo procesado
-        </Title>
-        <Text c="dimmed" ta="center">
-          El pago fue enviado, pero la activación está tardando más de lo
-          normal. Esto puede ocurrir por demoras en la red.
-        </Text>
-      </Stack>
+        {pageStatus === "activated" && (
+          <>
+            {icon("success", <IconCheck size={28} />)}
+            <h1 style={{ margin: 0, font: "600 22px/28px var(--mantine-font-family)" }}>Tu plan está activo</h1>
+            <div className="ag-muted" style={{ fontSize: 14 }}>Ya puedes usar todas las funciones de tu nuevo plan.</div>
+            <div className="ag-stack" style={{ gap: 8, width: "100%" }}>
+              <Button fullWidth size="md" color="var(--platform)" onClick={() => navigate("/gestionar-agenda")}>
+                Ir a mi agenda
+              </Button>
+              <Button fullWidth variant="default" onClick={() => navigate("/my-membership")}>
+                Ver mi membresía
+              </Button>
+            </div>
+          </>
+        )}
 
-      <Alert color="blue" variant="light" style={{ width: "100%" }}>
-        <Text size="sm">
-          Si completaste el pago con PayPal, tu plan se activará
-          automáticamente en los próximos minutos. También puedes contactarnos
-          por WhatsApp para una activación manual inmediata.
-        </Text>
-      </Alert>
-
-      <Stack gap="sm" style={{ width: "100%" }}>
-        <Button
-          fullWidth
-          variant="light"
-          leftSection={<IconRefresh size={16} />}
-          onClick={handleManualCheck}
-        >
-          Verificar de nuevo
-        </Button>
-        <Button
-          fullWidth
-          color="teal"
-          variant="light"
-          leftSection={<BsWhatsapp size={16} />}
-          onClick={handleWhatsApp}
-        >
-          Contactar soporte por WhatsApp
-        </Button>
-        <Button
-          fullWidth
-          variant="subtle"
-          color="gray"
-          onClick={() => navigate("/my-membership")}
-        >
-          Ver estado de mi membresía
-        </Button>
-      </Stack>
-    </Stack>
+        {pageStatus === "timeout" && (
+          <>
+            {icon("warning", <IconClock size={28} />)}
+            <h1 style={{ margin: 0, font: "600 22px/28px var(--mantine-font-family)" }}>Tu pago se está procesando</h1>
+            <div className="ag-muted" style={{ fontSize: 14 }}>
+              La activación está tardando más de lo normal. Si pagaste con PayPal, tu plan se activará solo en unos minutos. También podemos activarlo
+              a mano si nos escribes.
+            </div>
+            <div className="ag-stack" style={{ gap: 8, width: "100%" }}>
+              <Button fullWidth color="var(--platform)" onClick={handleManualCheck}>
+                Verificar de nuevo
+              </Button>
+              <Button fullWidth variant="default" component="a" href={supportUrl} target="_blank" rel="noopener noreferrer" leftSection={<IconBrandWhatsapp size={16} />}>
+                Escribir a soporte
+              </Button>
+              <Button fullWidth variant="subtle" color="gray" onClick={() => navigate("/my-membership")}>
+                Ver estado de mi membresía
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
