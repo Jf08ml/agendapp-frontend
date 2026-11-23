@@ -46,6 +46,7 @@ const AdminEmployees: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [profileRefresh, setProfileRefresh] = useState(0);
 
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -380,11 +381,24 @@ const AdminEmployees: React.FC = () => {
         isOpen={showEmployeeDetails}
         onClose={() => setShowEmployeeDetails(false)}
         employee={selectedEmployee}
+        refreshKey={profileRefresh}
+        onAdvance={handleShowAdvanceModal}
+        onIncome={handleShowIncomeModal}
+        onEdit={(e) => {
+          setShowEmployeeDetails(false);
+          handleEditEmployee(e);
+        }}
       />
 
-      <AdvanceModal isOpen={showAdvanceModal} onClose={() => setShowAdvanceModal(false)} employee={selectedEmployee} />
+      <AdvanceModal isOpen={showAdvanceModal} onClose={() => {
+          setShowAdvanceModal(false);
+          setProfileRefresh((n) => n + 1);
+        }} employee={selectedEmployee} />
 
-      <IncomeModal isOpen={showIncomeModal} onClose={() => setShowIncomeModal(false)} employee={selectedEmployee} />
+      <IncomeModal isOpen={showIncomeModal} onClose={() => {
+          setShowIncomeModal(false);
+          setProfileRefresh((n) => n + 1);
+        }} employee={selectedEmployee} />
     </div>
   );
 };

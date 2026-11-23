@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * ScheduleOverviewHeatmap (HOURLY + COMPACT)
+ * Horarios (rediseño, ProfesionalesPanel): mapa de calor día × hora con «N libres»
+ * escrito en cada celda y el detalle de la franja elegida. Móvil: un día a la vez.
+ * Lógica de disponibilidad sin cambios:
  * - Días como columnas
  * - Filas por HORA
  * - Disponibilidad REAL = (Org ∩ Profesional) - breaks
@@ -10,30 +12,12 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActionIcon,
-  Alert,
-  Avatar,
-  Badge,
-  Box,
-  Center,
-  Skeleton,
-  Divider,
-  Drawer,
-  Group,
-  Loader,
-  Paper,
-  ScrollArea,
-  Switch,
-  Stack,
-  Table,
-  Text,
-  Title,
-  Tooltip,
-} from "@mantine/core";
+import { SegmentedControl, Switch } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { IoInformationCircleOutline } from "react-icons/io5";
-import { BiX } from "react-icons/bi";
+import { IconInfoCircle } from "@tabler/icons-react";
+import { toSpanishMeridiem } from "../../../../utils/timeFormatUtils";
+import { formatTimeLabel } from "../../../../utils/timeOfDay";
+import { EmployeeAvatar } from "./EmployeeRow";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
@@ -389,12 +373,11 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
   const [loading, setLoading] = useState(true);
   const [employeeSchedules, setEmployeeSchedules] = useState<Map<string, WeeklySchedule>>(new Map());
 
-  const [drawerOpened, setDrawerOpened] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [resolution, setResolution] = useState<30 | 60 | null>(null);
   const [showOnlyAvailability, setShowOnlyAvailability] = useState(false);
 
   const organization = useSelector((state: RootState) => state.organization.organization);
+  const is24h = organization?.timeFormat === "24h";
 
   const orgData: OrgScheduleData | null = useMemo(() => {
     if (!organization) return null;
@@ -475,7 +458,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
 
   // Duración de cada fila: 60 min, o 30 si algún horario (de la organización, de un
   // profesional o un descanso) empieza o termina en una hora no exacta, como 9:30.
-  const slotMinutes = useMemo(() => {
+  const autoSlotMinutes = useMemo(() => {
     if (!orgData) return 60;
     const times: (string | undefined)[] = [];
     for (const day of DAY_LABELS.map((d) => d.value)) {
@@ -493,6 +476,7 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
     }
     return times.some((t) => isValidTime(t) && timeToMinutes(t) % 60 !== 0) ? 30 : 60;
   }, [orgData, employeeSchedules]);
+  const slotMinutes = resolution ?? autoSlotMinutes;
 
   const hourlyIndex = useMemo(() => {
     if (!orgData) return new Map() as HourIndex;
@@ -556,549 +540,310 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
     return [480, 540, 600, 660, 720, 780]; // 08:00-13:00 fallback to keep layout stable
   }, [hoursForTable]);
 
-  const openDrawer = (day: number, hourStart: number) => {
-    setSelectedDay(day);
-    setSelectedHour(hourStart);
-    setDrawerOpened(true);
+  const timeLabel = (mins: number) => toSpanishMeridiem(formatTimeLabel(minutesToTime(mins), is24h));
+  // Versión corta para encabezados y filas: «9 a. m.», «9:30 a. m.»
+  const shortLabel = (t: string) => (is24h ? formatTimeLabel(t, true) : toSpanishMeridiem(formatTimeLabel(t, false).replace(":00 ", " ")));
+  const hhmmLabel = (t: string) => toSpanishMeridiem(formatTimeLabel(t, is24h));
+
+  // Máximo de profesionales libres en una franja: escala del mapa de calor
+  const maxCount = useMemo(() => {
+    let max = 0;
+    for (const dayMap of hourlyIndex.values()) for (const c of dayMap.values()) max = Math.max(max, c.available.length);
+    return max;
+  }, [hourlyIndex]);
+
+  type CellInfo = {
+    status: "closed" | "outside" | "available" | "break" | "no-staff";
+    available: string[];
+    resting: string[];
   };
+
+  const cellInfo = (day: number, hourStart: number): CellInfo => {
+    const empty = { available: [], resting: [] };
+    if (!orgData) return { status: "outside", ...empty };
+    const orgDay = getOrgDaySchedule(orgData, day);
+    if (!orgDay) return { status: "closed", ...empty };
+    const hr: Range = { start: hourStart, end: hourStart + slotMinutes };
+    if (hr.end <= timeToMinutes(orgDay.start) || hr.start >= timeToMinutes(orgDay.end)) return { status: "outside", ...empty };
+    const cell = hourlyIndex.get(day)?.get(hourStart);
+    const available = cell?.available ?? [];
+    const resting = cell?.resting ?? [];
+    const orgBreak =
+      subtractOrgBreaks &&
+      (orgDay.breaks ?? []).some((b) => overlaps(hr, { start: timeToMinutes(b.start), end: timeToMinutes(b.end) }));
+    if (available.length > 0) return { status: "available", available, resting };
+    if (orgBreak || resting.length > 0) return { status: "break", available, resting };
+    return { status: "no-staff", available, resting };
+  };
+
+  const [selected, setSelected] = useState<{ day: number; hour: number } | null>(null);
+  const todayDow = new Date().getDay();
+  // Móvil: un día a la vez; por defecto hoy o el siguiente día que abre
+  const [chosenMobileDay, setMobileDay] = useState<number | null>(null);
+  const mobileDay =
+    chosenMobileDay ??
+    (orgData
+      ? ([0, 1, 2, 3, 4, 5, 6].map((i) => (todayDow + i) % 7).find((d) => getOrgDaySchedule(orgData, d)) ?? todayDow)
+      : todayDow);
 
   const renderCell = (day: number, hourStart: number) => {
-    if (!orgData) return <Box h={32} />;
-
-    const orgDay = getOrgDaySchedule(orgData, day);
-    if (!orgDay) {
-      return (
-        <Center h={32}>
-          <Text size="xs" c="dimmed">
-            —
-          </Text>
-        </Center>
-      );
+    const info = cellInfo(day, hourStart);
+    if (info.status === "closed" || info.status === "outside") {
+      return <div style={{ height: 36, borderRadius: "var(--radius-sm)", background: "transparent" }} aria-hidden="true" />;
     }
-
-    const dayStart = timeToMinutes(orgDay.start);
-    const dayEnd = timeToMinutes(orgDay.end);
-    const hr: Range = { start: hourStart, end: hourStart + slotMinutes };
-
-    if (hr.end <= dayStart || hr.start >= dayEnd) return <Box h={32} />;
-
-    const cell = hourlyIndex.get(day)?.get(hourStart);
-    const availableIds = cell?.available ?? [];
-    const restingIds = cell?.resting ?? [];
-
-    const count = availableIds.length;
-
-    const hasOrgBreakOverlap = subtractOrgBreaks
-      ? (orgDay.breaks ?? []).some((brk) => overlaps(hr, {
-          start: timeToMinutes(brk.start),
-          end: timeToMinutes(brk.end),
-        }))
-      : false;
-
-    let status: "available" | "break" | "no-staff" = "no-staff";
-    if (count > 0) status = "available";
-    else if (hasOrgBreakOverlap || restingIds.length > 0) status = "break";
-
-    const previewIds = availableIds.slice(0, 3);
-    const remaining = count - previewIds.length;
-
-    const tooltipContent = (
-      <Stack gap={6}>
-        <Text size="xs" fw={700}>
-          {DAY_LABELS.find((d) => d.value === day)?.label} · {minutesToTime(hourStart)} -{" "}
-          {minutesToTime(hourStart + slotMinutes)}
-        </Text>
-
-        <Divider />
-
-        <Group gap={8} wrap="wrap">
-          <Badge size="xs" color={count ? "green" : "gray"} variant="light">
-            Disponibles: {count}
-          </Badge>
-          <Badge size="xs" color={restingIds.length ? "yellow" : "gray"} variant="light">
-            En descanso: {restingIds.length}
-          </Badge>
-          {hasOrgBreakOverlap && (
-            <Badge size="xs" color="yellow" variant="dot">
-              Break org
-            </Badge>
-          )}
-          {status === "no-staff" && !hasOrgBreakOverlap && restingIds.length === 0 && (
-            <Badge size="xs" color="gray" variant="light">
-              Sin personal
-            </Badge>
-          )}
-        </Group>
-
-        <Divider />
-        <Text size="xs" c="dimmed">
-          Click para ver detalle.
-        </Text>
-      </Stack>
-    );
-
+    const n = info.available.length;
+    const isSel = selected?.day === day && selected?.hour === hourStart;
+    // Intensidad 14–52 % según cuántos están libres respecto al máximo de la semana:
+    // suave para que el texto se lea siempre en tinta
+    const pct = n > 0 && maxCount > 0 ? Math.round(14 + (38 * n) / maxCount) : 0;
     const bg =
-      status === "available"
-        ? "var(--mantine-color-green-0)"
-        : status === "break"
-        ? "var(--mantine-color-yellow-0)"
-        : "var(--mantine-color-gray-0)";
-
-    const label =
-      status === "available"
-        ? "Disponible"
-        : status === "break"
-        ? "En descanso"
-        : "Sin personal";
-
+      info.status === "available"
+        ? `color-mix(in srgb, var(--success) ${pct}%, var(--surface-raised))`
+        : info.status === "break"
+          ? "var(--warning-soft)"
+          : "var(--surface-muted)";
+    const color = info.status === "available" ? "var(--ink)" : info.status === "break" ? "var(--warning)" : "var(--ink-subtle)";
+    const text = info.status === "available" ? `${n} ${n === 1 ? "libre" : "libres"}` : info.status === "break" ? "Descanso" : "Sin personal";
+    const dayLabel = DAY_LABELS.find((d) => d.value === day)?.label ?? "";
     return (
-      <Tooltip multiline w={320} label={tooltipContent} position="top" withArrow>
-        <Box
-          onClick={() => openDrawer(day, hourStart)}
-          style={{
-            cursor: "pointer",
-            height: 32,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 4,
-            borderRadius: 8,
-            border: "1px solid var(--mantine-color-gray-3)",
-            background: bg,
-          }}
-        >
-          {count === 0 ? (
-            <Text size="xs" c="dimmed">
-              {label}
-            </Text>
-          ) : (
-            <Group gap={6} wrap="nowrap">
-              <Badge color="green" variant="filled" size="sm">
-                {count}
-              </Badge>
-              <Group gap={-6} wrap="nowrap">
-                {previewIds.map((id) => {
-                  const emp = employeeMap.get(id);
-                  if (!emp) return null;
-                  return (
-                    <Avatar
-                      key={id}
-                      src={emp.profileImage}
-                      size={20}
-                      radius="xl"
-                      color={emp.color || "blue"}
-                      style={{ border: "2px solid var(--mantine-color-body)" }}
-                    >
-                      {emp.names?.charAt(0) || "?"}
-                    </Avatar>
-                  );
-                })}
-                {remaining > 0 && (
-                  <Avatar size={20} radius="xl" color="gray">
-                    +{remaining}
-                  </Avatar>
-                )}
-              </Group>
-            </Group>
-          )}
-        </Box>
-      </Tooltip>
+      <button
+        type="button"
+        onClick={() => setSelected({ day, hour: hourStart })}
+        aria-pressed={isSel}
+        aria-label={`${dayLabel} ${timeLabel(hourStart)}: ${text}`}
+        style={{
+          width: "100%",
+          height: 36,
+          border: 0,
+          borderRadius: "var(--radius-sm)",
+          background: bg,
+          color,
+          font: `${info.status === "available" ? 600 : 500} 12px/16px var(--mantine-font-family)`,
+          fontVariantNumeric: "tabular-nums",
+          cursor: "pointer",
+          outline: isSel ? "2px solid var(--ink)" : "none",
+          outlineOffset: 1,
+          whiteSpace: "nowrap",
+          padding: "0 4px",
+        }}
+      >
+        {text}
+      </button>
     );
   };
 
-  const renderDrawerDetail = () => {
-    if (!orgData || selectedDay === null || selectedHour === null) return null;
+  const renderDetail = () => {
+    if (!orgData || !selected) {
+      return <span className="ag-muted" style={{ fontSize: 14 }}>Toca una franja para ver quién trabaja y quién está en descanso.</span>;
+    }
+    const { day, hour } = selected;
+    const dayLabel = DAY_LABELS.find((d) => d.value === day)?.label ?? "Día";
+    const orgDay = getOrgDaySchedule(orgData, day);
+    const info = cellInfo(day, hour);
+    const list = (ids: string[]) => ids.map((id) => employeeMap.get(id)).filter(Boolean) as Employee[];
+    const working = list(info.available);
+    const resting = list(info.resting);
 
-    const dayLabel = DAY_LABELS.find((d) => d.value === selectedDay)?.label ?? "Día";
-    const orgDay = getOrgDaySchedule(orgData, selectedDay);
-
-    const hourStart = selectedHour;
-    const hourEnd = selectedHour + slotMinutes;
-
-    const cell = hourlyIndex.get(selectedDay)?.get(hourStart);
-    const availableIds = cell?.available ?? [];
-    const restingIds = cell?.resting ?? [];
-
-    const availableEmployees = availableIds
-      .map((id) => employeeMap.get(id))
-      .filter(Boolean) as Employee[];
-
-    const restingEmployees = restingIds
-      .map((id) => employeeMap.get(id))
-      .filter(Boolean) as Employee[];
-
-    const renderEmpCard = (emp: Employee, status: "available" | "resting") => {
-      if (!orgDay) return null;
-
-      const empSchedule = employeeSchedules.get(emp._id);
-      const summary = getEmployeeDaySummary({ day: selectedDay, orgDay, empSchedule });
-
+    const empRow = (emp: Employee, resting: boolean) => {
+      const summary = orgDay ? getEmployeeDaySummary({ day, orgDay, empSchedule: employeeSchedules.get(emp._id) }) : null;
+      const breaks = summary ? [...(subtractOrgBreaks ? summary.breaksOrg : []), ...summary.breaksEmp] : [];
       return (
-        <Paper key={`${status}-${emp._id}`} withBorder p="sm" radius="md">
-          <Group justify="space-between" align="flex-start" wrap="nowrap">
-            <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-              <Avatar src={emp.profileImage} radius="xl" color={emp.color || "blue"}>
-                {emp.names?.charAt(0) || "?"}
-              </Avatar>
-
-              <Stack gap={2} style={{ minWidth: 0 }}>
-                <Text fw={700} lineClamp={1}>
-                  {emp.names}
-                </Text>
-                <Text size="xs" c="dimmed" lineClamp={1}>
-                  {emp.position}
-                </Text>
-
-                <Group gap={6} wrap="wrap">
-                  <Badge size="xs" color={summary.modeLabel === "Personalizado" ? "blue" : "gray"} variant="light">
-                    {summary.modeLabel}
-                  </Badge>
-
-                  {summary.isAvailable ? (
-                    <Badge size="xs" color="green" variant="light">
-                      Activo día: {summary.start}-{summary.end}
-                    </Badge>
-                  ) : (
-                    <Badge size="xs" color="red" variant="light">
-                      {summary.note}
-                    </Badge>
-                  )}
-
-                  <Badge size="xs" color={status === "available" ? "green" : "yellow"} variant="light">
-                    {status === "available" ? "Trabajando" : "En descanso"}
-                  </Badge>
-                </Group>
-              </Stack>
-            </Group>
-          </Group>
-
-          {(summary.breaksEmp.length > 0 || (subtractOrgBreaks && summary.breaksOrg.length > 0)) && (
-            <Stack gap={6} mt="sm">
-              <Divider />
-              <Text size="xs" fw={700}>
-                Breaks del día
-              </Text>
-              <Group gap={8} wrap="wrap">
-                {subtractOrgBreaks &&
-                  summary.breaksOrg.map((b, i) => (
-                    <Badge key={`o-${emp._id}-${i}`} size="xs" color="yellow" variant="light">
-                      Org {b.start}-{b.end}
-                    </Badge>
-                  ))}
-                {summary.breaksEmp.map((b, i) => (
-                  <Badge key={`e-${emp._id}-${i}`} size="xs" color="yellow" variant="light">
-                    Emp {b.start}-{b.end}
-                  </Badge>
-                ))}
-              </Group>
-            </Stack>
-          )}
-        </Paper>
+        <div key={`${resting ? "r" : "w"}-${emp._id}`} className="ag-list-row" style={{ padding: "10px 0", alignItems: "flex-start" }}>
+          <EmployeeAvatar employee={emp} size={32} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ display: "block", fontSize: 14 }}>{emp.names}</b>
+            {summary && (
+              <span className="ag-subtle" style={{ display: "block" }}>
+                {summary.isAvailable
+                  ? `${hhmmLabel(summary.start)} – ${hhmmLabel(summary.end)} · ${summary.modeLabel === "Org" ? "horario del negocio" : "horario propio"}`
+                  : "No trabaja este día"}
+              </span>
+            )}
+            {breaks.length > 0 && (
+              <span className="ag-subtle" style={{ display: "block" }}>
+                Descanso: {breaks.map((b) => `${hhmmLabel(b.start)} – ${hhmmLabel(b.end)}`).join(", ")}
+              </span>
+            )}
+          </div>
+        </div>
       );
     };
 
     return (
-      <Stack gap="md">
-        <Group justify="space-between" align="flex-start">
-          <Stack gap={2}>
-            <Title order={4}>
-              {dayLabel} · {minutesToTime(hourStart)} - {minutesToTime(hourEnd)}
-            </Title>
-            {orgDay ? (
-              <Text size="sm" c="dimmed">
-                Org: {orgDay.start} - {orgDay.end}
-                {subtractOrgBreaks && orgDay.breaks?.length ? ` · breaks org: ${orgDay.breaks.length}` : ""}
-              </Text>
-            ) : (
-              <Text size="sm" c="red">
-                La organización está cerrada este día.
-              </Text>
-            )}
-          </Stack>
-
-          <ActionIcon variant="light" onClick={() => setDrawerOpened(false)}>
-            <BiX size={18} />
-          </ActionIcon>
-        </Group>
-
-        {!orgDay ? (
-          <Text size="sm" c="dimmed">
-            No hay detalle porque el día está cerrado.
-          </Text>
-        ) : (
-          <>
-            <Paper withBorder p="md" radius="md">
-              <Group justify="space-between" mb="xs">
-                <Text fw={700}>Trabajando (disponibles)</Text>
-                <Badge color={availableEmployees.length ? "green" : "gray"} variant="light">
-                  {availableEmployees.length}
-                </Badge>
-              </Group>
-
-              {availableEmployees.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  Nadie trabajando en esta hora.
-                </Text>
-              ) : (
-                <Stack gap="sm">
-                  {availableEmployees.map((emp) => renderEmpCard(emp, "available"))}
-                </Stack>
-              )}
-            </Paper>
-
-            <Paper withBorder p="md" radius="md">
-              <Group justify="space-between" mb="xs">
-                <Text fw={700}>En descanso</Text>
-                <Badge color={restingEmployees.length ? "yellow" : "gray"} variant="light">
-                  {restingEmployees.length}
-                </Badge>
-              </Group>
-
-              {restingEmployees.length === 0 ? (
-                <Text size="sm" c="dimmed">
-                  Nadie en descanso en esta hora (o no cae en su rango activo).
-                </Text>
-              ) : (
-                <Stack gap="sm">
-                  {restingEmployees.map((emp) => renderEmpCard(emp, "resting"))}
-                </Stack>
-              )}
-            </Paper>
-
-            <Text size="xs" c="dimmed">
-              Nota: La celda queda vacía cuando “Trabajando” = 0 (por breaks o por no disponibilidad).
-            </Text>
-          </>
-        )}
-      </Stack>
+      <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+        <div>
+          <h3 style={{ margin: 0, font: "600 16px/22px var(--mantine-font-family)" }}>
+            {dayLabel} · {timeLabel(hour)} – {timeLabel(hour + slotMinutes)}
+          </h3>
+          {orgDay && (
+            <span className="ag-subtle">
+              El negocio abre de {hhmmLabel(orgDay.start)} a {hhmmLabel(orgDay.end)}
+            </span>
+          )}
+        </div>
+        <div>
+          <div className="ag-row" style={{ gap: 6 }}>
+            <b style={{ fontSize: 14 }}>Trabajando</b>
+            <span className="ag-badge ag-badge--success">{working.length}</span>
+          </div>
+          {working.length === 0 ? (
+            <span className="ag-subtle">Nadie trabaja en esta franja.</span>
+          ) : (
+            working.map((e) => empRow(e, false))
+          )}
+        </div>
+        <div>
+          <div className="ag-row" style={{ gap: 6 }}>
+            <b style={{ fontSize: 14 }}>En descanso</b>
+            <span className="ag-badge ag-badge--warning">{resting.length}</span>
+          </div>
+          {resting.length === 0 ? <span className="ag-subtle">Nadie está en descanso.</span> : resting.map((e) => empRow(e, true))}
+        </div>
+      </div>
     );
   };
 
-  const shouldShowLoading = loading && !orgData;
-  const shouldShowNoOrg = !loading && !orgData;
+  const legend = (
+    <div className="ag-row" style={{ gap: 12, fontSize: 13, color: "var(--ink-muted)" }}>
+      <span className="ag-row" style={{ gap: 6 }}>
+        <i style={{ width: 12, height: 12, borderRadius: 3, background: "color-mix(in srgb, var(--success) 18%, var(--surface-raised))" }} />
+        <i style={{ width: 12, height: 12, borderRadius: 3, marginLeft: -4, background: "color-mix(in srgb, var(--success) 52%, var(--surface-raised))" }} />
+        Más libres, más oscuro
+      </span>
+      <span className="ag-row" style={{ gap: 6 }}>
+        <i style={{ width: 12, height: 12, borderRadius: 3, background: "var(--warning-soft)" }} /> Descanso
+      </span>
+      <span className="ag-row" style={{ gap: 6 }}>
+        <i style={{ width: 12, height: 12, borderRadius: 3, background: "var(--surface-muted)", border: "1px solid var(--line)" }} /> Sin personal
+      </span>
+    </div>
+  );
+
+  const toolbar = (
+    <div className="ag-row" style={{ gap: 12 }}>
+      <SegmentedControl
+        size="xs"
+        value={String(slotMinutes)}
+        onChange={(v) => setResolution(Number(v) as 30 | 60)}
+        data={[
+          { label: "Por hora", value: "60" },
+          { label: "Cada 30 min", value: "30" },
+        ]}
+      />
+      <Switch
+        size="sm"
+        checked={showOnlyAvailability}
+        onChange={(e) => setShowOnlyAvailability(e.currentTarget.checked)}
+        label="Solo horas con disponibilidad"
+        disabled={loading}
+      />
+    </div>
+  );
+
+  if (!orgData) {
+    return loading ? (
+      <div className="ag-card" aria-busy="true" style={{ padding: "var(--space-4)" }}>
+        <span className="ag-skeleton" style={{ width: "30%" }} />
+      </div>
+    ) : (
+      <div className="ag-alert ag-alert--info">
+        <IconInfoCircle size={18} />
+        <div>Aún no está configurado el horario del negocio.</div>
+      </div>
+    );
+  }
+
+  const rows = loading ? skeletonHours : hoursForTable;
+  const days = isMobile ? DAY_LABELS.filter((d) => d.value === mobileDay) : DAY_LABELS;
+
+  const grid = (
+    <div className="ag-card" style={{ padding: "var(--space-3)", overflowX: "auto" }}>
+      <div
+        role="grid"
+        aria-label="Disponibilidad de la semana"
+        style={{
+          display: "grid",
+          gridTemplateColumns: `64px repeat(${days.length}, minmax(${isMobile ? 0 : 76}px, 1fr))`,
+          gap: 4,
+          minWidth: isMobile ? 0 : 64 + 7 * 80,
+        }}
+      >
+        <span />
+        {days.map((d) => {
+          const orgDay = getOrgDaySchedule(orgData, d.value);
+          return (
+            <div key={d.value} style={{ textAlign: "center", padding: "0 0 6px" }}>
+              <b style={{ display: "block", fontSize: 13 }}>{isMobile ? d.label : d.short}</b>
+              <span className="ag-subtle" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                {orgDay ? `${shortLabel(orgDay.start)}–${shortLabel(orgDay.end)}` : "Cerrado"}
+              </span>
+            </div>
+          );
+        })}
+        {isMobile && !getOrgDaySchedule(orgData, mobileDay) ? (
+          <span className="ag-muted" style={{ gridColumn: "1 / -1", padding: "var(--space-4)", textAlign: "center" }}>
+            El negocio no abre este día.
+          </span>
+        ) : rows.length === 0 && !loading ? (
+          <span className="ag-muted" style={{ gridColumn: "1 / -1", padding: "var(--space-4)", textAlign: "center" }}>
+            No hay horas con disponibilidad para mostrar.
+          </span>
+        ) : (
+          rows.map((h) => (
+            <div key={h} style={{ display: "contents" }}>
+              <span className="ag-subtle ag-num" style={{ alignSelf: "center", fontSize: 12, whiteSpace: "nowrap" }}>
+                {shortLabel(minutesToTime(h))}
+              </span>
+              {days.map((d) => (
+                <div key={d.value}>
+                  {loading ? (
+                    <span className="ag-skeleton" style={{ height: 36, borderRadius: "var(--radius-sm)" }} />
+                  ) : (
+                    renderCell(d.value, h)
+                  )}
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <Stack gap="md">
-      {shouldShowLoading && (
-        <Paper p="md" withBorder>
-          <Group justify="center" p="xl">
-            <Loader size="sm" />
-            <Text>Cargando horarios...</Text>
-          </Group>
-        </Paper>
+    <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+      {toolbar}
+      {isMobile && (
+        <div className="ag-tabs" role="tablist" aria-label="Día" style={{ scrollbarWidth: "none" }}>
+          {DAY_LABELS.map((d) => (
+            <button
+              key={d.value}
+              type="button"
+              role="tab"
+              className="ag-chip"
+              aria-selected={mobileDay === d.value}
+              onClick={() => {
+                setMobileDay(d.value);
+                setSelected(null);
+              }}
+            >
+              {d.short}
+            </button>
+          ))}
+        </div>
       )}
-
-      {shouldShowNoOrg && (
-        <Alert icon={<IoInformationCircleOutline size={20} />} title="Sin configuración" color="blue">
-          No se ha configurado el horario de la organización
-        </Alert>
-      )}
-
-      {orgData && (
+      {legend}
+      {isMobile ? (
         <>
-          <Paper p="md" withBorder>
-            <Group justify="space-between" align="flex-start" mb="sm">
-              <Stack gap={2}>
-                <Title order={4}>Disponibilidad ({slotMinutes === 60 ? "por hora" : "cada 30 min"})</Title>
-                <Text size="sm" c="dimmed">
-                  Los descansos (breaks) se restan: generan huecos visuales cuando no hay nadie trabajando.
-                </Text>
-              </Stack>
-
-              <Stack gap={6} align={isMobile ? "flex-start" : "flex-end"}>
-                <Switch
-                  size="sm"
-                  checked={showOnlyAvailability}
-                  onChange={(e) => setShowOnlyAvailability(e.currentTarget.checked)}
-                  label="Solo horas con disponibilidad"
-                  disabled={loading}
-                />
-
-                <Badge variant="light" color={subtractOrgBreaks ? "blue" : "gray"}>
-                  Breaks org restan: {subtractOrgBreaks ? "Sí" : "No"}
-                </Badge>
-              </Stack>
-            </Group>
-
-            <Group gap="xs" mb="sm" wrap="wrap">
-              <Text size="xs" c="dimmed" fw={600}>
-                Leyenda:
-              </Text>
-              <Badge size="xs" color="green" variant="light">
-                Disponible
-              </Badge>
-              <Badge size="xs" color="yellow" variant="light">
-                En descanso
-              </Badge>
-              <Badge size="xs" color="gray" variant="light">
-                Sin personal
-              </Badge>
-            </Group>
-
-            {loading ? (
-              <ScrollArea>
-                <Table withTableBorder withColumnBorders striped highlightOnHover style={{ minWidth: isMobile ? 920 : 860 }}>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th
-                        style={{
-                          position: "sticky",
-                          left: 0,
-                          backgroundColor: "var(--mantine-color-body)",
-                          zIndex: 3,
-                          width: 85,
-                          minWidth: 85,
-                        }}
-                      >
-                        Hora
-                      </Table.Th>
-
-                      {DAY_LABELS.map((day) => {
-                        const orgDay = getOrgDaySchedule(orgData, day.value);
-                        return (
-                          <Table.Th key={day.value} style={{ textAlign: "center", minWidth: 130 }}>
-                            <Stack gap={2} align="center">
-                              <Text size="sm" fw={700}>
-                                {isMobile ? day.short : day.label}
-                              </Text>
-                              {orgDay ? (
-                                <Text size="10px" c="dimmed">
-                                  {orgDay.start}-{orgDay.end}
-                                </Text>
-                              ) : (
-                                <Text size="10px" c="red">
-                                  Cerrado
-                                </Text>
-                              )}
-                            </Stack>
-                          </Table.Th>
-                        );
-                      })}
-                    </Table.Tr>
-                  </Table.Thead>
-
-                  <Table.Tbody>
-                    {skeletonHours.map((hourStart) => (
-                      <Table.Tr key={`sk-${hourStart}`}>
-                        <Table.Td
-                          style={{
-                            position: "sticky",
-                            left: 0,
-                            backgroundColor: "var(--mantine-color-body)",
-                            zIndex: 2,
-                            padding: 6,
-                            verticalAlign: "middle",
-                          }}
-                        >
-                          <Skeleton height={16} width={54} radius="sm" />
-                        </Table.Td>
-
-                        {DAY_LABELS.map((day) => (
-                          <Table.Td key={`sk-${day.value}-${hourStart}`} style={{ padding: 6, verticalAlign: "middle" }}>
-                            <Skeleton height={24} radius="sm" />
-                          </Table.Td>
-                        ))}
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
-            ) : hoursForTable.length === 0 ? (
-              <Alert icon={<IoInformationCircleOutline size={20} />} title="Sin horarios configurados" color="yellow">
-                {orgData
-                  ? "No hay horas con disponibilidad para mostrar."
-                  : "No se encontraron horarios configurados en la organización."}
-              </Alert>
-            ) : (
-              <ScrollArea>
-                <Table
-                  withTableBorder
-                  withColumnBorders
-                  striped
-                  highlightOnHover
-                  style={{ minWidth: isMobile ? 920 : 860 }}
-                >
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th
-                        style={{
-                          position: "sticky",
-                          left: 0,
-                          backgroundColor: "var(--mantine-color-body)",
-                          zIndex: 3,
-                          width: 85,
-                          minWidth: 85,
-                        }}
-                      >
-                        Hora
-                      </Table.Th>
-
-                      {DAY_LABELS.map((day) => {
-                        const orgDay = getOrgDaySchedule(orgData, day.value);
-                        return (
-                          <Table.Th key={day.value} style={{ textAlign: "center", minWidth: 130 }}>
-                            <Stack gap={2} align="center">
-                              <Text size="sm" fw={700}>
-                                {isMobile ? day.short : day.label}
-                              </Text>
-                              {orgDay ? (
-                                <Text size="10px" c="dimmed">
-                                  {orgDay.start}-{orgDay.end}
-                                </Text>
-                              ) : (
-                                <Text size="10px" c="red">
-                                  Cerrado
-                                </Text>
-                              )}
-                            </Stack>
-                          </Table.Th>
-                        );
-                      })}
-                    </Table.Tr>
-                  </Table.Thead>
-
-                  <Table.Tbody>
-                    {hoursForTable.map((hourStart) => (
-                      <Table.Tr key={hourStart}>
-                        <Table.Td
-                          style={{
-                            position: "sticky",
-                            left: 0,
-                            backgroundColor: "var(--mantine-color-body)",
-                            zIndex: 2,
-                            padding: 6,
-                            verticalAlign: "middle",
-                          }}
-                        >
-                          <Text size="sm" fw={800}>
-                            {minutesToTime(hourStart)}
-                          </Text>
-                        </Table.Td>
-
-                        {DAY_LABELS.map((day) => (
-                          <Table.Td key={day.value} style={{ padding: 6, verticalAlign: "middle" }}>
-                            {renderCell(day.value, hourStart)}
-                          </Table.Td>
-                        ))}
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
-            )}
-          </Paper>
-
-          <Drawer
-            opened={drawerOpened}
-            onClose={() => setDrawerOpened(false)}
-            title="Detalle"
-            position="right"
-            size={isMobile ? "100%" : "md"}
-          >
-            {renderDrawerDetail()}
-          </Drawer>
+          {grid}
+          <div className="ag-card" style={{ padding: "var(--space-4)" }}>{renderDetail()}</div>
         </>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 280px", gap: "var(--space-4)", alignItems: "start" }}>
+          {grid}
+          <div className="ag-card" style={{ padding: "var(--space-4)", position: "sticky", top: 16 }}>{renderDetail()}</div>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }

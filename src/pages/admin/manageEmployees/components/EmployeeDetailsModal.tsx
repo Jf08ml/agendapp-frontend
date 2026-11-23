@@ -1,216 +1,128 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-import React, { useEffect, useState } from "react";
-import {
-  Box,
-  Card,
-  Text,
-  Title,
-  Table,
-  ScrollArea,
-  Loader,
-  Select,
-  Group,
-  Modal,
-  Tabs,
-  Badge,
-  NumberInput,
-  Stack,
-  Grid,
-  Paper,
-  ThemeIcon,
-} from "@mantine/core";
+// Perfil y pagos del profesional (rediseño, ProfesionalesPanel): una sola vista
+// en lugar de detalles + adelantos + ingresos. Escritorio: panel lateral; móvil:
+// pantalla completa. Período de pago, cifras (2×2 en móvil), citas del período
+// con comisión «Normal / Personalizada», adelantos e ingresos manuales. Mismo
+// cálculo de siempre. El horario se edita ahora en el editor del profesional.
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Drawer, NumberInput, Select } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
-import {
-  Appointment,
-  getAppointmentsByEmployee,
-} from "../../../../services/appointmentService";
-import {
-  Advance,
-  getAdvancesByEmployee,
-} from "../../../../services/advanceService";
-import { Employee } from "../../../../services/employeeService";
-import EmployeeScheduleSection from "./EmployeeScheduleSection";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconCash, IconPencil, IconTrendingUp } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { useSelector } from "react-redux";
+import { Appointment, getAppointmentsByEmployee } from "../../../../services/appointmentService";
+import { Advance, getAdvancesByEmployee } from "../../../../services/advanceService";
+import { Employee } from "../../../../services/employeeService";
 import { selectOrganization } from "../../../../features/organization/sliceOrganization";
 import { formatCurrency as formatCurrencyUtil } from "../../../../utils/formatCurrency";
-import { BiDollar, BiReceipt, BiMoney, BiTrendingUp } from "react-icons/bi";
+import { appointmentStatus } from "../../../../components/customCalendar/appointmentStatus";
+import { EmployeeAvatar, OnlineBookingBadge } from "./EmployeeRow";
 
 interface EmployeeDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
+  onEdit?: (e: Employee) => void;
+  onAdvance?: (e: Employee) => void;
+  onIncome?: (e: Employee) => void;
+  /** Cambia cuando se registra un adelanto o ingreso, para volver a cargar. */
+  refreshKey?: number;
 }
 
-interface PayrollSummary {
-  totalAppointments: number;
-  totalRevenue: number;
-  commissionType: "percentage" | "fixed";
-  commissionValue: number;
-  commissionAmount: number;
-  totalAdvances: number;
-  totalIncomes: number;
-  finalEarnings: number;
+type IntervalKey = "daily" | "weekly" | "biweekly" | "monthly" | "custom";
+
+function rangeFor(interval: IntervalKey): [Date | null, Date | null] {
+  const now = new Date();
+  switch (interval) {
+    case "daily":
+      return [dayjs(now).startOf("day").toDate(), dayjs(now).endOf("day").toDate()];
+    case "weekly": {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() + 1); // Lunes
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return [start, end];
+    }
+    case "biweekly":
+      return now.getDate() <= 15
+        ? [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth(), 15)]
+        : [new Date(now.getFullYear(), now.getMonth(), 16), new Date(now.getFullYear(), now.getMonth() + 1, 0)];
+    case "monthly":
+      return [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 0)];
+    default:
+      return [null, null];
+  }
 }
+
+const fmtDate = (d: Date | string) => new Date(d).toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 
 const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
   isOpen,
   onClose,
   employee,
+  onEdit,
+  onAdvance,
+  onIncome,
+  refreshKey = 0,
 }) => {
+  const isMobile = useMediaQuery("(max-width: 48rem)");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [incomes, setIncomes] = useState<Advance[]>([]);
-  const [payroll, setPayroll] = useState<PayrollSummary | null>(null);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingAdvances, setLoadingAdvances] = useState(false);
-  const [interval, setInterval] = useState<string>("daily");
+  const [interval, setInterval] = useState<IntervalKey>("daily");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [customCommissionValue, setCustomCommissionValue] = useState<number | undefined>(undefined);
 
+  const org = useSelector(selectOrganization);
+  const money = (value: number) => formatCurrencyUtil(value, org?.currency || "COP");
+
   useEffect(() => {
-    if (employee && isOpen) {
-      calculateDates(interval);
+    if (employee && isOpen && interval !== "custom") {
+      const [s, e] = rangeFor(interval);
+      setStartDate(s);
+      setEndDate(e);
     }
   }, [employee, isOpen, interval]);
 
   useEffect(() => {
-    if (employee && startDate && endDate) {
-      fetchAppointments();
-      fetchAdvances();
-    }
-  }, [employee, startDate, endDate]);
-
-  useEffect(() => {
-    if (appointments.length > 0 || advances.length > 0 || incomes.length > 0) {
-      calculatePayroll(appointments, advances, incomes);
-    }
-  }, [customCommissionValue, appointments, advances, incomes]);
-
-  const calculateDates = (interval: string) => {
-    const now = new Date();
-    let start: Date | null = null;
-    let end: Date | null = null;
-
-    switch (interval) {
-      case "daily":
-        start = dayjs(now).startOf("day").toDate();
-        end = dayjs(now).endOf("day").toDate();
-        break;
-      case "weekly":
-        start = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate() - now.getDay() + 1
-        ); // Lunes
-        end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        break;
-      case "biweekly":
-        start =
-          now.getDate() <= 15
-            ? new Date(now.getFullYear(), now.getMonth(), 1)
-            : new Date(now.getFullYear(), now.getMonth(), 16);
-        end =
-          now.getDate() <= 15
-            ? new Date(now.getFullYear(), now.getMonth(), 15)
-            : new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case "monthly":
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        break;
-      case "custom":
-        // Fechas personalizadas
-        break;
-      default:
-        break;
-    }
-
-    if (interval !== "custom") {
-      setStartDate(start);
-      setEndDate(end);
-    }
-  };
-
-  const fetchAppointments = async () => {
-    if (!employee || !startDate || !endDate) return;
+    if (!employee || !isOpen || !startDate || !endDate) return;
+    const end = dayjs(endDate).endOf("day").toDate();
+    const inRange = (d: string | Date) => new Date(d) >= startDate && new Date(d) <= end;
 
     setLoadingAppointments(true);
-    try {
-      const employeeAppointments = await getAppointmentsByEmployee(
-        employee._id
-      );
-      const filteredAppointments = employeeAppointments.filter(
-        (appointment) =>
-          new Date(appointment.startDate) >= startDate &&
-          new Date(appointment.startDate) <= endDate
-      );
-
-      setAppointments(filteredAppointments);
-      calculatePayroll(filteredAppointments, advances, incomes);
-    } catch (error) {
-      console.error("Error al cargar citas del profesional", error);
-    } finally {
-      setLoadingAppointments(false);
-    }
-  };
-
-  const fetchAdvances = async () => {
-    if (!employee || !startDate || !endDate) return;
+    getAppointmentsByEmployee(employee._id)
+      .then((list) => setAppointments(list.filter((a) => inRange(a.startDate))))
+      .catch((error) => console.error("Error al cargar citas del profesional", error))
+      .finally(() => setLoadingAppointments(false));
 
     setLoadingAdvances(true);
-    try {
-      const employeeAdvancesAndIncomes = await getAdvancesByEmployee(employee._id);
-      const inRange = employeeAdvancesAndIncomes.filter(
-        (a) => new Date(a.date) >= startDate && new Date(a.date) <= endDate
-      );
-      const filteredAdvances = inRange.filter((a) => a.type !== "income");
-      const filteredIncomes = inRange.filter((a) => a.type === "income");
+    getAdvancesByEmployee(employee._id)
+      .then((list) => {
+        const r = list.filter((a) => inRange(a.date));
+        setAdvances(r.filter((a) => a.type !== "income"));
+        setIncomes(r.filter((a) => a.type === "income"));
+      })
+      .catch((error) => console.error("Error al cargar avances del profesional", error))
+      .finally(() => setLoadingAdvances(false));
+  }, [employee, isOpen, startDate, endDate, refreshKey]);
 
-      setAdvances(filteredAdvances);
-      setIncomes(filteredIncomes);
-      calculatePayroll(appointments, filteredAdvances, filteredIncomes);
-    } catch (error) {
-      console.error("Error al cargar avances del profesional", error);
-    } finally {
-      setLoadingAdvances(false);
-    }
-  };
-
-  const calculatePayroll = (
-    appointments: Appointment[],
-    advances: Advance[],
-    incomes: Advance[]
-  ) => {
-    const confirmedAppointments = appointments.filter((a) => a.status === "attended");
-    const appointmentsRevenue = confirmedAppointments.reduce(
-      (total, appointment) => total + (appointment.totalPrice || 0),
-      0
-    );
-
-    // Los ingresos manuales (citas realizadas pero no registradas en el
-    // sistema) se tratan igual que una cita atendida para efectos de nómina.
-    const totalIncomes = incomes.reduce((total, income) => total + income.amount, 0);
+  // Mismo cálculo de nómina de siempre: los ingresos manuales cuentan como una
+  // cita atendida; la comisión fija se paga por cada una.
+  const payroll = useMemo(() => {
+    const attended = appointments.filter((a) => a.status === "attended");
+    const appointmentsRevenue = attended.reduce((t, a) => t + (a.totalPrice || 0), 0);
+    const totalIncomes = incomes.reduce((t, i) => t + i.amount, 0);
     const totalRevenue = appointmentsRevenue + totalIncomes;
-    const commissionUnits = confirmedAppointments.length + incomes.length;
-
+    const commissionUnits = attended.length + incomes.length;
     const commissionType = employee?.commissionType ?? "percentage";
     const commissionValue = customCommissionValue ?? employee?.commissionValue ?? 0;
-
     const commissionAmount =
-      commissionType === "percentage"
-        ? (totalRevenue * commissionValue) / 100
-        : commissionUnits * commissionValue;
-
-    const totalAdvances = advances.reduce(
-      (total, advance) => total + advance.amount,
-      0
-    );
-
-    setPayroll({
-      totalAppointments: appointments.length,
+      commissionType === "percentage" ? (totalRevenue * commissionValue) / 100 : commissionUnits * commissionValue;
+    const totalAdvances = advances.reduce((t, a) => t + a.amount, 0);
+    return {
+      attendedCount: attended.length,
       totalRevenue,
       commissionType,
       commissionValue,
@@ -218,353 +130,223 @@ const EmployeeDetailsModal: React.FC<EmployeeDetailsModalProps> = ({
       totalAdvances,
       totalIncomes,
       finalEarnings: commissionAmount - totalAdvances,
-    });
-  };
+    };
+  }, [appointments, advances, incomes, customCommissionValue, employee]);
 
-  const org = useSelector(selectOrganization);
-  const formatCurrency = (value: number) =>
-    formatCurrencyUtil(value, org?.currency || "COP");
+  if (!employee) return null;
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "confirmed":
-        return <Badge color="green" variant="light">Confirmado</Badge>;
-      case "pending":
-        return <Badge color="yellow" variant="light">Pendiente</Badge>;
-      case "cancelled":
-      case "cancelled_by_customer":
-        return <Badge color="red" variant="light">Cancelado por cliente</Badge>;
-      case "cancelled_by_admin":
-        return <Badge color="orange" variant="light">Cancelado por admin</Badge>;
-      case "attended":
-        return <Badge color="teal" variant="light">Asistió</Badge>;
-      case "no_show":
-        return <Badge color="pink" variant="light">No asistió</Badge>;
-      default:
-        return <Badge color="gray" variant="light">{status || "Sin estado"}</Badge>;
-    }
-  };
+  const commissionText =
+    payroll.commissionType === "fixed" ? `${money(payroll.commissionValue)} por cita` : `${payroll.commissionValue} %`;
+
+  const stat = (label: string, value: string, hint?: string, strong?: boolean) => (
+    <div
+      className="ag-card"
+      style={{ padding: "var(--space-3) var(--space-4)", background: strong ? "var(--surface-muted)" : undefined }}
+    >
+      <div className="ag-stat__label">{label}</div>
+      <div style={{ font: "600 20px/28px var(--mantine-font-family)", fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      {hint && <div className="ag-subtle" style={{ fontSize: 12 }}>{hint}</div>}
+    </div>
+  );
+
+  const sectionTitle = (title: string, count?: number) => (
+    <div className="ag-row" style={{ gap: 6, marginBottom: 4 }}>
+      <h3 style={{ margin: 0, font: "600 15px/22px var(--mantine-font-family)" }}>{title}</h3>
+      {typeof count === "number" && <span className="ag-badge">{count}</span>}
+    </div>
+  );
+
+  const loadingRow = <span className="ag-skeleton" style={{ width: "60%", margin: "8px 0" }} />;
 
   return (
-    <Modal
+    <Drawer
       opened={isOpen}
       onClose={onClose}
-      title={`Detalles - ${employee?.names || "Profesional"}`}
-      size="xl"
-      centered
+      position="right"
+      size={isMobile ? "100%" : 560}
+      title="Perfil y pagos"
     >
-      <Box>
-        <Tabs defaultValue="payroll">
-          <Tabs.List>
-            <Tabs.Tab value="payroll">Nómina y Pagos</Tabs.Tab>
-            <Tabs.Tab value="schedule">Horario de Disponibilidad</Tabs.Tab>
-          </Tabs.List>
-
-          <Tabs.Panel value="payroll" pt="md">
-            <Stack gap="md">
-              {/* Filtros y período */}
-              <Card shadow="sm" radius="md" p="md" withBorder>
-                <Grid>
-                  <Grid.Col span={{ base: 12, md: 6 }}>
-                    <Select
-                      label="Intervalo de pago"
-                      placeholder="Selecciona intervalo"
-                      data={[
-                        { value: "daily", label: "Diario" },
-                        { value: "weekly", label: "Semanal" },
-                        { value: "biweekly", label: "Quincenal" },
-                        { value: "monthly", label: "Mensual" },
-                        { value: "custom", label: "Personalizado" },
-                      ]}
-                      value={interval}
-                      onChange={(value) => setInterval(value || "daily")}
-                    />
-                  </Grid.Col>
-
-                  <Grid.Col span={{ base: 12, md: 6 }}>
-                    <NumberInput
-                      label="Comisión personalizada"
-                      description="Deja vacío para usar la del profesional"
-                      placeholder={
-                        employee?.commissionType === "fixed"
-                          ? `Por defecto: $${employee?.commissionValue ?? 0} por cita`
-                          : `Por defecto: ${employee?.commissionValue ?? 0}%`
-                      }
-                      min={0}
-                      max={employee?.commissionType === "percentage" ? 100 : undefined}
-                      value={customCommissionValue}
-                      onChange={(val) => setCustomCommissionValue(val as number | undefined)}
-                      rightSection={
-                        <Text size="xs" c="dimmed" pr={4}>
-                          {employee?.commissionType === "fixed" ? "$" : "%"}
-                        </Text>
-                      }
-                    />
-                  </Grid.Col>
-                </Grid>
-
-                {interval === "custom" ? (
-                  <Group mt="md">
-                    <DatePickerInput
-                      label="Fecha de inicio"
-                      value={startDate}
-                      onChange={setStartDate}
-                    />
-                    <DatePickerInput
-                      label="Fecha de fin"
-                      value={endDate}
-                      onChange={setEndDate}
-                    />
-                  </Group>
-                ) : (
-                  <Group mt="sm" justify="center">
-                    <Text size="sm" c="dimmed">
-                      <strong>Período:</strong> {startDate?.toLocaleDateString("es-CO") || "N/A"} -{" "}
-                      {endDate?.toLocaleDateString("es-CO") || "N/A"}
-                    </Text>
-                  </Group>
-                )}
-              </Card>
-
-              {/* Resumen de nómina con métricas */}
-              <Grid>
-                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                  <Paper withBorder p="md" radius="md">
-                    <Group gap="xs" mb="xs">
-                      <ThemeIcon color="blue" variant="light" size="lg">
-                        <BiReceipt size={20} />
-                      </ThemeIcon>
-                      <div>
-                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                          Total Facturado
-                        </Text>
-                        <Text size="xl" fw={700}>
-                          {formatCurrency(payroll?.totalRevenue || 0)}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {payroll?.totalAppointments || 0} citas confirmadas
-                      {(payroll?.totalIncomes || 0) > 0 &&
-                        ` + ${incomes.length} ingreso${incomes.length !== 1 ? "s" : ""} manual${incomes.length !== 1 ? "es" : ""} (${formatCurrency(payroll?.totalIncomes || 0)})`}
-                    </Text>
-                  </Paper>
-                </Grid.Col>
-
-                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                  <Paper withBorder p="md" radius="md">
-                    <Group gap="xs" mb="xs">
-                      <ThemeIcon color="teal" variant="light" size="lg">
-                        <BiTrendingUp size={20} />
-                      </ThemeIcon>
-                      <div>
-                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                          Comisión{" "}
-                          {payroll?.commissionType === "fixed"
-                            ? `($${payroll?.commissionValue ?? 0}/cita)`
-                            : `(${payroll?.commissionValue ?? 0}%)`}
-                        </Text>
-                        <Text size="xl" fw={700} c="teal">
-                          {formatCurrency(payroll?.commissionAmount || 0)}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      Ganancia base
-                    </Text>
-                  </Paper>
-                </Grid.Col>
-
-                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                  <Paper withBorder p="md" radius="md">
-                    <Group gap="xs" mb="xs">
-                      <ThemeIcon color="orange" variant="light" size="lg">
-                        <BiMoney size={20} />
-                      </ThemeIcon>
-                      <div>
-                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                          Avances
-                        </Text>
-                        <Text size="xl" fw={700} c="orange">
-                          -{formatCurrency(payroll?.totalAdvances || 0)}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      Adelantos solicitados
-                    </Text>
-                  </Paper>
-                </Grid.Col>
-
-                <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-                  <Paper withBorder p="md" radius="md" bg="blue.0">
-                    <Group gap="xs" mb="xs">
-                      <ThemeIcon color="blue" size="lg">
-                        <BiDollar size={20} />
-                      </ThemeIcon>
-                      <div>
-                        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                          Total a Pagar
-                        </Text>
-                        <Text size="xl" fw={700} c="blue">
-                          {formatCurrency(payroll?.finalEarnings || 0)}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      Neto después de avances
-                    </Text>
-                  </Paper>
-                </Grid.Col>
-              </Grid>
-
-              {/* Tabla de citas */}
-              <Card shadow="sm" radius="md" p="md" withBorder>
-                <Title order={4} mb="md">
-                  Citas del Período
-                </Title>
-                <ScrollArea style={{ height: "300px" }}>
-                  {loadingAppointments ? (
-                    <Box ta="center" py="xl">
-                      <Loader />
-                    </Box>
-                  ) : appointments.length === 0 ? (
-                    <Text size="sm" c="dimmed" ta="center" py="xl">
-                      No hay citas en este período
-                    </Text>
-                  ) : (
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Fecha</Table.Th>
-                          <Table.Th>Cliente</Table.Th>
-                          <Table.Th>Servicio</Table.Th>
-                          <Table.Th>Estado</Table.Th>
-                          <Table.Th>Precio</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {appointments.map((appointment) => (
-                          <Table.Tr key={appointment._id}>
-                            <Table.Td>
-                              {new Date(appointment.startDate).toLocaleDateString("es-CO")}
-                            </Table.Td>
-                            <Table.Td>{appointment.client?.name || "N/A"}</Table.Td>
-                            <Table.Td>{appointment.service?.name || "N/A"}</Table.Td>
-                            <Table.Td>{getStatusBadge(appointment.status)}</Table.Td>
-                            <Table.Td>
-                              <Group gap={4} wrap="nowrap">
-                                {formatCurrency(appointment.totalPrice || 0)}
-                                {appointment.customPrice != null ? (
-                                  <Badge size="xs" color="orange" variant="light">Personalizado</Badge>
-                                ) : (
-                                  <Badge size="xs" color="gray" variant="light">Normal</Badge>
-                                )}
-                              </Group>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  )}
-                </ScrollArea>
-              </Card>
-
-              {/* Tabla de avances */}
-              <Card shadow="sm" radius="md" p="md" withBorder>
-                <Title order={4} mb="md">
-                  Avances del Período
-                </Title>
-                <ScrollArea style={{ height: "200px" }}>
-                  {loadingAdvances ? (
-                    <Box ta="center" py="xl">
-                      <Loader />
-                    </Box>
-                  ) : advances.length === 0 ? (
-                    <Text size="sm" c="dimmed" ta="center" py="xl">
-                      No hay avances en este período
-                    </Text>
-                  ) : (
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Fecha</Table.Th>
-                          <Table.Th>Monto</Table.Th>
-                          <Table.Th>Descripción</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {advances.map((advance) => (
-                          <Table.Tr key={advance._id}>
-                            <Table.Td>
-                              {new Date(advance.date).toLocaleDateString("es-CO")}
-                            </Table.Td>
-                            <Table.Td>{formatCurrency(advance.amount)}</Table.Td>
-                            <Table.Td>
-                              {advance.description || "Sin descripción"}
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  )}
-                </ScrollArea>
-              </Card>
-
-              {/* Tabla de ingresos manuales */}
-              <Card shadow="sm" radius="md" p="md" withBorder>
-                <Title order={4} mb="md">
-                  Ingresos Manuales del Período
-                </Title>
-                <ScrollArea style={{ height: "200px" }}>
-                  {loadingAdvances ? (
-                    <Box ta="center" py="xl">
-                      <Loader />
-                    </Box>
-                  ) : incomes.length === 0 ? (
-                    <Text size="sm" c="dimmed" ta="center" py="xl">
-                      No hay ingresos manuales en este período
-                    </Text>
-                  ) : (
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Fecha</Table.Th>
-                          <Table.Th>Monto</Table.Th>
-                          <Table.Th>Descripción</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {incomes.map((income) => (
-                          <Table.Tr key={income._id}>
-                            <Table.Td>
-                              {new Date(income.date).toLocaleDateString("es-CO")}
-                            </Table.Td>
-                            <Table.Td>{formatCurrency(income.amount)}</Table.Td>
-                            <Table.Td>
-                              {income.description || "Sin descripción"}
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  )}
-                </ScrollArea>
-              </Card>
-            </Stack>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="schedule" pt="md">
-            {employee && (
-              <EmployeeScheduleSection
-                employeeId={employee._id}
-                employeeName={employee.names}
-              />
+      <div className="ag-stack" style={{ gap: "var(--space-5)" }}>
+        {/* Encabezado */}
+        <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+          <div className="ag-row" style={{ gap: "var(--space-3)", flexWrap: "nowrap" }}>
+            <EmployeeAvatar employee={employee} size={48} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <b style={{ display: "block", fontSize: 17 }}>{employee.names}</b>
+              <span className="ag-subtle">
+                {employee.position}
+                {employee.phoneNumber ? ` · ${employee.phoneNumber}` : ""}
+              </span>
+            </div>
+            {!isMobile && <OnlineBookingBadge employee={employee} />}
+          </div>
+          <div className="ag-row" style={{ gap: 8 }}>
+            {onAdvance && (
+              <Button size="xs" variant="default" leftSection={<IconCash size={14} />} onClick={() => onAdvance(employee)}>
+                Registrar adelanto
+              </Button>
             )}
-          </Tabs.Panel>
-        </Tabs>
-      </Box>
-    </Modal>
+            {onIncome && (
+              <Button size="xs" variant="default" leftSection={<IconTrendingUp size={14} />} onClick={() => onIncome(employee)}>
+                Registrar ingreso
+              </Button>
+            )}
+            {onEdit && (
+              <Button size="xs" variant="subtle" color="gray" leftSection={<IconPencil size={14} />} onClick={() => onEdit(employee)}>
+                Editar
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Período */}
+        <div className="ag-stack" style={{ gap: 8 }}>
+          <div className="ag-row" style={{ gap: 8, alignItems: "flex-end" }}>
+            <Select
+              label="Período de pago"
+              data={[
+                { value: "daily", label: "Hoy" },
+                { value: "weekly", label: "Esta semana" },
+                { value: "biweekly", label: "Esta quincena" },
+                { value: "monthly", label: "Este mes" },
+                { value: "custom", label: "Personalizado" },
+              ]}
+              value={interval}
+              onChange={(v) => setInterval((v as IntervalKey) || "daily")}
+              allowDeselect={false}
+              w={180}
+              comboboxProps={{ withinPortal: true, zIndex: 400 }}
+            />
+            <NumberInput
+              label="Comisión para este cálculo"
+              placeholder={
+                employee.commissionType === "fixed"
+                  ? `${money(employee.commissionValue ?? 0)} por cita`
+                  : `${employee.commissionValue ?? 0} %`
+              }
+              min={0}
+              max={employee.commissionType === "percentage" ? 100 : undefined}
+              value={customCommissionValue ?? ""}
+              onChange={(val) => setCustomCommissionValue(typeof val === "number" ? val : undefined)}
+              rightSection={<span className="ag-subtle" style={{ paddingRight: 4 }}>{employee.commissionType === "fixed" ? "$" : "%"}</span>}
+              w={200}
+            />
+          </div>
+          {interval === "custom" ? (
+            <div className="ag-row" style={{ gap: 8 }}>
+              <DatePickerInput label="Desde" value={startDate} onChange={setStartDate} w={160} popoverProps={{ zIndex: 400 }} />
+              <DatePickerInput label="Hasta" value={endDate} onChange={setEndDate} w={160} popoverProps={{ zIndex: 400 }} />
+            </div>
+          ) : (
+            <span className="ag-subtle">
+              {startDate && endDate
+                ? dayjs(startDate).isSame(endDate, "day")
+                  ? startDate.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })
+                  : `Del ${startDate.toLocaleDateString("es-CO", { day: "numeric", month: "long" })} al ${endDate.toLocaleDateString("es-CO", { day: "numeric", month: "long" })}`
+                : ""}
+              {customCommissionValue === undefined && ` · Comisión: ${commissionText}`}
+            </span>
+          )}
+        </div>
+
+        {/* Cifras */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+          {stat(
+            "Facturado",
+            money(payroll.totalRevenue),
+            `${payroll.attendedCount} ${payroll.attendedCount === 1 ? "cita atendida" : "citas atendidas"}${
+              incomes.length ? ` + ${incomes.length} ${incomes.length === 1 ? "ingreso" : "ingresos"}` : ""
+            }`
+          )}
+          {stat("Comisión", money(payroll.commissionAmount), commissionText)}
+          {stat("Adelantos", payroll.totalAdvances ? `−${money(payroll.totalAdvances)}` : money(0), `${advances.length} en el período`)}
+          {stat("A pagar", money(payroll.finalEarnings), "Comisión menos adelantos", true)}
+        </div>
+
+        {/* Citas del período */}
+        <div>
+          {sectionTitle("Citas del período", appointments.length)}
+          {loadingAppointments ? (
+            loadingRow
+          ) : appointments.length === 0 ? (
+            <span className="ag-subtle">No hay citas en este período.</span>
+          ) : (
+            <div className="ag-card" style={{ overflow: "hidden" }}>
+              {appointments.map((a) => {
+                const st = appointmentStatus(a.status);
+                const Icon = st.icon;
+                return (
+                  <div key={a._id} className="ag-list-row" style={{ padding: "10px 12px", alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <b style={{ display: "block", fontSize: 14 }}>{a.client?.name || "Sin cliente"}</b>
+                      <span className="ag-subtle">
+                        {fmtDate(a.startDate)} · {a.service?.name || "Servicio"}
+                      </span>
+                      <div className="ag-row" style={{ gap: 4, marginTop: 4 }}>
+                        <span className={`ag-badge ag-badge--${st.tone}`} style={{ height: 20, fontSize: 11, padding: "0 8px" }}>
+                          <Icon size={12} stroke={2} /> {st.label}
+                        </span>
+                        <span className="ag-badge" style={{ height: 20, fontSize: 11, padding: "0 8px" }}>
+                          {a.customPrice != null ? "Precio personalizado" : "Precio normal"}
+                        </span>
+                      </div>
+                    </div>
+                    <b className="ag-num" style={{ fontSize: 14, whiteSpace: "nowrap" }}>{money(a.totalPrice || 0)}</b>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <span className="ag-subtle" style={{ display: "block", marginTop: 6, fontSize: 12 }}>
+            Solo las citas atendidas suman a la comisión.
+          </span>
+        </div>
+
+        {/* Adelantos */}
+        <div>
+          {sectionTitle("Adelantos", advances.length)}
+          {loadingAdvances ? (
+            loadingRow
+          ) : advances.length === 0 ? (
+            <span className="ag-subtle">No hay adelantos en este período.</span>
+          ) : (
+            <div className="ag-card" style={{ overflow: "hidden" }}>
+              {advances.map((a) => (
+                <div key={a._id} className="ag-list-row" style={{ padding: "10px 12px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14 }}>{a.description || "Sin descripción"}</span>
+                    <span className="ag-subtle" style={{ display: "block" }}>{fmtDate(a.date)}</span>
+                  </div>
+                  <b className="ag-num" style={{ fontSize: 14 }}>−{money(a.amount)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Ingresos manuales */}
+        <div style={{ paddingBottom: "var(--space-4)" }}>
+          {sectionTitle("Ingresos manuales", incomes.length)}
+          {loadingAdvances ? (
+            loadingRow
+          ) : incomes.length === 0 ? (
+            <span className="ag-subtle">No hay ingresos manuales en este período.</span>
+          ) : (
+            <div className="ag-card" style={{ overflow: "hidden" }}>
+              {incomes.map((i) => (
+                <div key={i._id} className="ag-list-row" style={{ padding: "10px 12px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 14 }}>{i.description || "Sin descripción"}</span>
+                    <span className="ag-subtle" style={{ display: "block" }}>{fmtDate(i.date)}</span>
+                  </div>
+                  <b className="ag-num" style={{ fontSize: 14 }}>{money(i.amount)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Drawer>
   );
 };
 
