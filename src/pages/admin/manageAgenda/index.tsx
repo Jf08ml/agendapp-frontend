@@ -67,7 +67,7 @@ import { getMetaStatus } from "../../../services/organizationService";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
 import GettingStarted, { GettingStartedToggle, useGettingStartedPrefs } from "./components/GettingStarted";
-import { gettingStartedSteps } from "./components/gettingStartedModel";
+import { gettingStartedSteps, isGettingStartedRelevant } from "./components/gettingStartedModel";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
 import { IconShieldCog, IconCalendarOff, IconPlus } from "@tabler/icons-react";
@@ -286,7 +286,10 @@ const ScheduleView: React.FC = () => {
       }),
     [allServices.length, employees, organization, appointments.length, isWhatsAppReady, gsPrefs.linkShared]
   );
-  const showGettingStarted = role === "admin" && !gsPrefs.hidden;
+  const showGettingStarted =
+    role === "admin" &&
+    !gsPrefs.hidden &&
+    isGettingStartedRelevant(gsSteps, organization?.onboardingMilestones?.setupCompletedAt, Date.now());
   const gsExpanded = showGettingStarted && !gsPrefs.collapsed;
 
   // ---------- Envío de recordatorios (campaña bulk) ----------

@@ -4,6 +4,7 @@ import {
   gettingStartedSteps,
   progressOf,
   isGettingStartedHidden,
+  isGettingStartedRelevant,
   tomorrowStart,
 } from "../src/pages/admin/manageAgenda/components/gettingStartedModel.ts";
 
@@ -31,6 +32,16 @@ test("profesional sin servicios no cuenta; 3 de 6", () => {
   const p2 = progressOf(gettingStartedSteps({ ...base, servicesCount: 2, employeesCount: 1, employeesWithServices: 1, scheduleSaved: true }));
   assert.equal(p2.done, 3);
   assert.equal(p2.current, "appointment");
+});
+
+test("solo para negocios nuevos o con lo básico pendiente", () => {
+  const now = Date.UTC(2026, 10, 23);
+  const basics = { ...base, servicesCount: 3, employeesCount: 2, employeesWithServices: 2, scheduleSaved: true, hasAppointments: true };
+  const steps = gettingStartedSteps(basics); // falta WhatsApp y el enlace
+  assert.equal(isGettingStartedRelevant(steps, "2025-01-10T00:00:00Z", now), false); // negocio de hace tiempo
+  assert.equal(isGettingStartedRelevant(steps, null, now), false);
+  assert.equal(isGettingStartedRelevant(steps, "2026-11-10T00:00:00Z", now), true); // configurado hace 13 días
+  assert.equal(isGettingStartedRelevant(gettingStartedSteps({ ...basics, scheduleSaved: false }), "2025-01-10T00:00:00Z", now), true);
 });
 
 test("ocultar hasta mañana y no volver a mostrar", () => {

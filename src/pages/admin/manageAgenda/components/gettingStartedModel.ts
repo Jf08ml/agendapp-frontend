@@ -69,6 +69,22 @@ export function progressOf(steps: GettingStartedStep[]) {
   return { done, total: steps.length, pct: Math.round((done / steps.length) * 100), current: steps.find((s) => !s.done)?.key ?? null };
 }
 
+const BASIC_KEYS: GettingStartedKey[] = ["service", "employee", "schedule", "appointment"];
+const NEW_BUSINESS_DAYS = 30;
+
+/**
+ * Solo para negocios nuevos (configurados hace 30 días o menos) o a los que les
+ * falta algo básico (servicio, profesional, horario o primera cita). Un negocio
+ * que ya funciona no pierde espacio de la agenda por WhatsApp o el enlace.
+ */
+export function isGettingStartedRelevant(steps: GettingStartedStep[], setupCompletedAt: string | null | undefined, nowMs: number): boolean {
+  const basicsMissing = steps.some((s) => BASIC_KEYS.includes(s.key) && !s.done);
+  if (basicsMissing) return true;
+  if (!setupCompletedAt) return false;
+  const t = Date.parse(setupCompletedAt);
+  return Number.isFinite(t) && nowMs - t <= NEW_BUSINESS_DAYS * 86_400_000;
+}
+
 /** ¿Se muestra la lista? «Ocultar hasta mañana» guarda un instante; «No volver a mostrar», un flag. */
 export function isGettingStartedHidden(opts: { neverShow: boolean; hiddenUntilMs: number | null; nowMs: number }): boolean {
   if (opts.neverShow) return true;
