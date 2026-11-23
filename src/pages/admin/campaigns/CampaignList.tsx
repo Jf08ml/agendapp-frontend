@@ -26,6 +26,7 @@ import { useAppSelector } from "../../../app/store";
 import campaignService from "../../../services/campaignService";
 import type { Campaign } from "../../../types/campaign";
 import { getCampaignStatusLabel } from "../../../utils/campaignValidations";
+import WhatsappTabs from "../../../components/whatsapp/WhatsappTabs";
 
 export default function CampaignList() {
   const navigate = useNavigate();
@@ -84,13 +85,15 @@ export default function CampaignList() {
 
   return (
     <Container size="lg" py="xl">
-      <Group justify="space-between" mb="lg">
-        <Title order={2}>📜 Campañas de WhatsApp</Title>
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <WhatsappTabs subtitle="Mensajes masivos a tus clientes: promociones, novedades y recordatorios." />
+      </div>
+      <Group justify="flex-end" mb="md">
         <Button
           leftSection={<IconPlus size={16} />}
           onClick={() => navigate("/admin/campaigns/new")}
         >
-          Nueva Campaña
+          Nueva campaña
         </Button>
       </Group>
 

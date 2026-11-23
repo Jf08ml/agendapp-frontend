@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Container,
-  Title,
   Text,
   Textarea,
   Button,
@@ -22,7 +21,6 @@ import {
   NavLink,
   ScrollArea,
   Paper,
-  ThemeIcon,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
@@ -38,9 +36,7 @@ import {
   IconAlertCircle,
   IconSettings,
   IconChevronLeft,
-  IconMessage,
   IconClock,
-  IconBell,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -51,6 +47,8 @@ import whatsappTemplateService, {
 import { handleAxiosError } from "../../utils/handleAxiosError";
 import MetaTemplateFormTab, { MetaTemplateStatus } from "./MetaTemplateFormTab";
 import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
+import WhatsappTabs from "../../components/whatsapp/WhatsappTabs";
+import { useSearchParams } from "react-router-dom";
 import { listMetaTemplates, MetaTemplateDraftSaved } from "../../services/organizationService";
 
 // ─── Metadata de plantillas ───────────────────────────────────────────────────
@@ -417,6 +415,9 @@ const templateKeys = Object.keys(templateInfo) as TemplateType[];
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function WhatsappTemplateEditor() {
+  // «Plantillas de Meta» es su propia pestaña de WhatsApp (?vista=plantillas-meta)
+  const [searchParams] = useSearchParams();
+  const metaTemplatesView = searchParams.get("vista") === "plantillas-meta";
   const { organization } = useSelector((state: RootState) => state.organization);
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -644,21 +645,14 @@ export default function WhatsappTemplateEditor() {
       <Container size="xl" py="md">
         <Stack gap="md">
 
-          {/* ── Cabecera ─────────────────────────────────────────── */}
-          <Group align="center" gap="sm">
-            <ThemeIcon size="lg" radius="md" variant="light" color="green">
-              <IconMessage size={18} />
-            </ThemeIcon>
-            <Box>
-              <Title order={3} lh={1.2}>Mensajes de WhatsApp</Title>
-              <Text size="xs" c="dimmed">Personaliza los mensajes que se envían automáticamente</Text>
-            </Box>
-            {isMeta ? (
-              <Badge color="blue" size="sm" ml="auto">Meta Cloud API</Badge>
-            ) : (
-              <Badge color="green" size="sm" ml="auto">Baileys</Badge>
-            )}
-          </Group>
+          {/* ── Cabecera: pestañas de WhatsApp ─────────────────── */}
+          <WhatsappTabs
+            subtitle={
+              metaTemplatesView
+                ? "Plantillas aprobadas por Meta para usar en tus campañas."
+                : "Lo que reciben tus clientes en cada momento. Enciende, apaga o personaliza cada mensaje."
+            }
+          />
 
           {message && (
             <Alert
@@ -670,7 +664,11 @@ export default function WhatsappTemplateEditor() {
             </Alert>
           )}
 
-          {/* ── Layout principal ─────────────────────────────────── */}
+          {metaTemplatesView && organization?._id ? (
+            <div className="ag-card" style={{ padding: 20 }}>
+              <MetaTemplatesPanel organizationId={organization._id} />
+            </div>
+          ) : (
           <Paper withBorder radius="md" style={{ overflow: "hidden" }}>
             <Box style={{ display: "flex", minHeight: rem(580) }}>
 
@@ -773,19 +771,6 @@ export default function WhatsappTemplateEditor() {
                         })}
                       </Box>
                     ))}
-
-                    {isMeta && (
-                      <>
-                        <Divider my="xs" />
-                        <NavLink
-                          label={<Text size="sm">Plantillas de campaña</Text>}
-                          leftSection={<IconBell size={15} />}
-                          active={selectedKey === "campaign_templates"}
-                          onClick={() => handleSelectKey("campaign_templates")}
-                          styles={{ root: { paddingInline: rem(12) } }}
-                        />
-                      </>
-                    )}
 
                     <Divider my="xs" />
                     <NavLink
@@ -1229,6 +1214,7 @@ export default function WhatsappTemplateEditor() {
               )}
             </Box>
           </Paper>
+          )}
         </Stack>
       </Container>
 

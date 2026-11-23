@@ -1,43 +1,34 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Anchor,
-  Badge,
   Box,
   Button,
-  Card,
-  Center,
   CheckIcon,
   CopyButton,
   Group,
   Kbd,
-  Paper,
   Progress,
-  SegmentedControl,
   Select,
   Stack,
   Switch,
-  Tabs,
   Text,
   TextInput,
-  ThemeIcon,
-  Title,
-  Tooltip,
 } from "@mantine/core";
 import { QRCodeSVG } from "qrcode.react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconBrandWhatsapp } from "@tabler/icons-react";
+import WhatsappTabs from "../../../components/whatsapp/WhatsappTabs";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../../app/store";
 import {
-  BiBot,
   BiCopy,
-  BiDesktop,
   BiInfoCircle,
-  BiLink,
-  BiLogoMeta,
   BiRefresh,
   BiX,
   BiQrScan,
   BiMobile,
+  BiSend,
 } from "react-icons/bi";
 import { useWhatsappStatus } from "../../../hooks/useWhatsappStatus";
 import type { WaCode } from "../../../utils/waRealtime";
@@ -107,6 +98,15 @@ const UI_STATUS: Record<
 
 const METHOD_STORAGE_KEY = "wa_connection_method";
 
+const eyebrowStyle: React.CSSProperties = {
+  fontSize: 12,
+  lineHeight: "16px",
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--ink-subtle)",
+};
+
 function readStoredMethod(): "web" | "meta" | null {
   try {
     const v = localStorage.getItem(METHOD_STORAGE_KEY);
@@ -147,7 +147,7 @@ const WhatsappOrgSession: React.FC = () => {
 
     // QR & Pairing
     qr,
-    qrMeta,
+
     qrTtl,
     pairingCode, // <--- Importante: viene del hook actualizado
 
@@ -189,6 +189,9 @@ const WhatsappOrgSession: React.FC = () => {
   // Estado local para UI de conexión
   const [connectMode, setConnectMode] = useState<"qr" | "pairing">("qr");
   const [pairingPhone, setPairingPhone] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [searchParams] = useSearchParams();
+  const isDesktop = useMediaQuery("(min-width: 62em)");
 
   const handleSaveAgentConfig = async () => {
     if (!organization?._id) return;
@@ -222,22 +225,22 @@ const WhatsappOrgSession: React.FC = () => {
           notifications.show({
             color: "green",
             autoClose: 14000,
-            title: "🎉 ¡WhatsApp conectado!",
+            title: "¡WhatsApp conectado!",
             message:
-              "Te enviamos a tu propio número el recordatorio de ejemplo que recibirían tus clientes. Revísalo en tu WhatsApp 👀",
+              "Te enviamos a tu propio número el recordatorio de ejemplo que recibirían tus clientes. Revísalo en tu WhatsApp.",
           });
         } else if (!r.alreadySent) {
           // No silenciar la falla: avisar el motivo y ofrecer reintento manual
           const reasons: Record<string, string> = {
             no_phone: "No encontramos tu número de teléfono. Verifícalo en la configuración del negocio.",
             plan_limit: "Tu plan no incluye el envío por WhatsApp.",
-            send_failed: "No se pudo enviar el mensaje. Usa el botón “Enviar ejemplo a mi WhatsApp”.",
+            send_failed: "No se pudo enviar el mensaje. Usa el botón «Enviar mensaje de prueba».",
           };
           notifications.show({
             color: "yellow",
             autoClose: 10000,
             title: "No se envió el mensaje de ejemplo",
-            message: reasons[r.reason || ""] || "Inténtalo con el botón “Enviar ejemplo a mi WhatsApp”.",
+            message: reasons[r.reason || ""] || "Inténtalo con el botón «Enviar mensaje de prueba».",
           });
         }
         dispatch(fetchOrganizationConfig());
@@ -254,7 +257,7 @@ const WhatsappOrgSession: React.FC = () => {
       const selfPhone = me?.id ? me.id.split("@")[0].split(":")[0] : undefined;
       const r = await sendWhatsappWelcomeTest(organization._id, selfPhone, true);
       if (r.sent) {
-        notifications.show({ color: "green", title: "Mensaje enviado", message: "Revisa tu WhatsApp 👀" });
+        notifications.show({ color: "green", title: "Mensaje enviado", message: "Revisa tu WhatsApp." });
       } else {
         const reasons: Record<string, string> = {
           no_phone: "No encontramos tu número. Verifícalo en la configuración del negocio.",
@@ -274,7 +277,7 @@ const WhatsappOrgSession: React.FC = () => {
   const handleConnect = () => {
     if (connectMode === "pairing") {
       if (!pairingPhone || pairingPhone.length < 7) {
-        alert("Por favor ingresa un número válido (ej: 57300...)");
+        notifications.show({ color: "red", message: "Escribe un número válido, con indicativo del país (ej: 57300…)." });
         return;
       }
       // Forzamos nueva sesión enviando el teléfono
@@ -285,389 +288,362 @@ const WhatsappOrgSession: React.FC = () => {
     }
   };
 
-  return (
-    <Paper shadow="md" radius="md" p="xl" withBorder>
-      <Stack gap="md">
-        {/* HEADER */}
-        <Group justify="space-between" align="center">
+  const tab = searchParams.get("tab") === "asistentes" ? "asistentes" : "conexion";
+  const selfPhone = me?.id ? me.id.split("@")[0].split(":")[0] : "";
+  const statusTone: Record<string, string> = {
+    green: "success",
+    orange: "warning",
+    red: "danger",
+    blue: "info",
+    teal: "info",
+    gray: "",
+  };
+
+  const methodCards = !organization?.hideBaileysUI && (
+    <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Método de conexión">
+      {[
+        {
+          value: "web",
+          title: "WhatsApp Web",
+          desc: "Vinculas tu número como un dispositivo más, con un código QR. Listo en un minuto.",
+        },
+        {
+          value: "meta",
+          title: "API oficial de Meta",
+          desc: "Conexión oficial con tu cuenta de Facebook. Necesaria para el asistente que responde a tus clientes y las plantillas de campaña.",
+        },
+      ].map((o) => (
+        <div
+          key={o.value}
+          className="ag-opt"
+          role="radio"
+          tabIndex={0}
+          aria-checked={connectionMethod === o.value}
+          onClick={() => handleChangeMethod(o.value)}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), handleChangeMethod(o.value))}
+          style={{ cursor: "pointer" }}
+        >
+          <span className="ag-radio" />
           <div>
-            <Title order={3}>
-              WhatsApp de{" "}
-              <Text span c="blue">
-                {organization?.name ?? "Organización"}
-              </Text>
-            </Title>
-            <Text size="sm" c="dimmed">
-              Conecta tu línea y administra el agente de IA por WhatsApp.
-            </Text>
+            <b>{o.title}</b>
+            <span className="d">{o.desc}</span>
           </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const advanced = showWebPanel && (
+    <details className="ag-card" style={{ padding: "12px 16px" }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Opciones avanzadas</summary>
+      <div className="ag-stack" style={{ gap: 14, marginTop: 14 }}>
+        {code === "ready" && !organization?.hideBaileysUI && (
+          <Select
+            label="Método de conexión"
+            value={connectionMethod}
+            onChange={handleChangeMethod}
+            data={[
+              { value: "web", label: "WhatsApp Web" },
+              { value: "meta", label: "API oficial de Meta" },
+            ]}
+            allowDeselect={false}
+            maw={320}
+          />
+        )}
+        <Group align="end" wrap="nowrap">
+          <TextInput
+            label="ID de sesión"
+            description="Identificador interno de esta conexión."
+            value={clientId}
+            onChange={(e) => setClientId(e.currentTarget.value)}
+            style={{ flex: 1, maxWidth: 360 }}
+            disabled={code === "ready" || code === "connecting"}
+          />
+          <CopyButton value={clientId} timeout={1500}>
+            {({ copied, copy }) => (
+              <Button variant="default" onClick={copy} leftSection={copied ? <CheckIcon size={14} /> : <BiCopy size={14} />}>
+                {copied ? "Copiado" : "Copiar"}
+              </Button>
+            )}
+          </CopyButton>
         </Group>
+        {reason && (
+          <Text size="xs" c="dimmed">
+            Detalle técnico: <Kbd>{reason}</Kbd>
+          </Text>
+        )}
+        {code === "ready" && (
+          <>
+            <Group align="end" wrap="wrap">
+              <TextInput
+                label="Probar envío a otro número"
+                description="Con indicativo del país, sin +. Ej: 573001234567"
+                placeholder="573001234567"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.currentTarget.value)}
+                style={{ flex: 1, maxWidth: 360 }}
+              />
+              <Button variant="default" loading={loadingSend} disabled={testPhone.trim().length < 7} onClick={() => sendTest(testPhone.trim())}>
+                Enviar prueba
+              </Button>
+            </Group>
+            <Group gap="xs">
+              <Button variant="default" onClick={restart} loading={loadingRestart} leftSection={<BiRefresh size={16} />}>
+                Reiniciar conexión
+              </Button>
+              <Button variant="subtle" color="red" onClick={logout} loading={loadingLogout} leftSection={<BiX size={16} />}>
+                Desconectar
+              </Button>
+            </Group>
+          </>
+        )}
+      </div>
+    </details>
+  );
+
+  const webPanel = showWebPanel && (
+    <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+      {code === "ready" ? (
+        <div className="ag-card" style={{ padding: 20, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <span
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 999,
+              display: "grid",
+              placeItems: "center",
+              background: "var(--success-soft)",
+              color: "var(--success)",
+              flex: "none",
+            }}
+          >
+            <IconBrandWhatsapp size={26} />
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div className="ag-row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <b style={{ fontSize: 18, lineHeight: "24px" }}>Conectado{selfPhone ? ` · +${selfPhone}` : ""}</b>
+              <span className="ag-badge ag-badge--success">WhatsApp Web</span>
+            </div>
+            <div className="ag-muted" style={{ fontSize: 14 }}>
+              {me?.name ? `${me.name} · ` : ""}Tus clientes reciben confirmaciones y recordatorios desde este número.
+            </div>
+          </div>
+          <Button onClick={handleSendWelcomeTest} loading={sendingWelcome} leftSection={<BiSend size={16} />}>
+            Enviar mensaje de prueba
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className={`ag-alert ag-alert--${statusTone[ui.color] || "warning"}`}>
+            <BiInfoCircle size={20} />
+            <div>
+              <b style={{ display: "block" }}>
+                {code === "disconnected" ? "WhatsApp no está conectado" : ui.title}
+              </b>
+              {code === "disconnected"
+                ? "Mientras no lo conectes, tus clientes no reciben confirmaciones ni recordatorios."
+                : ui.desc}
+              {code === "connecting" && <Progress value={100} striped animated mt={8} />}
+            </div>
+          </div>
+
+          {methodCards}
+
+          <div className="ag-card" style={{ padding: 20 }}>
+            <div className="ag-stack" style={{ gap: 14 }}>
+              <WhatsappConnectGuide />
+              <div className="ag-segment" role="group" aria-label="Cómo vincular">
+                <button type="button" aria-pressed={connectMode === "qr"} disabled={code === "connecting"} onClick={() => setConnectMode("qr")}>
+                  <BiQrScan style={{ marginRight: 6, verticalAlign: -2 }} />
+                  Código QR
+                </button>
+                <button type="button" aria-pressed={connectMode === "pairing"} disabled={code === "connecting"} onClick={() => setConnectMode("pairing")}>
+                  <BiMobile style={{ marginRight: 6, verticalAlign: -2 }} />
+                  Usar código de vinculación
+                </button>
+              </div>
+
+              {connectMode === "pairing" &&
+                (!pairingCode ? (
+                  <Group align="end" wrap="wrap">
+                    <TextInput
+                      label="Tu número de WhatsApp"
+                      placeholder="573001234567"
+                      description="Con indicativo del país, sin +."
+                      value={pairingPhone}
+                      onChange={(e) => setPairingPhone(e.currentTarget.value)}
+                      disabled={code === "connecting"}
+                      style={{ flex: 1, maxWidth: 320 }}
+                    />
+                    <Button onClick={handleConnect} loading={loadingPrimary} disabled={!pairingPhone || code === "connecting"}>
+                      Obtener código
+                    </Button>
+                  </Group>
+                ) : (
+                  <div className="ag-card" style={{ padding: 20, textAlign: "center", background: "var(--surface-muted)" }}>
+                    <span style={eyebrowStyle}>Código de vinculación</span>
+                    <div style={{ font: "600 32px/40px monospace", letterSpacing: "0.2em", margin: "8px 0" }}>{pairingCode}</div>
+                    <div className="ag-muted" style={{ fontSize: 13, maxWidth: 320, margin: "0 auto" }}>
+                      En tu celular: <b>Dispositivos vinculados</b> › <b>Vincular dispositivo</b> › <b>Vincular con número de teléfono</b>.
+                    </div>
+                    <Group justify="center" mt="sm" gap="xs">
+                      <CopyButton value={pairingCode}>
+                        {({ copied, copy }) => (
+                          <Button size="xs" variant="default" onClick={copy} leftSection={copied ? <CheckIcon size={12} /> : <BiCopy size={14} />}>
+                            {copied ? "Copiado" : "Copiar código"}
+                          </Button>
+                        )}
+                      </CopyButton>
+                      <Button size="xs" variant="subtle" color="gray" onClick={() => connect({ forceFresh: true })}>
+                        Volver a intentar
+                      </Button>
+                    </Group>
+                  </div>
+                ))}
+
+              {connectMode === "qr" &&
+                (!qr ? (
+                  <Button onClick={() => connect({ forceFresh: true })} loading={loadingPrimary} disabled={code === "connecting"} style={{ alignSelf: "flex-start" }}>
+                    Generar código QR
+                  </Button>
+                ) : (
+                  <Stack align="center" gap={6}>
+                    <QRCodeSVG value={qr} size={240} includeMargin />
+                    <Text size="xs" c="dimmed">
+                      Expira en {qrTtl}s
+                    </Text>
+                    {qrTtl === 0 && (
+                      <Button variant="default" size="xs" leftSection={<BiRefresh size={16} />} onClick={() => connect()}>
+                        Generar otro QR
+                      </Button>
+                    )}
+                  </Stack>
+                ))}
+            </div>
+          </div>
+        </>
+      )}
+      {advanced}
+    </div>
+  );
+
+  const comparison = !organization?.hideBaileysUI && (
+    <aside className="ag-card" style={{ padding: 20, alignSelf: "flex-start" }}>
+      <b style={{ display: "block", marginBottom: 10 }}>¿Cuál método me conviene?</b>
+      <dl className="ag-kv" style={{ gridTemplateColumns: "1fr", gap: 4 }}>
+        <dt style={{ fontWeight: 600, color: "var(--ink)" }}>WhatsApp Web</dt>
+        <dd className="ag-muted" style={{ marginBottom: 10 }}>Rápido y gratis. Usas tu mismo número desde el celular. Envía confirmaciones, recordatorios y campañas.</dd>
+        <dt style={{ fontWeight: 600, color: "var(--ink)" }}>API oficial de Meta</dt>
+        <dd className="ag-muted">
+          Más estable. Con la coexistencia de Meta sigues usando la app de WhatsApp Business en tu celular. Incluye el asistente que responde a tus clientes.
+        </dd>
+      </dl>
+    </aside>
+  );
+
+  const assistants = (
+    <div className="ag-stack" style={{ gap: "var(--space-4)", maxWidth: 760 }}>
+      <div className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <b style={{ fontSize: 16 }}>Responde a tus clientes</b>
+          {organization?.waConnectionType === "meta" ? (
+            <span className={`ag-badge${organization?.waBookingAgentEnabled ? " ag-badge--success" : ""}`}>
+              {organization?.waBookingAgentEnabled ? "Activo" : "Apagado"}
+            </span>
+          ) : (
+            <span className="ag-badge">Requiere la API oficial de Meta</span>
+          )}
+        </div>
+        <div className="ag-muted" style={{ fontSize: 14 }}>
+          Contesta los mensajes que tus clientes escriben a tu número: muestra servicios, consulta disponibilidad y agenda la cita. Si respondes tú, se
+          pausa con ese cliente por el tiempo que elijas.
+        </div>
+        <div>
+          <Button
+            size="xs"
+            variant="outline"
+            component={Link}
+            to="/gestionar-whatsapp"
+            onClick={() => organization?.waConnectionType !== "meta" && handleChangeMethod("meta")}
+          >
+            {organization?.waConnectionType === "meta" ? "Configurar en Conexión" : "Conectar con Meta"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <b style={{ fontSize: 16 }}>Agente para tu equipo</b>
+          <span className={`ag-badge${(organization as any)?.waAgentEnabled ? " ag-badge--success" : ""}`}>
+            {(organization as any)?.waAgentEnabled ? "Activo" : "Apagado"}
+          </span>
+        </div>
+        <div className="ag-muted" style={{ fontSize: 14 }}>
+          Escríbele al WhatsApp de AgenditApp, por ejemplo «agenda una cita para Juan mañana a las 3 p. m. con María» o «muéstrame los ingresos de
+          esta semana», y lo hace en tu agenda. Te responde a tu número de contacto:{" "}
+          <b>{organization?.phoneNumber || "—"}</b>.
+        </div>
+        <Switch
+          label="Activar agente para el equipo"
+          checked={waAgentEnabled}
+          onChange={(e) => setWaAgentEnabled(e.currentTarget.checked)}
+        />
+        <TextInput
+          label="Número adicional autorizado (opcional)"
+          description="Otro número del equipo que también puede darle instrucciones. Con +, ej: +573218104634"
+          placeholder="+57300..."
+          value={waPhone}
+          onChange={(e) => setWaPhone(e.currentTarget.value)}
+          maw={360}
+        />
+        <Group justify="flex-end">
+          <Button onClick={handleSaveAgentConfig} loading={savingAgent}>
+            Guardar
+          </Button>
+        </Group>
+      </div>
+    </div>
+  );
+
+  return (
+    <Box p={{ base: "sm", md: "lg" }}>
+      <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+        <WhatsappTabs />
 
         {/* Tope mensual de citas con WhatsApp (solo planes de entrada) */}
         {planUsage?.whatsappAppointmentsThisMonth?.max != null && (
-          <Paper withBorder radius="md" p="sm">
+          <div className="ag-card" style={{ padding: 12 }}>
             <WhatsappQuotaUsage usage={planUsage.whatsappAppointmentsThisMonth} showUpgrade />
-          </Paper>
+          </div>
         )}
 
-        <Tabs defaultValue="connection" keepMounted={false}>
-          <Tabs.List>
-            <Tabs.Tab value="connection" leftSection={<BiLink size={16} />}>
-              Conexión de WhatsApp
-            </Tabs.Tab>
-            <Tabs.Tab value="agent" leftSection={<BiBot size={16} />}>
-              Agente IA
-            </Tabs.Tab>
-          </Tabs.List>
-
-          {/* ============================================================= */}
-          {/* TAB 1: CONEXIÓN — Baileys (app) o Meta/Facebook (Cloud API)  */}
-          {/* ============================================================= */}
-          <Tabs.Panel value="connection" pt="md">
-            <Stack gap="md">
-              {/* SELECTOR DE MÉTODO — desplegable cerrado: solo se ve el método elegido,
-                  no las dos opciones a la vez. Solo si la org tiene más de uno disponible. */}
-              {!organization?.hideBaileysUI && (
-                <Select
-                  label="Método de conexión"
-                  value={connectionMethod}
-                  onChange={handleChangeMethod}
-                  data={[
-                    { value: "web", label: "WhatsApp Web" },
-                    { value: "meta", label: "API oficial de Meta" },
-                  ]}
-                  leftSection={
-                    connectionMethod === "meta" ? <BiLogoMeta size={16} /> : <BiDesktop size={16} />
-                  }
-                  allowDeselect={false}
-                  maw={340}
-                />
-              )}
-
-              {/* SECCIÓN BAILEYS */}
-              {showWebPanel && (
-                <Stack gap="md">
-                  <Group justify="space-between" align="center">
-                    <Title order={5}>WhatsApp Web (WEB)</Title>
-                    <Badge color={ui.color} size="lg" radius="sm">
-                      {ui.title}
-                    </Badge>
-                  </Group>
-                  <Text size="sm" c="dimmed" mt={-8}>
-                    Vincula este número como un dispositivo más de WhatsApp, igual que WhatsApp Web.
-                  </Text>
-
-                  {/* CLIENT ID */}
-                  <Group align="end">
-                    <TextInput
-                      label="ID de sesión (clientId)"
-                      description="Identificador interno para esta conexión."
-                      value={clientId}
-                      onChange={(e) => setClientId(e.currentTarget.value)}
-                      style={{ flex: 1 }}
-                      disabled={code === "ready" || code === "connecting"}
-                    />
-                    <CopyButton value={clientId} timeout={1500}>
-                      {({ copied, copy }) => (
-                        <Tooltip label={copied ? "Copiado" : "Copiar"}>
-                          <Button
-                            variant="light"
-                            onClick={copy}
-                            leftSection={
-                              copied ? <CheckIcon size={16} /> : <BiCopy size={16} />
-                            }
-                          >
-                            {copied ? "Copiado" : "Copiar"}
-                          </Button>
-                        </Tooltip>
-                      )}
-                    </CopyButton>
-                  </Group>
-
-                  {/* STATUS CARD */}
-                  <Card withBorder padding="md" radius="md">
-                    <Group align="flex-start" wrap="nowrap">
-                      <ThemeIcon color={ui.color} variant="light" radius="xl">
-                        <BiInfoCircle size={18} />
-                      </ThemeIcon>
-                      <Box style={{ flex: 1 }}>
-                        <Text fw={600}>{ui.title}</Text>
-                        <Text size="sm" c="dimmed">
-                          {ui.desc}
-                        </Text>
-                        {reason && (
-                          <Text size="xs" c="dimmed" mt={6}>
-                            Detalle técnico: <Kbd>{reason}</Kbd>
-                          </Text>
-                        )}
-                        {code === "ready" && me && (
-                          <Text size="xs" c="dimmed" mt={6}>
-                            Cuenta: {me.name ?? "—"} {me.id ? `· ${me.id}` : ""}
-                          </Text>
-                        )}
-
-                        {code === "connecting" && (
-                          <Box mt="sm">
-                            <Progress value={100} striped animated />
-                            <Text size="xs" c="dimmed" mt={4}>
-                              Conectando con WhatsApp...
-                            </Text>
-                          </Box>
-                        )}
-                      </Box>
-                    </Group>
-                  </Card>
-
-                  {/* ========================================================= */}
-                  {/* ZONA DE CONEXIÓN (Solo visible si NO estamos listos)      */}
-                  {/* ========================================================= */}
-                  {code !== "ready" && (
-                    <Box>
-                      <WhatsappConnectGuide />
-
-                      <Text fw={600} mb="xs">
-                        Método de vinculación
-                      </Text>
-
-                      {/* Selector de Modo */}
-                      <SegmentedControl
-                        value={connectMode}
-                        onChange={(val: any) => setConnectMode(val)}
-                        data={[
-                          {
-                            label: (
-                              <Center>
-                                <BiQrScan style={{ marginRight: 6 }} /> Código QR
-                              </Center>
-                            ),
-                            value: "qr",
-                          },
-                          {
-                            label: (
-                              <Center>
-                                <BiMobile style={{ marginRight: 6 }} /> Pairing Code
-                              </Center>
-                            ),
-                            value: "pairing",
-                          },
-                        ]}
-                        fullWidth
-                        mb="md"
-                        disabled={code === "connecting"}
-                      />
-
-                      {/* --- CASO 1: MODO PAIRING --- */}
-                      {connectMode === "pairing" && (
-                        <Stack>
-                          {!pairingCode ? (
-                            /* Paso 1: Pedir teléfono */
-                            <>
-                              <TextInput
-                                label="Número de teléfono"
-                                placeholder="573001234567"
-                                description="Ingresa el número internacional sin '+' (Ej: 57...)"
-                                value={pairingPhone}
-                                onChange={(e) => setPairingPhone(e.currentTarget.value)}
-                                disabled={code === "connecting"}
-                              />
-                              <Button
-                                onClick={handleConnect}
-                                loading={loadingPrimary}
-                                disabled={!pairingPhone || code === "connecting"}
-                                fullWidth
-                              >
-                                Obtener Código de Vinculación
-                              </Button>
-                            </>
-                          ) : (
-                            /* Paso 2: Mostrar Código */
-                            <Paper withBorder p="lg" bg="gray.0" radius="md">
-                              <Stack align="center" gap="xs">
-                                <Text size="sm" c="dimmed" fw={500}>
-                                  CÓDIGO DE VINCULACIÓN
-                                </Text>
-                                <Title
-                                  order={1}
-                                  style={{
-                                    letterSpacing: "0.2em",
-                                    fontFamily: "monospace",
-                                  }}
-                                >
-                                  {pairingCode}
-                                </Title>
-                                <Text size="xs" c="dimmed" ta="center" maw={300}>
-                                  En tu celular ve a: <b>Dispositivos vinculados</b> {">"}{" "}
-                                  <b>Vincular dispositivo</b> {">"}{" "}
-                                  <b>Vincular con número de teléfono</b>.
-                                </Text>
-                                <CopyButton value={pairingCode}>
-                                  {({ copied, copy }) => (
-                                    <Button
-                                      size="xs"
-                                      variant="subtle"
-                                      onClick={copy}
-                                      color={copied ? "teal" : "blue"}
-                                      leftSection={
-                                        copied ? (
-                                          <CheckIcon size={14} />
-                                        ) : (
-                                          <BiCopy size={14} />
-                                        )
-                                      }
-                                    >
-                                      {copied ? "Copiado" : "Copiar Código"}
-                                    </Button>
-                                  )}
-                                </CopyButton>
-                                <Button
-                                  variant="subtle"
-                                  size="xs"
-                                  color="red"
-                                  onClick={() => connect({ forceFresh: true })}
-                                  mt="xs"
-                                >
-                                  Cancelar / Reintentar
-                                </Button>
-                              </Stack>
-                            </Paper>
-                          )}
-                        </Stack>
-                      )}
-
-                      {/* --- CASO 2: MODO QR --- */}
-                      {connectMode === "qr" && (
-                        <Stack align="center">
-                          {!qr ? (
-                            <Button
-                              onClick={() => connect({ forceFresh: true })}
-                              loading={loadingPrimary}
-                              disabled={code === "connecting"}
-                              fullWidth
-                              variant="light"
-                            >
-                              Generar Código QR
-                            </Button>
-                          ) : (
-                            <Stack align="center" gap={6}>
-                              <QRCodeSVG value={qr} size={240} includeMargin />
-                              <Text size="xs" c="gray">
-                                {qrMeta?.seq ? `QR #${qrMeta.seq} · ` : null}
-                                Expira en {qrTtl}s
-                              </Text>
-                              {qrTtl === 0 && (
-                                <Button
-                                  variant="light"
-                                  leftSection={<BiRefresh size={16} />}
-                                  onClick={() => connect()}
-                                  size="xs"
-                                >
-                                  Regenerar QR
-                                </Button>
-                              )}
-                            </Stack>
-                          )}
-                        </Stack>
-                      )}
-                    </Box>
-                  )}
-
-                  {/* ACCIONES cuando está READY */}
-                  {code === "ready" && (
-                    <Group justify="center" mt="sm">
-                      <Button
-                        color="teal"
-                        variant="light"
-                        leftSection={<BiInfoCircle size={16} />}
-                        onClick={handleSendWelcomeTest}
-                        loading={sendingWelcome}
-                      >
-                        Enviar ejemplo a mi WhatsApp
-                      </Button>
-                      <Button
-                        variant="default"
-                        onClick={restart}
-                        loading={loadingRestart}
-                      >
-                        Reiniciar Cliente
-                      </Button>
-                      <Button
-                        variant="default"
-                        onClick={async () => {
-                          const phone = prompt(
-                            "Número E.164 (ej: 57300XXXXXXX):"
-                          )?.trim();
-                          if (phone) await sendTest(phone);
-                        }}
-                        loading={loadingSend}
-                      >
-                        Probar envío
-                      </Button>
-                      <Button
-                        color="red"
-                        onClick={logout}
-                        leftSection={<BiX size={16} />}
-                        loading={loadingLogout}
-                      >
-                        Cerrar sesión
-                      </Button>
-                    </Group>
-                  )}
-                </Stack>
-              )}
-
-              {/* META / FACEBOOK (Cloud API + coexistencia) */}
+        {tab === "asistentes" ? (
+          assistants
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isDesktop && comparison ? "minmax(0, 1fr) 320px" : "minmax(0, 1fr)",
+              gap: "var(--space-4)",
+              alignItems: "start",
+            }}
+          >
+            <div className="ag-stack" style={{ gap: "var(--space-3)", minWidth: 0 }}>
+              {webPanel}
               {showMetaPanel && organization?._id && (
-                <MetaConnectionPanel organizationId={organization._id} />
+                <>
+                  {methodCards}
+                  <div className="ag-card" style={{ padding: 20 }}>
+                    <MetaConnectionPanel organizationId={organization._id} />
+                  </div>
+                </>
               )}
-            </Stack>
-          </Tabs.Panel>
-
-          {/* ============================================================= */}
-          {/* TAB 2: AGENTE IA — comandos por WhatsApp                      */}
-          {/* ============================================================= */}
-          <Tabs.Panel value="agent" pt="md">
-            <Stack gap="sm">
-              <Title order={5} mb={4}>Agente IA por WhatsApp</Title>
-              <Text size="sm" c="dimmed">
-                Envía instrucciones por WhatsApp al número de AgenditApp (por ejemplo: "agenda
-                una cita para Juan mañana a las 3pm con María", "cancela la cita de las 10am" o
-                "muéstrame los ingresos de esta semana") y el asistente las ejecuta directamente
-                en tu agenda. Las respuestas te llegan por WhatsApp a tu número de contacto:{" "}
-                <Text span fw={600}>{organization?.phoneNumber || "—"}</Text>.
-              </Text>
-              <Stack gap="sm" mt="xs">
-                <TextInput
-                  label="Número adicional autorizado (opcional)"
-                  description="Si otro número del equipo también puede enviar comandos al bot, agrégalo aquí en formato E.164. Ej: +573218104634"
-                  placeholder="+57300..."
-                  value={waPhone}
-                  onChange={(e) => setWaPhone(e.currentTarget.value)}
-                />
-                <Switch
-                  label="Activar agente IA"
-                  description="Cuando está activo, podrás gestionar citas, servicios, profesionales y configuración escribiendo directamente al WhatsApp de AgenditApp."
-                  checked={waAgentEnabled}
-                  onChange={(e) => setWaAgentEnabled(e.currentTarget.checked)}
-                />
-                <Group justify="flex-end">
-                  <Button onClick={handleSaveAgentConfig} loading={savingAgent} size="sm">
-                    Guardar configuración
-                  </Button>
-                </Group>
-              </Stack>
-            </Stack>
-          </Tabs.Panel>
-        </Tabs>
-
-        {/* FOOTER */}
-        <Text size="xs" c="dimmed">
-          ¿Necesitas ayuda? Escríbenos o revisa la guía de instalación.{" "}
-          <Anchor size="xs" href="#" onClick={(e) => e.preventDefault()}>
-            Ver guía
-          </Anchor>
-        </Text>
-      </Stack>
-    </Paper>
+            </div>
+            {comparison}
+          </div>
+        )}
+      </div>
+    </Box>
   );
 };
 

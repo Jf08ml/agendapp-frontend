@@ -147,7 +147,7 @@ export function buildAdminNav(can: NavPermissions): NavGroup[] {
           icon: "whatsapp",
           links: [
             { label: "Conexión", to: "/gestionar-whatsapp", visible: can.whatsappRead },
-            { label: "Mensajes", to: "/mensajes-whatsapp", visible: can.whatsappRead },
+            { label: "Mensajes automáticos", to: "/mensajes-whatsapp", visible: can.whatsappRead },
             { label: "Campañas", to: "/admin/campaigns", visible: can.campaignsRead },
           ],
         },

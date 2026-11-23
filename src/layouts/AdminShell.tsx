@@ -18,6 +18,7 @@ import NotificationsMenu from "./NotificationsMenu";
 import UserMenu from "./UserMenu";
 import AdminNavbar, { OrgMark } from "./AdminNavbar";
 import { NAV_ICONS } from "./navIcons";
+import { activeWhatsappTab } from "../components/whatsapp/whatsappTabsModel";
 import {
   allNavLinks,
   buildAdminNav,
@@ -59,8 +60,10 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
   const userLinks = useMemo(() => buildUserMenuLinks(can, hasNewUpdates), [can, hasNewUpdates]);
   const tabs = useMemo(() => buildTabbar(can), [can]);
   const activeTo = findActiveLink(allNavLinks(groups), location.pathname, location.search);
-  const tabActive = (to: string) => activeTo === to;
-  const moreActive = !!activeTo && !tabs.some((t) => t.to === activeTo);
+  // Toda la sección WhatsApp (mensajes, campañas, asistentes) marca la pestaña WhatsApp
+  const inWhatsapp = activeWhatsappTab(location.pathname, location.search) !== null;
+  const tabActive = (to: string) => activeTo === to || (to === "/gestionar-whatsapp" && inWhatsapp);
+  const moreActive = !!activeTo && !tabs.some((t) => tabActive(t.to));
 
   const agentName = organization?.aiAssistantName || "Roxi";
 
