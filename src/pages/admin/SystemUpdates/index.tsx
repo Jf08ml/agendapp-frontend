@@ -1,36 +1,11 @@
+// Novedades (rediseño, NovedadesHistorial): tarjetas por versión con el tipo de
+// cada cambio (Nuevo, Mejora o Corrección), «Más reciente», soporte por WhatsApp y
+// la versión de compilación al pie (antes en el footer fijo).
 import { useEffect, useState } from "react";
-import {
-  Box,
-  Title,
-  Text,
-  Stack,
-  Paper,
-  Badge,
-  Group,
-  ThemeIcon,
-  Divider,
-  Loader,
-  Alert,
-  Collapse,
-  UnstyledButton,
-  Button,
-} from "@mantine/core";
-import {
-  IconBrandWhatsapp,
-  IconBell,
-  IconSparkles,
-  IconTool,
-  IconBug,
-  IconAlertCircle,
-  IconChevronDown,
-  IconChevronUp,
-} from "@tabler/icons-react";
-import {
-  getPublishedAnnouncements,
-  markAnnouncementsRead,
-  type Announcement,
-  type AnnouncementItem,
-} from "../../../services/announcementService";
+import { Button, Collapse, Skeleton, UnstyledButton } from "@mantine/core";
+import { IconBrandWhatsapp, IconBug, IconChevronDown, IconChevronUp, IconInfoCircle, IconSparkles, IconTool } from "@tabler/icons-react";
+import { getPublishedAnnouncements, markAnnouncementsRead, type Announcement, type AnnouncementItem } from "../../../services/announcementService";
+import { usePwaActions } from "../../../hooks/usePwaActions";
 
 export const NOVEDADES_STORAGE_KEY = "novedades_last_seen";
 
@@ -39,16 +14,10 @@ const SUPPORT_WHATSAPP_URL = "https://api.whatsapp.com/send/?phone=573506674686"
 
 type UpdateType = AnnouncementItem["type"];
 
-const BADGE_CONFIG: Record<UpdateType, { label: string; color: string }> = {
-  new: { label: "Nuevo", color: "teal" },
-  improvement: { label: "Mejora", color: "blue" },
-  fix: { label: "Corrección", color: "orange" },
-};
-
-const TYPE_ICON: Record<UpdateType, React.ReactNode> = {
-  new: <IconSparkles size={13} />,
-  improvement: <IconTool size={13} />,
-  fix: <IconBug size={13} />,
+const TYPE_CONFIG: Record<UpdateType, { label: string; tone: string; Icon: typeof IconSparkles }> = {
+  new: { label: "Nuevo", tone: "ag-badge--brand", Icon: IconSparkles },
+  improvement: { label: "Mejora", tone: "ag-badge--info", Icon: IconTool },
+  fix: { label: "Corrección", tone: "", Icon: IconBug },
 };
 
 export default function SystemUpdates() {
@@ -56,8 +25,11 @@ export default function SystemUpdates() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
+  const { appVersion } = usePwaActions();
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(false);
     getPublishedAnnouncements()
       .then((data) => {
         setAnnouncements(data);
@@ -69,7 +41,9 @@ export default function SystemUpdates() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(load, []);
 
   const toggleDetail = (key: string) => {
     setOpenDetails((prev) => {
@@ -81,145 +55,109 @@ export default function SystemUpdates() {
   };
 
   return (
-    <Box p="md" maw={720} mx="auto">
-      <Group mb="xl" justify="space-between" align="center" gap="sm">
-        <Group gap="sm" align="center" wrap="nowrap">
-          <ThemeIcon size="lg" radius="md" variant="light" color="violet">
-            <IconBell size={20} />
-          </ThemeIcon>
-          <div>
-            <Title order={2}>Novedades del sistema</Title>
-            <Text size="sm" c="dimmed">
-              Últimas actualizaciones y mejoras de la plataforma
-            </Text>
-          </div>
-        </Group>
+    <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+      <div className="ag-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <span className="ag-muted" style={{ fontSize: 14 }}>Lo último que cambió en AgenditApp.</span>
         <Button
           component="a"
           href={SUPPORT_WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          color="green"
-          variant="light"
-          leftSection={<IconBrandWhatsapp size={18} />}
+          variant="default"
+          size="xs"
+          leftSection={<IconBrandWhatsapp size={16} />}
         >
           Soporte por WhatsApp
         </Button>
-      </Group>
+      </div>
 
       {loading && (
-        <Stack align="center" py="xl">
-          <Loader size="sm" />
-          <Text size="sm" c="dimmed">Cargando novedades...</Text>
-        </Stack>
+        <div className="ag-stack" style={{ gap: 12 }}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="ag-card" style={{ padding: 20 }}>
+              <Skeleton height={16} width="30%" mb={14} />
+              <Skeleton height={12} mb={8} />
+              <Skeleton height={12} width="80%" />
+            </div>
+          ))}
+        </div>
       )}
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
-          No se pudieron cargar las novedades. Intenta de nuevo más tarde.
-        </Alert>
+        <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+          <IconInfoCircle size={20} />
+          <div style={{ flex: 1 }}>No pudimos cargar las novedades.</div>
+          <Button size="xs" variant="outline" onClick={load}>
+            Reintentar
+          </Button>
+        </div>
       )}
 
       {!loading && !error && announcements.length === 0 && (
-        <Text c="dimmed" ta="center" py="xl">
-          Aún no hay novedades publicadas.
-        </Text>
+        <div className="ag-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+          <b>Aún no hay novedades publicadas</b>
+        </div>
       )}
 
-      {!loading && !error && (
-        <Stack gap="lg">
-          {announcements.map((entry, i) => (
-            <Paper key={entry._id} withBorder radius="md" p="lg">
-              <Group justify="space-between" mb="md">
-                <Group gap="xs">
-                  {i === 0 && (
-                    <Badge size="xs" color="violet" variant="filled">
-                      Más reciente
-                    </Badge>
-                  )}
-                  <Text fw={700} size="lg">
-                    v{entry.version}
-                  </Text>
-                </Group>
-                <Group gap="xs">
-                  {entry.viewCount !== undefined && entry.viewCount > 0 && (
-                    <Text size="xs" c="dimmed">
-                      {entry.viewCount} {entry.viewCount === 1 ? "lectura" : "lecturas"}
-                    </Text>
-                  )}
-                  <Text size="sm" c="dimmed">
-                    {entry.date}
-                  </Text>
-                </Group>
-              </Group>
-              <Divider mb="md" />
-              <Stack gap="sm">
-                {entry.items.map((item, j) => {
-                  const cfg = BADGE_CONFIG[item.type];
-                  const detailKey = `${entry._id}_${j}`;
-                  const detailOpen = openDetails.has(detailKey);
-                  const hasDetail = !!item.detail?.trim();
-
-                  return (
-                    <Box key={j}>
-                      <Group gap="sm" align="flex-start" wrap="nowrap">
-                        <Badge
-                          size="xs"
-                          color={cfg.color}
-                          variant="light"
-                          leftSection={TYPE_ICON[item.type]}
-                          style={{ flexShrink: 0, marginTop: 2 }}
-                        >
-                          {cfg.label}
-                        </Badge>
-                        <Box style={{ flex: 1 }}>
-                          <Text size="sm">{item.text}</Text>
-                          {hasDetail && (
-                            <UnstyledButton
-                              onClick={() => toggleDetail(detailKey)}
-                              mt={4}
-                            >
-                              <Group gap={4} align="center">
-                                <Text size="xs" c="violet" fw={500}>
-                                  {detailOpen ? "Ver menos" : "Ver más"}
-                                </Text>
-                                {detailOpen ? (
-                                  <IconChevronUp size={12} color="var(--mantine-color-violet-6)" />
-                                ) : (
-                                  <IconChevronDown size={12} color="var(--mantine-color-violet-6)" />
-                                )}
-                              </Group>
-                            </UnstyledButton>
-                          )}
-                        </Box>
-                      </Group>
-
+      {!loading &&
+        !error &&
+        announcements.map((entry, i) => (
+          <article key={entry._id} className="ag-card" style={{ padding: 20 }}>
+            <div className="ag-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              <div className="ag-row" style={{ gap: 8 }}>
+                <h2 className="ag-h" style={{ margin: 0 }}>Versión {entry.version}</h2>
+                {i === 0 && <span className="ag-badge ag-badge--brand">Más reciente</span>}
+              </div>
+              <span className="ag-subtle">{entry.date}</span>
+            </div>
+            <div className="ag-stack" style={{ gap: 12 }}>
+              {entry.items.map((item, j) => {
+                const cfg = TYPE_CONFIG[item.type];
+                const detailKey = `${entry._id}_${j}`;
+                const detailOpen = openDetails.has(detailKey);
+                const hasDetail = !!item.detail?.trim();
+                return (
+                  <div key={j} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <span className={`ag-badge ${cfg.tone}`} style={{ flex: "none", minWidth: 104, justifyContent: "center" }}>
+                      <cfg.Icon size={13} /> {cfg.label}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, lineHeight: "20px" }}>{item.text}</div>
                       {hasDetail && (
-                        <Collapse in={detailOpen}>
-                          <Box
-                            mt="xs"
-                            ml={52}
-                            p="sm"
-                            style={{
-                              borderLeft: "2px solid var(--mantine-color-violet-3)",
-                              borderRadius: "0 4px 4px 0",
-                              backgroundColor: "var(--mantine-color-violet-0)",
-                            }}
-                          >
-                            <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap" }}>
+                        <>
+                          <UnstyledButton onClick={() => toggleDetail(detailKey)} mt={4} className="ag-link" style={{ fontSize: 13 }}>
+                            {detailOpen ? "Ver menos" : "Ver más"} {detailOpen ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
+                          </UnstyledButton>
+                          <Collapse in={detailOpen}>
+                            <div
+                              className="ag-muted"
+                              style={{
+                                marginTop: 8,
+                                padding: "10px 12px",
+                                borderLeft: "2px solid var(--line-strong)",
+                                background: "var(--surface-muted)",
+                                fontSize: 13,
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
                               {item.detail}
-                            </Text>
-                          </Box>
-                        </Collapse>
+                            </div>
+                          </Collapse>
+                        </>
                       )}
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </Paper>
-          ))}
-        </Stack>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+        ))}
+
+      {appVersion && (
+        <div className="ag-subtle" style={{ textAlign: "center" }}>
+          Versión de la app: {appVersion.buildDate}
+        </div>
       )}
-    </Box>
+    </div>
   );
 }

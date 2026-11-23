@@ -74,7 +74,7 @@
 .ag-pick[aria-checked="true"] .ag-pick__check { background: var(--brand); border-color: var(--brand); }
 .ag-tabs { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-1); }
 .ag-chip { flex: none; height: 32px; padding: 0 14px; border-radius: var(--radius-full); border: 1px solid var(--line-control); background: var(--surface-raised); color: var(--ink); font: 500 13px/18px var(--font-sans); display: inline-flex; align-items: center; gap: 6px; }
-.ag-chip[aria-selected="true"] { background: var(--ink); border-color: var(--ink); color: var(--ink-inverse); }
+.ag-chip[aria-selected="true"], .ag-chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--ink-inverse); }
 .ag-chip .count { color: inherit; opacity: .7; font-variant-numeric: tabular-nums; }
 
 /* Stepper */
