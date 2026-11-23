@@ -1,22 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
-import {
-  Alert,
-  Anchor,
-  Button,
-  Card,
-  Group,
-  Loader,
-  PasswordInput,
-  PinInput,
-  SegmentedControl,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
-import { IconAlertCircle, IconBrandWhatsapp, IconMail } from "@tabler/icons-react";
+import { Button, Loader, PasswordInput, PinInput, TextInput } from "@mantine/core";
+import { IconBrandWhatsapp, IconCheck, IconChevronRight, IconInfoCircle, IconMail } from "@tabler/icons-react";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
 import {
   AccessAccount,
@@ -35,6 +21,7 @@ import { detectSignupCountry } from "../../utils/signupRegion";
 import type { CountryCode } from "libphonenumber-js";
 import { AGENDITAPP_SUPPORT_WA_URL, recoveryExchangeUrl } from "../../utils/panelAccess";
 import AuthCard from "../../components/auth/AuthCard";
+import { IndeterminateBar, StatusIcon } from "../../components/auth/AccessStatus";
 
 /**
  * /recuperar-acceso — el dueño entra a su panel sin la contraseña:
@@ -249,275 +236,285 @@ export default function RecoverAccessPage() {
     setError(null);
   };
 
+  // Botón principal: color de la plataforma en app.agenditapp.com; el del
+  // negocio dentro de su dominio.
+  const primaryColor = isGlobal ? "var(--platform)" : undefined;
+
   const errorAlert = error && (
-    <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
-      {error}
-    </Alert>
+    <div className="ag-alert ag-alert--danger">
+      <IconInfoCircle size={20} />
+      <div>{error}</div>
+    </div>
   );
 
   const supportLink = (
-    <Text size="xs" c="dimmed" ta="center">
+    <div className="ag-subtle" style={{ textAlign: "center" }}>
       ¿No puedes recibir el código?{" "}
-      <Anchor href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" size="xs">
+      <a href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" className="ag-link">
         Escríbenos por WhatsApp
-      </Anchor>
-    </Text>
+      </a>
+    </div>
+  );
+
+  const heading = (title: string, text?: React.ReactNode) => (
+    <div>
+      <h1>{title}</h1>
+      {text && (
+        <p className="ag-muted" style={{ margin: "4px 0 0", fontSize: 14 }}>
+          {text}
+        </p>
+      )}
+    </div>
+  );
+
+  const textBtn = (label: string, onClick: () => void, disabled = false) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="ag-link"
+      style={{ border: 0, background: "none", padding: 0, cursor: disabled ? "default" : "pointer", color: disabled ? "var(--ink-subtle)" : undefined }}
+    >
+      {label}
+    </button>
   );
 
   return (
     // AuthCard (rediseño): tarjeta clara sobre surface-muted con el logo del negocio;
     // en app.agenditapp.com, sin marca de negocio.
     <AuthCard platform={isGlobal} subtitle="" maxWidth={440}>
-        {step === "identify" && (
-          <Stack gap="md">
-            <div>
-              <Title order={3}>
-                {!isGlobal && organization?.name ? `Entra al panel de ${organization.name}` : "Entra a tu panel"}
-              </Title>
-              <Text size="sm" c="dimmed" mt={4}>
-                {isGlobal
-                  ? "¿Olvidaste tu contraseña o el enlace de tu negocio? Escribe el correo o el celular con el que registraste tu negocio y te enviamos un código."
-                  : "¿Olvidaste tu contraseña? Escribe el correo o el celular con el que registraste el negocio y te enviamos un código."}
-              </Text>
-            </div>
-            <SegmentedControl
-              fullWidth
-              value={mode}
-              onChange={(v) => {
-                setMode(v as "email" | "phone");
-                setError(null);
-              }}
-              data={[
-                { label: "Con mi correo", value: "email" },
-                { label: "Con mi celular", value: "phone" },
-              ]}
-            />
-            {mode === "email" ? (
-              <TextInput
-                label="Correo"
-                placeholder="tu@email.com"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.currentTarget.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              />
-            ) : (
-              <InternationalPhoneInput
-                label="Celular"
-                compact
-                defaultCountry={phoneDefaultCountry}
-                value={phone}
-                onChange={(e164) => setPhone(e164 || "")}
-                placeholder="300 000 0000"
-              />
-            )}
-            {isGlobal && (
-              <Turnstile
-                ref={turnstileRef}
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                options={{ size: "invisible" }}
-                onSuccess={(token) => {
-                  setTurnstileToken(token);
-                  tokenResolverRef.current?.(token);
-                  tokenResolverRef.current = null;
-                }}
-                onExpire={() => setTurnstileToken("")}
-                onError={() => setTurnstileToken("")}
-              />
-            )}
-            {errorAlert}
-            <Button fullWidth onClick={handleLookup} loading={loading}>
-              Buscar mi cuenta
-            </Button>
-            <Text size="xs" c="dimmed" ta="center">
-              ¿Eres empleado de un negocio? Pídele al administrador que te cambie la contraseña.
-            </Text>
-          </Stack>
-        )}
-
-        {step === "choose" && accounts && (
-          <Stack gap="md">
-            {accounts.length === 0 ? (
-              <>
-                <Title order={3}>No encontramos tu cuenta</Title>
-                <Text size="sm" c="dimmed">
-                  {isGlobal
-                    ? `No hay ningún negocio registrado con ${mode === "email" ? "ese correo" : "ese celular"}.`
-                    : `${mode === "email" ? "Ese correo" : "Ese celular"} no es el del dueño de ${organization?.name ?? "este negocio"}.`}{" "}
-                  Revisa que esté bien escrito o intenta con {mode === "email" ? "tu celular" : "tu correo"}.
-                </Text>
-                <Button variant="light" onClick={restart}>
-                  Intentar de nuevo
-                </Button>
-                {supportLink}
-              </>
-            ) : (
-              <>
-                <div>
-                  <Title order={3}>¿A dónde te enviamos el código?</Title>
-                  <Text size="sm" c="dimmed" mt={4}>
-                    {accounts.length > 1 ? "Encontramos varios negocios. Elige el tuyo y " : "Elige "}
-                    por dónde quieres recibir el código.
-                  </Text>
-                </div>
-                {accounts.map((acc) => (
-                  <Card key={acc.organizationId} withBorder radius="md" p="md">
-                    <Text fw={600} mb="xs">
-                      {acc.businessName}
-                    </Text>
-                    <Stack gap={8}>
-                      {acc.channels.map((ch) => (
-                        <div key={ch.channel}>
-                          <Button
-                            fullWidth
-                            variant={ch.channel === "whatsapp" ? "filled" : "default"}
-                            color={ch.channel === "whatsapp" ? "green" : undefined}
-                            leftSection={ch.channel === "whatsapp" ? <IconBrandWhatsapp size={18} /> : <IconMail size={18} />}
-                            disabled={!ch.available || loading}
-                            loading={loading && selectedOrg === acc.organizationId}
-                            onClick={() => {
-                              setSelectedOrg(acc.organizationId);
-                              handleSend(acc.organizationId, ch.channel);
-                            }}
-                            styles={{ label: { whiteSpace: "normal" } }}
-                            h="auto"
-                            py={8}
-                          >
-                            {ch.channel === "whatsapp" ? `WhatsApp a ${ch.masked}` : `Correo a ${ch.masked}`}
-                          </Button>
-                          {!ch.available && ch.reason === "bounced" && (
-                            <Text size="xs" c="var(--warning)" mt={4}>
-                              Los correos a esta dirección no están llegando. Usa WhatsApp y, ya dentro, corrige tu
-                              correo en Mi negocio.
-                            </Text>
-                          )}
-                        </div>
-                      ))}
-                    </Stack>
-                  </Card>
-                ))}
-                {errorAlert}
-                <Anchor component="button" type="button" size="sm" onClick={restart}>
-                  Usar otro correo o celular
-                </Anchor>
-              </>
-            )}
-          </Stack>
-        )}
-
-        {step === "code" && sent && (
-          <Stack gap="md" align="stretch">
-            <div>
-              <Title order={3}>Escribe el código</Title>
-              <Text size="sm" c="dimmed" mt={4}>
-                Te enviamos un código de 6 dígitos {sent.channel === "whatsapp" ? "por WhatsApp" : "por correo"} a{" "}
-                <strong>{sent.masked}</strong>. Vence en {sent.expiresInMinutes} minutos.
-                {sent.channel === "email" && " También puedes tocar el botón del correo."}
-              </Text>
-            </div>
-            <Group justify="center">
-              <PinInput
-                length={6}
-                type="number"
-                oneTimeCode
-                autoFocus
-                value={code}
-                onChange={setCode}
-                onComplete={(v) => handleVerify(v)}
-                disabled={loading}
-                size="md"
-              />
-            </Group>
-            {errorAlert}
-            <Button fullWidth onClick={() => handleVerify()} loading={loading} disabled={code.length !== 6}>
-              Verificar
-            </Button>
-            <Group justify="space-between">
-              <Anchor
-                component="button"
+      {step === "identify" && (
+        <>
+          {heading(
+            !isGlobal && organization?.name ? `Entra al panel de ${organization.name}` : "Entra a tu panel",
+            isGlobal
+              ? "¿Olvidaste tu contraseña o el enlace de tu negocio? Escribe el correo o el celular con el que lo registraste y te enviamos un código."
+              : "¿Olvidaste tu contraseña? Escribe el correo o el celular con el que registraste el negocio y te enviamos un código."
+          )}
+          <div className="ag-segment" role="group" aria-label="Buscar con" style={{ display: "flex" }}>
+            {(
+              [
+                ["email", "Con mi correo"],
+                ["phone", "Con mi celular"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
                 type="button"
-                size="sm"
-                disabled={resendIn > 0 || loading}
-                c={resendIn > 0 ? "dimmed" : undefined}
-                onClick={() => selectedOrg && handleSend(selectedOrg, sent.channel)}
-              >
-                {resendIn > 0 ? `Reenviar en ${resendIn} s` : "Reenviar código"}
-              </Anchor>
-              <Anchor
-                component="button"
-                type="button"
-                size="sm"
+                aria-pressed={mode === value}
+                style={{ flex: 1, cursor: "pointer" }}
                 onClick={() => {
+                  setMode(value);
                   setError(null);
-                  setStep("choose");
                 }}
               >
-                Usar otro medio
-              </Anchor>
-            </Group>
-            {supportLink}
-          </Stack>
-        )}
+                {label}
+              </button>
+            ))}
+          </div>
+          {mode === "email" ? (
+            <TextInput
+              label="Correo"
+              placeholder="tu@correo.com"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+            />
+          ) : (
+            <InternationalPhoneInput
+              label="Celular"
+              compact
+              defaultCountry={phoneDefaultCountry}
+              value={phone}
+              onChange={(e164) => setPhone(e164 || "")}
+              placeholder="300 000 0000"
+            />
+          )}
+          {isGlobal && (
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+              options={{ size: "invisible" }}
+              onSuccess={(token) => {
+                setTurnstileToken(token);
+                tokenResolverRef.current?.(token);
+                tokenResolverRef.current = null;
+              }}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
+          )}
+          {errorAlert}
+          <Button fullWidth size="md" color={primaryColor} onClick={handleLookup} loading={loading}>
+            Buscar mi cuenta
+          </Button>
+          <div className="ag-subtle" style={{ textAlign: "center" }}>
+            ¿Eres empleado de un negocio? Pídele al administrador que te cambie la contraseña.
+          </div>
+        </>
+      )}
 
-        {step === "password" && (
-          <Stack gap="md">
-            {loading && !completion ? (
-              <Stack align="center" py="lg">
-                <Loader />
-                <Text size="sm" c="dimmed">
-                  Verificando el enlace…
-                </Text>
-              </Stack>
-            ) : completion ? (
+      {step === "choose" &&
+        accounts &&
+        (accounts.length === 0 ? (
+          <>
+            {heading(
+              "No encontramos tu cuenta",
               <>
-                <div>
-                  <Title order={3}>¡Listo! Ya puedes entrar</Title>
-                  <Text size="sm" c="dimmed" mt={4}>
-                    Panel de <strong>{completion.businessName}</strong>. Tu correo de ingreso es{" "}
-                    <strong>{completion.email}</strong>. Si no recuerdas tu contraseña, crea una nueva:
-                  </Text>
-                </div>
-                <PasswordInput
-                  label="Contraseña nueva"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.currentTarget.value)}
-                />
-                <PasswordInput
-                  label="Repite la contraseña"
-                  autoComplete="new-password"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.currentTarget.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleComplete(true)}
-                />
-                {errorAlert}
-                <Button fullWidth onClick={() => handleComplete(true)} loading={loading} disabled={!password}>
-                  Guardar contraseña y entrar
-                </Button>
-                <Button fullWidth variant="subtle" onClick={() => handleComplete(false)} disabled={loading}>
-                  Entrar sin cambiarla
-                </Button>
-              </>
-            ) : (
-              <>
-                {errorAlert}
-                <Button variant="light" onClick={restart}>
-                  Pedir un código nuevo
-                </Button>
+                {isGlobal
+                  ? `No hay ningún negocio registrado con ${mode === "email" ? "ese correo" : "ese celular"}.`
+                  : `${mode === "email" ? "Ese correo" : "Ese celular"} no es el del dueño de ${organization?.name ?? "este negocio"}.`}{" "}
+                Revisa que esté bien escrito o intenta con {mode === "email" ? "tu celular" : "tu correo"}.
               </>
             )}
-          </Stack>
-        )}
+            <div className="ag-stack" style={{ gap: 8 }}>
+              <Button fullWidth color={primaryColor} onClick={restart}>
+                Usar otro correo o celular
+              </Button>
+              <Button fullWidth variant="default" component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" leftSection={<IconBrandWhatsapp size={16} />}>
+                Escríbenos por WhatsApp
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {heading(
+              accounts.length > 1 ? "Elige tu negocio" : "¿A dónde te enviamos el código?",
+              accounts.length > 1 ? "Encontramos varios negocios. Elige el tuyo y por dónde quieres recibir el código." : "Elige por dónde quieres recibir el código."
+            )}
+            {accounts.map((acc) => (
+              <div key={acc.organizationId} className="ag-stack" style={{ gap: 8 }}>
+                {accounts.length > 1 && <b style={{ fontSize: 14 }}>{acc.businessName}</b>}
+                {acc.channels.map((ch) => {
+                  const busy = loading && selectedOrg === acc.organizationId;
+                  return (
+                    <div key={ch.channel}>
+                      <button
+                        type="button"
+                        className="ag-opt"
+                        disabled={!ch.available || loading}
+                        onClick={() => {
+                          setSelectedOrg(acc.organizationId);
+                          handleSend(acc.organizationId, ch.channel);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          alignItems: "center",
+                          cursor: ch.available && !loading ? "pointer" : "default",
+                          opacity: ch.available ? 1 : 0.55,
+                          font: "inherit",
+                          color: "inherit",
+                        }}
+                      >
+                        <span style={{ color: "var(--ink-muted)", display: "grid" }}>
+                          {ch.channel === "whatsapp" ? <IconBrandWhatsapp size={20} /> : <IconMail size={20} />}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <b>{ch.channel === "whatsapp" ? "WhatsApp" : "Correo"}</b>
+                          <span className="d ag-num" style={{ display: "block" }}>
+                            {ch.masked}
+                          </span>
+                        </span>
+                        {busy ? <Loader size={16} /> : <IconChevronRight size={18} style={{ color: "var(--ink-subtle)" }} />}
+                      </button>
+                      {!ch.available && ch.reason === "bounced" && (
+                        <div style={{ fontSize: 13, color: "var(--warning)", marginTop: 4 }}>
+                          Los correos a esta dirección no están llegando. Usa WhatsApp y, ya dentro, corrige tu correo en Mi negocio.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {errorAlert}
+            <div style={{ textAlign: "center" }}>{textBtn("Usar otro correo o celular", restart)}</div>
+          </>
+        ))}
 
-        {step === "redirecting" && (
-          <Stack align="center" gap="md" py="lg">
-            <Loader size="lg" />
-            <Text c="dimmed" size="sm">
-              Abriendo tu panel…
-            </Text>
-          </Stack>
-        )}
+      {step === "code" && sent && (
+        <>
+          {heading(
+            "Escribe el código",
+            <>
+              Te enviamos un código de 6 dígitos {sent.channel === "whatsapp" ? "por WhatsApp" : "por correo"} a <b style={{ color: "var(--ink)" }}>{sent.masked}</b>.
+              Vence en {sent.expiresInMinutes} minutos.
+              {sent.channel === "email" && " También puedes tocar el botón del correo."}
+            </>
+          )}
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <PinInput length={6} type="number" oneTimeCode autoFocus value={code} onChange={setCode} onComplete={(v) => handleVerify(v)} disabled={loading} size="md" />
+          </div>
+          {errorAlert}
+          <Button fullWidth size="md" color={primaryColor} onClick={() => handleVerify()} loading={loading} disabled={code.length !== 6}>
+            Verificar
+          </Button>
+          <div className="ag-row" style={{ justifyContent: "space-between" }}>
+            {textBtn(resendIn > 0 ? `Reenviar en ${resendIn} s` : "Reenviar código", () => selectedOrg && handleSend(selectedOrg, sent.channel), resendIn > 0 || loading)}
+            {textBtn("Usar otro medio", () => {
+              setError(null);
+              setStep("choose");
+            })}
+          </div>
+          {supportLink}
+        </>
+      )}
+
+      {step === "password" &&
+        (loading && !completion ? (
+          <>
+            {heading("Verificando el enlace…", "Un momento.")}
+            <IndeterminateBar />
+          </>
+        ) : completion ? (
+          <>
+            <StatusIcon tone="success">
+              <IconCheck size={26} />
+            </StatusIcon>
+            {heading(
+              "Listo, ya puedes entrar",
+              <>
+                Panel de <b style={{ color: "var(--ink)" }}>{completion.businessName}</b>. Tu correo de ingreso es{" "}
+                <b style={{ color: "var(--ink)" }}>{completion.email}</b>. Si no recuerdas tu contraseña, crea una nueva.
+              </>
+            )}
+            <PasswordInput label="Contraseña nueva" placeholder={`Mínimo ${MIN_PASSWORD} caracteres`} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
+            <PasswordInput
+              label="Repite la contraseña"
+              autoComplete="new-password"
+              value={password2}
+              onChange={(e) => setPassword2(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleComplete(true)}
+            />
+            {errorAlert}
+            <div className="ag-stack" style={{ gap: 8 }}>
+              <Button fullWidth size="md" color={primaryColor} onClick={() => handleComplete(true)} loading={loading} disabled={!password}>
+                Guardar contraseña y entrar
+              </Button>
+              <Button fullWidth variant="default" onClick={() => handleComplete(false)} disabled={loading}>
+                Entrar sin cambiarla
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            {heading("No pudimos abrir el enlace")}
+            {errorAlert}
+            <Button fullWidth color={primaryColor} onClick={restart}>
+              Pedir un código nuevo
+            </Button>
+          </>
+        ))}
+
+      {step === "redirecting" && (
+        <>
+          {heading("Abriendo tu panel…", "Un momento.")}
+          <IndeterminateBar />
+        </>
+      )}
     </AuthCard>
   );
 }

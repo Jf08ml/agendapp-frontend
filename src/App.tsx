@@ -15,7 +15,6 @@ import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
-import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
@@ -27,6 +26,7 @@ import {
   ORG_CONFIG_NOT_FOUND,
 } from "./features/organization/sliceOrganization";
 import OrgLoadError from "./components/OrgLoadError";
+import OrgLoadingSkeleton from "./components/OrgLoadingSkeleton";
 
 import { ChristmasDecorations } from "./components/seasonal/ChristmasDecorations";
 import {
@@ -253,7 +253,7 @@ function AppContent() {
         />
       );
     }
-    return <CustomLoaderHtml loadingText="Cargando organización..." />;
+    return <OrgLoadingSkeleton />;
   }
 
   const routes = (
