@@ -1,8 +1,9 @@
 // components/ReservationDepositAlert.tsx
-import { Alert, Stack, Text, Button, Group, Card, Badge, CopyButton, ActionIcon, Tooltip, Image, Modal } from "@mantine/core";
-import { BiInfoCircle, BiCopy } from "react-icons/bi";
-import { BsWhatsapp } from "react-icons/bs";
-import { CheckIcon } from "@mantine/core";
+// Abono manual (rediseño, PagosPublico): para negocios sin pago en línea. Monto con
+// «Copiar monto», métodos como chips, datos de la cuenta y «Enviar comprobante»
+// por WhatsApp con el mensaje armado como antes.
+import { Button, CopyButton, ActionIcon, Tooltip, Image, Modal, Drawer } from "@mantine/core";
+import { IconBrandWhatsapp, IconCheck, IconCopy, IconQrcode } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
@@ -39,6 +40,7 @@ export function ReservationDepositAlert({
   const [opened, { open, close }] = useDisclosure(false);
   const [selectedQR, setSelectedQR] = useState<{ url: string; label: string } | null>(null);
   const isMobile = useMediaQuery("(max-width: 48rem)");
+  const [methodIdx, setMethodIdx] = useState(0);
   
   const requireDeposit = organization?.requireReservationDeposit || false;
   const hasExplicitDeposit = depositAmountProp !== undefined;
@@ -67,19 +69,6 @@ export function ReservationDepositAlert({
     transferencia_bancaria: "Transferencia bancaria",
     efectivo: "Efectivo",
     otros: "Otros",
-  };
-
-  const paymentTypeColors: Record<string, string> = {
-    nequi: "grape",
-    bancolombia: "yellow",
-    daviplata: "red",
-    mercado_pago: "blue",
-    pix: "teal",
-    yape: "violet",
-    sinpe: "indigo",
-    transferencia_bancaria: "cyan",
-    efectivo: "green",
-    otros: "gray",
   };
 
   const handleSendWhatsApp = () => {
@@ -117,200 +106,96 @@ export function ReservationDepositAlert({
     open();
   };
 
+  const method = paymentMethods[Math.min(methodIdx, Math.max(0, paymentMethods.length - 1))];
+
+  const copyRow = (label: string, value?: string) =>
+    value ? (
+      <div className="ag-row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "nowrap", padding: "3px 0" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="ag-subtle">{label}</div>
+          <div className="ag-num" style={{ fontSize: 14, fontWeight: 500, wordBreak: "break-all" }}>{value}</div>
+        </div>
+        <CopyButton value={value}>
+          {({ copied, copy }) => (
+            <Tooltip label={copied ? "Copiado" : "Copiar"} withArrow>
+              <ActionIcon variant="subtle" color="gray" onClick={copy} aria-label={`Copiar ${label.toLowerCase()}`}>
+                {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </CopyButton>
+      </div>
+    ) : null;
+
   return (
-    <Alert 
-      icon={!isMobile ? <BiInfoCircle size={20} /> : undefined} 
-      color="orange" 
-      variant="light"
-      p={isMobile ? "sm" : "md"}
-    >
-      <Stack gap={isMobile ? "sm" : "md"}>
+    <div className="ag-alert ag-alert--warning" style={{ display: "block", padding: 16 }}>
+      <div className="ag-stack" style={{ gap: 12 }}>
         <div>
-          <Text size="sm" fw={600} mb={4}>
-            Abono requerido para aprobar tu reserva
-          </Text>
-          <Text size={isMobile ? "xs" : "sm"}>
-            {depositPercentage ? (
-              <>
-                Para asegurar tu cita, deberás hacer un abono del <strong>{depositPercentage}%</strong> del
-                valor del servicio.
-              </>
-            ) : hidePrice ? (
-              <>Para asegurar tu cita, deberás hacer un abono. El monto te lo confirmaremos.</>
-            ) : (
-              <>
-                Para asegurar tu cita, deberás hacer un abono de{" "}
-                <strong>{formatCurrency(depositAmount, currency)}</strong>.
-              </>
-            )}
-          </Text>
+          <b style={{ display: "block" }}>Abono para confirmar tu reserva</b>
+          <div className="ag-muted" style={{ fontSize: 13, lineHeight: "18px" }}>
+            {depositPercentage
+              ? `Para asegurar tu cita, haz un abono del ${depositPercentage}% del valor del servicio y envíanos el comprobante.`
+              : hidePrice
+                ? "Para asegurar tu cita, haz un abono. El negocio te confirma el monto."
+                : "Para asegurar tu cita, haz el abono y envíanos el comprobante."}{" "}
+            El resto lo pagas en el establecimiento.
+          </div>
         </div>
 
-        {/* Monto a abonar (oculto si el servicio tiene el precio oculto) */}
         {!hidePrice && (
-          <Card withBorder padding="sm" style={{ backgroundColor: "#fff3e0" }}>
-            <Group justify="space-between" wrap="nowrap">
-              <div>
-                <Text size="xs" c="dimmed">
-                  Monto a abonar:
-                </Text>
-                <Text size={isMobile ? "md" : "lg"} fw={700} c="orange">
-                  {formatCurrency(depositAmount, currency)}
-                </Text>
-              </div>
-              <CopyButton value={depositAmount.toString()}>
-                {({ copied, copy }) => (
-                  <Tooltip label={copied ? "¡Copiado!" : "Copiar monto"}>
-                    <ActionIcon
-                      color={copied ? "teal" : "gray"}
-                      variant="light"
-                      onClick={copy}
-                      size={isMobile ? "md" : "lg"}
-                    >
-                      {copied ? <CheckIcon size={16} /> : <BiCopy size={16} />}
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-              </CopyButton>
-            </Group>
-          </Card>
-        )}
-
-        {/* Métodos de pago */}
-        {paymentMethods.length > 0 && (
-          <div>
-            <Text size="xs" fw={600} mb={isMobile ? 6 : 8}>
-              Métodos de pago disponibles:
-            </Text>
-            <Stack gap={isMobile ? "sm" : "xs"}>
-              {paymentMethods.map((method, index) => (
-                <Card key={index} withBorder padding={isMobile ? "sm" : "xs"} style={{ backgroundColor: "white" }}>
-                  <Stack gap={isMobile ? "xs" : "sm"}>
-                    {/* Info del método */}
-                    <Stack gap="xs">
-                      <Group justify="space-between" wrap="wrap" gap="xs">
-                        <Group gap="xs">
-                          <Badge color={paymentTypeColors[method.type]} size="sm">
-                            {paymentTypeLabels[method.type]}
-                          </Badge>
-                          {method.accountName && (
-                            <Text size="xs" truncate={isMobile ? "end" : undefined}>
-                              {method.accountName}
-                            </Text>
-                          )}
-                        </Group>
-                        {method.phoneNumber && (
-                          <Group gap={4}>
-                            <Text size="xs" style={{ fontFamily: "monospace" }}>
-                              {method.phoneNumber}
-                            </Text>
-                            <CopyButton value={method.phoneNumber}>
-                              {({ copied, copy }) => (
-                                <ActionIcon
-                                  size="xs"
-                                  color={copied ? "teal" : "gray"}
-                                  variant="subtle"
-                                  onClick={copy}
-                                >
-                                  {copied ? <CheckIcon size={12} /> : <BiCopy size={12} />}
-                                </ActionIcon>
-                              )}
-                            </CopyButton>
-                          </Group>
-                        )}
-                      </Group>
-                      {method.accountNumber && (
-                        <Group gap={4} wrap="wrap">
-                          <Text size="xs" c="dimmed">
-                            Cuenta: {method.accountNumber}
-                          </Text>
-                          <CopyButton value={method.accountNumber}>
-                            {({ copied, copy }) => (
-                              <ActionIcon
-                                size="xs"
-                                color={copied ? "teal" : "gray"}
-                                variant="subtle"
-                                onClick={copy}
-                              >
-                                {copied ? <CheckIcon size={12} /> : <BiCopy size={12} />}
-                              </ActionIcon>
-                            )}
-                          </CopyButton>
-                        </Group>
-                      )}
-                      {method.notes && (
-                        <Text size="xs" c="dimmed" fs="italic">
-                          {method.notes}
-                        </Text>
-                      )}
-                    </Stack>
-                    
-                    {/* QR Code centrado en mobile */}
-                    {method.qrCodeUrl && (
-                      <Group justify={isMobile ? "center" : "flex-end"}>
-                        <Image
-                          src={method.qrCodeUrl}
-                          alt={`QR ${paymentTypeLabels[method.type]}`}
-                          w={isMobile ? 120 : 100}
-                          h={isMobile ? 120 : 100}
-                          fit="contain"
-                          style={{ 
-                            border: "1px solid #e0e0e0", 
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            transition: "transform 0.2s"
-                          }}
-                          onClick={() => handleQRClick(method.qrCodeUrl!, method.type)}
-                          onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
-                          onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
-                        />
-                      </Group>
-                    )}
-                  </Stack>
-                </Card>
-              ))}
-            </Stack>
+          <div className="ag-card" style={{ padding: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div className="ag-subtle">Monto del abono</div>
+              <div className="ag-num" style={{ font: "600 22px/28px var(--font-sans)" }}>{formatCurrency(depositAmount, currency)}</div>
+            </div>
+            <CopyButton value={depositAmount.toString()}>
+              {({ copied, copy }) => (
+                <Button variant="default" size="xs" onClick={copy} leftSection={copied ? <IconCheck size={14} /> : <IconCopy size={14} />}>
+                  {copied ? "Copiado" : "Copiar monto"}
+                </Button>
+              )}
+            </CopyButton>
           </div>
         )}
 
-        {/* Botón de WhatsApp */}
-        <Button
-          leftSection={<BsWhatsapp size={18} />}
-          color="teal"
-          onClick={handleSendWhatsApp}
-          fullWidth
-        >
-          Enviar Comprobante por WhatsApp
+        {paymentMethods.length > 0 && method && (
+          <div className="ag-stack" style={{ gap: 8 }}>
+            <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }} role="group" aria-label="Método de pago">
+              {paymentMethods.map((m, i) => (
+                <button key={i} type="button" className="ag-chip" aria-pressed={i === methodIdx} onClick={() => setMethodIdx(i)}>
+                  {paymentTypeLabels[m.type] || m.type}
+                </button>
+              ))}
+            </div>
+            <div className="ag-card" style={{ padding: 12 }}>
+              {copyRow("Titular", method.accountName)}
+              {copyRow("Número de cuenta", method.accountNumber)}
+              {copyRow("Teléfono", method.phoneNumber)}
+              {method.notes && <div className="ag-subtle" style={{ marginTop: 4 }}>{method.notes}</div>}
+              {method.qrCodeUrl && (
+                <Button size="compact-xs" variant="subtle" mt={6} leftSection={<IconQrcode size={14} />} onClick={() => handleQRClick(method.qrCodeUrl!, method.type)}>
+                  Ver QR
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <Button leftSection={<IconBrandWhatsapp size={18} />} onClick={handleSendWhatsApp} fullWidth>
+          Enviar comprobante
         </Button>
+        <div className="ag-subtle" style={{ textAlign: "center" }}>Se abre WhatsApp con el mensaje listo; adjunta la captura del pago.</div>
+      </div>
 
-        <Text size="xs" c="dimmed" ta="center">
-          Una vez realices el pago, envíanos el comprobante y aprobaremos tu reserva
-        </Text>
-      </Stack>
-
-      <Modal
-        opened={opened}
-        onClose={close}
-        title={`Código QR - ${selectedQR?.label || ""}`}
-        centered
-        size={isMobile ? "sm" : "auto"}
-        fullScreen={isMobile}
-      >
-        <Stack align="center" gap="md" p={isMobile ? "xs" : "md"}>
-          {selectedQR && (
-            <Image
-              src={selectedQR.url}
-              alt={`QR ${selectedQR.label}`}
-              maw={isMobile ? "100%" : 400}
-              w={isMobile ? "100%" : "auto"}
-              fit="contain"
-            />
-          )}
-          <Text size="sm" c="dimmed" ta="center">
-            Escanea este código QR para realizar el pago
-          </Text>
-        </Stack>
-      </Modal>
-    </Alert>
+      {isMobile ? (
+        <Drawer opened={opened} onClose={close} position="bottom" size="auto" radius="lg" title={<b>QR · {selectedQR?.label || ""}</b>}>
+          {selectedQR && <Image src={selectedQR.url} alt={`QR ${selectedQR.label}`} mah={340} fit="contain" />}
+        </Drawer>
+      ) : (
+        <Modal opened={opened} onClose={close} title={<b>QR · {selectedQR?.label || ""}</b>} centered>
+          {selectedQR && <Image src={selectedQR.url} alt={`QR ${selectedQR.label}`} mah={400} fit="contain" />}
+        </Modal>
+      )}
+    </div>
   );
 }

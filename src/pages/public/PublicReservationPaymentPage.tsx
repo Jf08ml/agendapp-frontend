@@ -1,30 +1,14 @@
+// Retorno tras pagar en Mercado Pago (rediseño, PagosPublico): reserva, clase,
+// paquete o pedido. MP redirige aquí (back_urls) con ?status=…&ref=<externalReference>.
+// La confirmación real la da el webhook → se consulta el estado del Order.
 import { useEffect, useRef, useState } from "react";
-import {
-  Stack,
-  Title,
-  Text,
-  Button,
-  ThemeIcon,
-  Loader,
-  Alert,
-  RingProgress,
-  Badge,
-} from "@mantine/core";
-import {
-  IconCircleCheck,
-  IconClock,
-  IconAlertTriangle,
-  IconCircleX,
-} from "@tabler/icons-react";
+import { Button, Progress } from "@mantine/core";
+import { IconCheck, IconClock, IconInfoCircle, IconX } from "@tabler/icons-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { getOrderStatus, type OrderStatus } from "../../services/collectionService";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
-
-// Pantalla de retorno tras pagar en Mercado Pago (reserva, clase o paquete).
-// MP redirige aquí (back_urls) con ?status=success|failure|pending&ref=<externalReference>.
-// La confirmación real la da el webhook → hacemos polling al estado del Order.
 
 const POLL_INTERVAL_MS = 4000; // cada 4 segundos
 const MAX_ATTEMPTS = 15; // ~60 segundos
@@ -32,34 +16,50 @@ const MAX_ATTEMPTS = 15; // ~60 segundos
 type PageStatus = "waiting" | "paid" | "failed" | "timeout";
 type OrderType = "reservation" | "class" | "package" | "store";
 
-// Copys por tipo de objeto pagado.
-const COPY: Record<OrderType, { paidTitle: string; paidText: string; retryPath: string; retryLabel: string }> = {
+const COPY: Record<OrderType, { paidTitle: string; paidText: string; retryPath: string; retryLabel: string; doneLabel: string; donePath: string }> = {
   reservation: {
-    paidTitle: "¡Reserva confirmada!",
-    paidText: "Recibimos tu depósito y tu reserva quedó confirmada. Te enviaremos los detalles por WhatsApp.",
+    paidTitle: "Reserva confirmada",
+    paidText: "Recibimos tu abono y tu reserva quedó confirmada. Te enviamos los detalles por WhatsApp.",
     retryPath: "/online-reservation",
-    retryLabel: "Reservar de nuevo",
+    retryLabel: "Intentar de nuevo",
+    doneLabel: "Ver mis reservas",
+    donePath: "/mis-reservas",
   },
   class: {
-    paidTitle: "¡Inscripción confirmada!",
-    paidText: "Recibimos tu depósito y tu cupo en la clase quedó reservado. Te enviaremos los detalles por WhatsApp.",
-    retryPath: "/",
-    retryLabel: "Volver al inicio",
+    paidTitle: "Inscripción confirmada",
+    paidText: "Recibimos tu abono y tu cupo en la clase quedó reservado. Te enviamos los detalles por WhatsApp.",
+    retryPath: "/reservar-clase",
+    retryLabel: "Intentar de nuevo",
+    doneLabel: "Ver mis reservas",
+    donePath: "/mis-reservas",
   },
   package: {
-    paidTitle: "¡Paquete activado!",
+    paidTitle: "Paquete activado",
     paidText: "Recibimos tu pago y tu paquete quedó activo. Ya puedes usar tus sesiones.",
     retryPath: "/",
     retryLabel: "Volver al inicio",
+    doneLabel: "Volver al inicio",
+    donePath: "/",
   },
   store: {
-    paidTitle: "¡Pedido confirmado!",
-    paidText:
-      "Recibimos tu pago y tu pedido quedó confirmado. El negocio te contactará para coordinar la entrega.",
+    paidTitle: "Pedido confirmado",
+    paidText: "Recibimos tu pago y tu pedido quedó confirmado. El negocio te escribe para coordinar la entrega.",
     retryPath: "/tienda",
     retryLabel: "Volver a la tienda",
+    doneLabel: "Volver a la tienda",
+    donePath: "/tienda",
   },
 };
+
+const shell = { maxWidth: 480, margin: "0 auto", padding: "56px 16px" } as const;
+
+function ResultIcon({ tone, children }: { tone: "success" | "danger" | "info" | "warning"; children: React.ReactNode }) {
+  return (
+    <span style={{ width: 56, height: 56, borderRadius: 999, display: "inline-grid", placeItems: "center", background: `var(--${tone}-soft)`, color: `var(--${tone})` }}>
+      {children}
+    </span>
+  );
+}
 
 export default function PublicReservationPaymentPage() {
   const navigate = useNavigate();
@@ -69,10 +69,11 @@ export default function PublicReservationPaymentPage() {
 
   const [pageStatus, setPageStatus] = useState<PageStatus>("waiting");
   const [orderType, setOrderType] = useState<OrderType>("reservation");
-  const [attempts, setAttempts] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const attemptsRef = useRef(0);
   const conversionFired = useRef(false);
   const organization = useSelector((s: RootState) => s.organization.organization);
+  const whatsappUrl = organization?.whatsappUrl as string | undefined;
 
   const copy = COPY[orderType];
 
@@ -97,13 +98,7 @@ export default function PublicReservationPaymentPage() {
     }
     const order = await getOrderStatus(ref);
     if (order) {
-      if (
-        order.type === "class" ||
-        order.type === "package" ||
-        order.type === "store"
-      ) {
-        setOrderType(order.type);
-      }
+      if (order.type === "class" || order.type === "package" || order.type === "store") setOrderType(order.type);
       const mapped = mapOrderStatus(order.status);
       if (mapped) {
         stopPolling();
@@ -111,14 +106,11 @@ export default function PublicReservationPaymentPage() {
         return;
       }
     }
-    setAttempts((prev) => {
-      const next = prev + 1;
-      if (next >= MAX_ATTEMPTS) {
-        stopPolling();
-        setPageStatus("timeout");
-      }
-      return next;
-    });
+    attemptsRef.current += 1;
+    if (attemptsRef.current >= MAX_ATTEMPTS) {
+      stopPolling();
+      setPageStatus("timeout");
+    }
   };
 
   useEffect(() => {
@@ -128,125 +120,98 @@ export default function PublicReservationPaymentPage() {
       return;
     }
     setPageStatus("waiting");
-    setAttempts(0);
+    attemptsRef.current = 0;
     check();
     intervalRef.current = setInterval(check, POLL_INTERVAL_MS);
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref]);
 
-  // Reserva con depósito confirmada (webhook de MP ya procesó el pago): dispara
-  // la conversión de Google Ads de la org, igual que en los flujos sin depósito.
+  // Reserva con abono confirmada: conversión de Google Ads de la org
   useEffect(() => {
     if (pageStatus !== "paid" || orderType !== "reservation" || conversionFired.current) return;
-    if (!organization) return; // esperar a que cargue la org antes de marcar como disparado
+    if (!organization) return;
     conversionFired.current = true;
     trackReservationConversion(organization.analyticsConfig);
   }, [pageStatus, orderType, organization]);
 
-  const progressValue = Math.min(100, (attempts / MAX_ATTEMPTS) * 100);
+  const card = (children: React.ReactNode) => (
+    <div style={shell}>
+      <div className="ag-card" style={{ padding: 28, textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+        {children}
+      </div>
+    </div>
+  );
+  const title = (t: string) => <h1 style={{ margin: 0, font: "600 22px/28px var(--mantine-font-family)" }}>{t}</h1>;
 
-  // ── Esperando confirmación del webhook ─────────────────────────────────────
   if (pageStatus === "waiting") {
-    return (
-      <Stack align="center" justify="center" mt={80} gap="xl" maw={480} mx="auto">
-        <RingProgress
-          size={120}
-          thickness={8}
-          roundCaps
-          sections={[{ value: progressValue, color: "blue" }]}
-          label={
-            <Stack align="center" gap={0}>
-              <Loader size="sm" color="blue" />
-            </Stack>
-          }
-        />
-        <Stack align="center" gap="xs">
-          <Title order={2} ta="center">
-            Confirmando tu pago...
-          </Title>
-          <Text c="dimmed" ta="center" size="sm">
-            Estamos verificando el depósito con Mercado Pago. Suele tardar menos
-            de 30 segundos.
-          </Text>
-          <Badge color="blue" variant="light" leftSection={<IconClock size={12} />}>
-            Intento {attempts + 1} de {MAX_ATTEMPTS}
-          </Badge>
-        </Stack>
-        <Alert color="gray" variant="light" style={{ width: "100%" }}>
-          <Text size="xs" c="dimmed" ta="center">
-            No cierres esta página. Tu reserva se confirma automáticamente al
-            recibir el pago.
-          </Text>
-        </Alert>
-      </Stack>
+    return card(
+      <>
+        <ResultIcon tone="info">
+          <IconClock size={28} />
+        </ResultIcon>
+        {title("Confirmando tu pago")}
+        <div className="ag-muted" style={{ fontSize: 14 }}>Estamos verificando el pago con Mercado Pago. Suele tardar menos de 30 segundos.</div>
+        <Progress value={100} striped animated color="dark" size="sm" style={{ width: "100%" }} />
+        <div className="ag-subtle">No cierres esta página: se confirma sola al recibir el pago.</div>
+      </>
     );
   }
 
-  // ── Pago confirmado / reserva creada ───────────────────────────────────────
   if (pageStatus === "paid") {
-    return (
-      <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
-        <ThemeIcon size={80} radius="xl" color="teal" variant="light">
-          <IconCircleCheck size={52} />
-        </ThemeIcon>
-        <Stack align="center" gap="xs">
-          <Title order={2} ta="center">
-            {copy.paidTitle}
-          </Title>
-          <Text c="dimmed" ta="center">
-            {copy.paidText}
-          </Text>
-        </Stack>
-        <Button size="md" onClick={() => navigate("/")}>
-          Volver al inicio
+    return card(
+      <>
+        <ResultIcon tone="success">
+          <IconCheck size={28} />
+        </ResultIcon>
+        {title(copy.paidTitle)}
+        <div className="ag-muted" style={{ fontSize: 14 }}>{copy.paidText}</div>
+        <Button size="md" onClick={() => navigate(copy.donePath)} mt={4}>
+          {copy.doneLabel}
         </Button>
-      </Stack>
+      </>
     );
   }
 
-  // ── Pago rechazado / expirado ──────────────────────────────────────────────
   if (pageStatus === "failed") {
-    return (
-      <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
-        <ThemeIcon size={80} radius="xl" color="red" variant="light">
-          <IconCircleX size={52} />
-        </ThemeIcon>
-        <Stack align="center" gap="xs">
-          <Title order={2} ta="center">
-            No se completó el pago
-          </Title>
-          <Text c="dimmed" ta="center">
-            El pago no se completó, así que no quedó confirmado. Puedes intentarlo
-            de nuevo.
-          </Text>
-        </Stack>
-        <Button size="md" onClick={() => navigate(copy.retryPath)}>
+    return card(
+      <>
+        <ResultIcon tone="danger">
+          <IconX size={28} />
+        </ResultIcon>
+        {title("No se completó el pago")}
+        <div className="ag-muted" style={{ fontSize: 14 }}>
+          {orderType === "reservation"
+            ? "No se cobró nada. Puedes intentarlo de nuevo mientras el horario siga libre; si ya se ocupó, elige otro."
+            : "No se cobró nada. Puedes intentarlo de nuevo."}
+        </div>
+        <Button size="md" onClick={() => navigate(copy.retryPath)} mt={4}>
           {copy.retryLabel}
         </Button>
-      </Stack>
+      </>
     );
   }
 
-  // ── Timeout — el webhook está tardando ─────────────────────────────────────
-  return (
-    <Stack align="center" justify="center" mt={80} gap="lg" maw={480} mx="auto">
-      <ThemeIcon size={80} radius="xl" color="yellow" variant="light">
-        <IconAlertTriangle size={52} />
-      </ThemeIcon>
-      <Stack align="center" gap="xs">
-        <Title order={2} ta="center">
-          Tu pago está siendo procesado
-        </Title>
-        <Text c="dimmed" ta="center">
-          El pago fue enviado pero la confirmación está tardando. Si lo
-          completaste, tu reserva se confirmará en los próximos minutos y
-          recibirás un WhatsApp.
-        </Text>
-      </Stack>
-      <Button size="md" variant="light" onClick={() => navigate("/")}>
-        Volver al inicio
-      </Button>
-    </Stack>
+  // Demora — el webhook está tardando
+  return card(
+    <>
+      <ResultIcon tone="warning">
+        <IconInfoCircle size={28} />
+      </ResultIcon>
+      {title("Tu pago está siendo procesado")}
+      <div className="ag-muted" style={{ fontSize: 14 }}>
+        La confirmación está tardando. Si completaste el pago, se confirma en los próximos minutos y te llega un WhatsApp.
+      </div>
+      <div className="ag-row" style={{ gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+        <Button variant="default" onClick={() => navigate("/")}>
+          Volver al inicio
+        </Button>
+        {whatsappUrl && (
+          <Button component="a" href={whatsappUrl} target="_blank" rel="noopener noreferrer" variant="subtle">
+            Escribir al negocio
+          </Button>
+        )}
+      </div>
+    </>
   );
 }
