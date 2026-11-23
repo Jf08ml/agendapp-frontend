@@ -12,11 +12,10 @@ import {
   ActionIcon,
   Divider,
   ThemeIcon,
-  Paper,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { showNotification } from "@mantine/notifications";
-import { IconShoppingCart, IconTrash, IconPlus } from "@tabler/icons-react";
+import { IconShoppingCart, IconTrash, IconPlus, IconMinus } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import {
@@ -269,19 +268,41 @@ const SaleModal: React.FC<SaleModalProps> = ({
                 )}
               </Group>
               <Group gap="xs" align="flex-end" wrap="nowrap">
-                <NumberInput
-                  label={isMobile ? "Cantidad" : undefined}
-                  placeholder="Cant."
-                  value={row.quantity}
-                  onChange={(v) =>
-                    updateItem(idx, {
-                      quantity: typeof v === "number" ? v : 1,
-                    })
-                  }
-                  min={1}
-                  w={isMobile ? undefined : 80}
-                  style={isMobile ? { flex: 1 } : undefined}
-                />
+                {isMobile ? (
+                  // Móvil: cantidad con − y + grandes
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }} aria-label="Cantidad">
+                    <ActionIcon
+                      variant="default"
+                      size={40}
+                      aria-label="Quitar uno"
+                      disabled={row.quantity <= 1}
+                      onClick={() => updateItem(idx, { quantity: Math.max(1, row.quantity - 1) })}
+                    >
+                      <IconMinus size={16} />
+                    </ActionIcon>
+                    <span className="ag-num" style={{ minWidth: 28, textAlign: "center", fontWeight: 600, fontSize: 16 }}>{row.quantity}</span>
+                    <ActionIcon
+                      variant="default"
+                      size={40}
+                      aria-label="Agregar uno"
+                      onClick={() => updateItem(idx, { quantity: row.quantity + 1 })}
+                    >
+                      <IconPlus size={16} />
+                    </ActionIcon>
+                  </div>
+                ) : (
+                  <NumberInput
+                    placeholder="Cant."
+                    value={row.quantity}
+                    onChange={(v) =>
+                      updateItem(idx, {
+                        quantity: typeof v === "number" ? v : 1,
+                      })
+                    }
+                    min={1}
+                    w={80}
+                  />
+                )}
                 <NumberInput
                   label={isMobile ? "Precio" : undefined}
                   placeholder="Precio"
@@ -327,14 +348,27 @@ const SaleModal: React.FC<SaleModalProps> = ({
 
         <Divider />
 
-        <Group grow align="flex-start">
-          <Select
-            label="Método de pago"
-            data={METHOD_OPTIONS}
-            value={method}
-            onChange={(v) => setMethod(v ?? "cash")}
-            allowDeselect={false}
-          />
+        <Stack gap="md">
+          <div>
+            <Text size="sm" fw={500} mb={6}>
+              Método de pago
+            </Text>
+            <div className="ag-row" style={{ gap: 6 }} role="radiogroup" aria-label="Método de pago">
+              {METHOD_OPTIONS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  role="radio"
+                  className="ag-chip"
+                  aria-checked={method === m.value}
+                  aria-selected={method === m.value}
+                  onClick={() => setMethod(m.value)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <Select
             label="Profesional que vendió"
             placeholder="Sin profesional"
@@ -344,7 +378,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
             clearable
             searchable
           />
-        </Group>
+        </Stack>
 
         <Select
           label="Cliente (opcional)"
@@ -373,7 +407,22 @@ const SaleModal: React.FC<SaleModalProps> = ({
           autosize
         />
 
-        <Paper withBorder p="sm" radius="md">
+        {/* Total y acciones fijos abajo (se ven siempre, también en móvil) */}
+        <div
+          style={{
+            position: "sticky",
+            bottom: 0,
+            zIndex: 2,
+            margin: "0 calc(-1 * var(--mantine-spacing-md))",
+            padding: "12px var(--mantine-spacing-md)",
+            background: "var(--surface-raised)",
+            borderTop: "1px solid var(--line)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+        <div>
           <Group justify="space-between">
             <Text fw={600}>Total</Text>
             <Text fw={800} size="lg">
@@ -392,9 +441,8 @@ const SaleModal: React.FC<SaleModalProps> = ({
               </Text>
             </Group>
           )}
-        </Paper>
-
-        <Group justify="flex-end">
+        </div>
+        <Group justify="flex-end" grow={isMobile}>
           <Button variant="default" onClick={onClose}>
             Cancelar
           </Button>
@@ -402,6 +450,7 @@ const SaleModal: React.FC<SaleModalProps> = ({
             Registrar venta
           </Button>
         </Group>
+        </div>
       </Stack>
     </Modal>
   );
