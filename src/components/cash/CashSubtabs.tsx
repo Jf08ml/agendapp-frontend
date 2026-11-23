@@ -25,7 +25,7 @@ export default function CashSubtabs() {
   const tabs: SubTab[] = [
     { key: "movimientos", label: "Movimientos", to: "/gestion-caja", visible: can.cashRead },
     { key: "comprobantes", label: "Comprobantes", to: "/gestionar-pagos", visible: can.onlineRes },
-    { key: "pedidos", label: "Pedidos de tienda", to: "/pedidos", visible: can.inventoryRead },
+    { key: "pedidos", label: "Pedidos de tienda", to: "/pedidos?desde=caja", visible: can.inventoryRead },
     { key: "gastos", label: "Gastos", to: "/gestion-caja?tab=movimientos", visible: can.cashRead },
     { key: "arqueos", label: "Arqueos", to: "/gestion-caja?tab=arqueo", visible: can.cashRead },
   ].filter((t) => t.visible);

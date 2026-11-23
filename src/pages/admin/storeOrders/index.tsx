@@ -6,7 +6,7 @@
 // llamadas y reglas que la bandeja anterior.
 import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ActionIcon, Button, Drawer, Menu, Modal, SegmentedControl, Text } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
@@ -40,6 +40,7 @@ import {
   type CodCollectMethod,
 } from "../../../services/storeOrderService";
 import StoreTabs from "../../../components/store/StoreTabs";
+import CashSubtabs from "../../../components/cash/CashSubtabs";
 import StateBadge from "../inventory/components/StoreStateBadge";
 import {
   PROVIDER_LABEL,
@@ -74,7 +75,13 @@ export default function StoreOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [processing, setProcessing] = useState<string | null>(null);
+  // Desde Caja y pagos (?desde=caja) la página se ve como parte de Caja y
+  // arranca en «Cobro pendiente» si hay; si no, en «Por entregar».
+  const [searchParams] = useSearchParams();
+  const fromCash = searchParams.get("desde") === "caja";
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [onlyCollect, setOnlyCollect] = useState(fromCash);
+  const [collectDefaultChecked, setCollectDefaultChecked] = useState(!fromCash);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collectFor, setCollectFor] = useState<StoreOrder | null>(null);
@@ -104,8 +111,9 @@ export default function StoreOrdersPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return orders;
-    return orders.filter((o) => {
+    const base = onlyCollect ? orders.filter((o) => orderActions(o, true).primary === "collect") : orders;
+    if (!q) return base;
+    return base.filter((o) => {
       const c = o.store?.customer;
       return (
         (c?.name || "").toLowerCase().includes(q) ||
@@ -114,7 +122,20 @@ export default function StoreOrdersPage() {
         (o.store?.items || []).some((i) => i.name.toLowerCase().includes(q))
       );
     });
-  }, [orders, search]);
+  }, [orders, search, onlyCollect]);
+
+  useEffect(() => {
+    if (collectDefaultChecked || loading) return;
+    setCollectDefaultChecked(true);
+    if (!orders.some((o) => orderActions(o, true).primary === "collect")) setOnlyCollect(false);
+  }, [collectDefaultChecked, loading, orders]);
+
+  const header = fromCash ? (
+    <>
+      <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Caja y pagos</h1>
+      <CashSubtabs />
+    </>
+  ) : null;
 
   const selected = orders.find((o) => o._id === selectedId) || null;
 
@@ -212,7 +233,7 @@ export default function StoreOrdersPage() {
   if (!canRead) {
     return (
       <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
-        <StoreTabs pendingOrders={0} />
+        {header ?? <StoreTabs pendingOrders={0} />}
         <div className="ag-card">
           <div className="ag-empty">
             <div className="ag-empty__icon"><IconLock size={22} /></div>
@@ -393,7 +414,7 @@ export default function StoreOrdersPage() {
 
   return (
     <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
-      <StoreTabs pendingOrders={pendingCount} />
+      {header ?? <StoreTabs pendingOrders={pendingCount} />}
 
       <div className="ag-row" style={{ gap: 12 }}>
         <div className="ag-search" style={{ flex: isMobile ? "1 1 100%" : "0 1 320px" }}>
@@ -411,9 +432,13 @@ export default function StoreOrdersPage() {
         </div>
         <SegmentedControl
           size="xs"
-          value={filter}
-          onChange={(v) => setFilter(v as "pending" | "all")}
+          value={onlyCollect ? "collect" : filter}
+          onChange={(v) => {
+            setOnlyCollect(v === "collect");
+            setFilter(v === "all" ? "all" : "pending");
+          }}
           data={[
+            ...(fromCash ? [{ label: "Cobro pendiente", value: "collect" }] : []),
             { label: "Por entregar", value: "pending" },
             { label: "Todos", value: "all" },
           ]}
@@ -445,7 +470,9 @@ export default function StoreOrdersPage() {
             <h3>
               {search
                 ? "Ningún pedido coincide con la búsqueda"
-                : filter === "pending"
+                : onlyCollect
+                  ? "No hay pedidos con cobro pendiente"
+                  : filter === "pending"
                   ? "No hay pedidos por entregar"
                   : "Aún no hay pedidos"}
             </h3>
