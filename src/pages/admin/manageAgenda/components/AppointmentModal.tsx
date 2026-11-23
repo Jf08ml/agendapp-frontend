@@ -2186,6 +2186,26 @@ ${clientServices}`;
 
   const actionButtons = (
     <>
+          {isRescheduling && appointment && newAppointment.startDate && (() => {
+            // Resumen del cambio: «Martes 20 nov, de 10:00 a. m. a 11:00 a. m.» y el profesional nuevo
+            const fmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
+            const label = (d: Date | string) => {
+              const t = formatInTimezone(d, timezone, `ddd D MMM, ${fmt}`);
+              return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/s?AM/, " a. m.").replace(/s?PM/, " p. m.");
+            };
+            const newEmp = newAppointment.employee as Employee | undefined;
+            const oldEmpId = String((appointment.employee as Employee | undefined)?._id ?? appointment.employee);
+            const empChanged = !!newEmp && String(newEmp._id) !== oldEmpId;
+            return (
+              <div className="ag-alert ag-alert--info" style={{ marginTop: 16 }}>
+                <div>
+                  <b style={{ display: "block" }}>Cambio de horario</b>
+                  De {label(appointment.startDate)} a {label(newAppointment.startDate)}
+                  {empChanged && <>{" · "}con {newEmp?.names}</>}
+                </div>
+              </div>
+            );
+          })()}
           {isRescheduling && (
             <Checkbox
               mt="md"

@@ -25,6 +25,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
+  type AppointmentMove,
   cancelAppointment,
   createAppointmentsBatch,
   createMultiEmployeeBatch,
@@ -522,17 +523,21 @@ const ScheduleView: React.FC = () => {
   /**
    * EDITAR CITA
    */
+  // `move`: cambio propuesto al arrastrar la cita. La cita seleccionada sigue siendo la
+  // ORIGINAL y el cambio va precargado en el formulario: así el modal ve que es una
+  // reprogramación (aparece «Avisar al cliente por WhatsApp», marcada) y el guardado
+  // compara contra el horario original para enviar el aviso.
   const handleEditAppointment = useCallback(
-    (appointment: Appointment, initialTab?: string) => {
+    (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => {
       setSelectedAppointment(appointment);
       setNewAppointment({
         service: appointment.service,
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
-        employee: appointment.employee,
+        employee: move?.employee ?? appointment.employee,
         employeeRequestedByClient: appointment.employeeRequestedByClient,
-        startDate: new Date(appointment.startDate),
-        endDate: new Date(appointment.endDate),
+        startDate: new Date(move?.startDate ?? appointment.startDate),
+        endDate: new Date(move?.endDate ?? appointment.endDate),
         status: appointment.status,
         advancePayment: appointment.advancePayment,
         customFieldValues: appointment.customFieldValues,

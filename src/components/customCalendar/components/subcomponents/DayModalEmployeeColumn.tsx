@@ -14,6 +14,8 @@ import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../.
 import DraggableAppointmentCard from "../DraggableAppointmentCard";
 import { describeRecurrence, exceptionAppliesToDay } from "../../../../utils/scheduleExceptions";
 import { HOUR_HEIGHT, MINUTE_HEIGHT, CARD_WIDTH } from "../dayGrid";
+import { dropMinutes, dropStart, snapToQuarter } from "../dropTarget";
+import type { AppointmentMove } from "../../../../services/appointmentService";
 
 interface DayBlock {
   id?: string;
@@ -120,7 +122,7 @@ interface EmployeeColumnProps {
   selectedDay: Date;
   isExpanded: (appointment: Appointment) => boolean;
   handleToggleExpand: (appointmentId: string) => void;
-  onEditAppointment: (appointment: Appointment, initialTab?: string) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
@@ -139,9 +141,6 @@ interface DraggedItem {
 }
 
 const isTouchDevice = () => navigator.maxTouchPoints > 0;
-function snapToQuarter(minutes: number) {
-  return Math.round(minutes / 15) * 15;
-}
 
 const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
   employee,
@@ -186,18 +185,11 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       const mousePos = monitor.getClientOffset();
       if (!mousePos) return;
 
-      // getClientOffset ya viene en píxeles CSS (mouse y táctil): no se divide por devicePixelRatio
-      const scrollOffset = columnRef.current.scrollTop || 0;
-      const correctedY = mousePos.y - boundingRect.top;
-      const yTop = correctedY - item.offsetY + scrollOffset;
-
-      const totalMinutes = Math.round((yTop / HOUR_HEIGHT) * 60);
-      const snappedMinutes = snapToQuarter(totalMinutes);
-      const hourOffset = Math.floor(snappedMinutes / 60);
-      const minuteOffset = snappedMinutes % 60;
-
-      const newStartDate = new Date(selectedDay);
-      newStartDate.setHours(startHour + hourOffset, minuteOffset, 0, 0);
+      // getClientOffset viene en píxeles CSS (mouse y táctil) y getBoundingClientRect ya
+      // descuenta el scroll del contenedor: no se suma scrollTop ni se divide por devicePixelRatio.
+      const minutes = dropMinutes(mousePos.y, boundingRect.top, item.offsetY, HOUR_HEIGHT, (endHour - startHour + 1) * 60);
+      // Hora en la zona del negocio (la misma con la que se dibujan las citas)
+      const newStartDate = dropStart(selectedDay, timezone, startHour, minutes);
 
       const originalAppointment = allAppointments.find(
         (app) => app._id === item.appointmentId
@@ -210,23 +202,23 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
 
       const newEndDate = new Date(newStartDate.getTime() + durationMs);
 
-      const updatedAppointment: Appointment = {
-        ...originalAppointment,
-        employee,
-        startDate: newStartDate,
-        endDate: newEndDate,
-      };
-
-      onEditAppointment(updatedAppointment, "edicion");
+      // El modal recibe la cita ORIGINAL y el cambio propuesto aparte: así detecta que es
+      // una reprogramación y ofrece avisar al cliente por WhatsApp.
+      onEditAppointment(originalAppointment, "edicion", { startDate: newStartDate, endDate: newEndDate, employee });
     },
-    [columnRef, allAppointments, employee, onEditAppointment, selectedDay, startHour]
+    [allAppointments, employee, onEditAppointment, selectedDay, startHour, endHour, timezone]
   );
 
-  const [{ isOver }, dropRef] = useDrop(() => ({
-    accept: ItemTypes.APPOINTMENT,
-    drop: handleDrop,
-    collect: (monitor) => ({ isOver: !!monitor.isOver() }),
-  }));
+  // Con dependencias: sin ellas react-dnd se quedaba con el primer handleDrop (día,
+  // profesional y citas de la primera vez) y el arrastre fallaba o movía al día equivocado.
+  const [{ isOver }, dropRef] = useDrop(
+    () => ({
+      accept: ItemTypes.APPOINTMENT,
+      drop: handleDrop,
+      collect: (monitor) => ({ isOver: !!monitor.isOver() }),
+    }),
+    [handleDrop]
+  );
 
   const handleColumnClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const clickedElement = event.target as HTMLElement;

@@ -15,7 +15,7 @@ import timezone from "dayjs/plugin/timezone";
 import { IconLayoutColumns, IconList, IconTrash } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import { Appointment } from "../../../services/appointmentService";
+import { Appointment, type AppointmentMove } from "../../../services/appointmentService";
 import { Employee, EmployeeScheduleException } from "../../../services/employeeService";
 import {
   generateTimeIntervals,
@@ -49,7 +49,7 @@ interface DayViewProps {
   getAppointmentsForDay: (day: Date) => Appointment[];
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
   loadedMonthDate: Date;
-  onEditAppointment: (appointment: Appointment) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;

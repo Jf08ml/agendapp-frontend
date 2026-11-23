@@ -6,7 +6,7 @@
 // que en la columna por profesional).
 import React, { FC, useCallback, useMemo, useRef } from "react";
 import { useDrag, useDrop, type DropTargetMonitor } from "react-dnd";
-import { Appointment } from "../../../services/appointmentService";
+import { Appointment, type AppointmentMove } from "../../../services/appointmentService";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
 import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
 import { calculateAppointmentPosition, organizeAppointmentsInLayers } from "../utils/scheduleUtils";
@@ -29,13 +29,13 @@ interface WeekDayColumnProps {
   timezone: string;
   timeFormat?: string;
   canCreate: boolean;
-  onEditAppointment: (appointment: Appointment, initialTab?: string) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
 }
 
 const STAGGER_PX = 18;
 
-const snapToQuarter = (minutes: number) => Math.round(minutes / 15) * 15;
+import { dropMinutes, dropStart, snapToQuarter } from "./dropTarget";
 
 function MiniCard({
   appointment,
@@ -47,7 +47,7 @@ function MiniCard({
   appointment: Appointment;
   timezone: string;
   timeFormat?: string;
-  onEditAppointment: (appointment: Appointment, initialTab?: string) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   /** Bloque bajo (≤ 30 min): solo hora y cliente */
   short?: boolean;
 }) {
@@ -143,14 +143,17 @@ const WeekDayColumn: FC<WeekDayColumnProps> = ({
       if (!pos) return;
       const original = weekAppointments.find((a) => a._id === item.appointmentId);
       if (!original) return;
-      const minutes = Math.max(0, minutesAt(pos.y, item.offsetY));
-      const newStart = new Date(day);
-      newStart.setHours(startHour + Math.floor(minutes / 60), minutes % 60, 0, 0);
+      const rect = columnRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const minutes = dropMinutes(pos.y, rect.top, item.offsetY, HOUR_HEIGHT, (endHour - startHour + 1) * 60);
+      // Hora en la zona del negocio (antes setHours usaba la zona del navegador)
+      const newStart = dropStart(day, timezone, startHour, minutes);
       const duration = new Date(original.endDate).getTime() - new Date(original.startDate).getTime();
-      // Mismo profesional: en esta vista se cambia día u hora
-      onEditAppointment({ ...original, startDate: newStart, endDate: new Date(newStart.getTime() + duration) }, "edicion");
+      // Mismo profesional: en esta vista se cambia día u hora. El modal recibe la cita
+      // original y el cambio aparte, para ofrecer avisar al cliente por WhatsApp.
+      onEditAppointment(original, "edicion", { startDate: newStart, endDate: new Date(newStart.getTime() + duration) });
     },
-    [weekAppointments, minutesAt, day, startHour, onEditAppointment]
+    [weekAppointments, day, startHour, endHour, timezone, onEditAppointment]
   );
 
   const [{ isOver }, drop] = useDrop(

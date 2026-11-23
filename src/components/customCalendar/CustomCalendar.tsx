@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Appointment } from "../../services/appointmentService";
+import { Appointment, type AppointmentMove } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
 import DayView from "./components/DayView";
 import WeekView from "./components/WeekView";
@@ -70,7 +70,7 @@ interface CustomCalendarProps {
   currentDate: Date;
   setCurrentDate: React.Dispatch<React.SetStateAction<Date>>;
   onOpenModal: (selectedDay: Date | null, interval: Date) => void;
-  onEditAppointment: (appointment: Appointment) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
