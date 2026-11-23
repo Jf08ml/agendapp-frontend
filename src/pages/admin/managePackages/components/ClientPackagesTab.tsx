@@ -17,7 +17,6 @@ import {
   Collapse,
   ActionIcon,
   Tooltip,
-  ThemeIcon,
   Avatar,
   NumberInput,
   Select,
@@ -62,6 +61,8 @@ import {
 import { formatCurrency } from "../../../../utils/formatCurrency";
 
 interface ClientPackagesTabProps {
+  /** Acción del estado vacío («Asignar a cliente» o «Nuevo paquete», la decide la página) */
+  emptyAction?: { label: string; onClick: () => void };
   currency: string;
 }
 
@@ -849,7 +850,7 @@ function EditPackageModal({
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
+const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency, emptyAction }) => {
   const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
   const [allPackages, setAllPackages] = useState<ClientPackage[]>([]);
@@ -1078,17 +1079,22 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         </Tooltip>
       </Group>
 
-      {/* Status filter */}
-      <SegmentedControl
-        fullWidth
-        size="xs"
-        value={statusFilter}
-        onChange={setStatusFilter}
-        data={STATUS_FILTER_OPTIONS.map((opt) => ({
-          value: opt.value,
-          label: `${opt.label}${countByStatus[opt.value] !== undefined ? ` (${countByStatus[opt.value]})` : ""}`,
-        }))}
-      />
+      {/* Filtro de estado: chips con conteo (como en Servicios) */}
+      <div className="ag-tabs" role="tablist" aria-label="Estado" style={{ scrollbarWidth: "none" }}>
+        {STATUS_FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            className="ag-chip"
+            aria-selected={statusFilter === opt.value}
+            onClick={() => setStatusFilter(opt.value)}
+          >
+            {opt.label}
+            {countByStatus[opt.value] !== undefined && <span className="count">{countByStatus[opt.value]}</span>}
+          </button>
+        ))}
+      </div>
 
       {/* Content */}
       {loading ? (
@@ -1096,17 +1102,16 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
           <Loader size="md" />
         </Center>
       ) : allPackages.length === 0 ? (
-        <Center mih={200}>
-          <Stack align="center" gap="xs">
-            <ThemeIcon size="xl" radius="xl" color="gray" variant="light">
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon">
               <IconPackage size={24} />
-            </ThemeIcon>
-            <Text c="dimmed" ta="center">No hay paquetes asignados aún.</Text>
-            <Text size="xs" c="dimmed" ta="center">
-              Asigna un paquete a un cliente desde la pestaña &quot;Plantillas de paquetes&quot;.
-            </Text>
-          </Stack>
-        </Center>
+            </div>
+            <h3>Aún no has vendido paquetes</h3>
+            <p>Cuando asignes un paquete a un cliente, lo verás aquí con sus sesiones y pagos.</p>
+            {emptyAction && <Button onClick={emptyAction.onClick}>{emptyAction.label}</Button>}
+          </div>
+        </div>
       ) : sortedFiltered.length === 0 ? (
         <Center mih={150}>
           <Stack align="center" gap="xs">

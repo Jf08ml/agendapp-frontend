@@ -328,7 +328,7 @@ const AdminPackages: React.FC = () => {
   // del panel para que no parezca un buscador global que también debería
   // aplicar a "Paquetes asignados" — esa pestaña tiene el suyo propio.
   const TemplatesToolbar = (
-    <Group wrap="wrap" gap="sm" align="end" mb="md">
+    <Group wrap="wrap" gap="sm" align="center" mb="md">
       <TextInput
         leftSection={<BsSearch />}
         placeholder="Buscar plantillas por nombre o descripción..."
@@ -339,20 +339,18 @@ const AdminPackages: React.FC = () => {
           minWidth: isMobile ? "100%" : 240,
         }}
       />
-      <Box style={{ flex: isMobile ? "1 1 100%" : "0 0 auto" }}>
-        <Text size="xs" fw={500} mb={4}>Estado</Text>
-        <SegmentedControl
-          value={status}
-          onChange={(v: any) => setStatus(v)}
-          data={[
-            { label: "Todos", value: "all" },
-            { label: "Activos", value: "active" },
-            { label: "Inactivos", value: "inactive" },
-          ]}
-          size={isMobile ? "xs" : "sm"}
-          fullWidth={isMobile}
-        />
-      </Box>
+      {/* Mismo segmento compacto de Servicios */}
+      <SegmentedControl
+        aria-label="Estado"
+        value={status}
+        onChange={(v: any) => setStatus(v)}
+        data={[
+          { label: "Activos", value: "active" },
+          { label: "Inactivos", value: "inactive" },
+          { label: "Todos", value: "all" },
+        ]}
+        size="xs"
+      />
     </Group>
   );
 
@@ -371,6 +369,25 @@ const AdminPackages: React.FC = () => {
             </Grid.Col>
           ))}
         </Grid>
+      ) : packages.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon">
+              <IconPackage size={24} />
+            </div>
+            <h3>Crea tu primer paquete</h3>
+            <p>Vende varias sesiones por adelantado.</p>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => {
+                setIsCreateModalOpen(true);
+                setEditingPackage(null);
+              }}
+            >
+              Nuevo paquete
+            </Button>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <Center mih={240}>
           <Stack align="center" gap="xs">
@@ -565,7 +582,16 @@ const AdminPackages: React.FC = () => {
           {PackageTemplatesContent}
         </>
       ) : (
-        <ClientPackagesTab currency={currency} />
+        <ClientPackagesTab
+          currency={currency}
+          emptyAction={
+            packages.length === 0
+              ? { label: "Nuevo paquete", onClick: () => { setIsCreateModalOpen(true); setEditingPackage(null); } }
+              : packages.length === 1
+                ? { label: "Asignar a cliente", onClick: () => { setAssigningPackage(packages[0]); setIsAssignModalOpen(true); } }
+                : { label: "Asignar a cliente", onClick: () => setView("templates") }
+          }
+        />
       )}
 
       <ModalCreateEditPackage
