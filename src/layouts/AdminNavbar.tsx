@@ -44,9 +44,11 @@ interface AdminNavbarProps {
   onNavigate?: () => void;
   /** En el menú «Más» del móvil la marca ya está en el header. */
   showBrand?: boolean;
+  /** Contadores por clave de ítem (p. ej. reservas por confirmar). */
+  badges?: Partial<Record<string, string | null>>;
 }
 
-export default function AdminNavbar({ groups, onNavigate, showBrand = true }: AdminNavbarProps) {
+export default function AdminNavbar({ groups, onNavigate, showBrand = true, badges }: AdminNavbarProps) {
   const location = useLocation();
   const organization = useSelector((s: RootState) => s.organization.organization);
   const activeTo = useMemo(
@@ -87,6 +89,13 @@ export default function AdminNavbar({ groups, onNavigate, showBrand = true }: Ad
                         to={link.to}
                         label={item.label}
                         leftSection={icon}
+                        rightSection={
+                          badges?.[item.key] ? (
+                            <span className="ag-badge ag-badge--warning" style={{ height: 20, padding: "0 7px", fontSize: 11 }} aria-label={`${badges[item.key]} por confirmar`}>
+                              {badges[item.key]}
+                            </span>
+                          ) : undefined
+                        }
                         active={childActive}
                         aria-current={childActive ? "page" : undefined}
                         onClick={onNavigate}

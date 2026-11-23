@@ -2,7 +2,6 @@
 import { computeDepositTotal, uniformDepositPercentage } from "../../../utils/deposit";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Table,
   Card,
   Text,
   Badge,
@@ -13,27 +12,37 @@ import {
   Group,
   Skeleton,
   LoadingOverlay,
-  Center,
-  Tooltip,
   Alert,
   Loader,
-  Collapse,
   useMantineTheme,
-  useMantineColorScheme,
   TextInput,
-  Switch,
   Box,
   Divider,
   Checkbox,
   List,
   ScrollArea,
-  RingProgress,
-  SimpleGrid,
-  ThemeIcon,
   Pagination,
-  ActionIcon,
   Image,
+  Drawer,
 } from "@mantine/core";
+import { useSearchParams } from "react-router-dom";
+import { IconCheck, IconDeviceDesktop, IconLock, IconRobot, IconSearch, IconWorld } from "@tabler/icons-react";
+import {
+  RESERVATIONS_TAB_LABELS,
+  STATUS_META,
+  WHEN_LABELS,
+  formatPendingCount,
+  originLabel,
+  paymentMeta,
+  relativeWhen,
+  reservationsTabs,
+  resolveReservationsTab,
+  whenBucket,
+  type ReservationStatusKey,
+  type ReservationsTab,
+  type WhenBucket,
+} from "./reservationsView";
+import { notifyReservationsChanged } from "../../../hooks/usePendingReservationsCount";
 import { useMediaQuery, useDebouncedValue } from "@mantine/hooks";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -71,9 +80,6 @@ import {
   BiUser,
   BiCheck,
   BiInfoCircle,
-  BiChevronDown,
-  BiChevronUp,
-  BiFilter,
 } from "react-icons/bi";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
 import {
@@ -83,6 +89,41 @@ import {
 } from "../../../features/organization/sliceOrganization";
 
 type RowAction = "approve" | "reject" | "delete" | "assign" | "cancel";
+
+const POLICY_OPTIONS: { value: ReservationPolicy; title: string; desc: string }[] = [
+  {
+    value: "manual",
+    title: "Las apruebo yo",
+    desc: "Cada reserva queda pendiente hasta que la apruebes. No se crea la cita antes.",
+  },
+  {
+    value: "auto_if_available",
+    title: "Confirmar sola si hay cupo",
+    desc: "Si el horario y la profesional están libres, se crea la cita al instante. Si no, queda por confirmar para que decidas.",
+  },
+];
+
+const dateBoxStyle: React.CSSProperties = {
+  flex: "none",
+  width: 48,
+  height: 52,
+  borderRadius: "var(--radius-md)",
+  border: "1px solid var(--line)",
+  background: "var(--surface-raised)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  fontSize: 12,
+  lineHeight: "16px",
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--ink-subtle)",
+};
 
 const ReservationsList: React.FC = () => {
   const dispatch = useDispatch<any>();
@@ -141,8 +182,22 @@ const ReservationsList: React.FC = () => {
   const canAutoConfirm = (organization as any)?.planLimits?.autoConfirmations !== false;
 
   const theme = useMantineTheme();
-  const { colorScheme } = useMantineColorScheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
+  // ------- PESTAÑAS (en la URL: ?tab=) -------
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingCount, setPendingCount] = useState(0);
+  const [expiredCount, setExpiredCount] = useState(0);
+  const visibleTabs = reservationsTabs(orgPolicy, pendingCount, expiredCount);
+  const tab: ReservationsTab = resolveReservationsTab(searchParams.get("tab"), visibleTabs);
+  const setTab = (t: ReservationsTab) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", t);
+    setSearchParams(next, { replace: true });
+    setPage(1);
+  };
+  const [rejectAllOpen, setRejectAllOpen] = useState(false);
+  const [rejectAllBusy, setRejectAllBusy] = useState(false);
 
   // ------- FILTROS -------
   const [statusFilter, setStatusFilter] = useState<
@@ -153,7 +208,6 @@ const ReservationsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebouncedValue(searchTerm, 400);
   const [showOnlyFuture, setShowOnlyFuture] = useState(true);
-  const [filtersOpen, setFiltersOpen] = useState(true);
 
   // Modal de advertencia cuando el cupo máximo ya está alcanzado al aprobar
   const [concurrencyWarning, setConcurrencyWarning] = useState<{
@@ -174,10 +228,6 @@ const ReservationsList: React.FC = () => {
   } | null>(null);
   const [receiptPromptBusy, setReceiptPromptBusy] = useState(false);
 
-  useEffect(() => {
-    // En mobile, empezamos con filtros colapsados; en desktop, abiertos
-    setFiltersOpen(!isMobile);
-  }, [isMobile]);
 
   // ------- LOADERS HELPERS -------
   const setRowBusy = (id: string, action: RowAction | null) =>
@@ -258,6 +308,7 @@ const ReservationsList: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     organization?._id,
+    tab,
     page,
     statusFilter,
     employeeFilter,
@@ -270,15 +321,27 @@ const ReservationsList: React.FC = () => {
     setInitialLoading(true);
     setError(null);
     try {
-      const result = await getReservationsByOrganization(organizationId, {
-        page,
-        limit: PAGE_SIZE,
-        status: statusFilter,
-        employeeId: employeeFilter,
-        serviceId: serviceFilter,
-        search: debouncedSearchTerm,
-        onlyFuture: showOnlyFuture,
-      });
+      if (tab === "configuracion") {
+        setReservations([]);
+        return;
+      }
+      // Por confirmar: pendientes futuras. Vencidas: pendientes (se filtran las pasadas
+      // aquí; el backend ordena por fecha). Historial: los filtros de siempre.
+      const inbox = tab === "por_confirmar" || tab === "vencidas";
+      const result = await getReservationsByOrganization(
+        organizationId,
+        inbox
+          ? { page: 1, limit: 100, status: "pending", onlyFuture: tab === "por_confirmar" }
+          : {
+              page,
+              limit: PAGE_SIZE,
+              status: statusFilter,
+              employeeId: employeeFilter,
+              serviceId: serviceFilter,
+              search: debouncedSearchTerm,
+              onlyFuture: showOnlyFuture,
+            }
+      );
       setReservations(result.reservations);
       setTotalPages(result.pages);
       // Si el filtro dejó la página actual fuera de rango, volvemos a la última válida
@@ -293,9 +356,24 @@ const ReservationsList: React.FC = () => {
     }
   };
 
+  // Estadísticas + contadores de las pestañas. Tras cada acción refresca también el
+  // contador del menú (notifyReservationsChanged).
   const loadStats = async (organizationId: string) => {
-    const data = await getReservationStats(organizationId);
+    const [data, pending, allPending] = await Promise.all([
+      getReservationStats(organizationId),
+      getReservationsByOrganization(organizationId, { page: 1, limit: 1, status: "pending", onlyFuture: true }),
+      getReservationsByOrganization(organizationId, { page: 1, limit: 100, status: "pending", onlyFuture: false }),
+    ]);
     setStats(data);
+    setPendingCount(pending.total);
+    const now = Date.now();
+    const pastGroups = new Set(
+      allPending.reservations
+        .filter((r) => new Date(r.startDate).getTime() < now)
+        .map((r) => r.groupId || r._id)
+    );
+    setExpiredCount(pastGroups.size);
+    notifyReservationsChanged();
   };
 
   const fetchServices = async (organizationId: string) => {
@@ -316,53 +394,6 @@ const ReservationsList: React.FC = () => {
     }
   };
 
-  // ------- HELPERS UI -------
-  const translateStatus = (
-    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted"
-  ) => {
-    switch (status) {
-      case "pending":
-        return "Pendiente";
-      case "approved":
-        return "Aprobada";
-      case "rejected":
-        return "Rechazada";
-      case "auto_approved":
-        return "Auto-Aprobada";
-      case "cancelled_by_customer":
-        return "Cancelada por Cliente";
-      case "cancelled_by_admin":
-        return "Cancelada por Admin";
-      case "appointment_deleted":
-        return "Cita eliminada";
-      default:
-        return "Desconocido";
-    }
-  };
-
-  const getBadgeColor = (
-    status: "pending" | "approved" | "rejected" | "auto_approved" | "cancelled_by_customer" | "cancelled_by_admin" | "appointment_deleted"
-  ): string => {
-    switch (status) {
-      case "pending":
-        return "yellow";
-      case "approved":
-        return "green";
-      case "rejected":
-        return "red";
-      case "cancelled_by_customer":
-        return "orange";
-      case "cancelled_by_admin":
-        return "gray";
-      case "auto_approved":
-        return "teal";
-      case "appointment_deleted":
-        return "red";
-      default:
-        return "gray";
-    }
-  };
-
   // Reserva aprobada/auto_aprobada cuya cita no existe (populate devolvió null o no es objeto)
   const isApprovedWithoutAppointment = (r: Reservation): boolean => {
     const isApproved = r.status === "approved" || r.status === "auto_approved";
@@ -380,23 +411,6 @@ const ReservationsList: React.FC = () => {
     () => services.map((s) => ({ value: s._id, label: s.name })),
     [services]
   );
-
-  const policyBadge = useMemo(() => {
-    return orgPolicy === "auto_if_available" ? (
-      <Badge color="green" variant="filled">
-        Agendamiento automático
-      </Badge>
-    ) : (
-      <Badge color="gray" variant="light">
-        Aprobación manual
-      </Badge>
-    );
-  }, [orgPolicy]);
-
-  const policyHelpText =
-    orgPolicy === "auto_if_available"
-      ? "Las reservas se confirman y crean la cita automáticamente si hay disponibilidad inmediata. Si no hay cupo, la reserva queda pendiente."
-      : "Las reservas requieren aprobación manual. No se crean citas automáticamente.";
 
   // ------- LISTA DE LA PÁGINA ACTUAL -------
   // El filtrado (estado, profesional, servicio, búsqueda, solo futuras), el orden
@@ -424,10 +438,6 @@ const ReservationsList: React.FC = () => {
   // "sin resultados para estos filtros" en el mensaje vacío de la tabla.
   const hasReservations = stats.total > 0;
 
-  // Tarjetas de origen (Total / IA / Manual): estadísticas globales calculadas
-  // en el servidor, independientes de filtros y de la página cargada.
-  const sourceStats = stats;
-
   // ------- PAGO DEL ABONO (comprobante) -------
   // Order del abono de la reserva o de su grupo (todas comparten el mismo).
   const getPaymentOrder = (
@@ -450,26 +460,16 @@ const ReservationsList: React.FC = () => {
   const formatMoney = (order: ReservationPaymentOrder) =>
     `$${order.amount.toLocaleString("es-CO")} ${order.currency}`;
 
-  const renderPaymentBadge = (order: ReservationPaymentOrder | null, size: "xs" | "sm" = "xs") => {
+  const renderPaymentBadge = (order: ReservationPaymentOrder | null) => {
     if (!order) return null;
-    const amount = formatMoney(order);
-    const map: Record<string, { label: string; color: string }> = {
-      in_review: { label: `Comprobante en revisión · ${amount}`, color: "yellow" },
-      paid: { label: `Abono pagado · ${amount}`, color: "teal" },
-      created: { label: `Abono sin pagar · ${amount}`, color: "gray" },
-      pending: { label: `Abono sin pagar · ${amount}`, color: "gray" },
-      failed: { label: "Comprobante rechazado", color: "red" },
-      expired: { label: "Abono vencido", color: "gray" },
-    };
-    const info = map[order.status];
-    if (!info) return null;
+    const meta = paymentMeta(order.status);
+    if (!meta) return null;
     const clickable = !!order.receipt?.imageUrl;
+    const showAmount = order.status !== "failed" && order.status !== "expired";
     return (
-      <Badge
-        size={size}
-        color={info.color}
-        variant={order.status === "in_review" ? "filled" : "light"}
-        radius="lg"
+      <span
+        className={`ag-badge${meta.tone === "neutral" ? "" : ` ag-badge--${meta.tone}`}`}
+        role={clickable ? "button" : undefined}
         style={clickable ? { cursor: "pointer" } : undefined}
         onClick={
           clickable
@@ -480,8 +480,9 @@ const ReservationsList: React.FC = () => {
             : undefined
         }
       >
-        🧾 {info.label}
-      </Badge>
+        {meta.label}
+        {showAmount ? ` · ${formatMoney(order)}` : ""}
+      </span>
     );
   };
 
@@ -1041,179 +1042,303 @@ const ReservationsList: React.FC = () => {
     }
   };
 
-  // ------- RENDER HELPERS -------
-  const renderSkeletonRows = (rows = 6) =>
-    Array.from({ length: rows }).map((_, idx) => (
-      <Table.Tr key={`sk-${idx}`}>
-        <Table.Td>
-          <Skeleton height={12} radius="sm" />
-        </Table.Td>
-        <Table.Td>
-          <Skeleton height={12} radius="sm" />
-        </Table.Td>
-        <Table.Td>
-          <Skeleton height={20} radius="xl" />
-        </Table.Td>
-        <Table.Td>
-          <Skeleton height={12} radius="sm" />
-        </Table.Td>
-        <Table.Td>
-          <Skeleton height={24} radius="xl" />
-        </Table.Td>
-        <Table.Td>
-          <Skeleton height={20} radius="sm" />
-        </Table.Td>
-      </Table.Tr>
-    ));
+  // ------- REDISEÑO: filas de la bandeja, del historial y tarjetas móviles -------
+  const tz = organization?.timezone || "America/Bogota";
+  const fmtTime = (d: dayjs.Dayjs) =>
+    d.format(getTimeFormatStr(organization?.timeFormat)).replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const renderProfessionalCell = (names: string[]) => {
-    if (names.length === 1) {
-      const isUnassigned = names[0] === "Sin asignar";
-      return (
-        <Badge variant="light" color={isUnassigned ? "red" : "grape"} size="sm">
-          {names[0]}
-        </Badge>
-      );
+  // Una entrada por reserva o por grupo (la primera del grupo representa a todas)
+  type Entry = { first: Reservation; list: Reservation[] };
+  const toEntries = (rows: Reservation[]): Entry[] => {
+    const seen = new Set<string>();
+    const out: Entry[] = [];
+    for (const r of rows) {
+      const group = r.groupId ? groupsMap.get(r.groupId) : null;
+      if (group && group.length > 1) {
+        if (seen.has(r.groupId!)) continue;
+        seen.add(r.groupId!);
+        out.push({ first: group[0], list: group });
+      } else {
+        out.push({ first: r, list: [r] });
+      }
+    }
+    return out;
+  };
+
+  const nowTz = dayjs().tz(tz);
+  const todayKey = nowTz.format("YYYY-MM-DD");
+  const inboxEntries = useMemo(() => {
+    if (tab !== "por_confirmar" && tab !== "vencidas") return [];
+    const now = Date.now();
+    const rows = reservations.filter((r) =>
+      tab === "vencidas" ? new Date(r.startDate).getTime() < now : new Date(r.startDate).getTime() >= now - 60_000
+    );
+    const entries = toEntries(rows);
+    // Vencidas: la más reciente primero
+    return tab === "vencidas" ? entries.reverse() : entries;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reservations, tab, groupsMap]);
+
+  const inboxSections = useMemo(() => {
+    if (tab === "vencidas") return [{ key: "vencidas", label: "Fecha pasada", entries: inboxEntries }];
+    const buckets: Record<WhenBucket, Entry[]> = { hoy: [], semana: [], despues: [] };
+    inboxEntries.forEach((e) => {
+      buckets[whenBucket(dayjs(e.first.startDate).tz(tz).format("YYYY-MM-DD"), todayKey)].push(e);
+    });
+    return (Object.keys(buckets) as WhenBucket[])
+      .filter((k) => buckets[k].length > 0)
+      .map((k) => ({ key: k, label: WHEN_LABELS[k], entries: buckets[k] }));
+  }, [inboxEntries, tab, tz, todayKey]);
+
+  const historyEntries = useMemo(
+    () => (tab === "historial" ? toEntries(reservations) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [reservations, tab, groupsMap]
+  );
+
+  const hasActiveFilters =
+    statusFilter !== "all" || employeeFilter !== "all" || serviceFilter !== "all" || searchTerm.trim() !== "";
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setEmployeeFilter("all");
+    setServiceFilter("all");
+    setSearchTerm("");
+    setPage(1);
+  };
+
+  const serviceNames = (list: Reservation[]) =>
+    list.map((r) => (typeof r.serviceId === "object" && r.serviceId ? r.serviceId.name : "—")).join(" · ");
+
+  const renderPro = (first: Reservation, list: Reservation[]) => {
+    const names = getProfessionalNames(first, list);
+    if (names.length === 1 && names[0] === "Sin asignar") {
+      return <span className="ag-badge ag-badge--warning">Sin profesional</span>;
     }
     return (
-      <Text size="xs" c="dimmed">
-        {names.join(", ")}
-      </Text>
+      <span className="ag-appt__pro" style={{ color: "var(--ink)" }}>
+        <i style={{ background: "var(--brand)" }} />
+        {names.filter((n) => n !== "Sin asignar").join(", ")}
+      </span>
     );
   };
 
-  // Acciones rápidas (aprobar/rechazar) directamente en la fila/tarjeta, sin
-  // necesidad de abrir el modal de detalle — solo cuando todo está "pending".
-  const renderQuickActions = (
-    reservation: Reservation,
-    groupReservations?: Reservation[] | null
-  ) => {
-    const isGroup = !!groupReservations && groupReservations.length > 1;
-    const allPending = isGroup
-      ? groupReservations!.every((r) => r.status === "pending")
-      : reservation.status === "pending";
-
-    if (!allPending) {
-      return (
-        <Text size="xs" c="dimmed">
-          —
-        </Text>
-      );
-    }
-
-    const busy = isGroup
-      ? groupReservations!.some((r) => r._id && isRowBusy(r._id))
-      : Boolean(reservation._id && isRowBusy(reservation._id));
-
-    const onApprove = async () => {
-      if (isGroup && reservation.groupId) {
-        await handleApproveGroup(reservation.groupId);
-      } else if (reservation._id) {
-        await handleUpdateStatus(reservation._id, "approved");
-      }
-    };
-    const onReject = async () => {
-      if (isGroup && reservation.groupId) {
-        await handleRejectGroup(reservation.groupId);
-      } else if (reservation._id) {
-        await handleUpdateStatus(reservation._id, "rejected");
-      }
-    };
-
+  const renderOrigin = (r: Reservation) => {
+    const Icon = r.source === "ai_chatbot" ? IconRobot : r.source === "admin" ? IconDeviceDesktop : IconWorld;
     return (
-      <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
-        <Tooltip label={isGroup ? "Aprobar todas" : "Aprobar"}>
-          <ActionIcon color="green" variant="light" loading={busy} onClick={onApprove}>
-            <BiCheck />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label={isGroup ? "Rechazar todas" : "Rechazar"}>
-          <ActionIcon color="red" variant="light" loading={busy} onClick={onReject}>
-            <BiXCircle />
-          </ActionIcon>
-        </Tooltip>
-      </Group>
+      <span className="ag-subtle" style={{ display: "inline-flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
+        <Icon size={14} />
+        {originLabel(r.source)}
+      </span>
     );
   };
 
-  const renderMobileReservationCard = (reservation: Reservation, groupReservations?: Reservation[]) => {
-    const serviceObj =
-      typeof reservation.serviceId === "object" ? reservation.serviceId : null;
-    const serviceName = serviceObj?.name || "Sin especificar";
-    const isGroup = groupReservations && groupReservations.length > 1;
+  const renderStatus = (r: Reservation) => {
+    const meta = STATUS_META[r.status as ReservationStatusKey];
+    if (!meta) return null;
+    return <span className={`ag-badge${meta.tone === "neutral" ? "" : ` ag-badge--${meta.tone}`}`}>{meta.label}</span>;
+  };
 
-    return (
-      <Card
-        key={reservation._id}
-        withBorder
-        radius="lg"
-        shadow="xs"
-        mb="sm"
-        p="md"
-        style={{ cursor: 'pointer' }}
-        onClick={() => handleOpenDetail(reservation, groupReservations)}
+  const runApprove = async (e: Entry) => {
+    const isGroup = e.list.length > 1;
+    if (isGroup && e.first.groupId) await handleApproveGroup(e.first.groupId);
+    else if (e.first._id) await handleUpdateStatus(e.first._id, "approved");
+  };
+  const runReject = async (e: Entry) => {
+    const isGroup = e.list.length > 1;
+    if (isGroup && e.first.groupId) await handleRejectGroup(e.first.groupId);
+    else if (e.first._id) await handleUpdateStatus(e.first._id, "rejected");
+  };
+
+  const renderInboxRow = (entry: Entry, expired: boolean) => {
+    const { first, list } = entry;
+    const isGroup = list.length > 1;
+    const start = dayjs(first.startDate).tz(tz);
+    const dayDiff = start.startOf("day").diff(nowTz.startOf("day"), "day");
+    const order = getPaymentOrder(first, list);
+    const busy = list.some((r) => r._id && isRowBusy(r._id));
+    const open = () => handleOpenDetail(first, list);
+    const actions = (
+      <div
+        className="ag-row"
+        style={isMobile ? { display: "grid", gridTemplateColumns: expired ? "1fr" : "1fr 1fr", gap: 8, marginTop: 8 } : { flexWrap: "nowrap", gap: 8 }}
+        onClick={(ev) => ev.stopPropagation()}
       >
-        <Stack gap={8}>
-          <Group gap={6} align="center" wrap="wrap">
-            <Badge size="xs" variant="outline" radius="lg">
-              {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format(`DD/MM ${getTimeFormatStr(organization?.timeFormat)}`)}
-            </Badge>
-
-            <Badge
-              size="xs"
-              color={getBadgeColor(reservation.status)}
-              variant="light"
-              radius="lg"
-            >
-              {translateStatus(reservation.status)}
-            </Badge>
-
-            {isGroup && (
-              <Badge size="xs" variant="dot" color="blue" radius="lg">
-                Grupo
-              </Badge>
-            )}
-            {(isGroup
-              ? (groupReservations || [reservation]).some(isApprovedWithoutAppointment)
-              : isApprovedWithoutAppointment(reservation)) && (
-              <Badge size="xs" color="orange" variant="outline" radius="lg">
-                ⚠ Sin cita
-              </Badge>
-            )}
-            {renderPaymentBadge(getPaymentOrder(reservation, groupReservations))}
-          </Group>
-
-          <Text fw={600} size="sm">
-            {isGroup ? `${groupReservations.length} servicios` : serviceName}
-          </Text>
-
-          {isGroup && (
-            <Text size="xs" c="dimmed">
-              {groupReservations.map(r => {
-                const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
-                return sObj?.name || "—";
-              }).join(", ")}
-            </Text>
-          )}
-
-          <Text size="xs" c="dimmed">
-            Cliente:{" "}
-            <Text span fw={500} c="dark">
-              {reservation.customerDetails?.name ?? "—"}
-            </Text>
-          </Text>
-
-          <Group gap={6} align="center">
-            <Text size="xs" c="dimmed">Profesional:</Text>
-            {renderProfessionalCell(getProfessionalNames(reservation, groupReservations))}
-          </Group>
-
-          <Group justify="flex-end">
-            {renderQuickActions(reservation, groupReservations)}
-          </Group>
-        </Stack>
-      </Card>
+        <Button size="xs" variant={isMobile ? "outline" : "subtle"} color="gray" loading={busy} onClick={() => runReject(entry)}>
+          Rechazar
+        </Button>
+        {!expired && (
+          <Button size="xs" variant={isMobile ? "filled" : "outline"} loading={busy} leftSection={<IconCheck size={14} />} onClick={() => runApprove(entry)}>
+            {isGroup ? `Aprobar las ${list.length}` : "Aprobar"}
+          </Button>
+        )}
+      </div>
     );
+    return (
+      <div
+        key={first._id}
+        className="ag-list-row"
+        role="button"
+        tabIndex={0}
+        onClick={open}
+        onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), open())}
+        style={{ padding: "12px 16px", gap: 14, alignItems: isMobile ? "stretch" : "center", cursor: "pointer", flexDirection: isMobile ? "column" : "row" }}
+      >
+        <div style={{ display: "flex", gap: 14, flex: 1, minWidth: 0 }}>
+          <div style={dateBoxStyle}>
+            <small style={{ fontSize: 11, lineHeight: "14px", color: "var(--ink-muted)", textTransform: "capitalize" }}>{start.format("ddd").replace(".", "")}</small>
+            <b style={{ fontSize: 18, lineHeight: "22px" }}>{start.format("D")}</b>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div className="ag-row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <b className="ag-num">{fmtTime(start)}</b>
+              <span className="ag-subtle">{relativeWhen(start.valueOf(), Date.now(), dayDiff)}</span>
+              {isGroup && <span className="ag-badge ag-badge--outline">Grupo de {list.length}</span>}
+            </div>
+            <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              <b>{first.customerDetails?.name ?? "—"}</b>
+              {first.customerDetails?.phone && <span className="ag-muted" style={{ fontSize: 13 }}> · {first.customerDetails.phone}</span>}
+            </div>
+            <div className="ag-row" style={{ gap: 10, flexWrap: "wrap" }}>
+              <span className="ag-muted" style={{ fontSize: 13 }}>{serviceNames(list)}</span>
+              {renderPro(first, list)}
+              {renderOrigin(first)}
+            </div>
+            {order && <div style={{ marginTop: 4 }}>{renderPaymentBadge(order)}</div>}
+            {first.errorMessage && !expired && (
+              <div className="ag-subtle" style={{ color: "var(--warning)", marginTop: 2 }}>No se confirmó sola: {first.errorMessage}</div>
+            )}
+          </div>
+        </div>
+        {actions}
+      </div>
+    );
+  };
+
+  const renderNotice = (first: Reservation, list: Reservation[]) => {
+    const order = getPaymentOrder(first, list);
+    const noAppt = list.some(isApprovedWithoutAppointment);
+    if (!order && !noAppt) return <span className="ag-subtle">—</span>;
+    return (
+      <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }}>
+        {noAppt && <span className="ag-badge ag-badge--danger">Sin cita</span>}
+        {order && renderPaymentBadge(order)}
+      </div>
+    );
+  };
+
+  const renderRowAction = (first: Reservation, list: Reservation[]) => {
+    const busy = list.some((r) => r._id && isRowBusy(r._id));
+    const stop = (ev: React.MouseEvent) => ev.stopPropagation();
+    if (list.every((r) => r.status === "pending")) {
+      return (
+        <Button size="xs" variant="outline" loading={busy} onClick={(ev) => { stop(ev); void runApprove({ first, list }); }}>
+          Aprobar
+        </Button>
+      );
+    }
+    if (list.some((r) => r.status === "appointment_deleted")) {
+      return (
+        <Button size="xs" variant="subtle" loading={busy} onClick={(ev) => { stop(ev); handleOpenDetail(first, list); }}>
+          Re-aprobar
+        </Button>
+      );
+    }
+    if (list.some(isApprovedWithoutAppointment)) {
+      return (
+        <Button size="xs" variant="subtle" loading={busy} onClick={(ev) => { stop(ev); handleOpenDetail(first, list); }}>
+          Recrear cita
+        </Button>
+      );
+    }
+    return null;
+  };
+
+  const renderHistoryRow = (entry: Entry) => {
+    const { first, list } = entry;
+    const start = dayjs(first.startDate).tz(tz);
+    return (
+      <tr key={first._id} style={{ cursor: "pointer" }} onClick={() => handleOpenDetail(first, list)}>
+        <td className="ag-num" style={{ whiteSpace: "nowrap" }}>
+          <b>{capitalize(start.format("ddd D/MM").replace(".", ""))}</b>
+          <div className="ag-subtle">{fmtTime(start)}</div>
+        </td>
+        <td>
+          <b>{first.customerDetails?.name ?? "—"}</b>
+          <div className="ag-subtle" style={{ maxWidth: 240, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {list.length > 1 ? `Grupo de ${list.length} · ` : ""}
+            {serviceNames(list)}
+          </div>
+        </td>
+        <td>{renderPro(first, list)}</td>
+        <td>{renderOrigin(first)}</td>
+        <td>{renderStatus(first)}</td>
+        <td>{renderNotice(first, list)}</td>
+        <td style={{ textAlign: "right" }}>{renderRowAction(first, list)}</td>
+      </tr>
+    );
+  };
+
+  const renderHistoryCard = (entry: Entry) => {
+    const { first, list } = entry;
+    const start = dayjs(first.startDate).tz(tz);
+    return (
+      <div
+        key={first._id}
+        className="ag-card"
+        role="button"
+        tabIndex={0}
+        onClick={() => handleOpenDetail(first, list)}
+        style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6, cursor: "pointer" }}
+      >
+        <div className="ag-row" style={{ justifyContent: "space-between" }}>
+          <b className="ag-num">{capitalize(start.format("ddd D/MM").replace(".", ""))} · {fmtTime(start)}</b>
+          {renderStatus(first)}
+        </div>
+        <div>
+          <b>{first.customerDetails?.name ?? "—"}</b>
+          <div className="ag-subtle">{list.length > 1 ? `Grupo de ${list.length} · ` : ""}{serviceNames(list)}</div>
+        </div>
+        <div className="ag-row" style={{ gap: 10, flexWrap: "wrap" }}>
+          {renderPro(first, list)}
+          {renderOrigin(first)}
+        </div>
+        {(getPaymentOrder(first, list) || list.some(isApprovedWithoutAppointment)) && renderNotice(first, list)}
+        {renderRowAction(first, list)}
+      </div>
+    );
+  };
+
+  // Rechazar todas las vencidas (no se avisa al cliente: el backend no notifica rechazos).
+  // Las que tienen dinero de por medio (comprobante en revisión o abono pagado) quedan
+  // fuera: se revisan una por una para decidir qué pasa con el pago.
+  const hasMoneyAtStake = (e: Entry) => {
+    const st = getPaymentOrder(e.first, e.list)?.status;
+    return st === "in_review" || st === "paid";
+  };
+  const rejectableExpired = tab === "vencidas" ? inboxEntries.filter((e) => !hasMoneyAtStake(e)) : [];
+  const expiredWithMoney = tab === "vencidas" ? inboxEntries.length - rejectableExpired.length : 0;
+
+  const handleRejectAllExpired = async () => {
+    setRejectAllBusy(true);
+    let ok = 0;
+    try {
+      for (const e of rejectableExpired) {
+        const targets = e.list.filter((r) => r._id && r.status === "pending");
+        await Promise.all(targets.map((r) => updateReservation(r._id!, { status: "rejected" })));
+        ok += 1;
+      }
+      showNotification({ title: "Vencidas rechazadas", message: `${ok} reserva(s) rechazada(s).`, color: "green" });
+    } catch (err: any) {
+      showNotification({ title: "No se pudieron rechazar todas", message: err?.response?.data?.message || err?.message || "Intenta de nuevo.", color: "red" });
+    } finally {
+      setRejectAllBusy(false);
+      setRejectAllOpen(false);
+      if (organization?._id) {
+        await loadPage(organization._id);
+        void loadStats(organization._id);
+      }
+    }
   };
 
   // ------- RENDER -------
@@ -1396,17 +1521,23 @@ const ReservationsList: React.FC = () => {
         </Group>
       </Modal>
 
-      {/* Modal Detalle de Reserva */}
-      <Modal
+      {/* Detalle de la reserva: panel lateral en escritorio, sheet en móvil */}
+      <Drawer
         opened={detailModalOpen}
         onClose={handleCloseDetail}
+        position={isMobile ? "bottom" : "right"}
+        size={isMobile ? "90%" : 460}
+        radius={isMobile ? "lg" : 0}
         title={
-          selectedGroupReservations.length > 1
-            ? `Grupo de ${selectedGroupReservations.length} Reservas`
-            : "Detalle de Reserva"
+          <Group gap="sm">
+            <Text fw={600} size="lg">
+              {selectedGroupReservations.length > 1
+                ? `Grupo de ${selectedGroupReservations.length} reservas`
+                : "Reserva"}
+            </Text>
+            {selectedReservation && renderStatus(selectedReservation)}
+          </Group>
         }
-        size="lg"
-        centered
       >
         <div style={{ position: "relative" }}>
           <LoadingOverlay visible={detailModalLoading} zIndex={1000} />
@@ -1457,7 +1588,7 @@ const ReservationsList: React.FC = () => {
                     Abono
                   </Text>
                   <Group gap="xs">
-                    {renderPaymentBadge(order, "sm")}
+                    {renderPaymentBadge(order)}
                     {order.receipt?.imageUrl && (
                       <Button size="xs" variant="subtle" onClick={() => setReceiptView(order)}>
                         Ver comprobante
@@ -1558,17 +1689,15 @@ const ReservationsList: React.FC = () => {
                         <Stack gap={4} style={{ flex: 1 }}>
                           <Group gap="xs">
                             <Text fw={500}>{serviceName}</Text>
-                            <Badge size="sm" color={getBadgeColor(res.status)}>
-                              {translateStatus(res.status)}
-                            </Badge>
+                            {renderStatus(res)}
                             {isApprovedWithoutAppointment(res) && (
                               <Badge size="sm" color="orange" variant="outline">
-                                ⚠ Sin cita
+                                Sin cita
                               </Badge>
                             )}
                           </Group>
                           <Text size="sm" c="dimmed">
-                            {dayjs(res.startDate).tz(organization?.timezone || 'America/Bogota').format(`DD/MM/YYYY ${getTimeFormatStr(organization?.timeFormat)}`)}
+                            {capitalize(dayjs(res.startDate).tz(tz).format("ddd D/MM/YYYY").replace(".", ""))} · {fmtTime(dayjs(res.startDate).tz(tz))}
                           </Text>
                           <Group gap="xs">
                             <Text size="sm" c="dimmed">
@@ -1586,7 +1715,7 @@ const ReservationsList: React.FC = () => {
                           </Group>
                         </Stack>
                         <Text fw={600} size="lg">
-                          ${servicePrice}
+                          $ {servicePrice.toLocaleString("es-CO")}
                         </Text>
                       </Group>
 
@@ -1735,7 +1864,7 @@ const ReservationsList: React.FC = () => {
                         </Group>
                       ) : (
                         <Text size="sm" c="dimmed">
-                          ⚠️ El abono no está configurado. Ve a Configuración → Organización → Métodos de pago para establecerlo.
+                          El abono no está configurado. Configúralo en Ajustes › Cobros.
                         </Text>
                       );
                     })()}
@@ -1818,7 +1947,7 @@ const ReservationsList: React.FC = () => {
                     loading={detailModalLoading}
                     disabled={detailModalLoading}
                   >
-                    Aprobar Todas
+                    Aprobar todas
                   </Button>
                   <Button
                     color="red"
@@ -1834,7 +1963,7 @@ const ReservationsList: React.FC = () => {
                     loading={detailModalLoading}
                     disabled={detailModalLoading}
                   >
-                    Rechazar Todas
+                    Rechazar todas
                   </Button>
                 </Group>
               )}
@@ -1870,6 +1999,38 @@ const ReservationsList: React.FC = () => {
             <Text c="dimmed" ta="center">No hay información disponible</Text>
           )}
         </div>
+      </Drawer>
+
+      {/* Rechazar todas las vencidas */}
+      <Modal
+        opened={rejectAllOpen}
+        onClose={() => !rejectAllBusy && setRejectAllOpen(false)}
+        title="Rechazar las reservas vencidas"
+        centered
+      >
+        <Stack gap="sm">
+          <Text size="sm">
+            Se rechazarán {rejectableExpired.length === 1 ? "1 reserva vencida" : `${rejectableExpired.length} reservas vencidas`}. Su fecha ya pasó y no
+            se crea ninguna cita. No se le envía mensaje al cliente.
+          </Text>
+          {expiredWithMoney > 0 && (
+            <div className="ag-alert ag-alert--warning">
+              <BiInfoCircle size={20} />
+              <div>
+                {expiredWithMoney === 1 ? "1 reserva tiene" : `${expiredWithMoney} reservas tienen`} un comprobante en revisión o un abono
+                pagado. No se incluyen: ábrelas una por una para decidir qué pasa con el pago.
+              </div>
+            </div>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setRejectAllOpen(false)} disabled={rejectAllBusy}>
+              Volver
+            </Button>
+            <Button color="red" onClick={handleRejectAllExpired} loading={rejectAllBusy}>
+              Rechazar todas
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Modal: ver comprobante del abono */}
@@ -1883,7 +2044,7 @@ const ReservationsList: React.FC = () => {
         {receiptView && (
           <Stack gap="sm">
             <Group justify="space-between">
-              {renderPaymentBadge(receiptView, "sm")}
+              {renderPaymentBadge(receiptView)}
             </Group>
             {receiptView.receipt?.imageUrl && (
               <Image src={receiptView.receipt.imageUrl} alt="Comprobante" mah={420} fit="contain" radius="sm" />
@@ -2031,486 +2192,279 @@ const ReservationsList: React.FC = () => {
         </Stack>
       </Modal>
 
-      <Card shadow="sm" radius="lg" withBorder style={{ position: "relative" }}>
+      <Box p={{ base: "sm", md: "lg" }}>
+        <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+          <div className="ag-row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--space-3)" }}>
+            <div>
+              <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Reservas online</h1>
+              <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+                {orgPolicy === "auto_if_available"
+                  ? "Se confirman solas si hay cupo. Las que no tuvieron cupo quedan por confirmar."
+                  : "Las reservas de tu página y del chat esperan tu aprobación antes de crear la cita."}{" "}
+                {tab !== "configuracion" && (
+                  <a href="?tab=configuracion" className="ag-link" onClick={(e) => { e.preventDefault(); setTab("configuracion"); }}>
+                    Cambiar política
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
 
-        {/* Header */}
-        <Group justify="space-between" align="flex-start" mb="sm">
-          <Stack gap={2}>
-            <Text size={isMobile ? "lg" : "xl"} fw={600}>
-              Reservas de la organización
-            </Text>
-            <Text size="xs" c="dimmed">
-              Revisa, filtra y gestiona las reservas creadas desde tu página o
-              WhatsApp.
-            </Text>
-          </Stack>
+          <nav className="ag-subtabs" aria-label="Reservas online">
+            {visibleTabs.map((t) => {
+              const count = t === "por_confirmar" ? pendingCount : t === "vencidas" ? expiredCount : 0;
+              return (
+                <a
+                  key={t}
+                  href={`?tab=${t}`}
+                  aria-current={tab === t ? "page" : undefined}
+                  onClick={(e) => { e.preventDefault(); setTab(t); }}
+                >
+                  {RESERVATIONS_TAB_LABELS[t]}
+                  {count > 0 && (
+                    <span className={`ag-badge${t === "por_confirmar" ? " ag-badge--warning" : ""}`}>{formatPendingCount(count)}</span>
+                  )}
+                </a>
+              );
+            })}
+          </nav>
 
-          <Stack gap={4} align="flex-end">
-            <Tooltip label={policyHelpText} withArrow>
-              <span>{policyBadge}</span>
-            </Tooltip>
-            <Group gap="xs" align="flex-end">
-              <Select
-                w={isMobile ? 200 : 260}
-                label="Política de agendamiento"
-                value={orgPolicy}
-                onChange={(val) =>
-                  val && handleChangePolicy(val as ReservationPolicy)
-                }
-                data={[
-                  { value: "manual", label: "Aprobación manual" },
-                  {
-                    value: "auto_if_available",
-                    label: canAutoConfirm
-                      ? "Automático si hay disponibilidad"
-                      : "Automático si hay disponibilidad (Plan Starter o superior)",
-                    disabled: !canAutoConfirm,
-                  },
-                ]}
-                disabled={!organization?._id || savingPolicy}
-                comboboxProps={{ withinPortal: true }}
-                rightSection={savingPolicy ? <Loader size="xs" /> : null}
-              />
-              {savingPolicy && (
-                <Group gap={6} align="center">
-                  <Loader size="xs" />
-                  <Text size="xs" c="dimmed" aria-live="polite">
-                    Guardando…
-                  </Text>
+          {/* Política automática con reservas que no tuvieron cupo */}
+          {orgPolicy === "auto_if_available" && pendingCount > 0 && tab !== "por_confirmar" && (
+            <div className="ag-alert ag-alert--warning" style={{ alignItems: "center" }}>
+              <BiInfoCircle size={20} />
+              <div style={{ flex: 1 }}>
+                <b>{pendingCount === 1 ? "1 reserva no se pudo confirmar sola" : `${pendingCount} reservas no se pudieron confirmar solas`}</b>{" "}
+                <span className="ag-muted">· no había cupo. Apruébalas o recházalas.</span>
+              </div>
+              <Button size="xs" variant="outline" onClick={() => setTab("por_confirmar")}>Revisar</Button>
+            </div>
+          )}
+
+          {error && (
+            <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+              <BiInfoCircle size={20} />
+              <div style={{ flex: 1 }}>{error}</div>
+              <Button size="xs" variant="outline" onClick={() => organization?._id && loadPage(organization._id)}>Reintentar</Button>
+            </div>
+          )}
+
+          {/* ---------- POR CONFIRMAR / VENCIDAS ---------- */}
+          {(tab === "por_confirmar" || tab === "vencidas") && (
+            <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+              <div className="ag-row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <span className="ag-muted" style={{ fontSize: 14 }}>
+                  {tab === "por_confirmar"
+                    ? "Ordenadas por la fecha más próxima. Aprueba para crear la cita en la agenda."
+                    : "Su fecha pasó sin que nadie las aprobara. No suman en el contador."}
+                </span>
+                {tab === "vencidas" && rejectableExpired.length > 0 && (
+                  <Button size="xs" variant="outline" color="red" onClick={() => setRejectAllOpen(true)}>
+                    {expiredWithMoney > 0 ? `Rechazar las ${rejectableExpired.length} sin pago` : `Rechazar todas (${rejectableExpired.length})`}
+                  </Button>
+                )}
+              </div>
+
+              {initialLoading ? (
+                <div className="ag-card" style={{ padding: 16 }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <Skeleton key={i} height={56} radius="md" mb={i < 3 ? 12 : 0} />
+                  ))}
+                </div>
+              ) : inboxEntries.length === 0 ? (
+                <div className="ag-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+                  <b style={{ display: "block", marginBottom: 4 }}>
+                    {tab === "por_confirmar" ? "No tienes reservas por confirmar" : "No hay reservas vencidas"}
+                  </b>
+                  <span className="ag-muted" style={{ fontSize: 14 }}>
+                    {tab === "por_confirmar" ? "Cuando un cliente reserve desde tu página o el chat, aparecerá aquí. " : ""}
+                    <a href="?tab=historial" className="ag-link" onClick={(e) => { e.preventDefault(); setTab("historial"); }}>
+                      Ver historial
+                    </a>
+                  </span>
+                </div>
+              ) : (
+                <div className="ag-card" style={{ padding: 0, overflow: "hidden" }}>
+                  {inboxSections.map((section) => (
+                    <div key={section.key}>
+                      <div style={{ padding: "10px 16px", background: "var(--surface-muted)", borderBottom: "1px solid var(--line)" }}>
+                        <span style={eyebrowStyle}>{section.label}</span>
+                      </div>
+                      {section.entries.map((entry) => renderInboxRow(entry, tab === "vencidas"))}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === "por_confirmar" && expiredCount > 0 && !initialLoading && (
+                <div className="ag-alert ag-alert--info" style={{ alignItems: "center" }}>
+                  <BiInfoCircle size={20} />
+                  <div style={{ flex: 1 }}>
+                    <b>{expiredCount === 1 ? "1 reserva vencida" : `${expiredCount} reservas vencidas`}</b>{" "}
+                    <span className="ag-muted">· su fecha pasó sin que nadie las aprobara.</span>
+                  </div>
+                  <Button size="xs" variant="outline" onClick={() => setTab("vencidas")}>Ver vencidas</Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ---------- HISTORIAL ---------- */}
+          {tab === "historial" && (
+            <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+              {!initialLoading && stats.hasApprovedWithoutAppointment && (
+                <div className="ag-alert ag-alert--warning">
+                  <BiInfoCircle size={20} />
+                  <div>
+                    Hay reservas <b>aprobadas sin cita</b>: la cita se eliminó o falló al crearse. Aparecen con «Sin cita»; ábrelas para recrearla.
+                  </div>
+                </div>
+              )}
+
+              <div className="ag-row" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                <TextInput
+                  placeholder="Nombre, teléfono o correo"
+                  leftSection={<IconSearch size={16} />}
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.currentTarget.value); setPage(1); }}
+                  w={isMobile ? "100%" : 260}
+                  aria-label="Buscar cliente"
+                />
+                <Select
+                  aria-label="Estado"
+                  value={statusFilter}
+                  onChange={(val) => { setStatusFilter((val as typeof statusFilter) || "all"); setPage(1); }}
+                  data={[
+                    { value: "all", label: "Estado: todos" },
+                    ...(Object.keys(STATUS_META) as ReservationStatusKey[]).map((k) => ({ value: k, label: STATUS_META[k].label })),
+                  ]}
+                  w={isMobile ? "calc(50% - 4px)" : 200}
+                />
+                <Select
+                  aria-label="Profesional"
+                  value={employeeFilter}
+                  onChange={(val) => { setEmployeeFilter((val as string) || "all"); setPage(1); }}
+                  data={[{ value: "all", label: "Profesional: todos" }, ...employeesSelectData]}
+                  w={isMobile ? "calc(50% - 4px)" : 190}
+                  searchable
+                />
+                <Select
+                  aria-label="Servicio"
+                  value={serviceFilter}
+                  onChange={(val) => { setServiceFilter((val as string) || "all"); setPage(1); }}
+                  data={[{ value: "all", label: "Servicio: todos" }, ...serviceSelectData]}
+                  w={isMobile ? "100%" : 200}
+                  searchable
+                />
+                <div className="ag-segment" role="group" aria-label="Fechas" style={{ marginLeft: isMobile ? 0 : "auto" }}>
+                  <button type="button" aria-pressed={showOnlyFuture} onClick={() => { setShowOnlyFuture(true); setPage(1); }}>Próximas</button>
+                  <button type="button" aria-pressed={!showOnlyFuture} onClick={() => { setShowOnlyFuture(false); setPage(1); }}>Todas</button>
+                </div>
+              </div>
+
+              {initialLoading ? (
+                <div className="ag-card" style={{ padding: 16 }}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} height={40} radius="sm" mb={i < 5 ? 10 : 0} />
+                  ))}
+                </div>
+              ) : historyEntries.length === 0 ? (
+                <div className="ag-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+                  <b style={{ display: "block", marginBottom: 8 }}>
+                    {hasActiveFilters ? "No hay reservas con estos filtros" : hasReservations ? "No hay reservas próximas" : "Aún no tienes reservas online"}
+                  </b>
+                  {hasActiveFilters ? (
+                    <Button size="xs" variant="outline" onClick={clearFilters}>Quitar filtros</Button>
+                  ) : hasReservations && showOnlyFuture ? (
+                    <Button size="xs" variant="outline" onClick={() => setShowOnlyFuture(false)}>Ver todas</Button>
+                  ) : null}
+                </div>
+              ) : isMobile ? (
+                <div className="ag-stack" style={{ gap: 8 }}>
+                  {historyEntries.map((entry) => renderHistoryCard(entry))}
+                </div>
+              ) : (
+                <div className="ag-card" style={{ padding: 0, overflow: "auto" }}>
+                  <table className="ag-table" style={{ minWidth: 860 }}>
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Cliente y servicio</th>
+                        <th>Profesional</th>
+                        <th>Origen</th>
+                        <th>Estado</th>
+                        <th>Abono / aviso</th>
+                        <th aria-label="Acciones" />
+                      </tr>
+                    </thead>
+                    <tbody>{historyEntries.map((entry) => renderHistoryRow(entry))}</tbody>
+                  </table>
+                </div>
+              )}
+
+              {!initialLoading && totalPages > 1 && (
+                <Group justify="center">
+                  <Pagination value={page} onChange={setPage} total={totalPages} />
                 </Group>
               )}
-            </Group>
-          </Stack>
-        </Group>
-
-        <Divider mb="md" />
-
-        {/* ESTADÍSTICAS DE ORIGEN */}
-        {!initialLoading && sourceStats.total > 0 && (
-          <SimpleGrid cols={{ base: 1, xs: 3 }} mb="md" spacing="sm">
-            <Card withBorder radius="md" p="sm">
-              <Group gap="xs" align="center">
-                <ThemeIcon size="lg" radius="md" variant="light" color="blue">
-                  <Text size="sm" fw={700}>#</Text>
-                </ThemeIcon>
-                <Stack gap={0}>
-                  <Text size="xs" c="dimmed">Total solicitudes</Text>
-                  <Text size="xl" fw={700}>{sourceStats.total}</Text>
-                </Stack>
-              </Group>
-            </Card>
-
-            <Card withBorder radius="md" p="sm">
-              <Group gap="xs" align="center" wrap="nowrap">
-                <RingProgress
-                  size={52}
-                  thickness={5}
-                  sections={[{ value: sourceStats.total > 0 ? Math.round((sourceStats.ai / sourceStats.total) * 100) : 0, color: "violet" }]}
-                  label={
-                    <Text ta="center" size="xs" fw={700} c="violet">
-                      {sourceStats.total > 0 ? Math.round((sourceStats.ai / sourceStats.total) * 100) : 0}%
-                    </Text>
-                  }
-                />
-                <Stack gap={0}>
-                  <Text size="xs" c="dimmed">Asistente IA</Text>
-                  <Text size="xl" fw={700} c="violet">{sourceStats.ai}</Text>
-                </Stack>
-              </Group>
-            </Card>
-
-            <Card withBorder radius="md" p="sm">
-              <Group gap="xs" align="center" wrap="nowrap">
-                <RingProgress
-                  size={52}
-                  thickness={5}
-                  sections={[{ value: sourceStats.total > 0 ? Math.round((sourceStats.manual / sourceStats.total) * 100) : 0, color: "teal" }]}
-                  label={
-                    <Text ta="center" size="xs" fw={700} c="teal">
-                      {sourceStats.total > 0 ? Math.round((sourceStats.manual / sourceStats.total) * 100) : 0}%
-                    </Text>
-                  }
-                />
-                <Stack gap={0}>
-                  <Text size="xs" c="dimmed">Manual</Text>
-                  <Text size="xl" fw={700} c="teal">{sourceStats.manual}</Text>
-                </Stack>
-              </Group>
-            </Card>
-          </SimpleGrid>
-        )}
-
-        {/* FILTROS */}
-        <Box
-          mb="md"
-          p="sm"
-          bg={colorScheme === "dark" ? "dark.7" : "gray.0"}
-          style={{ borderRadius: theme.radius.md }}
-        >
-          <Group
-            justify="space-between"
-            align="center"
-            mb={isMobile ? "xs" : 8}
-          >
-            <Group gap={6}>
-              <BiFilter size={16} />
-              <Text size="sm" fw={500}>
-                Filtros
-              </Text>
-              <Text size="xs" c="dimmed">
-                Ajusta la vista según estado, profesional, servicio o cliente.
-              </Text>
-            </Group>
-
-            {isMobile && (
-              <Button
-                variant="subtle"
-                size="xs"
-                leftSection={filtersOpen ? <BiChevronUp /> : <BiChevronDown />}
-                onClick={() => setFiltersOpen((prev) => !prev)}
-              >
-                {filtersOpen ? "Ocultar filtros" : "Mostrar filtros"}
-              </Button>
-            )}
-          </Group>
-
-          <Collapse in={filtersOpen}>
-            <Group
-              justify="space-between"
-              align="flex-end"
-              wrap="wrap"
-              gap="sm"
-            >
-              <Group gap="sm" align="flex-end">
-                <Select
-                  label="Estado"
-                  placeholder="Todos"
-                  value={statusFilter}
-                  onChange={(val) => {
-                    setStatusFilter((val as typeof statusFilter) || "all");
-                    setPage(1);
-                  }}
-                  data={[
-                    { value: "all", label: "Todos" },
-                    { value: "pending", label: "Pendiente" },
-                    { value: "approved", label: "Aprobada" },
-                    { value: "auto_approved", label: "Auto-aprobada" },
-                    { value: "rejected", label: "Rechazada" },
-                    { value: "cancelled_by_customer", label: "Cancelada por Cliente" },
-                    { value: "cancelled_by_admin", label: "Cancelada por Admin" },
-                    { value: "appointment_deleted", label: "Cita eliminada" },
-                  ]}
-                  w={170}
-                />
-
-                <Select
-                  label="Profesional"
-                  placeholder="Todos"
-                  value={employeeFilter}
-                  onChange={(val) => {
-                    setEmployeeFilter((val as string) || "all");
-                    setPage(1);
-                  }}
-                  data={[
-                    { value: "all", label: "Todos" },
-                    ...employeesSelectData,
-                  ]}
-                  w={190}
-                  searchable
-                />
-
-                <Select
-                  label="Servicio"
-                  placeholder="Todos"
-                  value={serviceFilter}
-                  onChange={(val) => {
-                    setServiceFilter((val as string) || "all");
-                    setPage(1);
-                  }}
-                  data={[
-                    { value: "all", label: "Todos" },
-                    ...serviceSelectData,
-                  ]}
-                  w={190}
-                  searchable
-                />
-              </Group>
-
-              <Group gap="sm" align="flex-end">
-                <TextInput
-                  label="Buscar cliente"
-                  placeholder="Nombre, teléfono o email"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.currentTarget.value);
-                    setPage(1);
-                  }}
-                  w={220}
-                />
-
-                <Switch
-                  size="sm"
-                  checked={showOnlyFuture}
-                  onChange={(event) => {
-                    setShowOnlyFuture(event.currentTarget.checked);
-                    setPage(1);
-                  }}
-                  label="Solo futuras"
-                />
-
-                <Button
-                  variant="subtle"
-                  size="xs"
-                  onClick={() => {
-                    setStatusFilter("all");
-                    setEmployeeFilter("all");
-                    setServiceFilter("all");
-                    setSearchTerm("");
-                    setShowOnlyFuture(true);
-                    setPage(1);
-                  }}
-                >
-                  Limpiar filtros
-                </Button>
-              </Group>
-            </Group>
-          </Collapse>
-        </Box>
-
-        <Alert
-          variant="light"
-          color={orgPolicy === "auto_if_available" ? "green" : "gray"}
-          icon={<BiInfoCircle />}
-          mb="md"
-        >
-          {orgPolicy === "auto_if_available" ? (
-            <Text size="sm">
-              Al crear una <strong>reserva</strong>, si existe cupo inmediato
-              según el servicio, profesional (si aplica) y horario, se{" "}
-              <strong>confirma</strong> y se crea la <strong>cita</strong>{" "}
-              automáticamente. Si no hay disponibilidad (por conflictos de horario), 
-              la reserva quedará <em>pendiente</em> y deberás aprobarla manualmente.
-            </Text>
-          ) : (
-            <Text size="sm">
-              Las reservas requieren <strong>aprobación</strong> antes de crear
-              una cita.
-            </Text>
+            </div>
           )}
-        </Alert>
 
-        {/* Banner: reservas aprobadas sin cita válida (global, no solo la página actual) */}
-        {!initialLoading && stats.hasApprovedWithoutAppointment && (
-          <Alert color="orange" variant="light" icon={<BiInfoCircle />} mb="md">
-            <Text size="sm">
-              Hay reservas <strong>aprobadas sin cita creada</strong>. Pueden haber ocurrido por un error al aprobar o porque la cita fue eliminada manualmente. Se muestran con el indicador <strong>⚠ Sin cita</strong>.
-            </Text>
-          </Alert>
-        )}
-
-        {error && (
-          <Stack align="center" mb="md">
-            <Text c="red">{error}</Text>
-            <Button
-              variant="light"
-              onClick={() => organization?._id && loadPage(organization._id)}
-            >
-              Reintentar
-            </Button>
-          </Stack>
-        )}
-
-        {initialLoading ? (
-          isMobile ? (
-            <Stack>
-              {Array.from({ length: 5 }).map((_, idx) => (
-                <Card key={idx} withBorder radius="lg" shadow="xs" p="md">
-                  <Skeleton height={10} mb="xs" />
-                  <Skeleton height={10} mb="xs" />
-                  <Skeleton height={10} width="60%" />
-                </Card>
-              ))}
-            </Stack>
-          ) : (
-            <Table.ScrollContainer minWidth={760} type="native" mah={520}>
-              <Table
-                withTableBorder
-                withColumnBorders
-                striped
-                highlightOnHover
-                stickyHeader
-              >
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Fecha</Table.Th>
-                    <Table.Th>Servicios</Table.Th>
-                    <Table.Th>Profesional</Table.Th>
-                    <Table.Th>Cliente</Table.Th>
-                    <Table.Th>Estado</Table.Th>
-                    <Table.Th>Acciones</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>{renderSkeletonRows()}</Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          )
-        ) : filteredReservations.length === 0 ? (
-          <Center py="xl">
-            <Stack gap={6} align="center">
-              <Text c="dimmed">
-                {hasReservations
-                  ? "No hay reservas que coincidan con los filtros."
-                  : "No hay reservas para mostrar."}
-              </Text>
-              {hasReservations && (
-                <Text size="sm" c="dimmed">
-                  Ajusta los filtros o limpia la búsqueda para ver más
-                  resultados.
-                </Text>
-              )}
-            </Stack>
-          </Center>
-        ) : isMobile ? (
-          <Stack>
-            {filteredReservations.map((reservation) => {
-              // Filtrar para mostrar solo la primera del grupo
-              const groupId = reservation.groupId;
-              const groupReservations = groupId ? groupsMap.get(groupId) : null;
-              const isPartOfGroup = !!groupReservations && groupReservations.length > 1;
-              const groupIndex = groupReservations ? groupReservations.findIndex(r => r._id === reservation._id) : -1;
-              const isFirstInGroup = groupIndex === 0;
-              
-              if (isPartOfGroup && !isFirstInGroup) {
-                return null;
-              }
-              
-              return renderMobileReservationCard(reservation, groupReservations || undefined);
-            })}
-          </Stack>
-        ) : (
-          <Table.ScrollContainer minWidth={760} type="native" mah={520}>
-            <Table
-              withTableBorder
-              withColumnBorders
-              striped
-              highlightOnHover
-              stickyHeader
-            >
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Fecha</Table.Th>
-                  <Table.Th>Servicios</Table.Th>
-                  <Table.Th>Profesional</Table.Th>
-                  <Table.Th>Cliente</Table.Th>
-                  <Table.Th>Estado</Table.Th>
-                  <Table.Th>Acciones</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-
-              <Table.Tbody>
-                {filteredReservations.map((reservation) => {
-                  // 👥 Verificar si es parte de un grupo
-                  const groupId = reservation.groupId;
-                  const groupReservations = groupId ? groupsMap.get(groupId) : null;
-                  const isPartOfGroup = !!groupReservations && groupReservations.length > 1;
-                  const groupIndex = groupReservations ? groupReservations.findIndex(r => r._id === reservation._id) : -1;
-                  const isFirstInGroup = groupIndex === 0;
-                  
-                  // Si es parte de un grupo y NO es la primera, no renderizar (ya se mostrará en la fila del grupo)
-                  if (isPartOfGroup && !isFirstInGroup) {
-                    return null;
-                  }
-
-                  const serviceObj =
-                    typeof reservation.serviceId === "object"
-                      ? reservation.serviceId
-                      : null;
-                  const serviceName = serviceObj?.name || "Sin especificar";
-
+          {/* ---------- CONFIGURACIÓN ---------- */}
+          {tab === "configuracion" && (
+            <div className="ag-card" style={{ padding: 20, maxWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <h2 className="ag-h" style={{ margin: 0 }}>¿Cómo se confirman las reservas?</h2>
+                <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+                  Aplica a las reservas de tu página y del chat. Las citas que creas tú en la agenda no cambian.
+                </div>
+              </div>
+              <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Política de reservas">
+                {POLICY_OPTIONS.map((o) => {
+                  const locked = o.value === "auto_if_available" && !canAutoConfirm;
+                  const checked = orgPolicy === o.value;
+                  const choose = () => {
+                    if (locked || checked || savingPolicy) return;
+                    void handleChangePolicy(o.value);
+                  };
                   return (
-                    <React.Fragment key={reservation._id}>
-                      <Table.Tr 
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => handleOpenDetail(reservation, groupReservations || undefined)}
-                      >
-                        <Table.Td>
-                          {dayjs(reservation.startDate).tz(organization?.timezone || 'America/Bogota').format(
-                            `DD/MM/YYYY ${getTimeFormatStr(organization?.timeFormat)}`
-                          )}
-                          {isPartOfGroup && (
-                            <Tooltip label={`Grupo de ${groupReservations.length} reservas`}>
-                              <Badge size="xs" variant="dot" color="blue" ml={8}>
-                                Grupo
-                              </Badge>
-                            </Tooltip>
-                          )}
-                        </Table.Td>
-
-                        <Table.Td>
-                          {isPartOfGroup ? (
-                            <div>
-                              <Text size="sm" fw={500}>
-                                {groupReservations.length} servicios
-                              </Text>
-                              <Text size="xs" c="dimmed">
-                                {groupReservations.map(r => {
-                                  const sObj = typeof r.serviceId === "object" ? r.serviceId : null;
-                                  return sObj?.name || "—";
-                                }).join(", ")}
-                              </Text>
-                            </div>
-                          ) : (
-                            serviceName
-                          )}
-                        </Table.Td>
-
-                        <Table.Td>
-                          {renderProfessionalCell(
-                            getProfessionalNames(reservation, groupReservations || undefined)
-                          )}
-                        </Table.Td>
-
-                        <Table.Td>
-                          {reservation.customerDetails?.name ?? "—"}
-                        </Table.Td>
-
-                        <Table.Td>
-                          <Stack gap={4}>
-                            <Badge
-                              fullWidth
-                              color={getBadgeColor(reservation.status)}
-                            >
-                              {translateStatus(reservation.status)}
-                            </Badge>
-                            {(isPartOfGroup
-                              ? groupReservations.some(isApprovedWithoutAppointment)
-                              : isApprovedWithoutAppointment(reservation)) && (
-                              <Badge fullWidth color="orange" variant="outline" size="xs">
-                                ⚠ Sin cita
-                              </Badge>
-                            )}
-                            {renderPaymentBadge(getPaymentOrder(reservation, groupReservations))}
-                          </Stack>
-                        </Table.Td>
-
-                        <Table.Td>
-                          {renderQuickActions(reservation, groupReservations || undefined)}
-                        </Table.Td>
-                      </Table.Tr>
-                    </React.Fragment>
+                    <div
+                      key={o.value}
+                      className="ag-opt"
+                      role="radio"
+                      tabIndex={locked ? -1 : 0}
+                      aria-checked={checked}
+                      aria-disabled={locked || undefined}
+                      onClick={choose}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), choose())}
+                      style={{ cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.7 : 1 }}
+                    >
+                      <span className="ag-radio" />
+                      <div>
+                        <b>{o.title}</b>
+                        <span className="d">{o.desc}</span>
+                        {locked && (
+                          <div style={{ marginTop: 6 }}>
+                            <span className="ag-badge">
+                              <IconLock size={12} /> Desde el plan Starter
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
-              </Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        )}
-
-        {!initialLoading && totalPages > 1 && (
-          <Group justify="center" mt="md">
-            <Pagination value={page} onChange={setPage} total={totalPages} />
-          </Group>
-        )}
-      </Card>
+              </div>
+              {savingPolicy && (
+                <Group gap={6}>
+                  <Loader size="xs" />
+                  <Text size="xs" c="dimmed" aria-live="polite">Guardando…</Text>
+                </Group>
+              )}
+            </div>
+          )}
+        </div>
+      </Box>
     </>
   );
 };

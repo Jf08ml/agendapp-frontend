@@ -11,6 +11,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { usePermissions } from "../hooks/usePermissions";
 import { useAnnouncementBadge } from "../hooks/useAnnouncementBadge";
+import { usePendingReservationsCount } from "../hooks/usePendingReservationsCount";
+import { formatPendingCount } from "../pages/admin/manageReservation/reservationsView";
 import CustomLoader from "../components/customLoader/CustomLoader";
 import NotificationsMenu from "./NotificationsMenu";
 import UserMenu from "./UserMenu";
@@ -50,6 +52,10 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
     [hasPermission, organization?.planLimits]
   );
   const groups = useMemo(() => buildAdminNav(can), [can]);
+  // Reservas por confirmar (decisión 4): junto a «Reservas online» y, en móvil, sobre Agenda.
+  const pendingReservations = usePendingReservationsCount(organization?._id, can.onlineRes);
+  const pendingLabel = formatPendingCount(pendingReservations);
+  const navBadges = useMemo(() => ({ reservations: pendingLabel }), [pendingLabel]);
   const userLinks = useMemo(() => buildUserMenuLinks(can, hasNewUpdates), [can, hasNewUpdates]);
   const tabs = useMemo(() => buildTabbar(can), [can]);
   const activeTo = findActiveLink(allNavLinks(groups), location.pathname, location.search);
@@ -126,7 +132,7 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <AdminNavbar groups={groups} />
+        <AdminNavbar groups={groups} badges={navBadges} />
       </AppShell.Navbar>
 
       <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
@@ -156,7 +162,29 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
                 aria-current={active ? "page" : undefined}
                 style={tabStyle(active)}
               >
-                <Icon size={22} stroke={1.75} />
+                <span style={{ position: "relative", display: "inline-flex" }}>
+                  <Icon size={22} stroke={1.75} />
+                  {tab.key === "agenda" && pendingLabel && (
+                    <span
+                      aria-label={`${pendingLabel} reservas por confirmar`}
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -12,
+                        minWidth: 18,
+                        height: 18,
+                        padding: "0 5px",
+                        borderRadius: 999,
+                        background: "var(--warning)",
+                        color: "#fff",
+                        font: "600 11px/18px var(--font-sans)",
+                        textAlign: "center",
+                      }}
+                    >
+                      {pendingLabel}
+                    </span>
+                  )}
+                </span>
                 {tab.label}
               </UnstyledButton>
             );
@@ -178,7 +206,7 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
         radius="lg"
         styles={{ body: { height: "calc(100% - 60px)" } }}
       >
-        <AdminNavbar groups={groups} onNavigate={closeMore} showBrand={false} />
+        <AdminNavbar groups={groups} onNavigate={closeMore} showBrand={false} badges={navBadges} />
       </Drawer>
     </AppShell>
   );
