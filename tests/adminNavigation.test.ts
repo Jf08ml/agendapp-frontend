@@ -82,6 +82,8 @@ test("enlace activo: subrutas y Fidelidad vs. Ajustes en la misma página", () =
   assert.equal(findActiveLink(links, "/informacion-negocio", "?tab=fidelity"), "/informacion-negocio?tab=fidelity");
   assert.equal(findActiveLink(links, "/informacion-negocio", ""), "/informacion-negocio");
   assert.equal(findActiveLink(links, "/servicios-precios", ""), null);
+  assert.equal(findActiveLink(links, "/pedidos", "?desde=caja"), "/gestion-caja");
+  assert.equal(findActiveLink(links, "/pedidos", ""), "/pedidos");
 });
 
 test("las páginas públicas no usan el shell del panel", () => {

@@ -228,12 +228,21 @@ function pathMatches(linkPath: string, pathname: string): boolean {
   return pathname === linkPath || (linkPath !== "/" && pathname.startsWith(linkPath));
 }
 
+// Pedidos de tienda abierto desde Caja y pagos (/pedidos?desde=caja) marca «Caja y pagos».
+const ACTIVE_ALIASES = [{ path: "/pedidos", param: "desde", value: "caja", to: "/gestion-caja" }];
+
 /**
  * Ruta del menú que corresponde a la página actual. Un enlace con query
  * (Fidelidad → ?tab=fidelity) gana sobre uno de la misma ruta sin query (Ajustes).
  */
 export function findActiveLink(links: NavLeaf[], pathname: string, search: string): string | null {
   const current = new URLSearchParams(search);
+  // Páginas que se abren desde otra sección del menú y deben marcarla a ella
+  for (const alias of ACTIVE_ALIASES) {
+    if (pathMatches(alias.path, pathname) && current.get(alias.param) === alias.value && links.some((l) => l.to === alias.to)) {
+      return alias.to;
+    }
+  }
   let fallback: string | null = null;
   for (const link of links) {
     const { path, query } = splitTo(link.to);
