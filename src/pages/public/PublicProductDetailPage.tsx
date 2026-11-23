@@ -1,41 +1,30 @@
+// Detalle de producto (rediseño, TiendaPublica): fotos, precio, descripción,
+// "Modo de uso" y la barra "Agregar al pedido" (fija abajo en móvil).
 import { useEffect, useState } from "react";
 import { useParams, useLocation, Link, useNavigate } from "react-router-dom";
-import {
-  Container,
-  Box,
-  AspectRatio,
-  Stack,
-  Group,
-  Title,
-  Text,
-  Badge,
-  Button,
-  ActionIcon,
-  Divider,
-  Center,
-  Loader,
-  Anchor,
-  useMantineTheme,
-  rem,
-} from "@mantine/core";
+import { Button, Skeleton } from "@mantine/core";
 import { Carousel } from "@mantine/carousel";
-import { Image } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
-import {
-  IconArrowLeft,
-  IconBuildingStore,
-  IconShare,
-  IconClipboardCheck,
-  IconShoppingCart,
-  IconMinus,
-  IconPlus,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconClipboardCheck, IconMinus, IconPhoto, IconPlus, IconShare, IconShoppingCart } from "@tabler/icons-react";
 import { RootState } from "../../app/store";
 import { getProductDetail, StoreProduct } from "../../services/storeService";
 import { useStoreCart } from "../../hooks/useStoreCart";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { storeImageSrc } from "../../utils/storeImage";
+
+const STYLES = `
+  .pd-layout { display: grid; gap: 24px; }
+  @media (min-width: 48em) { .pd-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; } }
+  .pd-photo { aspect-ratio: 1; border-radius: 16px; overflow: hidden; }
+  .pd-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pd-stepper { display: inline-flex; align-items: center; border: 1px solid var(--line-control); border-radius: 999px; height: 36px; }
+  .pd-stepper button { width: 36px; height: 34px; border: 0; background: none; color: var(--ink); display: grid; place-items: center; cursor: pointer; border-radius: 999px; }
+  .pd-stepper button:hover { background: var(--surface-hover); }
+  .pd-stepper span { min-width: 28px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pd-bar-mobile { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; background: var(--surface-raised); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+`;
 
 export default function PublicProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -43,11 +32,8 @@ export default function PublicProductDetailPage() {
   const navigate = useNavigate();
   // De dónde vino el visitante — siempre la tienda, salvo enlace directo/compartido.
   const backTo = (location.state as { backTo?: string } | null)?.backTo || "/tienda";
-  const theme = useMantineTheme();
-  const organization = useSelector(
-    (s: RootState) => s.organization.organization
-  );
-  const primary = organization?.branding?.primaryColor || theme.colors[theme.primaryColor][6];
+  const isMobile = useMediaQuery("(max-width: 48em)");
+  const organization = useSelector((s: RootState) => s.organization.organization);
 
   const [product, setProduct] = useState<StoreProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,53 +89,57 @@ export default function PublicProductDetailPage() {
       showNotification({
         title: "Enlace copiado",
         message: "Ya puedes compartirlo por WhatsApp o donde prefieras.",
-        color: "green",
         icon: <IconClipboardCheck size={16} />,
       });
     } catch {
       showNotification({
         title: "No se pudo copiar el enlace",
-        message: "Copia la URL manualmente desde la barra de direcciones.",
+        message: "Copia la dirección desde la barra del navegador.",
         color: "red",
       });
     }
   };
 
+  const page = { maxWidth: 1040, margin: "0 auto", padding: isMobile ? "16px 16px 112px" : "24px 24px 64px" } as const;
+
   if (loading || !organization) {
     return (
-      <Center mih="60vh">
-        <Loader color={primary} />
-      </Center>
+      <div style={page}>
+        <div className="pd-layout">
+          <style>{STYLES}</style>
+          <Skeleton radius={16} style={{ aspectRatio: "1", height: "auto" }} />
+          <div>
+            <Skeleton height={14} width="30%" mb={12} />
+            <Skeleton height={28} width="80%" mb={12} />
+            <Skeleton height={22} width="40%" />
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (notFound || !product) {
     return (
-      <Container size="sm" py={rem(80)}>
-        <Stack align="center" gap="sm">
-          <Title order={3} ta="center">
-            No encontramos este producto
-          </Title>
-          <Text c="dimmed" ta="center">
-            Puede que ya no esté disponible. Mira el resto del catálogo de{" "}
-            {organization.name}.
-          </Text>
-          <Anchor component={Link} to="/tienda" fw={600}>
+      <div style={{ ...page, maxWidth: 480, paddingTop: 48 }}>
+        <div className="ag-card" style={{ padding: "40px 16px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <b style={{ fontSize: 15 }}>No encontramos este producto</b>
+          <div className="ag-muted" style={{ fontSize: 14 }}>Puede que ya no esté disponible. Mira el resto del catálogo de {organization.name}.</div>
+          <Button variant="default" mt={8} component={Link} to="/tienda">
             Ver toda la tienda
-          </Anchor>
-        </Stack>
-      </Container>
+          </Button>
+        </div>
+      </div>
     );
   }
 
-  const images = [product.imageUrl, ...(product.images || [])].filter(
-    (img): img is string => !!img
-  );
+  const currency = organization.currency || "COP";
+  const images = [product.imageUrl, ...(product.images || [])].filter((img): img is string => !!img);
   const qty = cart.find((i) => i.product._id === product._id)?.quantity ?? 0;
+  const soldOut = !!product.outOfStock;
 
   const addToCart = () => {
     showNotification({
-      message: "Producto agregado al carrito.",
+      message: "Producto agregado a tu pedido.",
       icon: <IconShoppingCart size={16} />,
       autoClose: 2000,
       withBorder: true,
@@ -157,9 +147,7 @@ export default function PublicProductDetailPage() {
     setCart((prev) => {
       const existing = prev.find((i) => i.product._id === product._id);
       if (existing) {
-        return prev.map((i) =>
-          i.product._id === product._id ? { ...i, quantity: i.quantity + 1 } : i
-        );
+        return prev.map((i) => (i.product._id === product._id ? { ...i, quantity: i.quantity + 1 } : i));
       }
       return [...prev, { product, quantity: 1 }];
     });
@@ -167,167 +155,100 @@ export default function PublicProductDetailPage() {
 
   const changeQty = (delta: number) => {
     setCart((prev) =>
-      prev
-        .map((i) =>
-          i.product._id === product._id ? { ...i, quantity: i.quantity + delta } : i
-        )
-        .filter((i) => i.quantity > 0)
+      prev.map((i) => (i.product._id === product._id ? { ...i, quantity: i.quantity + delta } : i)).filter((i) => i.quantity > 0)
     );
   };
 
-  return (
-    <Container size="sm" py={{ base: "md", sm: rem(48) }}>
-      <Anchor
-        component={Link}
-        to={backTo}
-        c="dimmed"
-        size="sm"
-        style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-        mb="md"
-      >
-        <IconArrowLeft size={14} /> Volver a la tienda
-      </Anchor>
+  const addBar = soldOut ? (
+    <Button fullWidth size="md" disabled>
+      Agotado
+    </Button>
+  ) : qty === 0 ? (
+    <Button fullWidth size="md" onClick={addToCart}>
+      Agregar al pedido · {formatCurrency(product.salePrice, currency)}
+    </Button>
+  ) : (
+    <div className="ag-row" style={{ gap: 12, flexWrap: "nowrap" }}>
+      <div className="pd-stepper" role="group" aria-label="Cantidad">
+        <button type="button" aria-label="Quitar uno" onClick={() => changeQty(-1)}>
+          <IconMinus size={16} />
+        </button>
+        <span>{qty}</span>
+        <button type="button" aria-label="Agregar uno" onClick={() => changeQty(1)}>
+          <IconPlus size={16} />
+        </button>
+      </div>
+      <Button style={{ flex: 1 }} size="md" onClick={() => navigate("/tienda", { state: { openCart: true } })}>
+        Ver pedido
+      </Button>
+    </div>
+  );
 
-      <AspectRatio
-        ratio={1}
-        style={{
-          borderRadius: theme.radius.lg,
-          overflow: "hidden",
-          background: theme.colors.gray[1],
-        }}
-      >
-        {images.length > 0 ? (
-          images.length > 1 ? (
-            <Carousel withIndicators loop height="100%">
+  return (
+    <div style={page}>
+      <style>{STYLES}</style>
+      <Link to={backTo} className="ag-link ag-row" style={{ gap: 4, marginBottom: 16, display: "inline-flex" }}>
+        <IconArrowLeft size={14} /> Volver a la tienda
+      </Link>
+
+      <div className="pd-layout">
+        <div className="pd-photo ag-photo">
+          {images.length > 1 ? (
+            <Carousel withIndicators loop height="100%" style={{ width: "100%", height: "100%" }}>
               {images.map((img, i) => (
                 <Carousel.Slide key={i}>
-                  <Image src={storeImageSrc(img)} h="100%" fit="cover" alt={product.name} />
+                  <img src={storeImageSrc(img)} alt={`${product.name} (${i + 1} de ${images.length})`} />
                 </Carousel.Slide>
               ))}
             </Carousel>
+          ) : images.length === 1 ? (
+            <img src={storeImageSrc(images[0])} alt={product.name} />
           ) : (
-            <Image src={storeImageSrc(images[0])} h="100%" fit="cover" alt={product.name} />
-          )
-        ) : (
-          <Center h="100%">
-            <Stack align="center" gap={8}>
-              <IconBuildingStore size={48} stroke={1.2} color={theme.colors.gray[4]} />
-              <Text fz="sm" fw={500} c={theme.colors.gray[5]}>
-                {product.name}
-              </Text>
-            </Stack>
-          </Center>
-        )}
-      </AspectRatio>
-
-      <Stack gap="sm" mt="lg">
-        <Group justify="space-between" align="flex-start" wrap="nowrap">
-          <Group gap={6}>
-            {product.category && (
-              <Badge color={primary} variant="light" size="sm">
-                {product.category}
-              </Badge>
-            )}
-            {product.featured && (
-              <Badge color="yellow" variant="filled" size="sm">
-                Destacado
-              </Badge>
-            )}
-          </Group>
-          <Button
-            variant="subtle"
-            color="gray"
-            size="xs"
-            leftSection={<IconShare size={14} />}
-            onClick={handleShare}
-          >
-            Compartir
-          </Button>
-        </Group>
-
-        {product.brand && (
-          <Text size="sm" c="dimmed" tt="uppercase" fw={600} lts={0.5}>
-            {product.brand}
-          </Text>
-        )}
-
-        <Title order={2}>{product.name}</Title>
-
-        <Group gap="lg" align="center">
-          <Text fw={700} fz={rem(28)} c={primary}>
-            {formatCurrency(product.salePrice, organization.currency || "COP")}
-          </Text>
-          {product.outOfStock && (
-            <Badge color="dark" variant="filled">
-              Agotado
-            </Badge>
+            <IconPhoto size={48} />
           )}
-        </Group>
+        </div>
 
-        {qty === 0 ? (
-          <Button
-            size="md"
-            color={primary}
-            radius="md"
-            fullWidth
-            leftSection={<IconShoppingCart size={18} />}
-            disabled={!!product.outOfStock}
-            onClick={addToCart}
-          >
-            Agregar al carrito
-          </Button>
-        ) : (
-          <Group gap="sm" wrap="nowrap">
-            <Group gap="xs" wrap="nowrap" style={{ flex: 1 }}>
-              <ActionIcon
-                variant="light"
-                size="lg"
-                radius="md"
-                aria-label="Quitar uno"
-                onClick={() => changeQty(-1)}
-              >
-                <IconMinus size={16} />
-              </ActionIcon>
-              <Text fw={700} ta="center" style={{ flex: 1 }}>
-                {qty} en el carrito
-              </Text>
-              <ActionIcon
-                variant="light"
-                size="lg"
-                radius="md"
-                aria-label="Agregar uno"
-                onClick={() => changeQty(1)}
-              >
-                <IconPlus size={16} />
-              </ActionIcon>
-            </Group>
-            <Button variant="light" color={primary} radius="md" onClick={() => navigate("/tienda")}>
-              Ver carrito
-            </Button>
-          </Group>
-        )}
+        <div className="ag-stack" style={{ gap: 16 }}>
+          <div className="ag-stack" style={{ gap: 6 }}>
+            <div className="ag-row" style={{ justifyContent: "space-between", gap: 8 }}>
+              <div className="ag-row" style={{ gap: 6 }}>
+                {product.category && <span className="ag-badge ag-badge--outline">{product.category}</span>}
+                {product.featured && !soldOut && <span className="ag-badge ag-badge--brand">Destacado</span>}
+                {soldOut && <span className="ag-badge ag-badge--danger">Agotado</span>}
+              </div>
+              <Button variant="subtle" color="gray" size="xs" leftSection={<IconShare size={14} />} onClick={handleShare}>
+                Compartir
+              </Button>
+            </div>
+            {product.brand && (
+              <div className="ag-subtle" style={{ textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 600 }}>
+                {product.brand}
+              </div>
+            )}
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>{product.name}</h1>
+            <div className="ag-price" style={{ fontSize: 22, lineHeight: "28px" }}>
+              {formatCurrency(product.salePrice, currency)}
+            </div>
+          </div>
 
-        {product.description && (
-          <>
-            <Divider mt="sm" />
-            <Text style={{ whiteSpace: "pre-wrap" }}>{product.description}</Text>
-          </>
-        )}
+          {!isMobile && addBar}
 
-        {product.usageInstructions && (
-          <>
-            <Divider />
-            <Box>
-              <Text fw={600} fz="sm" mb={4}>
-                Modo de uso
-              </Text>
-              <Text c="dimmed" fz="sm" style={{ whiteSpace: "pre-wrap" }}>
+          {product.description && (
+            <div style={{ fontSize: 15, lineHeight: "23px", whiteSpace: "pre-wrap" }}>{product.description}</div>
+          )}
+
+          {product.usageInstructions && (
+            <div className="ag-card" style={{ padding: 16 }}>
+              <b style={{ display: "block", fontSize: 14, marginBottom: 4 }}>Modo de uso</b>
+              <div className="ag-muted" style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>
                 {product.usageInstructions}
-              </Text>
-            </Box>
-          </>
-        )}
-      </Stack>
-    </Container>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isMobile && <div className="pd-bar-mobile">{addBar}</div>}
+    </div>
   );
 }
