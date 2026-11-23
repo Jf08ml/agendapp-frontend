@@ -28,7 +28,6 @@ import {
 } from "./features/organization/sliceOrganization";
 import OrgLoadError from "./components/OrgLoadError";
 
-import WhatsNewModal from "./components/WhatsNewModal";
 import { ChristmasDecorations } from "./components/seasonal/ChristmasDecorations";
 import {
   CHRISTMAS_PREVIEW_KEY,
@@ -349,7 +348,6 @@ function AppContent() {
       <Analytics />
 
       {/* Modal automático de novedades (solo admin/org, no superadmin) */}
-      {isAuthenticated && !isSuperadmin && <WhatsNewModal />}
 
       {useAdminShell ? (
         <AdminShell banners={banners} chatOpen={chatOpen} onToggleChat={toggleChat}>
