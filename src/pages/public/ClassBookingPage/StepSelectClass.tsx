@@ -1,122 +1,87 @@
-import {
-  SimpleGrid, Card, Text, Badge, Group, Stack, ThemeIcon,
-  Center, Loader,
-} from "@mantine/core";
-import { IconSchool, IconUsers, IconDiscount, IconClock } from "@tabler/icons-react";
+// Paso 1 · Clase (rediseño, ClasesPublico): filas como el selector de servicios.
+// Con paquete solo se ven las clases que cubre.
+import { Skeleton } from "@mantine/core";
+import { IconCheck, IconClock, IconPhoto } from "@tabler/icons-react";
 import { ClassType } from "../../../services/classService";
+import { formatCurrency } from "../../../utils/formatCurrency";
 
 interface Props {
   classes: ClassType[];
   loading: boolean;
   selected: ClassType | null;
   onSelect: (c: ClassType) => void;
+  currency?: string;
+  /** Modo paquete: solo se listan las clases que cubre. */
+  packageOnly?: boolean;
 }
 
-export default function StepSelectClass({ classes, loading, selected, onSelect }: Props) {
+export default function StepSelectClass({ classes, loading, selected, onSelect, currency = "COP", packageOnly = false }: Props) {
   if (loading) {
-    return <Center h={200}><Loader /></Center>;
+    return (
+      <div className="ag-stack" style={{ gap: 8 }}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} height={80} radius="md" />
+        ))}
+      </div>
+    );
   }
 
   if (classes.length === 0) {
     return (
-      <Center h={200}>
-        <Stack align="center" gap="xs">
-          <IconSchool size={40} color="gray" />
-          <Text c="dimmed">No hay clases disponibles por el momento.</Text>
-        </Stack>
-      </Center>
+      <div className="ag-card" style={{ padding: "32px 16px", textAlign: "center" }}>
+        <div className="ag-muted" style={{ fontSize: 14 }}>No hay clases disponibles por ahora.</div>
+      </div>
     );
   }
 
   return (
-    <Stack gap="md">
-      <Text fw={600} size="lg">Elige una clase</Text>
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+    <div className="ag-stack" style={{ gap: 10 }}>
+      <div>
+        <h2 className="ag-h" style={{ margin: 0 }}>Elige la clase</h2>
+        {packageOnly && <div className="ag-subtle">Solo ves las clases que cubre tu paquete.</div>}
+      </div>
+      <div role="radiogroup" aria-label="Clase">
         {classes.map((c) => {
           const isSelected = selected?._id === c._id;
+          const img = c.images?.[0];
+          const discount = c.groupDiscount?.enabled ? c.groupDiscount : null;
           return (
-            <Card
+            <div
               key={c._id}
-              withBorder
-              radius="md"
-              p="md"
+              className="ag-pick"
+              role="radio"
+              tabIndex={0}
+              aria-checked={isSelected}
               onClick={() => onSelect(c)}
-              style={{
-                cursor: "pointer",
-                borderColor: isSelected ? "var(--mantine-color-blue-5)" : undefined,
-                borderWidth: isSelected ? 2 : 1,
-                boxShadow: isSelected ? "0 0 0 2px var(--mantine-color-blue-2)" : undefined,
-                transition: "all 0.15s ease",
-              }}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect(c))}
             >
-              <Group gap="xs" mb="xs">
-                {c.color && (
-                  <div
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: "50%",
-                      background: c.color,
-                      flexShrink: 0,
-                    }}
-                  />
+              <div className="ag-pick__thumb" style={{ display: "grid", placeItems: "center", overflow: "hidden" }}>
+                {img ? <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <IconPhoto size={20} color="var(--ink-subtle)" />}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div className="ag-pick__name">{c.name}</div>
+                <div className="ag-row" style={{ gap: 10, fontSize: 13, color: "var(--ink-muted)", flexWrap: "wrap" }}>
+                  {!c.hidePrice && (
+                    <span className="ag-num" style={{ color: "var(--ink)", fontWeight: 600 }}>
+                      {c.pricePerPerson === 0 ? "Gratis" : `${formatCurrency(c.pricePerPerson, currency)} / persona`}
+                    </span>
+                  )}
+                  <span className="ag-row" style={{ gap: 4 }}>
+                    <IconClock size={13} /> {c.duration} min
+                  </span>
+                  <span>Hasta {c.defaultCapacity} {c.defaultCapacity === 1 ? "persona" : "personas"}</span>
+                </div>
+                {discount && (
+                  <div className="ag-subtle" style={{ marginTop: 2 }}>
+                    {discount.discountPercent} % de descuento desde {discount.minPeople} personas
+                  </div>
                 )}
-                <Text fw={700} size="md" style={{ flex: 1 }}>
-                  {c.name}
-                </Text>
-                {isSelected && (
-                  <Badge size="xs" color="blue">Seleccionada</Badge>
-                )}
-              </Group>
-
-              {c.description && (
-                <Text size="sm" c="dimmed" mb="sm" lineClamp={2}>
-                  {c.description}
-                </Text>
-              )}
-
-              <Stack gap={6}>
-                <Group gap="xs">
-                  <ThemeIcon size="xs" variant="transparent" color="gray">
-                    <IconClock size={13} />
-                  </ThemeIcon>
-                  <Text size="xs" c="dimmed">{c.duration} minutos</Text>
-                </Group>
-                <Group gap="xs">
-                  <ThemeIcon size="xs" variant="transparent" color="gray">
-                    <IconUsers size={13} />
-                  </ThemeIcon>
-                  <Text size="xs" c="dimmed">Cupo máximo: {c.defaultCapacity} personas</Text>
-                </Group>
-                {!c.hidePrice && (
-                  <Group gap="xs">
-                    <ThemeIcon size="xs" variant="transparent" color="green">
-                      <IconSchool size={13} />
-                    </ThemeIcon>
-                    <Text size="sm" fw={600} c="green">
-                      ${c.pricePerPerson.toLocaleString("es-CO")} / persona
-                    </Text>
-                  </Group>
-                )}
-
-                {c.groupDiscount?.enabled && (
-                  <Group gap="xs" mt={2}>
-                    <ThemeIcon size="xs" variant="transparent" color="blue">
-                      <IconDiscount size={13} />
-                    </ThemeIcon>
-                    <Text size="xs" c="blue" fw={500}>
-                      {c.groupDiscount.discountPercent}% de descuento al reservar{" "}
-                      {c.groupDiscount.minPeople}
-                      {c.groupDiscount.maxPeople ? `–${c.groupDiscount.maxPeople}` : "+"}{" "}
-                      personas juntas
-                    </Text>
-                  </Group>
-                )}
-              </Stack>
-            </Card>
+              </div>
+              <span className="ag-pick__check">{isSelected && <IconCheck size={14} />}</span>
+            </div>
           );
         })}
-      </SimpleGrid>
-    </Stack>
+      </div>
+    </div>
   );
 }

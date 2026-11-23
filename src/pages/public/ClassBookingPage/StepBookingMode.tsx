@@ -1,4 +1,5 @@
-import { Card, Stack, Text, SimpleGrid, ThemeIcon, Group } from "@mantine/core";
+// ¿Cómo quieres pagar? (rediseño, ClasesPublico): dos opciones en tarjetas de
+// radio: «Pagar una clase» y «Usar mi paquete».
 import { IconCreditCard, IconTicket } from "@tabler/icons-react";
 
 export type BookingMode = "single" | "package";
@@ -7,49 +8,35 @@ interface Props {
   onSelect: (mode: BookingMode) => void;
 }
 
+const OPTIONS: { value: BookingMode; title: string; desc: string; Icon: typeof IconTicket }[] = [
+  { value: "single", title: "Pagar una clase", desc: "Reservas y pagas la sesión al precio de la clase.", Icon: IconCreditCard },
+  { value: "package", title: "Usar mi paquete", desc: "Ya compraste un paquete de sesiones y usas uno de tus créditos.", Icon: IconTicket },
+];
+
 export default function StepBookingMode({ onSelect }: Props) {
   return (
-    <Stack gap="md">
-      <Text fw={600} size="lg">¿Cómo quieres agendar?</Text>
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-        <Card
-          withBorder
-          radius="md"
-          p="lg"
-          onClick={() => onSelect("single")}
-          style={{ cursor: "pointer" }}
-        >
-          <Stack align="center" gap="xs" ta="center">
-            <ThemeIcon size={44} radius="xl" variant="light" color="blue">
-              <IconCreditCard size={24} />
-            </ThemeIcon>
-            <Group gap={4}>
-              <Text fw={700}>Pagar una clase</Text>
-            </Group>
-            <Text size="sm" c="dimmed">
-              Reserva y paga una sesión individual al precio de lista.
-            </Text>
-          </Stack>
-        </Card>
-
-        <Card
-          withBorder
-          radius="md"
-          p="lg"
-          onClick={() => onSelect("package")}
-          style={{ cursor: "pointer" }}
-        >
-          <Stack align="center" gap="xs" ta="center">
-            <ThemeIcon size={44} radius="xl" variant="light" color="grape">
-              <IconTicket size={24} />
-            </ThemeIcon>
-            <Text fw={700}>Usar mi paquete</Text>
-            <Text size="sm" c="dimmed">
-              Ya compré un paquete de sesiones y quiero usar uno de mis créditos.
-            </Text>
-          </Stack>
-        </Card>
-      </SimpleGrid>
-    </Stack>
+    <div className="ag-stack" style={{ gap: 12 }}>
+      <h2 className="ag-h" style={{ margin: 0 }}>¿Cómo quieres pagar?</h2>
+      <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Cómo quieres pagar">
+        {OPTIONS.map((o) => (
+          <div
+            key={o.value}
+            className="ag-opt"
+            role="radio"
+            tabIndex={0}
+            aria-checked={false}
+            onClick={() => onSelect(o.value)}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect(o.value))}
+            style={{ cursor: "pointer", padding: "14px 16px", alignItems: "center" }}
+          >
+            <o.Icon size={22} stroke={1.75} style={{ flex: "none" }} />
+            <div>
+              <b>{o.title}</b>
+              <span className="d">{o.desc}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
