@@ -1,10 +1,7 @@
-import {
-  Stack, Group, Button, Text, Paper, ThemeIcon, Badge, Divider,
-  Alert, SimpleGrid, Box,
-} from "@mantine/core";
-import {
-  IconCheck, IconClock, IconUserCheck, IconInfoCircle,
-} from "@tabler/icons-react";
+// Paso «Reserva en línea» (rediseño, ConfiguracionInicial): las dos políticas en
+// tarjetas de radio, sin emoji.
+import { Button } from "@mantine/core";
+import { IconCheck } from "@tabler/icons-react";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../admin/OrganizationInfo/schema";
 
@@ -15,114 +12,67 @@ interface Props {
   saving: boolean;
 }
 
+const OPTIONS = [
+  {
+    value: "auto_if_available",
+    title: "Confirmar sola si hay cupo",
+    desc: "La reserva se confirma al instante y el cliente recibe el aviso. Si no hay cupo, queda pendiente para que decidas.",
+    ideal: ["Tu horario está al día", "Quieres que reservar sea lo más fácil posible"],
+  },
+  {
+    value: "manual",
+    title: "Las apruebo yo",
+    desc: "Cada reserva queda pendiente hasta que la apruebes o la rechaces desde Reservas online.",
+    ideal: ["Quieres revisar cada solicitud", "Tu disponibilidad cambia a menudo"],
+  },
+] as const;
+
 export default function StepOnlineBooking({ form, onNext, onBack, saving }: Props) {
-  const isAutoApprove = (form.values.reservationPolicy ?? "manual") === "auto_if_available";
+  const policy = form.values.reservationPolicy ?? "manual";
 
   return (
-    <Stack gap="lg">
-      <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
-        Define si las reservas de tus clientes se confirman de forma automática o si necesitan tu aprobación manual.
-        Podrás cambiarlo en cualquier momento desde la configuración del negocio.
-      </Alert>
-
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-        {/* Opción: Aprobación automática */}
-        <Paper
-          withBorder
-          radius="md"
-          p="lg"
-          style={{
-            cursor: "pointer",
-            borderColor: isAutoApprove
-              ? "var(--mantine-color-green-6)"
-              : "var(--mantine-color-gray-3)",
-            borderWidth: isAutoApprove ? 2 : 1,
-            background: isAutoApprove ? "var(--mantine-color-green-0)" : undefined,
-            transition: "all 0.15s",
-          }}
-          onClick={() => form.setFieldValue("reservationPolicy", "auto_if_available")}
-        >
-          <Stack gap="sm">
-            <Group gap="sm">
-              <ThemeIcon size="xl" radius="md" color="green" variant="light">
-                <IconCheck size={22} />
-              </ThemeIcon>
+    <div className="ag-stack" style={{ gap: 16 }}>
+      <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Cómo se confirman las reservas">
+        {OPTIONS.map((o) => {
+          const choose = () => form.setFieldValue("reservationPolicy", o.value);
+          return (
+            <div
+              key={o.value}
+              className="ag-opt"
+              role="radio"
+              tabIndex={0}
+              aria-checked={policy === o.value}
+              onClick={choose}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), choose())}
+              style={{ cursor: "pointer", padding: "14px 16px" }}
+            >
+              <span className="ag-radio" />
               <div>
-                <Text fw={700} size="md">Aprobación automática</Text>
-                {isAutoApprove && <Badge color="green" size="xs" mt={2}>Seleccionado</Badge>}
+                <b>{o.title}</b>
+                <span className="d">{o.desc}</span>
+                <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+                  {o.ideal.map((t) => (
+                    <li key={t} className="ag-row" style={{ gap: 6, fontSize: 13, color: "var(--ink-muted)" }}>
+                      <IconCheck size={14} color="var(--success)" /> {t}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </Group>
-            <Text size="sm" c="dimmed">
-              Las reservas se confirman al instante. El cliente recibe una notificación inmediata y la cita queda agendada sin intervención tuya.
-            </Text>
-            <Box>
-              <Text size="xs" fw={600} mb={4}>Ideal si:</Text>
-              <Stack gap={2}>
-                <Text size="xs" c="dimmed">✅ Tienes disponibilidad clara y definida</Text>
-                <Text size="xs" c="dimmed">✅ Quieres reducir fricción para tus clientes</Text>
-                <Text size="xs" c="dimmed">✅ Confías en que tu horario es correcto</Text>
-              </Stack>
-            </Box>
-          </Stack>
-        </Paper>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Opción: Aprobación manual */}
-        <Paper
-          withBorder
-          radius="md"
-          p="lg"
-          style={{
-            cursor: "pointer",
-            borderColor: !isAutoApprove
-              ? "var(--mantine-color-blue-6)"
-              : "var(--mantine-color-gray-3)",
-            borderWidth: !isAutoApprove ? 2 : 1,
-            background: !isAutoApprove ? "var(--mantine-color-blue-0)" : undefined,
-            transition: "all 0.15s",
-          }}
-          onClick={() => form.setFieldValue("reservationPolicy", "manual")}
-        >
-          <Stack gap="sm">
-            <Group gap="sm">
-              <ThemeIcon size="xl" radius="md" color="blue" variant="light">
-                <IconUserCheck size={22} />
-              </ThemeIcon>
-              <div>
-                <Text fw={700} size="md">Aprobación manual</Text>
-                {!isAutoApprove && <Badge color="blue" size="xs" mt={2}>Seleccionado</Badge>}
-              </div>
-            </Group>
-            <Text size="sm" c="dimmed">
-              Las reservas quedan en estado "pendiente" hasta que tú las apruebes o rechaces desde el panel de administración.
-            </Text>
-            <Box>
-              <Text size="xs" fw={600} mb={4}>Ideal si:</Text>
-              <Stack gap={2}>
-                <Text size="xs" c="dimmed">✅ Quieres revisar cada solicitud antes de confirmar</Text>
-                <Text size="xs" c="dimmed">✅ Tu disponibilidad varía frecuentemente</Text>
-                <Text size="xs" c="dimmed">✅ Atiendes clientes selectivos o por invitación</Text>
-              </Stack>
-            </Box>
-          </Stack>
-        </Paper>
-      </SimpleGrid>
+      <div className="ag-subtle">La mayoría de negocios empieza con «Confirmar sola si hay cupo». Puedes cambiarlo cuando quieras en Reservas online.</div>
 
-      <Paper withBorder p="sm" radius="md" bg="gray.0">
-        <Group gap="xs">
-          <IconClock size={16} />
-          <Text size="sm">
-            <Text span fw={600}>Consejo:</Text> La mayoría de negocios pequeños comienzan con{" "}
-            <Text span fw={600} c="green">aprobación automática</Text> para dar mejor experiencia al cliente.
-            Puedes cambiar esta configuración en cualquier momento.
-          </Text>
-        </Group>
-      </Paper>
-
-      <Divider />
-      <Group justify="space-between">
-        <Button variant="default" onClick={onBack} size="md">← Anterior</Button>
-        <Button size="md" onClick={onNext} loading={saving}>Guardar y continuar →</Button>
-      </Group>
-    </Stack>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
+        <Button variant="default" onClick={onBack}>
+          Anterior
+        </Button>
+        <Button onClick={onNext} loading={saving}>
+          Guardar y continuar
+        </Button>
+      </div>
+    </div>
   );
 }

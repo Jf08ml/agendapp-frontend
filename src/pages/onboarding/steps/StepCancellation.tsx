@@ -22,8 +22,8 @@ export default function StepCancellation({ form, onNext, onBack, saving }: Props
 
       <Divider />
       <Group justify="space-between">
-        <Button variant="default" onClick={onBack} size="md">← Anterior</Button>
-        <Button size="md" onClick={onNext} loading={saving}>Guardar y continuar →</Button>
+        <Button variant="default" onClick={onBack} size="md">Anterior</Button>
+        <Button size="md" onClick={onNext} loading={saving}>Guardar y continuar</Button>
       </Group>
     </Stack>
   );

@@ -323,12 +323,12 @@ export default function StepEmployee({ createdServiceId, onDone, onBack }: Props
       <Divider />
       <Group justify="space-between">
         <Button variant="default" onClick={onBack} size="md">
-          ← Anterior
+          Anterior
         </Button>
         <Group>
           {!canSave && <Text size="sm" c="dimmed">Completa los campos obligatorios (*)</Text>}
           <Button size="md" onClick={handleSave} loading={saving} disabled={!canSave}>
-            Crear profesional y continuar →
+            Crear profesional y continuar
           </Button>
         </Group>
       </Group>

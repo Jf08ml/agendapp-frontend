@@ -66,9 +66,8 @@ import type { WaCode } from "../../../utils/waRealtime";
 import { getMetaStatus } from "../../../services/organizationService";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
-import SetupGuide from "./components/SetupGuide";
-import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
-import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
+import GettingStarted, { GettingStartedToggle, useGettingStartedPrefs } from "./components/GettingStarted";
+import { gettingStartedSteps } from "./components/gettingStartedModel";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
 import { IconShieldCog, IconCalendarOff, IconPlus } from "@tabler/icons-react";
@@ -268,6 +267,27 @@ const ScheduleView: React.FC = () => {
   }, [newAppointment.employee, employees]);
 
   const isWhatsAppReady = code === "ready";
+
+  // «Primeros pasos» (reemplaza las tres guías): solo para el administrador
+  const gsPrefs = useGettingStartedPrefs(organization?._id);
+  const gsSteps = useMemo(
+    () =>
+      gettingStartedSteps({
+        servicesCount: allServices.length,
+        employeesCount: employees.length,
+        employeesWithServices: employees.filter((e) => (e.services?.length ?? 0) > 0).length,
+        scheduleSaved:
+          !!organization?.weeklySchedule?.enabled ||
+          (!!organization?.openingHours?.start && (organization?.openingHours?.businessDays?.length ?? 0) > 0),
+        hasAppointments: !!organization?.onboardingMilestones?.firstAppointmentAt || appointments.length > 0,
+        whatsappConnected:
+          isWhatsAppReady || !!organization?.onboardingMilestones?.whatsappConnectedAt || organization?.waConnectionType === "meta",
+        linkShared: gsPrefs.linkShared,
+      }),
+    [allServices.length, employees, organization, appointments.length, isWhatsAppReady, gsPrefs.linkShared]
+  );
+  const showGettingStarted = role === "admin" && !gsPrefs.hidden;
+  const gsExpanded = showGettingStarted && !gsPrefs.collapsed;
 
   // ---------- Envío de recordatorios (campaña bulk) ----------
   const handleSendDailyReminders = () => {
@@ -1471,6 +1491,10 @@ const ScheduleView: React.FC = () => {
             onChangeReminderDate={setReminderDate}
           />
 
+          {showGettingStarted && gsPrefs.collapsed && (
+            <GettingStartedToggle steps={gsSteps} onOpen={() => gsPrefs.setCollapsed(false)} />
+          )}
+
           {/* Único botón principal de la página (en móvil va flotante, abajo) */}
           {!isMobile && hasPermission("appointments:create") && (
             <Button size="sm" leftSection={<IconPlus size={16} />} onClick={() => openModal(new Date(), new Date())}>
@@ -1480,30 +1504,16 @@ const ScheduleView: React.FC = () => {
         </Group>
       </Box>
 
-      {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
-      {employees.length === 0 && <SetupGuide employees={employees} />}
-
-      {/* Guía de activación — empuja a crear la primera cita cuando ya hay
-          profesionales pero ninguna cita creada todavía */}
-      {employees.length > 0 &&
-        !organization?.onboardingMilestones?.firstAppointmentAt &&
-        appointments.length === 0 && (
-          <FirstAppointmentGuide
-            seeded={!!organization?.onboardingMilestones?.seededDemoAt}
-            onCreateFirst={() => openModal(new Date(), new Date())}
-          />
-        )}
-
-      {/* Puente al aha de WhatsApp — ya hay citas pero WhatsApp no está conectado:
-          invita a conectarlo para notificar a los clientes (descartable) */}
-      {employees.length > 0 &&
-        appointments.length > 0 &&
-        !isWhatsAppReady && (
-          <ConnectWhatsappGuide
-            organizationId={organization?._id}
-            onConnect={() => navigate("/gestionar-whatsapp")}
-          />
-        )}
+      {/* Primeros pasos en móvil: arriba de la agenda, solo los pendientes */}
+      {gsExpanded && isMobile && (
+        <GettingStarted
+          steps={gsSteps}
+          prefs={gsPrefs}
+          isMobile
+          seeded={!!organization?.onboardingMilestones?.seededDemoAt}
+          onCreateAppointment={() => openModal(new Date(), new Date())}
+        />
+      )}
 
       {/* Reporte de impacto + encuesta (modal una sola vez, auto-gateado en backend) */}
       <ImpactSurveyModal organizationId={organization?._id} />
@@ -1527,8 +1537,10 @@ const ScheduleView: React.FC = () => {
         </Button>
       )}
 
-      {/* Calendario principal — ocupa todo el alto restante */}
-      <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>
+      {/* Calendario principal — ocupa todo el alto restante; en escritorio, con
+          «Primeros pasos» a la derecha (340 px) */}
+      <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8, display: "flex", gap: 12 }}>
+        <Box style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
         <CustomCalendar
           employees={employees}
           services={allServices}
@@ -1556,6 +1568,16 @@ const ScheduleView: React.FC = () => {
             setAvailabilityRefreshKey((k) => k + 1);
           }}
         />
+        </Box>
+        {gsExpanded && !isMobile && (
+          <GettingStarted
+            steps={gsSteps}
+            prefs={gsPrefs}
+            isMobile={false}
+            seeded={!!organization?.onboardingMilestones?.seededDemoAt}
+            onCreateAppointment={() => openModal(new Date(), new Date())}
+          />
+        )}
       </Box>
 
       {/* 🚀 Modales con Suspense para lazy loading */}

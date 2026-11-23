@@ -23,13 +23,13 @@ export default function StepSocialMedia({ form, onNext, onSkip, onBack, saving }
 
       <Divider />
       <Group justify="space-between">
-        <Button variant="default" onClick={onBack} size="md">← Anterior</Button>
+        <Button variant="default" onClick={onBack} size="md">Anterior</Button>
         <Group>
           <Button variant="subtle" color="gray" onClick={onSkip}>
-            Omitir por ahora
+            Saltar este paso
           </Button>
           <Button size="md" onClick={onNext} loading={saving}>
-            Guardar y continuar →
+            Guardar y continuar
           </Button>
         </Group>
       </Group>
