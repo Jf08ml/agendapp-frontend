@@ -593,12 +593,12 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
     }
     const n = info.available.length;
     const isSel = selected?.day === day && selected?.hour === hourStart;
-    // Intensidad 14–52 % según cuántos están libres respecto al máximo de la semana:
-    // suave para que el texto se lea siempre en tinta
-    const pct = n > 0 && maxCount > 0 ? Math.round(14 + (38 * n) / maxCount) : 0;
+    // Base success-soft; solo las franjas con más libres se oscurecen un poco (hasta
+    // 22 %). El dato está en el texto «N libres».
+    const pct = n > 0 && maxCount > 1 ? Math.round((22 * (n - 1)) / (maxCount - 1)) : 0;
     const bg =
       info.status === "available"
-        ? `color-mix(in srgb, var(--success) ${pct}%, var(--surface-raised))`
+        ? `color-mix(in srgb, var(--success) ${pct}%, var(--success-soft))`
         : info.status === "break"
           ? "var(--warning-soft)"
           : "var(--surface-muted)";
@@ -706,9 +706,9 @@ export default function ScheduleOverviewHeatmap({ organizationId, employees }: P
   const legend = (
     <div className="ag-row" style={{ gap: 12, fontSize: 13, color: "var(--ink-muted)" }}>
       <span className="ag-row" style={{ gap: 6 }}>
-        <i style={{ width: 12, height: 12, borderRadius: 3, background: "color-mix(in srgb, var(--success) 18%, var(--surface-raised))" }} />
-        <i style={{ width: 12, height: 12, borderRadius: 3, marginLeft: -4, background: "color-mix(in srgb, var(--success) 52%, var(--surface-raised))" }} />
-        Más libres, más oscuro
+        <i style={{ width: 12, height: 12, borderRadius: 3, background: "var(--success-soft)" }} />
+        <i style={{ width: 12, height: 12, borderRadius: 3, marginLeft: -4, background: "color-mix(in srgb, var(--success) 22%, var(--success-soft))" }} />
+        Más libres, un poco más oscuro
       </span>
       <span className="ag-row" style={{ gap: 6 }}>
         <i style={{ width: 12, height: 12, borderRadius: 3, background: "var(--warning-soft)" }} /> Descanso
