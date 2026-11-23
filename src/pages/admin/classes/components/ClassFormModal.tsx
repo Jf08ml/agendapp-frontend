@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
 import {
-  Modal,
+  Drawer,
   TextInput,
   NumberInput,
   Textarea,
@@ -140,12 +140,12 @@ export default function ClassFormModal({
   const discountEnabled = form.values.groupDiscount.enabled;
 
   return (
-    <Modal
+    <Drawer
       opened={opened}
       onClose={onClose}
       title={editing ? "Editar clase" : "Nueva clase"}
-      centered
-      size="xl"
+      position="right"
+      size="lg"
     >
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="sm">
@@ -305,6 +305,6 @@ export default function ClassFormModal({
           </Group>
         </Stack>
       </form>
-    </Modal>
+    </Drawer>
   );
 }

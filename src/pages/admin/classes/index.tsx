@@ -1,18 +1,21 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback, useMemo } from "react";
+// Clases (rediseño, ClasesPanel): pestañas neutras (?tab=sesiones|inscripciones|
+// clases|salones|mensajes), sesiones por semana con selección múltiple y barra de
+// acciones, estados con palabra + ícono, política de inscripción en tarjeta con
+// switches de etiqueta fija y detalle de sesión en panel lateral.
 import {
-  Box, Title, Tabs, Button, Group, Text, Badge, Card, Stack,
-  ActionIcon, Tooltip, Table, ScrollArea, Skeleton, Center,
-  Menu, Alert, Progress, SimpleGrid,  Checkbox, SegmentedControl,
-  Select, Loader, Switch, TextInput,
+  ActionIcon, Button, Loader, Menu, SegmentedControl, Switch, Text,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { Link, useSearchParams } from "react-router-dom";
 import { modals } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import {
-  IconPlus, IconPencil, IconTrash, IconDots, IconEye,
-  IconCheck, IconX, IconSchool, IconDoor, IconCalendar, IconUsers,
-  IconBrandWhatsapp, IconSearch,
+  IconPlus, IconPencil, IconTrash, IconDots, IconEye, IconCheck, IconX, IconSchool,
+  IconDoor, IconCalendar, IconUsers, IconSearch, IconCalendarOff, IconCalendarRepeat,
+  IconChevronLeft, IconChevronRight, IconMinus, IconAlertTriangle, IconCircleCheck,
+  IconClock, IconCash, IconUserX, IconGift,
 } from "@tabler/icons-react";
 import { RootState, useAppDispatch, useAppSelector } from "../../../app/store";
 import {
@@ -45,26 +48,27 @@ import SessionDetailModal from "./components/SessionDetailModal";
 import BulkSessionModal from "./components/BulkSessionModal";
 import ClassWhatsappTemplates from "./components/ClassWhatsappTemplates";
 import ClassCalendar from "./components/ClassCalendar";
+import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
+import { formatCurrency } from "../../../utils/formatCurrency";
+import {
+  CLASS_TABS, ENROLLMENT_FILTERS, badgeClass, enrollmentState, occupancy, paymentState,
+  resolveClassTab, sessionState, toggleAllVisible, toggleOne,
+  type ClassTabKey, type StateInfo,
+} from "./classesView";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale("es");
 
-const STATUS_COLORS: Record<string, string> = {
-  open: "green", full: "red", cancelled: "gray", completed: "blue",
-};
-const STATUS_LABELS: Record<string, string> = {
-  open: "Disponible", full: "Llena", cancelled: "Cancelada", completed: "Completada",
-};
+const STATE_ICONS = {
+  check: IconCheck, circleCheck: IconCircleCheck, users: IconUsers, clock: IconClock,
+  cash: IconCash, userX: IconUserX, calendarOff: IconCalendarOff, gift: IconGift,
+} as const;
 
-const ENROLLMENT_STATUS_COLORS: Record<string, string> = {
-  pending_payment: "yellow", pending: "orange", confirmed: "green",
-  cancelled: "red", attended: "blue", no_show: "gray",
-};
-const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
-  pending_payment: "Pendiente de pago", pending: "Pendiente", confirmed: "Confirmada",
-  cancelled: "Cancelada", attended: "Asistió", no_show: "No asistió",
-};
+// Semana de lunes a domingo, en la zona del negocio
+// «lun. 16 nov» → «Lun. 16 nov» (solo la primera letra)
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const startOfWeek = (d: dayjs.Dayjs) => d.startOf("day").subtract((d.day() + 6) % 7, "day");
 
 // ══════════════════════════════════════════════════════
 // PÁGINA PRINCIPAL
@@ -78,6 +82,12 @@ export default function ManageClasses() {
   const savingClassPolicy = useAppSelector(selectSavingClassPolicy);
   const canAutoConfirmClasses = (organization as any)?.planLimits?.autoConfirmations !== false;
   const tz = organization?.timezone || "America/Bogota";
+  const isMobile = useMediaQuery("(max-width: 48rem)");
+  const [searchParams] = useSearchParams();
+  const activeTab = resolveClassTab(searchParams.get("tab"));
+  const money = (n: number) => formatCurrency(n, organization?.currency || "COP");
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(dayjs().tz(tz)));
+  const [loadError, setLoadError] = useState(false);
 
   const handleChangeClassPolicy = async (nextPolicy: ReservationPolicy) => {
     if (!organization?._id) return;
@@ -188,6 +198,7 @@ export default function ManageClasses() {
     setLoadingRooms(true);
     setLoadingClasses(true);
     setLoadingSessions(true);
+    setLoadError(false);
     setLoadingEnrollments(true);
     try {
       const [r, c, s, e, emp] = await Promise.all([
@@ -202,6 +213,9 @@ export default function ManageClasses() {
       setSessions(s);
       setPendingEnrollments(e.enrollments);
       setEmployees(emp);
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
     } finally {
       setLoadingRooms(false);
       setLoadingClasses(false);
@@ -506,519 +520,693 @@ export default function ManageClasses() {
     });
   };
 
+  const handleBulkCancel = () => {
+    const ids = Array.from(selectedIds).filter((id) => {
+      const s = sessions.find((x) => x._id === id);
+      return s && s.status !== "cancelled" && s.status !== "completed";
+    });
+    if (ids.length === 0) {
+      showNotification({ message: "Las sesiones elegidas ya están canceladas o completadas.", color: "yellow" });
+      return;
+    }
+    modals.openConfirmModal({
+      title: `Cancelar ${ids.length} ${ids.length === 1 ? "sesión" : "sesiones"}`,
+      children: (
+        <Text size="sm">
+          Se cancelan también sus inscripciones pendientes y confirmadas. Las sesiones quedan en la lista como canceladas.
+        </Text>
+      ),
+      labels: { confirm: "Sí, cancelar", cancel: "No" },
+      confirmProps: { color: "red" },
+      onConfirm: async () => {
+        let ok = 0;
+        for (const id of ids) {
+          try {
+            await cancelSession(id);
+            ok++;
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        showNotification({
+          message: ok === ids.length ? `${ok} ${ok === 1 ? "sesión cancelada" : "sesiones canceladas"}` : `Se cancelaron ${ok} de ${ids.length}`,
+          color: ok === ids.length ? "green" : "orange",
+        });
+        setSelectedIds(new Set());
+        loadAll();
+      },
+    });
+  };
+
   // ══════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════
 
-  return (
-    <Box p="md">
-      <Title order={2} mb="lg">
-        Módulo de Clases
-      </Title>
+  const openNewSession = () => {
+    setEditingSession(null);
+    setSessionModal(true);
+  };
+  const openDetail = (s: ClassSession) => {
+    setSelectedSession(s);
+    setDetailModal(true);
+  };
 
-      <Tabs defaultValue="sessions" keepMounted={false}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="sessions" leftSection={<IconCalendar size={16} />}>
-            Sesiones
-          </Tabs.Tab>
-          <Tabs.Tab value="enrollments" leftSection={<IconUsers size={16} />}>
-            Reservas
-            {pendingEnrollments.length > 0 && (
-              <Badge size="xs" color="red" circle ml={6}>
-                {pendingEnrollments.length}
-              </Badge>
+  const tabLink = (key: ClassTabKey) => `?tab=${key}`;
+
+  const StateBadge = ({ info, small }: { info: StateInfo; small?: boolean }) => {
+    const Icon = STATE_ICONS[info.icon];
+    return (
+      <span className={badgeClass(info.tone)} style={small ? { height: 20, fontSize: 11, padding: "0 8px" } : undefined}>
+        <Icon size={12} stroke={2} /> {info.label}
+      </span>
+    );
+  };
+
+  const SessionActions = ({ s }: { s: ClassSession }) => (
+    <Menu shadow="lg" withinPortal position="bottom-end">
+      <Menu.Target>
+        <ActionIcon variant="subtle" color="gray" aria-label="Acciones de la sesión" onClick={(e) => e.stopPropagation()}>
+          <IconDots size={18} />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+        <Menu.Item leftSection={<IconEye size={16} />} onClick={() => openDetail(s)}>
+          Ver inscritos
+        </Menu.Item>
+        {s.status !== "cancelled" && s.status !== "completed" && (
+          <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => { setEditingSession(s); setSessionModal(true); }}>
+            Editar
+          </Menu.Item>
+        )}
+        {s.status !== "cancelled" && (
+          <Menu.Item leftSection={<IconCalendarOff size={16} />} onClick={() => handleCancelSession(s)}>
+            Cancelar sesión
+          </Menu.Item>
+        )}
+        <Menu.Divider />
+        <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={() => handleDeleteSession(s)}>
+          Eliminar sesión
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+
+  const checkbox = (on: boolean, onToggle: () => void, label: string, mixed = false) => (
+    <span
+      role="checkbox"
+      tabIndex={0}
+      aria-checked={mixed ? "mixed" : on}
+      aria-label={label}
+      className="ag-check"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); onToggle(); } }}
+      style={{ cursor: "pointer", ...(mixed ? { background: "var(--brand)", borderColor: "var(--brand)" } : {}) }}
+    >
+      {mixed ? <IconMinus size={14} stroke={2.5} /> : on ? <IconCheck size={14} stroke={2.5} /> : null}
+    </span>
+  );
+
+  // ── Sesiones de la semana ────────────────────────────
+  const weekEnd = weekStart.add(7, "day");
+  const weekSessions = sessions
+    .filter((s) => {
+      const d = dayjs(s.startDate).tz(tz);
+      return !d.isBefore(weekStart) && d.isBefore(weekEnd);
+    })
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const weekIds = weekSessions.map((s) => s._id);
+  const selectedInWeek = weekIds.filter((id) => selectedIds.has(id)).length;
+  const weekLabel = `${weekStart.format("D MMM")} – ${weekEnd.subtract(1, "day").format("D MMM YYYY")}`;
+  const isThisWeek = weekStart.isSame(startOfWeek(dayjs().tz(tz)), "day");
+
+  const sessionMeta = (s: ClassSession) => {
+    const classDoc = typeof s.classId === "object" ? s.classId : null;
+    const employee = typeof s.employeeId === "object" ? s.employeeId : null;
+    const room = typeof s.roomId === "object" ? s.roomId : null;
+    return { classDoc, employee, room, start: dayjs(s.startDate).tz(tz), end: dayjs(s.endDate).tz(tz) };
+  };
+
+  const capacityCell = (s: ClassSession) => {
+    const pct = occupancy(s.enrolledCount, s.capacity);
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 110 }}>
+        <span className="ag-num" style={{ fontSize: 13, minWidth: 36 }}>{s.enrolledCount}/{s.capacity}</span>
+        <span className={`ag-progress${pct >= 100 ? "" : " ag-progress--brand"}`} style={{ flex: 1 }}>
+          <i style={{ width: `${pct}%` }} />
+        </span>
+      </div>
+    );
+  };
+
+  const sessionsTab = (
+    <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+      <div className="ag-row" style={{ gap: 8 }}>
+        <div className="ag-row" style={{ gap: 4 }}>
+          <ActionIcon variant="default" aria-label="Semana anterior" onClick={() => setWeekStart((w) => w.subtract(7, "day"))}>
+            <IconChevronLeft size={16} />
+          </ActionIcon>
+          <ActionIcon variant="default" aria-label="Semana siguiente" onClick={() => setWeekStart((w) => w.add(7, "day"))}>
+            <IconChevronRight size={16} />
+          </ActionIcon>
+          {!isThisWeek && (
+            <Button size="xs" variant="subtle" color="gray" onClick={() => setWeekStart(startOfWeek(dayjs().tz(tz)))}>
+              Esta semana
+            </Button>
+          )}
+        </div>
+        <b style={{ fontSize: 15 }}>{sessionView === "table" ? weekLabel : ""}</b>
+        <span style={{ flex: 1 }} />
+        <SegmentedControl
+          size="xs"
+          value={sessionView}
+          onChange={(v) => setSessionView(v as "table" | "calendar")}
+          data={[
+            { value: "table", label: "Tabla" },
+            { value: "calendar", label: "Calendario" },
+          ]}
+        />
+      </div>
+
+      {loadingSessions ? (
+        <div className="ag-card" aria-busy="true">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
+              <span className="ag-skeleton" style={{ width: 18, height: 18 }} />
+              <span className="ag-skeleton" style={{ width: "30%" }} />
+              <span className="ag-skeleton" style={{ width: "20%" }} />
+            </div>
+          ))}
+        </div>
+      ) : sessionView === "calendar" ? (
+        <ClassCalendar sessions={sessions} timezone={tz} onSelectSession={openDetail} />
+      ) : weekSessions.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon"><IconCalendar size={22} /></div>
+            <h3>No hay sesiones programadas esta semana</h3>
+            <p>Programa la semana completa o crea una sesión suelta.</p>
+            <div className="ag-row" style={{ justifyContent: "center" }}>
+              <Button variant="default" onClick={() => setBulkModal(true)}>Programar semana</Button>
+              <Button onClick={openNewSession}>Nueva sesión</Button>
+            </div>
+          </div>
+        </div>
+      ) : isMobile ? (
+        <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+          {Object.entries(
+            weekSessions.reduce<Record<string, ClassSession[]>>((acc, s) => {
+              const k = dayjs(s.startDate).tz(tz).format("YYYY-MM-DD");
+              (acc[k] ||= []).push(s);
+              return acc;
+            }, {})
+          ).map(([day, list]) => (
+            <div key={day}>
+              <div className="ag-slots__group" style={{ margin: "0 0 6px" }}>
+                {cap(dayjs.tz(day, tz).format("dddd D [de] MMMM"))}
+              </div>
+              <div className="ag-card">
+                {list.map((s) => {
+                  const m = sessionMeta(s);
+                  return (
+                    <div
+                      key={s._id}
+                      className="ag-list-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openDetail(s)}
+                      onKeyDown={(e) => e.key === "Enter" && openDetail(s)}
+                      style={{ padding: "var(--space-3)", cursor: "pointer", background: selectedIds.has(s._id) ? "var(--brand-soft)" : undefined }}
+                    >
+                      {checkbox(selectedIds.has(s._id), () => setSelectedIds((p) => toggleOne(p, s._id)), `Elegir ${m.classDoc?.name ?? "sesión"}`)}
+                      <span className="ag-num" style={{ width: 64, fontSize: 13, fontWeight: 600 }}>{toSpanishMeridiem(m.start.format("h:mm A"))}</span>
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                        <b style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+                          {m.classDoc?.color && <i style={{ width: 8, height: 8, borderRadius: 99, background: m.classDoc.color, flex: "none" }} />}
+                          {m.classDoc?.name ?? "Clase"}
+                        </b>
+                        <span className="ag-subtle">
+                          {[m.employee?.names, m.room?.name].filter(Boolean).join(" · ")} · <span className="ag-num">{s.enrolledCount}/{s.capacity}</span>
+                        </span>
+                        <div><StateBadge info={sessionState(s.status)} small /></div>
+                      </div>
+                      <SessionActions s={s} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table" style={{ minWidth: 860 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 44 }}>
+                  {checkbox(
+                    selectedInWeek > 0 && selectedInWeek === weekIds.length,
+                    () => setSelectedIds((p) => toggleAllVisible(p, weekIds)),
+                    "Elegir todas las sesiones de la semana",
+                    selectedInWeek > 0 && selectedInWeek < weekIds.length
+                  )}
+                </th>
+                <th>Clase</th>
+                <th>Fecha y hora</th>
+                <th>Instructor</th>
+                <th>Salón</th>
+                <th>Cupo</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {weekSessions.map((s) => {
+                const m = sessionMeta(s);
+                const on = selectedIds.has(s._id);
+                return (
+                  <tr key={s._id} aria-selected={on} onClick={() => openDetail(s)} style={{ cursor: "pointer" }}>
+                    <td>{checkbox(on, () => setSelectedIds((p) => toggleOne(p, s._id)), `Elegir ${m.classDoc?.name ?? "sesión"}`)}</td>
+                    <td>
+                      <b style={{ display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                        <i style={{ width: 10, height: 10, borderRadius: 99, background: m.classDoc?.color || "var(--line-strong)", flex: "none" }} />
+                        {m.classDoc?.name ?? "—"}
+                      </b>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span>{cap(m.start.format("ddd D MMM"))}</span>
+                      <span className="ag-subtle ag-num"> · {toSpanishMeridiem(m.start.format("h:mm A"))}</span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>{m.employee?.names ?? "—"}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>{m.room?.name ?? "—"}</td>
+                    <td>{capacityCell(s)}</td>
+                    <td><StateBadge info={sessionState(s.status)} /></td>
+                    <td style={{ width: 48, textAlign: "right" }}><SessionActions s={s} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Barra de selección múltiple */}
+      {selectedIds.size > 0 && sessionView === "table" && (
+        <div
+          role="toolbar"
+          aria-label="Acciones de las sesiones elegidas"
+          style={{
+            position: "sticky",
+            bottom: isMobile ? "calc(var(--app-shell-footer-offset, 0px) + 12px)" : 16,
+            zIndex: 20,
+            alignSelf: "center",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 8px 8px 16px",
+            borderRadius: "var(--radius-lg)",
+            background: "var(--ink)",
+            color: "var(--ink-inverse)",
+            boxShadow: "var(--shadow-lg)",
+            flexWrap: "wrap",
+          }}
+        >
+          <b style={{ fontSize: 14, marginRight: 8 }}>
+            {selectedIds.size} {selectedIds.size === 1 ? "elegida" : "elegidas"}
+          </b>
+          <Button size="xs" variant="white" color="dark" leftSection={<IconCalendarOff size={14} />} onClick={handleBulkCancel}>
+            Cancelar sesiones
+          </Button>
+          <Button size="xs" color="red" leftSection={<IconTrash size={14} />} onClick={handleBulkDelete}>
+            Eliminar
+          </Button>
+          <ActionIcon variant="subtle" color="gray" aria-label="Quitar selección" onClick={() => setSelectedIds(new Set())}>
+            <IconX size={16} color="var(--ink-inverse)" />
+          </ActionIcon>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Inscripciones ────────────────────────────────────
+  const switchRow = (
+    label: string,
+    help: string,
+    checked: boolean,
+    onChange: (v: boolean) => void,
+    disabled?: boolean,
+    busy?: boolean
+  ) => (
+    <div className="ag-switchrow">
+      <div>
+        <b>{label}</b>
+        <span>{help}</span>
+      </div>
+      {busy ? <span style={{ flex: "none" }}><Loader size="xs" /></span> : null}
+      <span style={{ flex: "none", paddingTop: 2 }}>
+        <Switch checked={checked} onChange={(e) => onChange(e.currentTarget.checked)} disabled={disabled} aria-label={label} />
+      </span>
+    </div>
+  );
+
+  const policyCard = (
+    <div className="ag-card" style={{ padding: "var(--space-2) var(--space-4)" }}>
+      <h3 style={{ margin: "var(--space-2) 0 0", font: "600 15px/22px var(--mantine-font-family)" }}>Política de inscripción</h3>
+      {switchRow(
+        "Confirmar automáticamente si hay cupo",
+        canAutoConfirmClasses
+          ? "Apagado: cada inscripción queda pendiente hasta que la apruebes."
+          : "Disponible desde el plan Starter. Hoy cada inscripción queda pendiente hasta que la apruebes.",
+        classPolicy === "auto_if_available",
+        (v) => handleChangeClassPolicy(v ? "auto_if_available" : "manual"),
+        !organization?._id || savingClassPolicy || (!canAutoConfirmClasses && classPolicy !== "auto_if_available"),
+        savingClassPolicy
+      )}
+      {switchRow(
+        "Permitir acompañante",
+        "Muestra la opción de agregar un acompañante en la reserva pública.",
+        allowCompanion,
+        handleToggleAllowCompanion,
+        !organization?._id || savingCompanionToggle,
+        savingCompanionToggle
+      )}
+      <div style={{ marginBottom: -1 }}>
+        {switchRow(
+          "Elegir clase paga o paquete",
+          "Antes de elegir la clase, el cliente indica si paga la clase o usa un paquete.",
+          packageChoiceStepEnabled,
+          handleTogglePackageChoiceStep,
+          !organization?._id || savingPackageChoiceToggle,
+          savingPackageChoiceToggle
+        )}
+      </div>
+    </div>
+  );
+
+  const enrollmentsTab = (
+    <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+      {policyCard}
+      <div className="ag-row" style={{ gap: 8 }}>
+        <div className="ag-tabs" role="tablist" aria-label="Estado" style={{ scrollbarWidth: "none" }}>
+          {ENROLLMENT_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              role="tab"
+              className="ag-chip"
+              aria-selected={enrollmentStatusFilter === f.value}
+              onClick={() => setEnrollmentStatusFilter(f.value)}
+            >
+              {f.label}
+              {f.value === "pending" && <span className="count">{pendingEnrollments.length}</span>}
+            </button>
+          ))}
+        </div>
+        <span style={{ flex: 1 }} />
+        <div className="ag-search" style={{ flex: isMobile ? "1 1 100%" : "0 1 280px" }}>
+          <input
+            className="ag-input"
+            type="search"
+            placeholder="Buscar por nombre o teléfono"
+            aria-label="Buscar inscripciones"
+            value={enrollmentSearch}
+            onChange={(e) => setEnrollmentSearch(e.currentTarget.value)}
+          />
+          <span aria-hidden="true"><IconSearch size={16} stroke={1.75} /></span>
+        </div>
+      </div>
+
+      {loadingEnrollmentsToShow ? (
+        <div className="ag-card" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
+              <span className="ag-skeleton" style={{ width: "40%" }} />
+            </div>
+          ))}
+        </div>
+      ) : filteredEnrollments.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon"><IconUsers size={22} /></div>
+            <h3>
+              {enrollmentSearch
+                ? "Nadie coincide con la búsqueda"
+                : enrollmentStatusFilter === "pending"
+                  ? "No tienes inscripciones por aprobar"
+                  : "No hay inscripciones con este filtro"}
+            </h3>
+          </div>
+        </div>
+      ) : (
+        <div className="ag-card" style={{ overflowX: isMobile ? undefined : "auto" }}>
+          {isMobile ? (
+            filteredEnrollments.map((e) => {
+              const classDoc = typeof e.classId === "object" ? e.classId : null;
+              const session = typeof e.sessionId === "object" ? e.sessionId : null;
+              return (
+                <div key={e._id} className="ag-list-row" style={{ padding: "var(--space-3)", flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <b style={{ display: "block", fontSize: 15 }}>{e.attendee.name}</b>
+                      <span className="ag-subtle" style={{ display: "block" }}>
+                        {classDoc?.name ?? "Clase"}
+                        {session ? ` · ${toSpanishMeridiem(dayjs(session.startDate).tz(tz).format("ddd D MMM, h:mm A"))}` : ""}
+                      </span>
+                    </div>
+                    <b className="ag-num" style={{ fontSize: 14 }}>{money(e.totalPrice)}</b>
+                  </div>
+                  <div className="ag-row" style={{ gap: 4 }}>
+                    <StateBadge info={enrollmentState(e.status)} small />
+                    <StateBadge info={paymentState(e.paymentStatus)} small />
+                  </div>
+                  {e.status === "pending" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <Button variant="default" loading={actionLoading === e._id} onClick={() => handleCancelEnrollment(e._id, e.attendee.name)}>
+                        Rechazar
+                      </Button>
+                      <Button loading={actionLoading === e._id} onClick={() => handleApprove(e._id)}>
+                        Aprobar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <table className="ag-table" style={{ minWidth: 820 }}>
+              <thead>
+                <tr>
+                  <th>Asistente</th>
+                  <th>Clase y sesión</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                  <th className="num">Total</th>
+                  <th aria-label="Acciones" />
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEnrollments.map((e) => {
+                  const classDoc = typeof e.classId === "object" ? e.classId : null;
+                  const session = typeof e.sessionId === "object" ? e.sessionId : null;
+                  return (
+                    <tr key={e._id}>
+                      <td>
+                        <b style={{ display: "block" }}>{e.attendee.name}</b>
+                        <span className="ag-subtle ag-num">{e.attendee.phone}</span>
+                      </td>
+                      <td>
+                        <span style={{ display: "block" }}>{classDoc?.name ?? "—"}</span>
+                        <span className="ag-subtle">
+                          {session ? cap(toSpanishMeridiem(dayjs(session.startDate).tz(tz).format("ddd D MMM, h:mm A"))) : "—"}
+                        </span>
+                      </td>
+                      <td><StateBadge info={enrollmentState(e.status)} /></td>
+                      <td><StateBadge info={paymentState(e.paymentStatus)} /></td>
+                      <td className="num">
+                        <b>{money(e.totalPrice)}</b>
+                        {e.discountPercent > 0 && <span className="ag-subtle" style={{ display: "block" }}>−{e.discountPercent} % grupal</span>}
+                      </td>
+                      <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                        {e.status === "pending" && (
+                          <div className="ag-row" style={{ gap: 6, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                            <Button size="xs" variant="default" loading={actionLoading === e._id} onClick={() => handleCancelEnrollment(e._id, e.attendee.name)}>
+                              Rechazar
+                            </Button>
+                            <Button size="xs" loading={actionLoading === e._id} onClick={() => handleApprove(e._id)}>
+                              Aprobar
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Clases (plantillas) ──────────────────────────────
+  const classesTab = loadingClasses ? (
+    <div className="ag-card" style={{ padding: 16 }}><span className="ag-skeleton" style={{ width: "40%" }} /></div>
+  ) : classes.length === 0 ? (
+    <div className="ag-card">
+      <div className="ag-empty">
+        <div className="ag-empty__icon"><IconSchool size={22} /></div>
+        <h3>Aún no tienes clases</h3>
+        <p>Crea una clase para poder programar sus sesiones.</p>
+        <Button onClick={() => { setEditingClass(null); setClassModal(true); }}>Nueva clase</Button>
+      </div>
+    </div>
+  ) : (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "var(--space-3)" }}>
+      {classes.map((c) => (
+        <div
+          key={c._id}
+          className="ag-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => { setEditingClass(c); setClassModal(true); }}
+          onKeyDown={(e) => e.key === "Enter" && (setEditingClass(c), setClassModal(true))}
+          style={{ padding: "var(--space-4)", cursor: "pointer", display: "flex", flexDirection: "column", gap: 8, opacity: c.isActive ? 1 : 0.7 }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <i style={{ width: 10, height: 10, borderRadius: 99, background: c.color || "var(--line-strong)", marginTop: 6, flex: "none" }} />
+            <b style={{ flex: 1, fontSize: 15 }}>{c.name}</b>
+            <Menu shadow="lg" withinPortal position="bottom-end">
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="gray" aria-label={`Acciones de ${c.name}`} onClick={(e) => e.stopPropagation()}>
+                  <IconDots size={18} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+                <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => { setEditingClass(c); setClassModal(true); }}>
+                  Editar
+                </Menu.Item>
+                <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={() => handleDeleteClass(c)}>
+                  Eliminar
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </div>
+          {c.description && <span className="ag-subtle" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.description}</span>}
+          <span className="ag-subtle ag-num">
+            {c.duration} min · Cupo {c.defaultCapacity} · {money(c.pricePerPerson)} por persona
+          </span>
+          <div className="ag-row" style={{ gap: 4 }}>
+            <StateBadge info={c.isActive ? { label: "Activa", tone: "success", icon: "circleCheck" } : { label: "Inactiva", tone: "neutral", icon: "calendarOff" }} small />
+            {c.groupDiscount?.enabled && (
+              <span className="ag-badge" style={{ height: 20, fontSize: 11, padding: "0 8px" }}>
+                −{c.groupDiscount.discountPercent} % desde {c.groupDiscount.minPeople} personas
+              </span>
             )}
-          </Tabs.Tab>
-          <Tabs.Tab value="classes" leftSection={<IconSchool size={16} />}>
-            Tipos de Clase
-          </Tabs.Tab>
-          <Tabs.Tab value="rooms" leftSection={<IconDoor size={16} />}>
-            Salones
-          </Tabs.Tab>
-          <Tabs.Tab value="messages" leftSection={<IconBrandWhatsapp size={16} />}>
-            Mensajes
-          </Tabs.Tab>
-        </Tabs.List>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
-        {/* ─── SESIONES ─────────────────────────────────── */}
-        <Tabs.Panel value="sessions">
-          <Group justify="space-between" mb="md">
-            <Group gap="xs">
-              <Text fw={600}>Sesiones programadas</Text>
-              <SegmentedControl
-                size="xs"
-                value={sessionView}
-                onChange={(v) => setSessionView(v as "table" | "calendar")}
-                data={[
-                  { value: "table", label: "Tabla" },
-                  { value: "calendar", label: "Calendario" },
-                ]}
-              />
-              {sessionView === "table" && selectedIds.size > 0 && (
-                <Button
-                  size="xs"
-                  color="red"
-                  variant="light"
-                  leftSection={<IconTrash size={14} />}
-                  onClick={handleBulkDelete}
-                >
-                  Eliminar {selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}
-                </Button>
+  // ── Salones ──────────────────────────────────────────
+  const roomsTab = loadingRooms ? (
+    <div className="ag-card" style={{ padding: 16 }}><span className="ag-skeleton" style={{ width: "40%" }} /></div>
+  ) : rooms.length === 0 ? (
+    <div className="ag-card">
+      <div className="ag-empty">
+        <div className="ag-empty__icon"><IconDoor size={22} /></div>
+        <h3>Aún no tienes salones</h3>
+        <p>Agrega los espacios donde das las clases.</p>
+        <Button onClick={() => { setEditingRoom(null); setRoomModal(true); }}>Nuevo salón</Button>
+      </div>
+    </div>
+  ) : (
+    <div className="ag-card" style={{ maxWidth: 720 }}>
+      {rooms.map((r) => (
+        <div key={r._id} className="ag-list-row" style={{ padding: "var(--space-3) var(--space-4)", opacity: r.isActive ? 1 : 0.7 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ display: "block", fontSize: 15 }}>{r.name}</b>
+            <span className="ag-subtle">
+              Capacidad {r.capacity} {r.capacity === 1 ? "persona" : "personas"}
+              {r.description ? ` · ${r.description}` : ""}
+              {!r.isActive ? " · Inactivo" : ""}
+            </span>
+          </div>
+          <Menu shadow="lg" withinPortal position="bottom-end">
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" aria-label={`Acciones de ${r.name}`}>
+                <IconDots size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => { setEditingRoom(r); setRoomModal(true); }}>
+                Editar
+              </Menu.Item>
+              <Menu.Item color="red" leftSection={<IconTrash size={16} />} onClick={() => handleDeleteRoom(r)}>
+                Eliminar
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Acción principal del encabezado según la pestaña
+  const headerActions =
+    activeTab === "sesiones" ? (
+      <>
+        <Button variant="default" leftSection={<IconCalendarRepeat size={16} />} onClick={() => setBulkModal(true)} size={isMobile ? "xs" : "sm"}>
+          Programar semana
+        </Button>
+        <Button leftSection={<IconPlus size={16} />} onClick={openNewSession} size={isMobile ? "xs" : "sm"}>
+          Nueva sesión
+        </Button>
+      </>
+    ) : activeTab === "clases" ? (
+      <Button leftSection={<IconPlus size={16} />} onClick={() => { setEditingClass(null); setClassModal(true); }} size={isMobile ? "xs" : "sm"}>
+        Nueva clase
+      </Button>
+    ) : activeTab === "salones" ? (
+      <Button leftSection={<IconPlus size={16} />} onClick={() => { setEditingRoom(null); setRoomModal(true); }} size={isMobile ? "xs" : "sm"}>
+        Nuevo salón
+      </Button>
+    ) : null;
+
+  return (
+    <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
+      <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+        <div className="ag-row" style={{ gap: 8 }}>
+          <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em", flex: 1 }}>Clases</h1>
+          {headerActions}
+        </div>
+        <nav className="ag-subtabs" aria-label="Clases">
+          {CLASS_TABS.map((t) => (
+            <Link key={t.key} to={tabLink(t.key)} aria-current={activeTab === t.key ? "page" : undefined}>
+              {t.label}
+              {t.key === "inscripciones" && pendingEnrollments.length > 0 && (
+                <span className="ag-badge ag-badge--warning">{pendingEnrollments.length}</span>
               )}
-            </Group>
-            <Group gap="xs">
-              <Button
-                variant="light"
-                leftSection={<IconCalendar size={16} />}
-                onClick={() => setBulkModal(true)}
-              >
-                Programar horario
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                onClick={() => { setEditingSession(null); setSessionModal(true); }}
-              >
-                Nueva sesión
-              </Button>
-            </Group>
-          </Group>
+            </Link>
+          ))}
+        </nav>
+      </div>
 
-          {loadingSessions ? (
-            <Stack gap="xs">{Array(4).fill(0).map((_, i) => <Skeleton key={i} h={60} radius="md" />)}</Stack>
-          ) : sessions.length === 0 ? (
-            <Center h={200}>
-              <Stack align="center" gap="xs">
-                <IconCalendar size={40} color="gray" />
-                <Text c="dimmed">No hay sesiones programadas</Text>
-                <Button size="xs" variant="light" onClick={() => setSessionModal(true)}>
-                  Crear primera sesión
-                </Button>
-              </Stack>
-            </Center>
-          ) : sessionView === "calendar" ? (
-            <ClassCalendar
-              sessions={sessions}
-              timezone={tz}
-              onSelectSession={(s) => { setSelectedSession(s); setDetailModal(true); }}
-            />
-          ) : (
-            <ScrollArea>
-              <Table striped highlightOnHover withTableBorder>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 40 }}>
-                      <Checkbox
-                        size="xs"
-                        checked={sessions.length > 0 && selectedIds.size === sessions.length}
-                        indeterminate={selectedIds.size > 0 && selectedIds.size < sessions.length}
-                        onChange={(e) =>
-                          setSelectedIds(e.currentTarget.checked ? new Set(sessions.map((s) => s._id)) : new Set())
-                        }
-                      />
-                    </Table.Th>
-                    <Table.Th>Clase</Table.Th>
-                    <Table.Th>Fecha y hora</Table.Th>
-                    <Table.Th>Instructor</Table.Th>
-                    <Table.Th>Salón</Table.Th>
-                    <Table.Th>Cupo</Table.Th>
-                    <Table.Th>Estado</Table.Th>
-                    <Table.Th></Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {sessions.map((s) => {
-                    const classDoc = typeof s.classId === "object" ? s.classId : null;
-                    const employee = typeof s.employeeId === "object" ? s.employeeId : null;
-                    const room = typeof s.roomId === "object" ? s.roomId : null;
-                    const start = dayjs(s.startDate).tz(tz);
-                    const pct = s.capacity > 0 ? Math.round((s.enrolledCount / s.capacity) * 100) : 0;
-                    const isSelected = selectedIds.has(s._id);
+      {loadError && (
+        <div className="ag-alert ag-alert--danger" role="alert">
+          <IconAlertTriangle size={18} />
+          <div style={{ flex: 1 }}>No se pudieron cargar las clases. Revisa tu conexión e inténtalo de nuevo.</div>
+          <Button size="xs" variant="default" onClick={() => loadAll()}>Reintentar</Button>
+        </div>
+      )}
 
-                    return (
-                      <Table.Tr key={s._id} bg={isSelected ? "var(--mantine-color-red-0)" : undefined}>
-                        <Table.Td>
-                          <Checkbox
-                            size="xs"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              const checked = e.currentTarget.checked;
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev);
-                                checked ? next.add(s._id) : next.delete(s._id);
-                                return next;
-                              });
-                            }}
-                          />
-                        </Table.Td>
-                        <Table.Td>
-                          <Group gap="xs">
-                            {classDoc?.color && (
-                              <div style={{ width: 10, height: 10, borderRadius: "50%", background: classDoc.color }} />
-                            )}
-                            <Text size="sm" fw={500}>{classDoc?.name ?? "—"}</Text>
-                          </Group>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{start.format("ddd D MMM, HH:mm")}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{employee?.names ?? "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{room?.name ?? "—"}</Text>
-                        </Table.Td>
-                        <Table.Td style={{ minWidth: 120 }}>
-                          <Text size="xs" mb={2}>{s.enrolledCount}/{s.capacity}</Text>
-                          <Progress value={pct} size="xs" color={pct >= 100 ? "red" : "blue"} />
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge size="sm" color={STATUS_COLORS[s.status] ?? "gray"}>
-                            {STATUS_LABELS[s.status] ?? s.status}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Menu shadow="md" withinPortal>
-                            <Menu.Target>
-                              <ActionIcon variant="subtle" size="sm">
-                                <IconDots size={16} />
-                              </ActionIcon>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                              <Menu.Item
-                                leftSection={<IconEye size={14} />}
-                                onClick={() => { setSelectedSession(s); setDetailModal(true); }}
-                              >
-                                Ver inscritos
-                              </Menu.Item>
-                              {s.status !== "cancelled" && s.status !== "completed" && (
-                                <Menu.Item
-                                  leftSection={<IconPencil size={14} />}
-                                  onClick={() => { setEditingSession(s); setSessionModal(true); }}
-                                >
-                                  Editar
-                                </Menu.Item>
-                              )}
-                              {s.status !== "cancelled" && (
-                                <Menu.Item
-                                  leftSection={<IconX size={14} />}
-                                  color="red"
-                                  onClick={() => handleCancelSession(s)}
-                                >
-                                  Cancelar sesión
-                                </Menu.Item>
-                              )}
-                              <Menu.Divider />
-                              <Menu.Item
-                                leftSection={<IconTrash size={14} />}
-                                color="red"
-                                onClick={() => handleDeleteSession(s)}
-                              >
-                                Eliminar sesión
-                              </Menu.Item>
-                            </Menu.Dropdown>
-                          </Menu>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </ScrollArea>
-          )}
-        </Tabs.Panel>
+      {activeTab === "sesiones" && sessionsTab}
+      {activeTab === "inscripciones" && enrollmentsTab}
+      {activeTab === "clases" && classesTab}
+      {activeTab === "salones" && roomsTab}
+      {activeTab === "mensajes" && <ClassWhatsappTemplates />}
 
-        {/* ─── RESERVAS ─────────────────────────────────── */}
-        <Tabs.Panel value="enrollments">
-          <Stack gap="sm" mb="md">
-            <Group justify="space-between" align="flex-end" wrap="wrap">
-              <Text fw={600}>Reservas de clases</Text>
-              <Group gap="md" align="flex-end" wrap="wrap">
-                <Select
-                  w={260}
-                  label="Política de inscripción"
-                  value={classPolicy}
-                  onChange={(val) =>
-                    val && handleChangeClassPolicy(val as ReservationPolicy)
-                  }
-                  data={[
-                    { value: "manual", label: "Aprobación manual" },
-                    {
-                      value: "auto_if_available",
-                      label: canAutoConfirmClasses
-                        ? "Automática si hay cupo"
-                        : "Automática si hay cupo (Plan Starter o superior)",
-                      disabled: !canAutoConfirmClasses,
-                    },
-                  ]}
-                  disabled={!organization?._id || savingClassPolicy}
-                  comboboxProps={{ withinPortal: true }}
-                  rightSection={savingClassPolicy ? <Loader size="xs" /> : null}
-                />
-                <Switch
-                  label={allowCompanion ? "Acompañante permitido" : "Acompañante oculto"}
-                  description="Mostrar la opción de agregar acompañante en la reserva pública"
-                  checked={allowCompanion}
-                  onChange={(e) => handleToggleAllowCompanion(e.currentTarget.checked)}
-                  disabled={!organization?._id || savingCompanionToggle}
-                />
-                <Switch
-                  label={packageChoiceStepEnabled ? "Elección clase paga/paquete activa" : "Elección clase paga/paquete inactiva"}
-                  description="Pedir al cliente elegir si paga una clase o usa un paquete, antes de elegir la clase"
-                  checked={packageChoiceStepEnabled}
-                  onChange={(e) => handleTogglePackageChoiceStep(e.currentTarget.checked)}
-                  disabled={!organization?._id || savingPackageChoiceToggle}
-                />
-              </Group>
-            </Group>
-
-            <Group gap="xs" wrap="wrap">
-              <TextInput
-                w={240}
-                placeholder="Buscar por nombre o teléfono"
-                leftSection={<IconSearch size={14} />}
-                value={enrollmentSearch}
-                onChange={(e) => setEnrollmentSearch(e.currentTarget.value)}
-              />
-              <Select
-                w={220}
-                value={enrollmentStatusFilter}
-                onChange={(val) => val && setEnrollmentStatusFilter(val)}
-                data={[
-                  { value: "pending", label: "Pendientes" },
-                  { value: "all", label: "Todas (historial)" },
-                  { value: "confirmed", label: "Confirmadas" },
-                  { value: "attended", label: "Asistió" },
-                  { value: "no_show", label: "No asistió" },
-                  { value: "cancelled", label: "Canceladas" },
-                  { value: "pending_payment", label: "Pendiente de pago" },
-                ]}
-                comboboxProps={{ withinPortal: true }}
-              />
-            </Group>
-          </Stack>
-
-          {loadingEnrollmentsToShow ? (
-            <Stack gap="xs">{Array(3).fill(0).map((_, i) => <Skeleton key={i} h={70} radius="md" />)}</Stack>
-          ) : filteredEnrollments.length === 0 ? (
-            <Alert color={enrollmentStatusFilter === "pending" ? "green" : "gray"} icon={<IconCheck size={16} />}>
-              {enrollmentStatusFilter === "pending"
-                ? "No hay reservas pendientes de aprobación."
-                : "No hay reservas con este filtro."}
-            </Alert>
-          ) : (
-            <ScrollArea>
-              <Table striped highlightOnHover withTableBorder>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Asistente</Table.Th>
-                    <Table.Th>Clase / Sesión</Table.Th>
-                    <Table.Th>Teléfono</Table.Th>
-                    <Table.Th>Estado</Table.Th>
-                    <Table.Th>Total</Table.Th>
-                    <Table.Th>Descuento</Table.Th>
-                    <Table.Th>Acciones</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {filteredEnrollments.map((e) => {
-                    const classDoc = typeof e.classId === "object" ? e.classId : null;
-                    const session = typeof e.sessionId === "object" ? e.sessionId : null;
-                    const sessionStart = session ? dayjs(session.startDate).tz(tz).format("D MMM, HH:mm") : "—";
-
-                    return (
-                      <Table.Tr key={e._id}>
-                        <Table.Td>
-                          <Text size="sm" fw={500}>{e.attendee.name}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{classDoc?.name ?? "—"}</Text>
-                          <Text size="xs" c="dimmed">{sessionStart}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{e.attendee.phone}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge size="sm" color={ENROLLMENT_STATUS_COLORS[e.status] ?? "gray"}>
-                            {ENROLLMENT_STATUS_LABELS[e.status] ?? e.status}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm">${e.totalPrice.toLocaleString("es-CO")}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          {e.discountPercent > 0 ? (
-                            <Badge size="sm" color="green" variant="light">
-                              -{e.discountPercent}%
-                            </Badge>
-                          ) : (
-                            <Text size="xs" c="dimmed">—</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          {e.status === "pending" ? (
-                            <Group gap="xs">
-                              <Tooltip label="Aprobar">
-                                <ActionIcon
-                                  color="green"
-                                  variant="light"
-                                  size="sm"
-                                  loading={actionLoading === e._id}
-                                  onClick={() => handleApprove(e._id)}
-                                >
-                                  <IconCheck size={14} />
-                                </ActionIcon>
-                              </Tooltip>
-                              <Tooltip label="Cancelar">
-                                <ActionIcon
-                                  color="red"
-                                  variant="light"
-                                  size="sm"
-                                  loading={actionLoading === e._id}
-                                  onClick={() => handleCancelEnrollment(e._id, e.attendee.name)}
-                                >
-                                  <IconX size={14} />
-                                </ActionIcon>
-                              </Tooltip>
-                            </Group>
-                          ) : (
-                            <Text size="xs" c="dimmed">—</Text>
-                          )}
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </ScrollArea>
-          )}
-        </Tabs.Panel>
-
-        {/* ─── TIPOS DE CLASE ────────────────────────────── */}
-        <Tabs.Panel value="classes">
-          <Group justify="space-between" mb="md">
-            <Text fw={600}>Tipos de clase</Text>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={() => { setEditingClass(null); setClassModal(true); }}
-            >
-              Nueva clase
-            </Button>
-          </Group>
-
-          {loadingClasses ? (
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {Array(4).fill(0).map((_, i) => <Skeleton key={i} h={160} radius="md" />)}
-            </SimpleGrid>
-          ) : classes.length === 0 ? (
-            <Center h={200}>
-              <Stack align="center" gap="xs">
-                <IconSchool size={40} color="gray" />
-                <Text c="dimmed">No hay clases configuradas</Text>
-                <Button size="xs" variant="light" onClick={() => setClassModal(true)}>
-                  Crear primera clase
-                </Button>
-              </Stack>
-            </Center>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {classes.map((c) => (
-                <Card key={c._id} withBorder radius="md" p="md">
-                  <Group justify="space-between" mb="xs">
-                    <Group gap="xs">
-                      {c.color && (
-                        <div style={{ width: 12, height: 12, borderRadius: "50%", background: c.color }} />
-                      )}
-                      <Text fw={600} size="sm">{c.name}</Text>
-                    </Group>
-                    <Badge size="xs" color={c.isActive ? "green" : "gray"} variant="light">
-                      {c.isActive ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </Group>
-                  <Text size="xs" c="dimmed" mb="xs" lineClamp={2}>{c.description || "Sin descripción"}</Text>
-                  <Stack gap={2}>
-                    <Text size="xs">⏱ {c.duration} min · 👥 Cupo: {c.defaultCapacity}</Text>
-                    <Text size="xs">💰 ${c.pricePerPerson.toLocaleString("es-CO")} / persona</Text>
-                    {c.groupDiscount?.enabled && (
-                      <Badge size="xs" color="blue" variant="light">
-                        Descuento {c.groupDiscount.discountPercent}% desde {c.groupDiscount.minPeople} personas
-                      </Badge>
-                    )}
-                  </Stack>
-                  <Group justify="flex-end" mt="sm" gap="xs">
-                    <ActionIcon variant="subtle" size="sm" onClick={() => { setEditingClass(c); setClassModal(true); }}>
-                      <IconPencil size={14} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteClass(c)}>
-                      <IconTrash size={14} />
-                    </ActionIcon>
-                  </Group>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
-        </Tabs.Panel>
-
-        {/* ─── SALONES ───────────────────────────────────── */}
-        <Tabs.Panel value="rooms">
-          <Group justify="space-between" mb="md">
-            <Text fw={600}>Salones / Espacios</Text>
-            <Button
-              leftSection={<IconPlus size={16} />}
-              onClick={() => { setEditingRoom(null); setRoomModal(true); }}
-            >
-              Nuevo salón
-            </Button>
-          </Group>
-
-          {loadingRooms ? (
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {Array(3).fill(0).map((_, i) => <Skeleton key={i} h={120} radius="md" />)}
-            </SimpleGrid>
-          ) : rooms.length === 0 ? (
-            <Center h={200}>
-              <Stack align="center" gap="xs">
-                <IconDoor size={40} color="gray" />
-                <Text c="dimmed">No hay salones configurados</Text>
-                <Button size="xs" variant="light" onClick={() => setRoomModal(true)}>
-                  Crear primer salón
-                </Button>
-              </Stack>
-            </Center>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-              {rooms.map((r) => (
-                <Card key={r._id} withBorder radius="md" p="md">
-                  <Group justify="space-between" mb="xs">
-                    <Text fw={600} size="sm">{r.name}</Text>
-                    <Badge size="xs" color={r.isActive ? "green" : "gray"} variant="light">
-                      {r.isActive ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </Group>
-                  <Text size="xs">Capacidad máxima: {r.capacity} personas</Text>
-                  {r.description && <Text size="xs" c="dimmed" mt={4}>{r.description}</Text>}
-                  <Group justify="flex-end" mt="sm" gap="xs">
-                    <ActionIcon variant="subtle" size="sm" onClick={() => { setEditingRoom(r); setRoomModal(true); }}>
-                      <IconPencil size={14} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteRoom(r)}>
-                      <IconTrash size={14} />
-                    </ActionIcon>
-                  </Group>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
-        </Tabs.Panel>
-
-        {/* ─── MENSAJES WHATSAPP ──────────────────────────── */}
-        <Tabs.Panel value="messages">
-          <Text fw={600} mb="md">Mensajes de WhatsApp</Text>
-          <ClassWhatsappTemplates />
-        </Tabs.Panel>
-
-      </Tabs>
-
-      {/* ── Modales ─────────────────────────────────────── */}
+      {/* ── Paneles y modales ─────────────────────────────── */}
       <RoomFormModal
         opened={roomModal}
         onClose={() => { setRoomModal(false); setEditingRoom(null); }}
@@ -1048,6 +1236,8 @@ export default function ManageClasses() {
         onClose={() => setDetailModal(false)}
         session={selectedSession}
         timezone={tz}
+        onEdit={(s) => { setDetailModal(false); setEditingSession(s); setSessionModal(true); }}
+        onCancelSession={(s) => { setDetailModal(false); handleCancelSession(s); }}
       />
       <BulkSessionModal
         opened={bulkModal}
@@ -1057,6 +1247,6 @@ export default function ManageClasses() {
         employees={employees}
         rooms={rooms.filter((r) => r.isActive)}
       />
-    </Box>
+    </div>
   );
 }
