@@ -2,23 +2,9 @@
 // AdminAnalyticsDashboard.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  Group,
-  Stack,
-  Text,
-  SimpleGrid,
-  Paper,
-  Badge,
-  Avatar,
-  Table,
-  Divider,
-  Select,
-  SegmentedControl,
-  Loader,
-  Tooltip,
-  ScrollArea,
-} from "@mantine/core";
+import { Box, Button, Select, Skeleton, Tooltip } from "@mantine/core";
+import { Link } from "react-router-dom";
+import { IconInfoCircle, IconPhoneCall, IconSpeakerphone, IconStar, IconTrendingUp } from "@tabler/icons-react";
 import { DatePickerInput } from "@mantine/dates";
 import { useMediaQuery } from "@mantine/hooks";
 import {
@@ -28,15 +14,18 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RTooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import weekOfYear from "dayjs/plugin/weekOfYear";
 import minMax from "dayjs/plugin/minMax";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
 dayjs.extend(minMax);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 dayjs.locale("es");
 dayjs.extend(weekOfYear);
 
@@ -144,62 +133,24 @@ function buildTimeBuckets(
   return buckets.map(({ key, ingresos, citas }) => ({ key, ingresos, citas }));
 }
 
-/* ------------------ HEATMAP simple (día x hora) ------------------ */
-const hours = Array.from({ length: 12 }).map((_, i) => 8 + i); // 08-19
-const days = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-function HeatCell({ intensity }: { intensity: number }) {
-  const alpha = Math.min(0.1 + intensity, 1);
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: 26,
-        borderRadius: 6,
-        background: `rgba(34, 197, 94, ${alpha})`,
-      }}
-    />
-  );
-}
-
-/* ------------------ KPI Card ------------------ */
-function KpiCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <Paper withBorder p="md" radius="md">
-      <Stack gap={4}>
-        <Text size="sm" c="dimmed">
-          {label}
-        </Text>
-        <Text fw={700} size="xl">
-          {value}
-        </Text>
-        {hint && (
-          <Text size="xs" c="dimmed">
-            {hint}
-          </Text>
-        )}
-      </Stack>
-    </Paper>
-  );
-}
+/* ------------------ Mapa de calor (día x hora) ------------------ */
+const hours = Array.from({ length: 12 }).map((_, i) => 8 + i); // 8 a. m. – 7 p. m.
+const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+// 5 niveles de ink (el 0 es «sin citas», en surface-hover)
+const HEAT_OPACITY = [0, 0.15, 0.32, 0.5, 0.72, 0.95];
 
 /* ------------------ MAIN ------------------ */
-const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
-  title = "Informe del negocio",
-}) => {
+const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analíticas" }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const currency = organization?.currency || "COP";
+  const tz = organization?.timezone || "America/Bogota";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
   const [services, setServices] = useState<ServiceLite[]>([]);
@@ -241,6 +192,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     const load = async () => {
       if (!organization?._id) return;
       setLoading(true);
+      setLoadError(false);
       try {
         const [emps, svcs] = await Promise.all([
           getEmployeesByOrganizationId(organization._id),
@@ -258,23 +210,14 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
           endISO
         );
         setAppointments(appts);
+      } catch {
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
     void load();
-  }, [organization?._id, range[0], range[1]]);
-
-  // Opciones selects
-  const employeeOptions = useMemo(
-    () => [{ value: "", label: "Todos" }, ...employees.map((e) => ({ value: e._id, label: e.names }))],
-    [employees]
-  );
-
-  const serviceOptions = useMemo(
-    () => [{ value: "", label: "Todos" }, ...services.map((s) => ({ value: s._id, label: s.name }))],
-    [services]
-  );
+  }, [organization?._id, range[0], range[1], reloadKey]);
 
   // Filtrado por rango + selects (TODAS las citas)
   const filtered = useMemo(() => {
@@ -287,7 +230,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     });
   }, [appointments, range, employeeId, serviceId]);
 
-  // 🎯 KPIs Principales (todas las citas)
+  // Cifras principales (todas las citas)
   const totalAppts = filtered.length;
   const totalCustomers = new Set(filtered.map((a) => (a.client as any)?._id ?? a.client)).size;
   
@@ -342,7 +285,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     return Array.from(map.values()).sort((a, b) => b.ingresos - a.ingresos);
   }, [filtered, employees, services]);
 
-  // 📊 Por servicio con más métricas
+  // Por servicio con más métricas
   const byService = useMemo(() => {
     const map = new Map<string, { 
       svc: ServiceLite; 
@@ -375,7 +318,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     })).sort((a, b) => b.citas - a.citas);
   }, [filtered, services]);
 
-  // 👥 Análisis de clientes
+  // Análisis de clientes
   const byClient = useMemo(() => {
     const map = new Map<string, { 
       clientId: string;
@@ -417,7 +360,7 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
   const heat = useMemo(() => {
     const matrix: number[][] = Array.from({ length: 7 }).map(() => Array(hours.length).fill(0));
     filtered.forEach((a) => {
-      const d = dayjs(a.startDate);
+      const d = dayjs(a.startDate).tz(tz);
       const dow = (d.day() + 6) % 7; // 0->Lun ... 6->Dom
       const hr = d.hour();
       const idx = hours.indexOf(hr);
@@ -426,458 +369,360 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({
     const max = Math.max(1, ...matrix.flat());
     const norm = matrix.map((row) => row.map((v) => v / max));
     return { raw: matrix, norm };
-  }, [filtered]);
+  }, [filtered, tz]);
 
-  // 💡 Insights y recomendaciones automáticas
+  // Consejos automáticos (tarjetas neutras con ícono Tabler)
   const insights = useMemo(() => {
-    const tips: { icon: string; title: string; message: string; color: string }[] = [];
-    
-    // Clientes en riesgo
-    const clientesEnRiesgo = byClient.filter(c => c.esRecurrente && c.diasDesdeUltimaCita > 60).length;
+    const tips: { icon: "phone" | "speaker" | "star" | "trend"; title: string; message: string; action?: { label: string; to: string } }[] = [];
+
+    const clientesEnRiesgo = byClient.filter((c) => c.esRecurrente && c.diasDesdeUltimaCita > 60).length;
     if (clientesEnRiesgo > 0) {
       tips.push({
-        icon: "📞",
+        icon: "phone",
         title: "Clientes inactivos",
-        message: `${clientesEnRiesgo} clientes recurrentes no visitan hace +60 días. Envía promociones para reactivarlos.`,
-        color: "yellow"
+        message: `${clientesEnRiesgo} clientes que solían volver no vienen hace más de 60 días. Escríbeles con una promoción.`,
+        action: { label: "Crear campaña", to: "/admin/campaigns/new" },
       });
     }
-    
-    // Servicios de baja demanda
-    const serviciosBajaDemanda = byService.filter(s => s.citas < 3 && services.length > 5);
+
+    const serviciosBajaDemanda = byService.filter((s) => s.citas < 3 && services.length > 5);
     if (serviciosBajaDemanda.length > 0) {
       tips.push({
-        icon: "📢",
+        icon: "speaker",
         title: "Servicios poco vendidos",
-        message: `${serviciosBajaDemanda.length} servicios tienen baja demanda. Considera paquetes o descuentos especiales.`,
-        color: "blue"
+        message: `${serviciosBajaDemanda.length} servicios tienen poca demanda. Prueba con paquetes o un descuento.`,
       });
     }
-    
-    // Servicios rentables (ingresos/hora)
-    const servicioMasRentable = byService.reduce((prev, curr) => 
-      curr.ingresosPorHora > prev.ingresosPorHora ? curr : prev
-    , byService[0]);
+
+    const servicioMasRentable = byService.reduce((prev, curr) => (curr.ingresosPorHora > prev.ingresosPorHora ? curr : prev), byService[0]);
     if (servicioMasRentable && byService.length > 2) {
       tips.push({
-        icon: "💎",
+        icon: "star",
         title: "Servicio estrella",
-        message: `"${servicioMasRentable.svc.name}" genera $${servicioMasRentable.ingresosPorHora.toFixed(0)}/hora. Promociónalo más.`,
-        color: "green"
+        message: `«${servicioMasRentable.svc.name}» deja ${formatCurrency(servicioMasRentable.ingresosPorHora, currency)} por hora. Vale la pena promocionarlo.`,
       });
     }
-    
-    // Proyección fin de mes
+
     if (range[0] && range[1]) {
-      const dias = dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1;
+      const dias = dayjs(range[1]).diff(dayjs(range[0]), "day") + 1;
       const ingresosDia = totalRevenue / dias;
-      const diasRestantes = dayjs(range[1]).endOf('month').diff(dayjs(), 'day');
+      const diasRestantes = dayjs(range[1]).endOf("month").diff(dayjs(), "day");
       if (diasRestantes > 0 && dias >= 7) {
-        const proyeccion = totalRevenue + (ingresosDia * diasRestantes);
+        const proyeccion = totalRevenue + ingresosDia * diasRestantes;
         tips.push({
-          icon: "📈",
+          icon: "trend",
           title: "Proyección del mes",
-          message: `Al ritmo actual, terminarás con ${formatCurrency(proyeccion, organization?.currency || 'COP')} (${diasRestantes} días restantes).`,
-          color: "teal"
+          message: `A este ritmo cerrarás con ${formatCurrency(proyeccion, currency)} (faltan ${diasRestantes} días).`,
         });
       }
     }
-    
     return tips;
   }, [totalAppts, byClient, byService, totalRevenue, services.length, range]);
 
-  return (
-    <Stack>
-      {/* Header + Filtros */}
-      <Card withBorder radius="md" p="md">
-        <Stack gap="sm">
-          <Group justify="space-between" align="center" wrap="wrap">
-            <Text fw={700} size="xl">
-              {title}
-            </Text>
-            {loading && <Loader size="sm" />}
-          </Group>
+  const TIP_ICONS = { phone: IconPhoneCall, speaker: IconSpeakerphone, star: IconStar, trend: IconTrendingUp };
+  const days = range[0] && range[1] ? dayjs(range[1]).diff(dayjs(range[0]), "day") + 1 : 1;
+  const hasFilters = !!employeeId || !!serviceId;
+  const resetFilters = () => {
+    setEmployeeId(null);
+    setServiceId(null);
+    setGranularity("day");
+  };
+  const newClients = byClient.filter((c) => !c.esRecurrente).length;
+  const vipClients = byClient.filter((c) => c.citas >= 5).length;
 
-          <Group wrap="wrap" gap="sm" align="flex-end">
-            <DatePickerInput
-              type="range"
-              label="Rango de fechas"
-              placeholder="Selecciona un rango"
-              value={range}
-              onChange={setRange}
-              locale="es"
-              dropdownType="modal"
-            />
-            <Select
-              label="Profesional"
-              data={employeeOptions}
-              value={employeeId ?? ""}
-              onChange={(v) => setEmployeeId(v || null)}
-              searchable
-              nothingFoundMessage="Sin resultados"
-            />
-            <Select
-              label="Servicio"
-              data={serviceOptions}
-              value={serviceId ?? ""}
-              onChange={(v) => setServiceId(v || null)}
-              searchable
-              nothingFoundMessage="Sin resultados"
-            />
-            <div>
-              <SegmentedControl
-                value={granularity}
-                onChange={(v: any) => setGranularity(v)}
-                data={[
-                  { label: "Día", value: "day" },
-                  { label: "Semana", value: "week" },
-                  { label: "Mes", value: "month" },
-                ]}
-                size={isMobile ? "xs" : "sm"}
-              />
-              {granularity === "month" && (
-                <Text size="xs" c="dimmed" mt={4}>
-                  Mostrando últimos 6 meses. Modifica el rango para ver más.
-                </Text>
-              )}
-              {granularity === "week" && (
-                <Text size="xs" c="dimmed" mt={4}>
-                  Mostrando últimas 8 semanas. Modifica el rango para ver más.
-                </Text>
+  const kpis = [
+    { label: "Ingresos", value: formatCurrency(totalRevenue, currency), hint: `${formatCurrency(totalRevenue / days, currency)} por día` },
+    { label: "Citas", value: String(totalAppts), hint: `${(totalAppts / days).toFixed(1)} por día` },
+    { label: "Clientes únicos", value: String(totalCustomers), hint: `${newClients} nuevos · ${vipClients} VIP` },
+    { label: "Ticket promedio", value: formatCurrency(ticketAvg, currency), hint: "Por cita" },
+  ];
+
+  const axisTick = { fill: "var(--ink-subtle)", fontSize: 11 };
+
+  return (
+    <Box p={{ base: "sm", md: "lg" }}>
+      <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+        <div>
+          <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>{title}</h1>
+          <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+            Cómo le va a tu negocio en el periodo que elijas.
+          </div>
+        </div>
+
+        {/* Filtros */}
+        <div className="ag-row" style={{ gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <DatePickerInput
+            type="range"
+            aria-label="Rango de fechas"
+            placeholder="Rango de fechas"
+            value={range}
+            onChange={setRange}
+            locale="es"
+            dropdownType={isMobile ? "modal" : "popover"}
+            valueFormat="D MMM YYYY"
+            w={isMobile ? "100%" : 260}
+          />
+          <Select
+            aria-label="Profesional"
+            data={[{ value: "", label: "Profesional: todos" }, ...employees.map((e) => ({ value: e._id, label: e.names }))]}
+            value={employeeId ?? ""}
+            onChange={(v) => setEmployeeId(v || null)}
+            searchable
+            nothingFoundMessage="Sin resultados"
+            w={isMobile ? "calc(50% - 4px)" : 200}
+          />
+          <Select
+            aria-label="Servicio"
+            data={[{ value: "", label: "Servicio: todos" }, ...services.map((s) => ({ value: s._id, label: s.name }))]}
+            value={serviceId ?? ""}
+            onChange={(v) => setServiceId(v || null)}
+            searchable
+            nothingFoundMessage="Sin resultados"
+            w={isMobile ? "calc(50% - 4px)" : 200}
+          />
+          <div className="ag-segment" role="group" aria-label="Agrupar por" style={{ marginLeft: isMobile ? 0 : "auto" }}>
+            {(["day", "week", "month"] as const).map((g) => (
+              <button key={g} type="button" aria-pressed={granularity === g} onClick={() => setGranularity(g)}>
+                {g === "day" ? "Día" : g === "week" ? "Semana" : "Mes"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadError && (
+          <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+            <IconInfoCircle size={20} />
+            <div style={{ flex: 1 }}>No pudimos cargar las analíticas.</div>
+            <Button size="xs" variant="outline" onClick={() => setReloadKey((k) => k + 1)}>
+              Reintentar
+            </Button>
+          </div>
+        )}
+
+        {/* Cifras */}
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12 }}>
+          {kpis.map((k) => (
+            <div key={k.label} className="ag-card" style={{ padding: 16 }}>
+              {loading ? (
+                <>
+                  <Skeleton height={12} width="50%" mb={10} />
+                  <Skeleton height={24} width="70%" mb={8} />
+                  <Skeleton height={10} width="40%" />
+                </>
+              ) : (
+                <>
+                  <div className="ag-subtle">{k.label}</div>
+                  <div className="ag-num" style={{ font: "600 22px/30px var(--font-sans)", margin: "2px 0" }}>
+                    {k.value}
+                  </div>
+                  <div className="ag-subtle">{k.hint}</div>
+                </>
               )}
             </div>
-          </Group>
-        </Stack>
-      </Card>
-
-      {/* KPIs Principales */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
-        <KpiCard
-          label="💰 Ingresos Totales"
-          value={<>{formatCurrency(totalRevenue, organization?.currency || 'COP')}</>}
-          hint={`${totalAppts} citas en total`}
-        />
-        <KpiCard
-          label="📊 Total Citas"
-          value={<>{totalAppts}</>}
-          hint={`${totalCustomers} clientes únicos`}
-        />
-        <KpiCard
-          label="👥 Clientes Únicos"
-          value={<>{totalCustomers}</>}
-          hint={`${(totalAppts / (totalCustomers || 1)).toFixed(1)} citas/cliente`}
-        />
-        <KpiCard
-          label="🎯 Ticket Promedio"
-          value={<>{formatCurrency(ticketAvg, organization?.currency || 'COP')}</>}
-          hint="Por cita"
-        />
-      </SimpleGrid>
-      
-      {/* KPIs Secundarios */}
-      <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm">
-        <Paper withBorder p="xs" radius="md">
-          <Group gap={4} align="center" wrap="nowrap">
-            <Text size="xs" c="dimmed">Ingresos/Día:</Text>
-            <Text size="sm" fw={600}>
-              {formatCurrency(range[0] && range[1] ? totalRevenue / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1) : 0, organization?.currency || 'COP')}
-            </Text>
-          </Group>
-        </Paper>
-        <Paper withBorder p="xs" radius="md">
-          <Group gap={4} align="center" wrap="nowrap">
-            <Text size="xs" c="dimmed">Citas/Día:</Text>
-            <Text size="sm" fw={600}>
-              {range[0] && range[1] ? (totalAppts / (dayjs(range[1]).diff(dayjs(range[0]), 'day') + 1)).toFixed(1) : 0}
-            </Text>
-          </Group>
-        </Paper>
-        <Paper withBorder p="xs" radius="md">
-          <Group gap={4} align="center" wrap="nowrap">
-            <Text size="xs" c="dimmed">Nuevos Clientes:</Text>
-            <Text size="sm" fw={600}>
-              {byClient.filter(c => !c.esRecurrente).length}
-            </Text>
-          </Group>
-        </Paper>
-        <Paper withBorder p="xs" radius="md">
-          <Group gap={4} align="center" wrap="nowrap">
-            <Text size="xs" c="dimmed">Clientes VIP:</Text>
-            <Text size="sm" fw={600} c="grape">
-              {byClient.filter(c => c.citas >= 5).length}
-            </Text>
-          </Group>
-        </Paper>
-      </SimpleGrid>
-
-      {/* 💡 Insights y Recomendaciones */}
-      {insights.length > 0 && (
-        <Card withBorder radius="md" p="md" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-          <Text fw={700} size="lg" mb="sm" c="white">
-            💡 Insights del Negocio
-          </Text>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
-            {insights.map((insight, idx) => (
-              <Paper key={idx} p="sm" radius="md" withBorder style={{ background: 'rgba(255,255,255,0.95)' }}>
-                <Group gap="xs" align="flex-start" wrap="nowrap">
-                  <Text size="xl">{insight.icon}</Text>
-                  <Stack gap={2} style={{ flex: 1 }}>
-                    <Text fw={600} size="sm" c={insight.color}>
-                      {insight.title}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ lineHeight: 1.4 }}>
-                      {insight.message}
-                    </Text>
-                  </Stack>
-                </Group>
-              </Paper>
-            ))}
-          </SimpleGrid>
-        </Card>
-      )}
-
-      {/* Serie temporal */}
-      <Card withBorder radius="md" p="md">
-        <Group justify="space-between" mb="xs">
-          <Text fw={700} size="lg">
-            Tendencia: ingresos y citas
-          </Text>
-          <Badge variant="light" color="blue">
-            {timeSeries.length} puntos
-          </Badge>
-        </Group>
-        <Divider mb="sm" />
-        <div style={{ width: "100%", height: 300 }}>
-          <ResponsiveContainer key={`chart-${granularity}-${range[0]?.getTime()}-${range[1]?.getTime()}`}>
-            <LineChart data={timeSeries}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="key" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <RTooltip />
-              <Legend />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="citas"
-                name="Citas"
-                stroke="#0ea5e9"
-                strokeWidth={2}
-                dot={false}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="ingresos"
-                name="Ingresos"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          ))}
         </div>
-      </Card>
 
-      {/* 🏆 Top Clientes VIP */}
-      <Card withBorder radius="md" p="md">
-        <Group justify="space-between" mb="xs">
-          <Text fw={700} size="lg">
-            🏆 Top Clientes
-          </Text>
-          <Badge size="lg" variant="light" color="grape">
-            {byClient.filter(c => c.esRecurrente).length} recurrentes
-          </Badge>
-        </Group>
-        <Divider mb="sm" />
-        <ScrollArea h={280}>
-          <Stack gap="xs">
-            {byClient.slice(0, 10).map((client, idx) => (
-              <Paper key={client.clientId} withBorder p="sm" radius="md">
-                <Group justify="space-between" wrap="nowrap">
-                  <Group gap="sm">
-                    <Avatar size="md" radius="xl" color="grape">
-                      {idx + 1}
-                    </Avatar>
-                    <Stack gap={0}>
-                      <Text fw={600} size="sm">{client.clientName}</Text>
-                      <Group gap="xs">
-                        <Text size="xs" c="dimmed">{client.citas} citas</Text>
-                        <Text size="xs" c="dimmed">•</Text>
-                        <Text size="xs" c="dimmed">{client.servicios} servicios</Text>
-                        {client.esRecurrente && (
-                          <>
-                            <Text size="xs" c="dimmed">•</Text>
-                            <Badge size="xs" variant="light" color="green">Recurrente</Badge>
-                          </>
-                        )}
-                        {client.diasDesdeUltimaCita > 60 && (
-                          <>
-                            <Text size="xs" c="dimmed">•</Text>
-                            <Badge size="xs" variant="light" color="orange">⚠️ {client.diasDesdeUltimaCita}d sin visitar</Badge>
-                          </>
-                        )}
-                      </Group>
-                    </Stack>
-                  </Group>
-                  <Stack gap={0} align="flex-end">
-                    <Text fw={600} style={{ fontSize: '0.9rem' }}>{formatCurrency(client.ingresos || 0, organization?.currency || 'COP')}</Text>
-                    <Text size="xs" c="dimmed">
-                      Prom: {formatCurrency(client.ticketPromedio || 0, organization?.currency || 'COP')}
-                    </Text>
-                  </Stack>
-                </Group>
-              </Paper>
-            ))}
-            {byClient.length === 0 && (
-              <Text c="dimmed" ta="center" py="xl">
-                No hay datos de clientes
-              </Text>
+        {!loading && totalAppts === 0 ? (
+          <div className="ag-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+            <b style={{ display: "block", marginBottom: 8 }}>Sin datos en este rango</b>
+            {hasFilters ? (
+              <Button size="xs" variant="outline" onClick={resetFilters}>
+                Quitar filtros
+              </Button>
+            ) : (
+              <span className="ag-muted" style={{ fontSize: 14 }}>Prueba con otro rango de fechas.</span>
             )}
-          </Stack>
-        </ScrollArea>
-      </Card>
+          </div>
+        ) : (
+          <>
+            {/* Tendencia */}
+            <div className="ag-card" style={{ padding: 20 }}>
+              <div className="ag-row" style={{ justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+                <h2 className="ag-h" style={{ margin: 0 }}>Ingresos y citas</h2>
+                <div className="ag-row" style={{ gap: 14 }}>
+                  <span className="ag-subtle" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 16, height: 2, background: "var(--ink)" }} /> Ingresos
+                  </span>
+                  <span className="ag-subtle" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 16, height: 0, borderTop: "2px dashed var(--ink-subtle)" }} /> Citas
+                  </span>
+                </div>
+              </div>
+              {loading ? (
+                <Skeleton height={280} />
+              ) : (
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer key={`chart-${granularity}-${range[0]?.getTime()}-${range[1]?.getTime()}`}>
+                    <LineChart data={timeSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid stroke="var(--line)" vertical={false} />
+                      <XAxis
+                        dataKey="key"
+                        tick={axisTick}
+                        tickLine={false}
+                        axisLine={{ stroke: "var(--line)" }}
+                        tickFormatter={(v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? dayjs(v).format("D MMM") : v)}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        tick={axisTick}
+                        tickLine={false}
+                        axisLine={false}
+                        width={64}
+                        tickFormatter={(v) => (v >= 1000000 ? `${(v / 1000000).toFixed(1)} M` : v >= 1000 ? `${Math.round(v / 1000)} k` : String(v))}
+                      />
+                      <YAxis yAxisId="right" orientation="right" tick={axisTick} tickLine={false} axisLine={false} width={32} allowDecimals={false} />
+                      <RTooltip
+                        formatter={(value: number, name: string) => (name === "Ingresos" ? formatCurrency(value, currency) : value)}
+                        contentStyle={{ borderRadius: 8, border: "1px solid var(--line)", fontSize: 12 }}
+                      />
+                      <Line yAxisId="left" type="monotone" dataKey="ingresos" name="Ingresos" stroke="var(--ink)" strokeWidth={2} dot={false} />
+                      <Line yAxisId="right" type="monotone" dataKey="citas" name="Citas" stroke="var(--ink-subtle)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
 
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-        {/* Servicios más vendidos */}
-        <Card withBorder radius="md" p="md">
-          <Text fw={700} size="lg" mb="xs">
-            📊 Análisis de Servicios
-          </Text>
-          <Divider mb="sm" />
-          <ScrollArea h={400}>
-            <Stack gap="sm">
-              {byService.map((row, idx) => (
-                <Paper key={row.svc._id} withBorder p="sm" radius="md">
-                  <Stack gap="xs">
-                    <Group justify="space-between" wrap="nowrap">
-                      <Group gap="sm">
-                        <Badge size="lg" variant="light" color="blue">{idx + 1}</Badge>
-                        <Stack gap={0}>
-                          <Text fw={600} size="sm">{row.svc.name}</Text>
-                          <Text size="xs" c="dimmed">
-                            {row.svc.duration}min • {formatCurrency(row.svc.price || 0, organization?.currency || 'COP')}
-                          </Text>
-                        </Stack>
-                      </Group>
-                      <Stack gap={0} align="flex-end">
-                        <Text fw={600}>{formatCurrency(row.ingresos || 0, organization?.currency || 'COP')}</Text>
-                        <Text size="xs" c="dimmed">{row.citas} citas</Text>
-                      </Stack>
-                    </Group>
-                    <Group gap="xs" wrap="wrap">
-                      <Badge size="sm" variant="light" color="green">
-                        {formatCurrency(row.ingresosPorHora || 0, organization?.currency || 'COP')}/hora
-                      </Badge>
-                      <Badge size="sm" variant="light" color="blue">
-                        {row.duracionTotal} min totales
-                      </Badge>
-                      {row.additionalItems > 0 && (
-                        <Badge size="sm" variant="light" color="grape">
-                          +{row.additionalItems} add-ons
-                        </Badge>
-                      )}
-                    </Group>
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-          </ScrollArea>
-        </Card>
-
-        {/* Heatmap día x hora */}
-        <Card withBorder radius="md" p="md">
-          <Text fw={700} size="lg" mb="xs">
-            Demanda por día y hora
-          </Text>
-          <Divider mb="sm" />
-          <Stack gap="xs">
-            <Group gap="xs" wrap="nowrap" align="center" justify="space-between">
-              <div style={{ width: 40 }} />
-              {hours.map((h) => (
-                <Text key={h} size="xs" ta="center" style={{ width: 32 }}>
-                  {String(h).padStart(2, "0")}
-                </Text>
-              ))}
-            </Group>
-
-            {days.map((d, rowIdx) => (
-              <Group key={d} gap="xs" wrap="nowrap" align="center">
-                <Text size="xs" w={40}>
-                  {d}
-                </Text>
-                {hours.map((_, colIdx) => {
-                  const intensity = heat.norm[rowIdx]?.[colIdx] ?? 0;
-                  const raw = heat.raw[rowIdx]?.[colIdx] ?? 0;
+            {/* Consejos */}
+            {!loading && insights.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+                {insights.map((tip) => {
+                  const Icon = TIP_ICONS[tip.icon];
                   return (
-                    <Tooltip label={`${raw} citas`} key={colIdx} withArrow>
-                      <div style={{ width: 32 }}>
-                        <HeatCell intensity={intensity} />
+                    <div key={tip.title} className="ag-card" style={{ padding: 16, display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      <span style={{ flex: "none", width: 32, height: 32, borderRadius: 999, display: "grid", placeItems: "center", background: "var(--surface-hover)", color: "var(--ink-muted)" }}>
+                        <Icon size={17} />
+                      </span>
+                      <div style={{ flex: 1 }}>
+                        <b style={{ display: "block", fontSize: 14 }}>{tip.title}</b>
+                        <div className="ag-muted" style={{ fontSize: 13, lineHeight: "18px" }}>{tip.message}</div>
+                        {tip.action && (
+                          <Link to={tip.action.to} className="ag-link" style={{ fontSize: 13, display: "inline-block", marginTop: 6 }}>
+                            {tip.action.label}
+                          </Link>
+                        )}
                       </div>
-                    </Tooltip>
+                    </div>
                   );
                 })}
-              </Group>
-            ))}
-          </Stack>
-        </Card>
-      </SimpleGrid>
+              </div>
+            )}
 
-      {/* Rendimiento por profesional */}
-      <Card withBorder radius="md" p="md">
-        <Text fw={700} size="lg" mb="xs">
-          Rendimiento por profesional
-        </Text>
-        <Divider mb="sm" />
-        <ScrollArea>
-          <Table withTableBorder striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Profesional</Table.Th>
-                <Table.Th>Citas</Table.Th>
-                <Table.Th>Ingresos</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {byEmployee.map((row) => (
-                <Table.Tr key={row.emp._id}>
-                  <Table.Td>
-                    <Group gap="sm">
-                      <Avatar
-                        src={row.emp.profileImage || undefined}
-                        name={row.emp.names}
-                        radius="xl"
-                      />
-                      <Stack gap={0} justify="center">
-                        <Text fw={600}>{row.emp.names}</Text>
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color={row.emp.isActive ? "green" : "gray"}
-                        >
-                          {row.emp.isActive ? "Activo" : "Inactivo"}
-                        </Badge>
-                      </Stack>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>{row.citas}</Table.Td>
-                  <Table.Td>{formatCurrency(row.ingresos || 0, organization?.currency || 'COP')}</Table.Td>
-                </Table.Tr>
-              ))}
-              {byEmployee.length === 0 && (
-                <Table.Tr>
-                  <Table.Td colSpan={3}>
-                    <Text c="dimmed" ta="center">
-                      No hay datos para los filtros seleccionados.
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
-        </ScrollArea>
-      </Card>
-    </Stack>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+              {/* Mapa de calor */}
+              <div className="ag-card" style={{ padding: 20, overflowX: "auto" }}>
+                <h2 className="ag-h" style={{ margin: "0 0 12px" }}>Demanda por día y hora</h2>
+                <div style={{ display: "grid", gridTemplateColumns: `36px repeat(${hours.length}, minmax(22px, 1fr))`, gap: 3, minWidth: 360 }}>
+                  <span />
+                  {hours.map((h) => (
+                    <span key={h} className="ag-subtle" style={{ fontSize: 11, textAlign: "center" }}>
+                      {h}
+                    </span>
+                  ))}
+                  {dayNames.map((d, rowIdx) => (
+                    <React.Fragment key={d}>
+                      <span className="ag-subtle" style={{ fontSize: 11, alignSelf: "center" }}>
+                        {d}
+                      </span>
+                      {hours.map((h, colIdx) => {
+                        const raw = heat.raw[rowIdx]?.[colIdx] ?? 0;
+                        const level = raw === 0 ? 0 : Math.min(5, Math.ceil((heat.norm[rowIdx]?.[colIdx] ?? 0) * 5));
+                        return (
+                          <Tooltip key={colIdx} label={`${d} ${h}:00 · ${raw} ${raw === 1 ? "cita" : "citas"}`} withArrow>
+                            <span
+                              style={{
+                                height: 22,
+                                borderRadius: 4,
+                                background: level === 0 ? "var(--surface-hover)" : "var(--ink)",
+                                opacity: level === 0 ? 1 : HEAT_OPACITY[level],
+                              }}
+                            />
+                          </Tooltip>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div className="ag-row" style={{ gap: 6, marginTop: 12, justifyContent: "flex-end" }}>
+                  <span className="ag-subtle" style={{ fontSize: 11 }}>Menos</span>
+                  {[1, 2, 3, 4, 5].map((l) => (
+                    <span key={l} style={{ width: 14, height: 14, borderRadius: 3, background: "var(--ink)", opacity: HEAT_OPACITY[l] }} />
+                  ))}
+                  <span className="ag-subtle" style={{ fontSize: 11 }}>Más</span>
+                </div>
+              </div>
+
+              {/* Rendimiento por profesional */}
+              <div className="ag-card" style={{ padding: 20 }}>
+                <h2 className="ag-h" style={{ margin: "0 0 8px" }}>Rendimiento por profesional</h2>
+                {byEmployee.length === 0 ? (
+                  <div className="ag-muted" style={{ fontSize: 14, padding: "16px 0" }}>No hay datos para estos filtros.</div>
+                ) : (
+                  byEmployee.map((row, i) => (
+                    <div key={row.emp._id} className="ag-list-row" style={{ gap: 12 }}>
+                      <span className="ag-appt__pro" style={{ flex: 1, minWidth: 0, color: "var(--ink)", fontSize: 14 }}>
+                        <i style={{ background: `var(--pro-${(i % 6) + 1})` }} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.emp.names}</span>
+                        {!row.emp.isActive && <span className="ag-badge" style={{ height: 20, fontSize: 11 }}>Inactivo</span>}
+                      </span>
+                      <span className="ag-subtle ag-num">{row.citas} {row.citas === 1 ? "cita" : "citas"}</span>
+                      <b className="ag-num" style={{ minWidth: 100, textAlign: "right" }}>{formatCurrency(row.ingresos || 0, currency)}</b>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+              {/* Servicios */}
+              <div className="ag-card" style={{ padding: 20 }}>
+                <h2 className="ag-h" style={{ margin: "0 0 8px" }}>Servicios</h2>
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                  {byService.map((row) => (
+                    <div key={row.svc._id} className="ag-list-row" style={{ gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <b style={{ fontSize: 14 }}>{row.svc.name}</b>
+                        <div className="ag-subtle">
+                          {row.citas} {row.citas === 1 ? "cita" : "citas"} · {formatCurrency(row.ingresosPorHora || 0, currency)} por hora
+                          {row.additionalItems > 0 ? ` · ${row.additionalItems} adicionales` : ""}
+                        </div>
+                      </div>
+                      <b className="ag-num">{formatCurrency(row.ingresos || 0, currency)}</b>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mejores clientes */}
+              <div className="ag-card" style={{ padding: 20 }}>
+                <div className="ag-row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+                  <h2 className="ag-h" style={{ margin: 0 }}>Mejores clientes</h2>
+                  <span className="ag-subtle">{byClient.filter((c) => c.esRecurrente).length} recurrentes</span>
+                </div>
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                  {byClient.slice(0, 10).map((client, idx) => (
+                    <div key={client.clientId} className="ag-list-row" style={{ gap: 12, alignItems: "flex-start" }}>
+                      <span className="ag-subtle ag-num" style={{ width: 18 }}>{idx + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <b style={{ fontSize: 14 }}>{client.clientName}</b>
+                        <div className="ag-subtle">
+                          {client.citas} citas · {client.servicios} servicios
+                          {client.diasDesdeUltimaCita > 60 ? ` · ${client.diasDesdeUltimaCita} días sin venir` : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <b className="ag-num">{formatCurrency(client.ingresos || 0, currency)}</b>
+                        <div className="ag-subtle">prom. {formatCurrency(client.ticketPromedio || 0, currency)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Box>
   );
 };
 
