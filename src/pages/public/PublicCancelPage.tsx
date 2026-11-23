@@ -1,31 +1,17 @@
+// Página del enlace del recordatorio (rediseño, CancelarCita): confirmar
+// asistencia, cambiar fecha u hora o cancelar, también para reservas en grupo.
+// La ruta (/cancel?token=…) y el token no cambian: los enlaces ya enviados siguen
+// funcionando.
 import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import {
-  Container,
-  Paper,
-  Title,
-  Text,
-  Button,
-  Box,
-  Alert,
-  Loader,
-  Divider,
-  Textarea,
-  Stack,
-  Group,
-  Center,
-  Checkbox,
-  Card,
-  Badge,
-} from "@mantine/core";
-import {
-  formatInTimezone,
-  formatFullDateInTimezone,
-} from "../../utils/timezoneUtils";
+import { Link, useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { Button, Checkbox, Drawer, Modal, Skeleton, Textarea } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconBrandWhatsapp, IconCalendarPlus, IconCheck, IconInfoCircle, IconLock } from "@tabler/icons-react";
+import { RootState } from "../../app/store";
+import { formatInTimezone, formatFullDateInTimezone } from "../../utils/timezoneUtils";
 import cancellationService from "../../services/cancellationService";
 import RescheduleCard from "./RescheduleCard";
-import { MdEventBusy, MdCheckCircle, MdError } from "react-icons/md";
-import "./PublicCancelPage.css";
 
 interface AppointmentInfo {
   id: string;
@@ -40,11 +26,6 @@ interface AppointmentInfo {
   policyBlockedReason?: string;
 }
 
-interface CancellationPolicy {
-  minHoursBeforeAppointment?: number;
-  preventCancellingConfirmed?: boolean;
-}
-
 interface CancellationInfo {
   customerName: string;
   organizationName: string;
@@ -53,25 +34,28 @@ interface CancellationInfo {
   isGroup?: boolean;
   appointments?: AppointmentInfo[];
   allBlockedByPolicy?: boolean;
-  cancellationPolicy?: CancellationPolicy;
+  cancellationPolicy?: { minHoursBeforeAppointment?: number; preventCancellingConfirmed?: boolean };
   policyBlocked?: boolean; // Para reservaciones
   policyBlockedReason?: string; // Para reservaciones
 }
 
 // La política de cancelación (horas mínimas, "ya confirmada") solo limita CANCELAR.
 // Confirmar asistencia es válido para cualquier cita futura no cancelada: los
-// recordatorios suelen llegar dentro de la ventana de la política, así que usar el
-// criterio de cancelación para confirmar dejaba los grupos sin nada seleccionable.
-const isCancellable = (apt: AppointmentInfo) =>
-  !apt.isCancelled && !apt.isPast && !apt.policyBlocked;
-const isConfirmable = (apt: AppointmentInfo) =>
-  !apt.isCancelled && !apt.isPast && !apt.clientConfirmed;
+// recordatorios suelen llegar dentro de la ventana de la política.
+const isCancellable = (apt: AppointmentInfo) => !apt.isCancelled && !apt.isPast && !apt.policyBlocked;
+const isConfirmable = (apt: AppointmentInfo) => !apt.isCancelled && !apt.isPast && !apt.clientConfirmed;
+
+const amPm = (s: string) => s.replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
+const shell = { maxWidth: 520, margin: "0 auto", padding: "32px 16px 48px" } as const;
+const h1 = { margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" } as const;
 
 export const PublicCancelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const token = searchParams.get("token");
   const source = searchParams.get("source") || "confirmation"; // 'confirmation' o 'reminder'
+  const organization = useSelector((s: RootState) => s.organization.organization);
+  const whatsappUrl = organization?.whatsappUrl as string | undefined;
+  const isMobile = useMediaQuery("(max-width: 48em)");
 
   const [loading, setLoading] = useState(true);
   const [info, setInfo] = useState<CancellationInfo | null>(null);
@@ -81,59 +65,36 @@ export const PublicCancelPage: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [selectedAppointments, setSelectedAppointments] = useState<string[]>(
-    []
-  );
+  const [selectedAppointments, setSelectedAppointments] = useState<string[]>([]);
   const [action, setAction] = useState<"cancel" | "confirm" | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Detectar si es mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 600);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
+  const [canReschedule, setCanReschedule] = useState(false);
+  const [openReschedule, setOpenReschedule] = useState(0);
 
   const loadCancellationInfo = useCallback(async () => {
     if (!token) return;
-
     try {
       setLoading(true);
       const response = await cancellationService.getCancellationInfo(token);
-
       if (response.status === "success") {
         setInfo(response.data);
-
-        // Pre-seleccionar citas que se pueden cancelar (no canceladas, futuras y no bloqueadas por política)
         if (response.data.appointments) {
-          const cancellableIds = response.data.appointments
-            .filter(isCancellable)
-            .map((apt: AppointmentInfo) => apt.id);
-          setSelectedAppointments(cancellableIds);
+          setSelectedAppointments(response.data.appointments.filter(isCancellable).map((apt: AppointmentInfo) => apt.id));
         }
-
         setError(null);
       } else {
-        setError(response.message || "No se pudo cargar la información");
+        setError(response.message || "No se pudo cargar la información.");
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      const errorMsg =
-        error.response?.data?.message ||
-        "Error al cargar la información de cancelación";
-      setError(errorMsg);
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || "No se pudo cargar la información de tu cita.");
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  // Refresco silencioso (sin spinner de página) tras reagendar: así la tarjeta de
-  // reagendamiento conserva su mensaje de éxito y la fecha mostrada se actualiza.
+  // Refresco silencioso tras reagendar: la tarjeta conserva su mensaje de éxito
   const refreshInfoSilently = useCallback(async () => {
     if (!token) return;
     try {
@@ -146,24 +107,20 @@ export const PublicCancelPage: React.FC = () => {
 
   useEffect(() => {
     if (!token) {
-      setError("Token de cancelación no válido");
+      setError("El enlace no es válido.");
       setLoading(false);
       return;
     }
-
     loadCancellationInfo();
   }, [token, loadCancellationInfo]);
 
-  const selectableFor = (a: "cancel" | "confirm" | null) =>
-    a === "confirm" ? isConfirmable : isCancellable;
+  const appointments = info?.appointments || [];
+  const isGroupList = !!info?.isGroup && appointments.length > 1;
+  const selectableFor = (a: "cancel" | "confirm" | null) => (a === "confirm" ? isConfirmable : isCancellable);
 
-  // Cambia de acción ajustando la selección a lo que esa acción permite:
-  // conserva lo que el cliente ya marcó si sigue siendo válido; si no queda
-  // nada, preselecciona todas las citas elegibles para la nueva acción.
+  // Cambia de acción ajustando la selección a lo que esa acción permite
   const switchAction = (next: "cancel" | "confirm" | null) => {
-    const eligible = (info?.appointments || [])
-      .filter(selectableFor(next))
-      .map((apt) => apt.id);
+    const eligible = appointments.filter(selectableFor(next)).map((apt) => apt.id);
     setSelectedAppointments((prev) => {
       const kept = prev.filter((id) => eligible.includes(id));
       return kept.length ? kept : eligible;
@@ -172,587 +129,375 @@ export const PublicCancelPage: React.FC = () => {
     setError(null);
   };
 
-  const handleCancel = async () => {
+  const doCancel = async () => {
     if (!token) return;
-
-    // Si no se ha seleccionado acción, solo establecer la acción
-    if (action !== "cancel") {
-      switchAction("cancel");
+    if (isGroupList && selectedAppointments.length === 0) {
+      setError("Elige al menos una cita para cancelar.");
       return;
     }
-
-    // Ejecutar cancelación si ya está confirmada la acción
-    if (info?.isGroup && (info?.appointments?.length ?? 0) > 1 && selectedAppointments.length === 0) {
-      setError("Debes seleccionar al menos una cita para cancelar");
-      return;
-    }
-
     setCancelling(true);
     try {
-      const response = await cancellationService.cancelByToken(
-        token,
-        reason || undefined,
-        info?.isGroup ? selectedAppointments : undefined
-      );
-
+      const response = await cancellationService.cancelByToken(token, reason || undefined, info?.isGroup ? selectedAppointments : undefined);
       if (response.status === "success") {
         setCancelled(true);
+        setSheetOpen(false);
         setError(null);
       } else {
-        setError(response.message || "No se pudo cancelar");
+        setError(response.message || "No se pudo cancelar. Intenta de nuevo.");
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      const errorMsg = error.response?.data?.message || "Error al cancelar";
-      setError(errorMsg);
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || "No se pudo cancelar. Intenta de nuevo.");
     } finally {
       setCancelling(false);
     }
   };
 
-  const handleConfirm = async () => {
+  const doConfirm = async (ids?: string[]) => {
     if (!token) return;
-
-    // Si no se ha seleccionado acción, solo establecer la acción
-    if (action !== "confirm") {
-      switchAction("confirm");
+    const list = ids ?? selectedAppointments;
+    if (isGroupList && list.length === 0) {
+      setError("Elige al menos una cita para confirmar.");
       return;
     }
-
-    // Ejecutar confirmación si ya está confirmada la acción
-    if (info?.isGroup && (info?.appointments?.length ?? 0) > 1 && selectedAppointments.length === 0) {
-      setError("Debes seleccionar al menos una cita para confirmar");
-      return;
-    }
-
     setConfirming(true);
     try {
-      const response = await cancellationService.confirmByToken(
-        token,
-        info?.isGroup ? selectedAppointments : undefined
-      );
-
+      const response = await cancellationService.confirmByToken(token, info?.isGroup ? list : undefined);
       if (response.status === "success") {
+        setSelectedAppointments(list);
         setConfirmed(true);
         setError(null);
       } else {
-        setError(response.message || "No se pudo confirmar");
+        setError(response.message || "No se pudo confirmar. Intenta de nuevo.");
       }
     } catch (err) {
-      const error = err as { response?: { data?: { message?: string } } };
-      const errorMsg = error.response?.data?.message || "Error al confirmar";
-      setError(errorMsg);
+      const e = err as { response?: { data?: { message?: string } } };
+      setError(e.response?.data?.message || "No se pudo confirmar. Intenta de nuevo.");
     } finally {
       setConfirming(false);
     }
   };
 
-  const formatDate = (dateString: string, tz?: string) => {
-    try {
-      const timezone = tz || info?.timezone || "America/Bogota";
-      return formatFullDateInTimezone(
-        dateString,
-        timezone,
-        "dddd, D [de] MMMM [de] YYYY [a las] HH:mm"
-      );
-    } catch {
-      return dateString;
-    }
+  const tz = info?.timezone || "America/Bogota";
+  const timeFmt = info?.timeFormat === "24h" ? "HH:mm" : "h:mm A";
+  const dayLong = (d: string) => {
+    const s = formatFullDateInTimezone(d, tz, "dddd D [de] MMMM");
+    return s.charAt(0).toUpperCase() + s.slice(1);
   };
+  const hours = (a: AppointmentInfo) => amPm(`${formatInTimezone(a.startDate, tz, timeFmt)} – ${formatInTimezone(a.endDate, tz, timeFmt)}`);
+  const firstName = (info?.customerName || "").trim().split(/\s+/)[0];
+  const n = (count: number) => (count === 1 ? "1 cita" : `${count} citas`);
 
+  const writeBusiness = whatsappUrl && (
+    <Button component="a" href={whatsappUrl} target="_blank" rel="noopener noreferrer" variant="default" size="xs" leftSection={<IconBrandWhatsapp size={14} />}>
+      Escribir al negocio
+    </Button>
+  );
+
+  // ─── Estados de pantalla completa ───────────────────────────────────────────
   if (loading) {
     return (
-      <Container size="sm" mt={80}>
-        <Center>
-          <Stack align="center" gap="md">
-            <Loader size="xl" />
-            <Title order={3}>Cargando información...</Title>
-          </Stack>
-        </Center>
-      </Container>
+      <div style={shell}>
+        <Skeleton height={28} width={220} mb={8} />
+        <Skeleton height={14} width={160} mb={20} />
+        <Skeleton height={140} radius="md" mb={16} />
+        <Skeleton height={44} radius="md" mb={10} />
+        <Skeleton height={44} radius="md" />
+      </div>
     );
   }
 
   if (error && !info) {
     return (
-      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
-        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
-          <Stack align="center" gap="md">
-            <MdError size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="red">
-              Error
-            </Title>
-            <Text size="md" c="dimmed" ta="center">
-              {error}
-            </Text>
-            <Button variant="outline" onClick={() => navigate("/")} mt="md">
-              Volver al inicio
-            </Button>
-          </Stack>
-        </Paper>
-      </Container>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center" }}>
+          <h1 style={{ ...h1, fontSize: 20 }}>Este enlace ya no funciona</h1>
+          <div className="ag-muted" style={{ fontSize: 14, margin: "6px 0 16px" }}>{error}</div>
+          <Button component={Link} to="/mis-reservas">
+            Ver mis reservas
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (cancelled) {
     return (
-      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
-        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
-          <Stack align="center" gap="md">
-            <MdCheckCircle size={48} color="red" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="red">
-              Cancelación exitosa
-            </Title>
-            <Text size="md" c="dimmed" ta="center">
-              {info?.isGroup
-                ? `Se cancelaron ${selectedAppointments.length} cita(s) correctamente.`
-                : "Tu cita ha sido cancelada correctamente."}
-            </Text>
-            <Alert color="blue" icon={<MdError />} mt="md">
-              Recibirás una confirmación por WhatsApp o correo electrónico.
-            </Alert>
-            <Button variant="outline" onClick={() => navigate("/")} mt="md">
-              Volver al inicio
-            </Button>
-          </Stack>
-        </Paper>
-      </Container>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+          <h1 style={{ ...h1, fontSize: 22 }}>{isGroupList ? `Cancelaste ${n(selectedAppointments.length)}` : "Tu cita quedó cancelada"}</h1>
+          <div className="ag-muted" style={{ fontSize: 14 }}>{info?.organizationName} ya recibió el aviso y el horario quedó libre.</div>
+          <Button component={Link} to="/online-reservation" leftSection={<IconCalendarPlus size={16} />} mt={6}>
+            Reservar otra fecha
+          </Button>
+          <Button component={Link} to="/" variant="subtle" color="gray">
+            Volver al inicio
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (confirmed) {
     return (
-      <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} px={{ base: "xs", sm: "md" }}>
-        <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
-          <Stack align="center" gap="md">
-            <MdCheckCircle size={48} color="green" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} c="green">
-              ¡Asistencia Confirmada!
-            </Title>
-            <Text size="md" c="dimmed" ta="center">
-              {info?.isGroup
-                ? `Has confirmado ${selectedAppointments.length} cita(s).`
-                : "Has confirmado tu asistencia a la cita."}
-            </Text>
-            <Alert color="blue" icon={<MdCheckCircle />} mt="md">
-              <Stack gap="xs">
-                <Text fw={500}>Tu confirmación ha sido registrada exitosamente.</Text>
-                <Text size="sm">
-                  El establecimiento recibirá una notificación de tu confirmación.
-                  Recuerda que el administrador debe aprobar finalmente tu asistencia.
-                </Text>
-              </Stack>
-            </Alert>
-            <Button variant="outline" onClick={() => navigate("/")} mt="md">
-              Volver al inicio
-            </Button>
-          </Stack>
-        </Paper>
-      </Container>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+          <span style={{ width: 48, height: 48, borderRadius: 999, display: "grid", placeItems: "center", background: "var(--success-soft)", color: "var(--success)" }}>
+            <IconCheck size={26} />
+          </span>
+          <h1 style={{ ...h1, fontSize: 22 }}>Listo, te esperamos</h1>
+          <div className="ag-muted" style={{ fontSize: 14 }}>
+            {isGroupList ? `Confirmaste ${n(selectedAppointments.length)}.` : "Confirmaste tu asistencia."} {info?.organizationName} ya recibió el aviso.
+          </div>
+          <Button component={Link} to="/" variant="subtle" color="gray" mt={4}>
+            Volver al inicio
+          </Button>
+        </div>
+      </div>
     );
   }
 
-  const toggleAppointment = (id: string) => {
-    setSelectedAppointments((prev) =>
-      prev.includes(id) ? prev.filter((aptId) => aptId !== id) : [...prev, id]
-    );
+  // ─── Pantalla principal ─────────────────────────────────────────────────────
+  const single = appointments[0];
+  const confirmableCount = appointments.filter(isConfirmable).length;
+  const cancellableCount = appointments.filter(isCancellable).length;
+  const canConfirm = source === "reminder" && confirmableCount > 0;
+  const canCancel = cancellableCount > 0 && !info?.policyBlocked;
+  const isSelectable = selectableFor(action);
+  const selectableIds = appointments.filter(isSelectable).map((a) => a.id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedAppointments.includes(id));
+
+  const toggleAppointment = (id: string) => setSelectedAppointments((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const statusBadge = (apt: AppointmentInfo) => {
+    if (apt.isCancelled) return <span className="ag-badge">Cancelada</span>;
+    if (apt.isPast) return <span className="ag-badge">Pasada</span>;
+    if (apt.clientConfirmed) return <span className="ag-badge ag-badge--success">Confirmada por ti</span>;
+    if (action === "cancel" && apt.policyBlocked)
+      return (
+        <span className="ag-badge">
+          <IconLock size={12} /> No cancelable
+        </span>
+      );
+    return null;
   };
 
-  const isSelectable = selectableFor(action);
-  const selectableCount = (info?.appointments || []).filter(isSelectable).length;
+  const header = (
+    <div>
+      <h1 style={h1}>{firstName ? `Hola, ${firstName}` : "Tu cita"}</h1>
+      <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+        {isGroupList ? `Tus ${appointments.length} citas` : "Tu cita"} en {info?.organizationName}.
+      </div>
+    </div>
+  );
 
-  const toggleAll = () => {
-    const selectableIds = (info?.appointments || [])
-      .filter(isSelectable)
-      .map((apt) => apt.id);
+  const singleCard = single && (
+    <article className="ag-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div className="ag-row" style={{ justifyContent: "space-between", gap: 8, alignItems: "flex-start", flexWrap: "nowrap" }}>
+        <b style={{ fontSize: 16 }}>{single.serviceName}</b>
+        {statusBadge(single)}
+      </div>
+      <div style={{ fontSize: 15 }}>{dayLong(single.startDate)}</div>
+      <div className="ag-muted ag-num" style={{ fontSize: 14 }}>{hours(single)}</div>
+    </article>
+  );
 
-    if (selectedAppointments.length === selectableIds.length) {
-      setSelectedAppointments([]);
-    } else {
-      setSelectedAppointments(selectableIds);
-    }
+  const groupList = isGroupList && (
+    <div className="ag-stack" style={{ gap: 8 }}>
+      {action && (
+        <div className="ag-row" style={{ justifyContent: "space-between" }}>
+          <b style={{ fontSize: 14 }}>{action === "confirm" ? "¿Cuáles confirmas?" : "¿Cuáles cancelas?"}</b>
+          <Button size="compact-xs" variant="subtle" onClick={() => setSelectedAppointments(allSelected ? [] : selectableIds)}>
+            {allSelected ? "Deseleccionar todas" : "Seleccionar todas"}
+          </Button>
+        </div>
+      )}
+      <div className="ag-card" style={{ padding: 0, overflow: "hidden" }}>
+        {appointments.map((apt) => {
+          const disabled = !action || !isSelectable(apt);
+          return (
+            <div
+              key={apt.id}
+              className="ag-list-row"
+              style={{ padding: "12px 16px", gap: 12, cursor: disabled ? "default" : "pointer", opacity: action && disabled ? 0.55 : 1 }}
+              onClick={() => !disabled && toggleAppointment(apt.id)}
+            >
+              {action && <Checkbox checked={selectedAppointments.includes(apt.id)} disabled={disabled} onChange={() => toggleAppointment(apt.id)} onClick={(e) => e.stopPropagation()} aria-label={apt.serviceName} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ fontSize: 14 }}>{apt.serviceName}</b>
+                <div className="ag-subtle">
+                  {dayLong(apt.startDate)} · {hours(apt)}
+                </div>
+                {action === "cancel" && apt.policyBlocked && apt.policyBlockedReason && <div className="ag-subtle" style={{ color: "var(--warning)" }}>{apt.policyBlockedReason}</div>}
+              </div>
+              {statusBadge(apt)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const policyNotice =
+    (info?.allBlockedByPolicy || (!isGroupList && single?.policyBlocked) || info?.policyBlocked) && (
+      <div className="ag-alert ag-alert--warning" style={{ alignItems: "center", flexWrap: "wrap" }}>
+        <IconLock size={20} />
+        <div style={{ flex: 1, minWidth: 200 }}>
+          {single?.policyBlockedReason || info?.policyBlockedReason || "Según la política del negocio ya no se puede cancelar en línea."} Si necesitas cancelar,
+          escríbele a {info?.organizationName || "el negocio"}.
+        </div>
+        {writeBusiness}
+      </div>
+    );
+
+  const errorAlert = error && (
+    <div className="ag-alert ag-alert--danger">
+      <IconInfoCircle size={20} />
+      <div>{error}</div>
+    </div>
+  );
+
+  // Grupo con una acción elegida: lista con casillas y barra con cuántas y qué acción
+  const groupActionBar = isGroupList && action && (
+    <div className="ag-stack" style={{ gap: 8 }}>
+      <Button
+        size="md"
+        fullWidth
+        color={action === "cancel" ? "red" : undefined}
+        disabled={selectedAppointments.length === 0}
+        loading={confirming}
+        onClick={() => (action === "confirm" ? doConfirm() : setSheetOpen(true))}
+      >
+        {action === "confirm" ? `Confirmar ${n(selectedAppointments.length)}` : `Cancelar ${n(selectedAppointments.length)}`}
+      </Button>
+      <Button variant="subtle" color="gray" fullWidth onClick={() => switchAction(null)} disabled={confirming || cancelling}>
+        Volver
+      </Button>
+    </div>
+  );
+
+  // Una sola tarjeta de cambio de fecha: mientras está abierta se ocultan las
+  // otras acciones (así su mensaje de «Cita reagendada» no se pierde).
+  const mainActions = !action && (
+    <div className="ag-stack" style={{ gap: 10 }}>
+      {canConfirm && !rescheduling && (
+        <Button
+          size="md"
+          fullWidth
+          leftSection={<IconCheck size={18} />}
+          loading={confirming}
+          onClick={() => (isGroupList ? switchAction("confirm") : doConfirm(appointments.filter(isConfirmable).map((a) => a.id)))}
+        >
+          Sí, asistiré
+        </Button>
+      )}
+      {!isGroupList && token && (
+        <RescheduleCard token={token} onRescheduled={refreshInfoSilently} onOpenChange={setRescheduling} onAvailability={setCanReschedule} openRequest={openReschedule} />
+      )}
+      {canCancel && !rescheduling && (
+        <Button
+          size="md"
+          fullWidth
+          variant="subtle"
+          color="red"
+          onClick={() => {
+            if (isGroupList) switchAction("cancel");
+            else {
+              switchAction("cancel");
+              setSheetOpen(true);
+            }
+          }}
+        >
+          No podré asistir
+        </Button>
+      )}
+    </div>
+  );
+
+  const sheetTitle = isGroupList ? `Cancelar ${n(selectedAppointments.length)}` : "No podré asistir";
+  const minHours = info?.cancellationPolicy?.minHoursBeforeAppointment;
+  const sheetBody = (
+    <div className="ag-stack" style={{ gap: 14 }}>
+      {!isGroupList && single && (
+        <div className="ag-card" style={{ padding: 12 }}>
+          <b style={{ display: "block", fontSize: 14 }}>{single.serviceName}</b>
+          <div className="ag-subtle">
+            {dayLong(single.startDate)} · {hours(single)}
+          </div>
+        </div>
+      )}
+      <div className="ag-muted" style={{ fontSize: 14 }}>
+        {info?.organizationName} recibirá el aviso y el horario quedará libre. No se puede deshacer.
+        {minHours ? ` Se puede cancelar hasta ${minHours} ${minHours === 1 ? "hora" : "horas"} antes.` : ""}
+      </div>
+      <Textarea label="Motivo (opcional)" placeholder="Si quieres, cuéntale al negocio por qué" value={reason} onChange={(e) => setReason(e.currentTarget.value)} minRows={2} autosize />
+      {errorAlert}
+      <div className="ag-stack" style={{ gap: 8 }}>
+        <Button color="red" size="md" fullWidth onClick={doCancel} loading={cancelling}>
+          {isGroupList ? `Cancelar ${n(selectedAppointments.length)}` : "Cancelar cita"}
+        </Button>
+        {!isGroupList && canReschedule ? (
+          <Button
+            variant="default"
+            fullWidth
+            disabled={cancelling}
+            onClick={() => {
+              setSheetOpen(false);
+              switchAction(null);
+              setOpenReschedule((k) => k + 1);
+            }}
+          >
+            Mejor cambiar la fecha
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            fullWidth
+            disabled={cancelling}
+            onClick={() => {
+              setSheetOpen(false);
+              if (!isGroupList) switchAction(null);
+            }}
+          >
+            Volver
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  const closeSheet = () => {
+    if (cancelling) return;
+    setSheetOpen(false);
+    if (!isGroupList) switchAction(null);
   };
 
   return (
-    <Container size="sm" mt={{ base: 40, sm: 60, md: 80 }} mb={40} px={{ base: "xs", sm: "md" }}>
-      <Paper shadow="md" p={{ base: "md", sm: "lg", md: "xl" }} radius="md" withBorder>
-        <Stack gap="lg">
-          {/* Header */}
-          <Stack align="center" gap="md">
-            <MdEventBusy size={48} color="orange" style={{ fontSize: "clamp(48px, 10vw, 64px)" }} />
-            <Title order={2} ta="center">
-              Gestionar {info?.isGroup ? "Citas" : "Cita"}
-            </Title>
-          </Stack>
+    <div style={shell}>
+      <div className="ag-stack" style={{ gap: 18 }}>
+        {header}
+        {isGroupList ? groupList : !rescheduling && singleCard}
+        {!rescheduling && policyNotice}
+        {!sheetOpen && errorAlert}
+        {groupActionBar}
+        {mainActions}
+        {!canConfirm && !canCancel && !canReschedule && !isGroupList && !policyNotice && (
+          <div className="ag-subtle" style={{ textAlign: "center" }}>
+            No hay nada pendiente con esta cita.
+          </div>
+        )}
+      </div>
 
-          <Divider />
-
-          {/* Información del cliente */}
-          <Stack gap="sm">
-            <Box>
-              <Text size="sm" c="dimmed" fw={500}>
-                Organización
-              </Text>
-              <Title order={4}>{info?.organizationName}</Title>
-            </Box>
-
-            <Box>
-              <Text size="sm" c="dimmed" fw={500}>
-                Cliente
-              </Text>
-              <Text size="md">{info?.customerName}</Text>
-            </Box>
-          </Stack>
-
-          <Divider />
-
-          {/* Lista de citas (si es grupo) */}
-          {info?.isGroup &&
-          info?.appointments &&
-          info.appointments.length > 1 ? (
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Text fw={600}>Selecciona las citas:</Text>
-                <Button size="xs" variant="subtle" onClick={toggleAll}>
-                  {selectedAppointments.length === selectableCount
-                    ? "Deseleccionar todas"
-                    : "Seleccionar todas"}
-                </Button>
-              </Group>
-
-              <Stack gap="xs">
-                {info.appointments.map((apt) => {
-                  const isDisabled = !isSelectable(apt);
-                  // En modo confirmar la restricción de política no aplica; no mostrarla
-                  const showPolicyBlock = apt.policyBlocked && action !== "confirm";
-                  return (
-                    <Card
-                      key={apt.id}
-                      padding="md"
-                      withBorder
-                      style={{
-                        opacity: isDisabled ? 0.5 : 1,
-                        cursor: isDisabled ? "not-allowed" : "pointer",
-                      }}
-                      onClick={() => {
-                        if (!isDisabled) {
-                          toggleAppointment(apt.id);
-                        }
-                      }}
-                    >
-                      <Group justify="space-between" wrap="nowrap">
-                        <Group gap="md" wrap="nowrap">
-                          <Checkbox
-                            checked={selectedAppointments.includes(apt.id)}
-                            onChange={() => toggleAppointment(apt.id)}
-                            disabled={isDisabled}
-                          />
-                          <Stack gap={4}>
-                            <Text fw={600}>{apt.serviceName}</Text>
-                            <Text size="sm" c="dimmed">
-                              {formatFullDateInTimezone(
-                                apt.startDate,
-                                info?.timezone || "America/Bogota",
-                                "ddd, D [de] MMM YYYY"
-                              )}
-                            </Text>
-                            <Text size="sm" c="dimmed">
-                              {formatInTimezone(
-                                apt.startDate,
-                                info?.timezone || "America/Bogota",
-                                info?.timeFormat === "24h" ? "HH:mm" : "h:mm A"
-                              )}{" "}
-                              -{" "}
-                              {formatInTimezone(
-                                apt.endDate,
-                                info?.timezone || "America/Bogota",
-                                info?.timeFormat === "24h" ? "HH:mm" : "h:mm A"
-                              )}
-                            </Text>
-                            {showPolicyBlock && apt.policyBlockedReason && (
-                              <Text size="xs" c="orange" fw={500}>
-                                {apt.policyBlockedReason}
-                              </Text>
-                            )}
-                          </Stack>
-                        </Group>
-                        <Stack gap={4} align="flex-end">
-                          {apt.clientConfirmed && !apt.isCancelled && (
-                            <Badge color="green" size="sm" variant="light">
-                              Confirmado por ti
-                            </Badge>
-                          )}
-                          {apt.isCancelled && (
-                            <Badge color="red" size="sm">
-                              Cancelada
-                            </Badge>
-                          )}
-                          {apt.isPast && !apt.isCancelled && (
-                            <Badge color="gray" size="sm">
-                              Pasada
-                            </Badge>
-                          )}
-                          {showPolicyBlock && !apt.isCancelled && !apt.isPast && (
-                            <Badge color="orange" size="sm">
-                              No cancelable
-                            </Badge>
-                          )}
-                        </Stack>
-                      </Group>
-                    </Card>
-                  );
-                })}
-              </Stack>
-            </Stack>
-          ) : (
-            /* Info de cita única */
-            <Stack gap="sm">
-              <Box>
-                <Text size="sm" c="dimmed" fw={500}>
-                  Servicio
-                </Text>
-                <Text size="md">{info?.appointments?.[0]?.serviceName}</Text>
-              </Box>
-
-              <Box>
-                <Text size="sm" c="dimmed" fw={500}>
-                  Fecha y hora
-                </Text>
-                <Text size="md">
-                  {info?.appointments?.[0]?.startDate &&
-                    formatDate(info.appointments[0].startDate)}
-                </Text>
-              </Box>
-
-              {info?.appointments?.[0]?.clientConfirmed && (
-                <Alert color="green" variant="light" icon={<MdCheckCircle />}>
-                  Ya has confirmado tu asistencia a esta cita
-                </Alert>
-              )}
-
-              {info?.appointments?.[0]?.policyBlocked && (
-                <Alert color="orange" variant="light" icon={<MdError />}>
-                  <Stack gap="xs">
-                    <Text fw={500}>{info.appointments[0].policyBlockedReason || "Esta cita no puede ser cancelada según la política de cancelación"}</Text>
-                    <Text size="sm">
-                      Si necesitas cancelar, por favor comunícate directamente con {info?.organizationName || "el establecimiento"} a través de sus líneas de atención.
-                    </Text>
-                  </Stack>
-                </Alert>
-              )}
-            </Stack>
-          )}
-
-          <Divider />
-
-          {/* Error message */}
-          {error && (
-            <Alert color="red" icon={<MdError />}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Alerta cuando todas las citas están bloqueadas por política */}
-          {info?.allBlockedByPolicy && (
-            <Alert color="orange" icon={<MdError />}>
-              <Stack gap="xs">
-                <Text fw={500}>No hay citas que se puedan cancelar según la política de cancelación del establecimiento.</Text>
-                <Text size="sm">
-                  Si necesitas cancelar tu cita, por favor comunícate directamente con {info?.organizationName || "el establecimiento"} a través de sus líneas de atención.
-                </Text>
-              </Stack>
-            </Alert>
-          )}
-
-          {/* Nota cuando hay algunas citas bloqueadas por política */}
-          {!info?.allBlockedByPolicy && info?.appointments?.some(apt => apt.policyBlocked) && (
-            <Alert color="blue" icon={<MdError />} variant="light">
-              <Text size="sm">
-                Algunas citas no pueden ser canceladas según la política del establecimiento. Si necesitas cancelarlas, comunícate directamente con {info?.organizationName || "el establecimiento"}.
-              </Text>
-            </Alert>
-          )}
-
-          {/* Acciones principales - antes de cualquier advertencia */}
-          {!action && (
-            <Stack gap="md">
-              <Text size="lg" fw={600} ta="center" c="dimmed">
-                ¿Qué deseas hacer con {selectedAppointments.length > 1 ? "estas citas" : "esta cita"}?
-              </Text>
-
-              <Stack gap="md" style={{
-                display: "grid",
-                gridTemplateColumns: source === "reminder" ? "repeat(auto-fit, minmax(min(100%, 250px), 1fr))" : "1fr",
-                gap: "1rem"
-              }}>
-                {/* Botón de confirmar solo visible en recordatorios */}
-                {source === "reminder" && (
-                  <Card
-                    padding="lg"
-                    radius="md"
-                    withBorder
-                    style={{
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      border: "2px solid var(--mantine-color-green-3)",
-                      backgroundColor: "var(--mantine-color-green-0)",
-                    }}
-                    onClick={handleConfirm}
-                    className="hover-lift"
-                  >
-                    <Stack align="center" gap="md">
-                      <MdCheckCircle size={40} color="var(--mantine-color-green-6)" style={{ fontSize: "clamp(40px, 8vw, 48px)" }} />
-                      <Stack gap={4} align="center">
-                        <Title order={4} ta="center">
-                            Confirmar mi Asistencia
-                          </Title>
-                        <Text size="sm" c="dimmed" ta="center">
-                          Avísale al establecimiento que sí asistirás
-                        </Text>
-                      </Stack>
-                    </Stack>
-                  </Card>
-                )}
-
-                {/* Botón de cancelar - deshabilitado si no hay citas cancelables */}
-                {(() => {
-                  const cancellableCount = (info?.appointments || []).filter(isCancellable).length;
-                  const isDisabled = cancellableCount === 0 || info?.policyBlocked;
-
-                  return (
-                    <Card
-                      padding="lg"
-                      radius="md"
-                      withBorder
-                      style={{
-                        cursor: isDisabled ? "not-allowed" : "pointer",
-                        transition: "all 0.2s ease",
-                        border: `2px solid ${isDisabled ? "var(--mantine-color-gray-3)" : "var(--mantine-color-red-3)"}`,
-                        backgroundColor: isDisabled ? "var(--mantine-color-gray-0)" : "var(--mantine-color-red-0)",
-                        opacity: isDisabled ? 0.6 : 1,
-                      }}
-                      onClick={isDisabled ? undefined : handleCancel}
-                      className={isDisabled ? "" : "hover-lift"}
-                    >
-                      <Stack align="center" gap="md">
-                        <MdEventBusy
-                          size={40}
-                          color={isDisabled ? "var(--mantine-color-gray-5)" : "var(--mantine-color-red-6)"}
-                          style={{ fontSize: "clamp(40px, 8vw, 48px)" }}
-                        />
-                        <Stack gap={4} align="center">
-                          <Title order={4} ta="center" c={isDisabled ? "dimmed" : undefined}>
-                            No Podré Asistir
-                          </Title>
-                          <Text size="sm" c="dimmed" ta="center">
-                            {isDisabled
-                              ? "No hay citas que se puedan cancelar"
-                              : "Cancela si no puedes ir"}
-                          </Text>
-                        </Stack>
-                      </Stack>
-                    </Card>
-                  );
-                })()}
-              </Stack>
-            </Stack>
-          )}
-
-          {/* Reagendar (solo si el negocio lo habilitó y la cita cumple la política) */}
-          {!action && token && (
-            <RescheduleCard token={token} onRescheduled={refreshInfoSilently} />
-          )}
-
-          {/* Advertencia condicional */}
-          {action && (
-            <Alert color={action === "confirm" ? "blue" : "orange"} icon={<MdError />}>
-              {action === "confirm"
-                ? `¿Estás seguro de que deseas confirmar ${
-                    selectedAppointments.length > 1 ? "estas citas" : "esta cita"
-                  }? Esto no se puede deshacer.`
-                : `¿Estás seguro de que deseas cancelar ${
-                    selectedAppointments.length > 1 ? "estas citas" : "esta cita"
-                  }? Esta acción no se puede deshacer.`}
-            </Alert>
-          )}
-
-          {/* Motivo de cancelación (solo si es cancelación) */}
-          {action === "cancel" && (
-            <Textarea
-              label="Motivo de cancelación (opcional)"
-              placeholder="Puedes indicarnos el motivo de la cancelación..."
-              value={reason}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                setReason(e.target.value)
-              }
-              minRows={3}
-              autosize
-            />
-          )}
-
-          {/* Botones de acción */}
-          {action ? (
-            <Group justify="center" mt="md" gap="md" style={{ flexDirection: isMobile ? "column" : "row", width: "100%" }}>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => switchAction(null)}
-                disabled={cancelling || confirming}
-                fullWidth={isMobile}
-              >
-                Volver
-              </Button>
-              {action === "confirm" && (
-                <Button
-                  color="green"
-                  size="md"
-                  onClick={handleConfirm}
-                  disabled={cancelling || confirming}
-                  fullWidth={isMobile}
-                  leftSection={
-                    confirming ? (
-                      <Loader size="xs" color="white" />
-                    ) : (
-                      <MdCheckCircle size={20} />
-                    )
-                  }
-                >
-                  {confirming ? "Confirmando..." : "Confirmar"}
-                </Button>
-              )}
-              {action === "cancel" && (
-                <Button
-                  color="red"
-                  size="md"
-                  onClick={handleCancel}
-                  disabled={cancelling || confirming}
-                  fullWidth={isMobile}
-                  leftSection={
-                    cancelling ? (
-                      <Loader size="xs" color="white" />
-                    ) : (
-                      <MdEventBusy size={20} />
-                    )
-                  }
-                >
-                  {cancelling ? "Cancelando..." : "Cancelar"}
-                </Button>
-              )}
-            </Group>
-          ) : (
-            <Button
-              variant="outline"
-              size="md"
-              onClick={() => navigate("/")}
-              disabled={cancelling || confirming}
-              fullWidth={isMobile}
-            >
-              Volver al inicio
-            </Button>
-          )}
-        </Stack>
-      </Paper>
-    </Container>
+      {isMobile ? (
+        <Drawer opened={sheetOpen} onClose={closeSheet} position="bottom" size="auto" radius="lg" title={<b>{sheetTitle}</b>}>
+          {sheetBody}
+        </Drawer>
+      ) : (
+        <Modal opened={sheetOpen} onClose={closeSheet} title={<b>{sheetTitle}</b>} centered>
+          {sheetBody}
+        </Modal>
+      )}
+    </div>
   );
 };
 
