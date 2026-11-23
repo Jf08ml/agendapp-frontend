@@ -2191,7 +2191,7 @@ ${clientServices}`;
             const fmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
             const label = (d: Date | string) => {
               const t = formatInTimezone(d, timezone, `ddd D MMM, ${fmt}`);
-              return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/s?AM/, " a. m.").replace(/s?PM/, " p. m.");
+              return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
             };
             const newEmp = newAppointment.employee as Employee | undefined;
             const oldEmpId = String((appointment.employee as Employee | undefined)?._id ?? appointment.employee);
