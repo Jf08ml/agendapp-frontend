@@ -242,6 +242,23 @@ export default function ManageClasses() {
     }
   }, []);
 
+  // Conteo de cada chip: total de cada estado (mismo endpoint, limit 1)
+  const [enrollmentCounts, setEnrollmentCounts] = useState<Record<string, number>>({});
+  const loadEnrollmentCounts = useCallback(async () => {
+    const keys = ENROLLMENT_FILTERS.map((f) => f.value).filter((v) => v !== "pending");
+    try {
+      const res = await Promise.all(
+        keys.map((k) => getEnrollments(k === "all" ? { limit: 1 } : { status: k, limit: 1 }))
+      );
+      setEnrollmentCounts(Object.fromEntries(keys.map((k, i) => [k, res[i].total ?? 0])));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+  useEffect(() => {
+    if (organizationId) void loadEnrollmentCounts();
+  }, [organizationId, loadEnrollmentCounts]);
+
   useEffect(() => {
     if (enrollmentStatusFilter === "pending" || !organizationId) return;
     loadEnrollmentsView(enrollmentStatusFilter);
@@ -483,6 +500,7 @@ export default function ManageClasses() {
   // ── ENROLLMENTS ────────────────────────────────────
   const refreshEnrollments = () => {
     loadAll();
+    void loadEnrollmentCounts();
     if (enrollmentStatusFilter !== "pending") loadEnrollmentsView(enrollmentStatusFilter);
   };
 
@@ -917,7 +935,9 @@ export default function ManageClasses() {
               onClick={() => setEnrollmentStatusFilter(f.value)}
             >
               {f.label}
-              {f.value === "pending" && <span className="count">{pendingEnrollments.length}</span>}
+              <span className="count">
+                {f.value === "pending" ? pendingEnrollments.length : enrollmentCounts[f.value] ?? "–"}
+              </span>
             </button>
           ))}
         </div>

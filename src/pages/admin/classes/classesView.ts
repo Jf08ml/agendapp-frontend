@@ -57,11 +57,14 @@ export function resolveClassTab(param: string | null): ClassTabKey {
   return (CLASS_TABS.find((t) => t.key === param)?.key ?? "sesiones") as ClassTabKey;
 }
 
-/** Filtros de inscripciones (chips). «pending» se carga aparte para el contador. */
+/** Filtros de inscripciones (chips). Los 4 del mockup más los que ya existían. */
 export const ENROLLMENT_FILTERS = [
   { value: "pending", label: "Pendientes" },
   { value: "confirmed", label: "Confirmadas" },
   { value: "attended", label: "Asistió" },
+  { value: "cancelled", label: "Canceladas" },
+  { value: "no_show", label: "No asistió" },
+  { value: "pending_payment", label: "Pendiente de pago" },
   { value: "all", label: "Todas" },
 ] as const;
 
