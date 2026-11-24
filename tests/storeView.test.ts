@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   isLowStock,
+  lowStockSummary,
   productCommissionText,
   publicationState,
   orderPaymentState,
@@ -60,4 +61,15 @@ test("una sola acción principal", () => {
 
 test("orderNumber", () => {
   assert.equal(orderNumber({ _id: "64ab12cd34ef56a1b2c3" }), "#A1B2C3");
+});
+
+test("aviso agrupado de stock bajo", () => {
+  const p = (name: string, stockQuantity: number, lowStockThreshold = 5, active = true, trackStock = true) => ({ name, stockQuantity, lowStockThreshold, active, trackStock });
+  assert.equal(lowStockSummary([p("Shampoo", 10)]), null);
+  const one = lowStockSummary([p("Shampoo", 2), p("Tinte", 9)])!;
+  assert.equal(one.text, "1 producto con stock bajo: Shampoo (2).");
+  const many = lowStockSummary([p("Shampoo", 4), p("Tinte", 0), p("Laca", 1), p("Gel", 3, 3), p("Cera", 2, 5, false), p("Mascarilla", 0, 5, true, false)])!;
+  assert.equal(many.items.length, 4);
+  assert.equal(many.text, "4 productos con stock bajo: Tinte (agotado), Laca (1), Shampoo (4) y 1 más.");
+  assert.equal(lowStockSummary([p("A", 1), p("B", 2)])!.text, "2 productos con stock bajo: A (1) y B (2).");
 });

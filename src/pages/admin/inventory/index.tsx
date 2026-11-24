@@ -40,7 +40,7 @@ import StockAdjustModal from "./components/StockAdjustModal";
 import SaleModal from "./components/SaleModal";
 import StoreSettingsDrawer from "./components/StoreSettingsDrawer";
 import StoreTabs from "../../../components/store/StoreTabs";
-import { isLowStock, productCommissionText, publicationState } from "./storeView";
+import { isLowStock, lowStockSummary, productCommissionText, publicationState } from "./storeView";
 import StateBadge from "./components/StoreStateBadge";
 
 const InventoryPage: React.FC = () => {
@@ -59,6 +59,8 @@ const InventoryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchTerm, 250);
   const [showInactive, setShowInactive] = useState(false);
+  // «Ver solo esos» del aviso de stock bajo
+  const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -89,6 +91,7 @@ const InventoryPage: React.FC = () => {
   const filtered = useMemo(() => {
     let data = [...products];
     if (!showInactive) data = data.filter((p) => p.active);
+    if (onlyLowStock) data = data.filter((p) => p.active && isLowStock(p));
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       data = data.filter(
@@ -101,7 +104,8 @@ const InventoryPage: React.FC = () => {
     }
     data.sort((a, b) => a.name.localeCompare(b.name, "es"));
     return data;
-  }, [products, debouncedSearch, showInactive]);
+  }, [products, debouncedSearch, showInactive, onlyLowStock]);
+  const lowStock = useMemo(() => lowStockSummary(products), [products]);
 
   const handleSaveProduct = async (form: ProductFormData) => {
     try {
@@ -336,6 +340,18 @@ const InventoryPage: React.FC = () => {
           </button>
         )}
       </div>
+
+      {initialLoaded && !loadError && (lowStock || onlyLowStock) && (
+        <div className="ag-alert ag-alert--warning" role="status">
+          <IconAlertTriangle size={18} />
+          <div style={{ flex: 1 }}>
+            {onlyLowStock || !lowStock ? <b>Viendo solo los productos con stock bajo.</b> : lowStock.text} {!onlyLowStock && "Revisa si hay que pedir más."}
+          </div>
+          <Button size="xs" variant="default" onClick={() => setOnlyLowStock((v) => !v)}>
+            {onlyLowStock ? "Ver todos" : "Ver solo esos"}
+          </Button>
+        </div>
+      )}
 
       {loadError ? (
         <div className="ag-alert ag-alert--danger" role="alert">
