@@ -1,195 +1,222 @@
-// pages/superadmin/SuperadminOnboarding.tsx
+// Embudo de activación por cohorte (rediseño, SuperadminActivacion): «Registrados
+// entre», el hito que mejor predice la compra, el embudo en un solo color (el
+// último en verde) con panel lateral de negocios por hito, y la conversión a
+// pago por hito con su leyenda.
 import { useEffect, useMemo, useState } from "react";
-import {
-  Container, Title, Text, Stack, Group, Card, Paper, Badge, Table,
-  Divider, Loader, ScrollArea, Progress, Alert, HoverCard,
-} from "@mantine/core";
+import { Drawer, ScrollArea, Skeleton } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
-import { IconBulb } from "@tabler/icons-react";
-import { notifications } from "@mantine/notifications";
+import { IconBulb, IconChevronRight, IconInfoCircle } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import {
-  getOnboardingFunnel,
-  type OnboardingFunnel,
-} from "../../services/onboardingFunnelService";
+import { getOnboardingFunnel, type OnboardingFunnel } from "../../services/onboardingFunnelService";
 
 dayjs.locale("es");
 
+type Step = OnboardingFunnel["funnel"][number];
+
+const rateClass = (t: number) => (t >= 50 ? "ag-badge ag-badge--success" : t >= 25 ? "ag-badge ag-badge--warning" : "ag-badge");
+
 export default function SuperadminOnboarding() {
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [data, setData] = useState<OnboardingFunnel | null>(null);
-  const [range, setRange] = useState<[Date | null, Date | null]>([
-    dayjs().subtract(29, "day").startOf("day").toDate(),
-    dayjs().endOf("day").toDate(),
-  ]);
+  const [reload, setReload] = useState(0);
+  const [openStep, setOpenStep] = useState<Step | null>(null);
+  const [range, setRange] = useState<[Date | null, Date | null]>([dayjs().subtract(29, "day").startOf("day").toDate(), dayjs().endOf("day").toDate()]);
 
   const dateParams = useMemo(() => {
     if (!range[0] || !range[1]) return null;
-    return {
-      startDate: dayjs(range[0]).format("YYYY-MM-DD"),
-      endDate: dayjs(range[1]).format("YYYY-MM-DD"),
-    };
+    return { startDate: dayjs(range[0]).format("YYYY-MM-DD"), endDate: dayjs(range[1]).format("YYYY-MM-DD") };
   }, [range]);
 
   useEffect(() => {
-    const load = async () => {
-      if (!dateParams) return;
-      setLoading(true);
-      try {
-        setData(await getOnboardingFunnel(dateParams));
-      } catch (err) {
-        console.error("Error cargando funnel de onboarding:", err);
-        notifications.show({ color: "red", title: "Error", message: "No se pudo cargar el funnel" });
-      } finally {
-        setLoading(false);
-      }
+    if (!dateParams) return;
+    let alive = true;
+    setStatus("loading");
+    getOnboardingFunnel(dateParams)
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        setStatus("ok");
+      })
+      .catch(() => alive && setStatus("error"));
+    return () => {
+      alive = false;
     };
-    void load();
-  }, [dateParams]);
+  }, [dateParams, reload]);
 
-  // Insight: hito con mayor tasa de conversión a pago (entre los que tienen base relevante)
+  // Hito con mayor tasa de conversión a pago (con base relevante)
   const bestPredictor = useMemo(() => {
     if (!data) return null;
-    const candidates = data.conversionPorHito.filter((c) => c.base >= 3);
+    // Solo si alguien pagó: con 0 % en todos los hitos no hay nada que predecir.
+    const candidates = data.conversionPorHito.filter((c) => c.base >= 3 && c.tasaPago > 0);
     if (candidates.length === 0) return null;
     return candidates.reduce((a, b) => (b.tasaPago > a.tasaPago ? b : a));
   }, [data]);
 
   const registered = data?.funnel.find((f) => f.clave === "registrados")?.total ?? 0;
+  const loading = status === "loading" && !data;
 
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="lg">
-        {/* Navegación superadmin (compartida) */}
-
-        {/* Header + filtros */}
-        <Card withBorder radius="md" p="md">
-          <Group justify="space-between" align="flex-end" wrap="wrap">
-            <div>
-              <Title order={2}>Funnel de activación y onboarding</Title>
-              <Text c="dimmed" size="sm">
-                De los negocios registrados en el rango, cuántos alcanzan cada hito y cuál predice mejor la conversión a pago
-              </Text>
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 48px" }}>
+      <div className="ag-stack" style={{ gap: 20 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
+          <div>
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Activación</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+              De los negocios registrados en el rango, cuántos llegan a cada hito y cuál predice mejor que paguen.
             </div>
-            <Group gap="sm" align="flex-end">
-              <DatePickerInput
-                type="range" label="Registrados entre" placeholder="Rango"
-                value={range} onChange={setRange} locale="es" dropdownType="modal"
-              />
-              {loading && <Loader size="sm" />}
-            </Group>
-          </Group>
-        </Card>
+          </div>
+          <DatePickerInput type="range" label="Registrados entre" value={range} onChange={setRange} locale="es" valueFormat="D MMM YYYY" dropdownType="modal" style={{ minWidth: 240 }} />
+        </div>
 
-        {/* Insight destacado */}
-        {bestPredictor && (
-          <Alert icon={<IconBulb size={18} />} color="violet" variant="light" title="Hito que mejor predice la compra">
-            <Text size="sm">
-              En este rango, los negocios que alcanzan <strong>“{bestPredictor.hito}”</strong> convierten a pago en{" "}
-              <strong>{bestPredictor.tasaPago}%</strong> ({bestPredictor.pagaron} de {bestPredictor.base}). Es la palanca de
-              activación con mayor correlación con la conversión — vale la pena empujar a los usuarios hacia este hito.
-            </Text>
-          </Alert>
+        {status === "error" && (
+          <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+            <IconInfoCircle size={20} />
+            <div style={{ flex: 1 }}>No pudimos cargar el embudo.</div>
+            <button type="button" className="ag-link" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={() => setReload((n) => n + 1)}>
+              Reintentar
+            </button>
+          </div>
         )}
 
-        {/* Funnel */}
-        <Card withBorder radius="md" p="md">
-          <Text fw={700} size="lg" mb="xs">Funnel de activación</Text>
-          <Divider mb="md" />
-          <Stack gap="sm">
-            {(data?.funnel ?? []).map((step) => (
-              <div key={step.clave}>
-                <Group justify="space-between" mb={4}>
-                  {step.orgs && step.orgs.length > 0 ? (
-                    <HoverCard width={300} shadow="md" position="right" withArrow openDelay={150}>
-                      <HoverCard.Target>
-                        <Text
-                          size="sm"
-                          fw={500}
-                          style={{ cursor: "pointer", textDecoration: "underline dotted" }}
-                        >
-                          {step.hito}
-                        </Text>
-                      </HoverCard.Target>
-                      <HoverCard.Dropdown>
-                        <Text size="xs" fw={700} mb={6}>
-                          {step.hito} — {step.total} organización(es)
-                        </Text>
-                        <ScrollArea.Autosize mah={260}>
-                          <Stack gap={2} pr="xs">
-                            {step.orgs.map((o) => (
-                              <Text key={o.id} size="xs">{o.name}</Text>
-                            ))}
-                          </Stack>
-                        </ScrollArea.Autosize>
-                      </HoverCard.Dropdown>
-                    </HoverCard>
-                  ) : (
-                    <Text size="sm" fw={500}>{step.hito}</Text>
-                  )}
-                  <Group gap="xs">
-                    <Text size="sm" fw={700}>{step.total.toLocaleString("es-CO")}</Text>
-                    <Badge size="sm" variant="light" color={step.clave === "convertidasPago" ? "green" : "blue"}>
-                      {step.pct}%
-                    </Badge>
-                  </Group>
-                </Group>
-                <Progress
-                  value={step.pct}
-                  color={step.clave === "convertidasPago" ? "green" : step.clave === "primeraCita" ? "violet" : "blue"}
-                  size="lg" radius="sm"
-                />
-              </div>
-            ))}
-            {(!data || registered === 0) && !loading && (
-              <Text c="dimmed" ta="center" py="md">No hay registros en el rango seleccionado.</Text>
-            )}
-          </Stack>
-        </Card>
+        {bestPredictor && (
+          <div className="ag-alert ag-alert--success">
+            <IconBulb size={20} />
+            <div style={{ fontSize: 14 }}>
+              <b>El hito que mejor predice la compra es «{bestPredictor.hito}».</b> Los negocios que llegan ahí pagan en un {bestPredictor.tasaPago} % ({bestPredictor.pagaron}{" "}
+              de {bestPredictor.base}). Vale la pena empujar a los usuarios hacia ese hito.
+            </div>
+          </div>
+        )}
 
-        {/* Conversión a pago por hito */}
-        <Card withBorder radius="md" p="md">
-          <Text fw={700} size="lg" mb="xs">Conversión a pago según hito alcanzado</Text>
-          <Text size="xs" c="dimmed" mb="sm">
-            De los negocios que alcanzaron cada hito, qué porcentaje terminó pagando la suscripción.
-          </Text>
-          <Divider mb="sm" />
-          <ScrollArea>
-            <Table withTableBorder striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Hito alcanzado</Table.Th>
-                  <Table.Th>Negocios</Table.Th>
-                  <Table.Th>Pagaron</Table.Th>
-                  <Table.Th>Tasa de conversión a pago</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {(data?.conversionPorHito ?? []).map((c) => (
-                  <Table.Tr key={c.hito}>
-                    <Table.Td><Text size="sm" fw={500}>{c.hito}</Text></Table.Td>
-                    <Table.Td>{c.base}</Table.Td>
-                    <Table.Td>{c.pagaron}</Table.Td>
-                    <Table.Td>
-                      <Badge size="sm" variant="light" color={c.tasaPago >= 50 ? "green" : c.tasaPago >= 25 ? "yellow" : "gray"}>
-                        {c.tasaPago}%
-                      </Badge>
-                    </Table.Td>
-                  </Table.Tr>
+        <section className="ag-card" style={{ padding: 20, opacity: status === "loading" && data ? 0.6 : 1 }}>
+          <h2 className="ag-h" style={{ margin: "0 0 4px" }}>Embudo de activación</h2>
+          <div className="ag-subtle" style={{ marginBottom: 14 }}>Toca un hito para ver los negocios que llegaron.</div>
+          {loading ? (
+            <div className="ag-stack" style={{ gap: 14 }}>
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton key={i} height={34} />
+              ))}
+            </div>
+          ) : registered === 0 ? (
+            <div className="ag-muted" style={{ textAlign: "center", padding: "16px 0", fontSize: 14 }}>No hay registros en este rango.</div>
+          ) : (
+            <div className="ag-stack" style={{ gap: 6 }}>
+              {(data?.funnel ?? []).map((step) => {
+                const last = step.clave === "convertidasPago";
+                const clickable = !!step.orgs?.length;
+                const Row = clickable ? "button" : "div";
+                return (
+                  <Row
+                    key={step.clave}
+                    {...(clickable ? { type: "button" as const, onClick: () => setOpenStep(step) } : {})}
+                    className="sa-step"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      border: 0,
+                      background: "none",
+                      padding: "8px 6px",
+                      borderRadius: "var(--radius-md)",
+                      cursor: clickable ? "pointer" : "default",
+                      font: "inherit",
+                      color: "inherit",
+                    }}
+                  >
+                    <div className="ag-row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "nowrap", marginBottom: 6 }}>
+                      <span style={{ fontSize: 14, fontWeight: 500 }}>{step.hito}</span>
+                      <span className="ag-row" style={{ gap: 10, flexWrap: "nowrap" }}>
+                        <b className="ag-num">{step.total.toLocaleString("es-CO")}</b>
+                        <span className="ag-num ag-muted" style={{ minWidth: 60, textAlign: "right", whiteSpace: "nowrap" }}>{step.pct} %</span>
+                        {clickable ? <IconChevronRight size={16} color="var(--ink-subtle)" /> : <span style={{ width: 16 }} />}
+                      </span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 999, background: "var(--surface-hover)", overflow: "hidden" }}>
+                      <div style={{ width: `${Math.min(100, step.pct)}%`, height: "100%", background: last ? "var(--success)" : "var(--brand)" }} />
+                    </div>
+                  </Row>
+                );
+              })}
+            </div>
+          )}
+          <style>{`.sa-step:hover { background: var(--surface-hover) !important; } button.sa-step:focus-visible { outline: 2px solid var(--brand); }`}</style>
+        </section>
+
+        <section className="ag-card" style={{ overflowX: "auto" }}>
+          <div style={{ padding: "16px 16px 8px" }}>
+            <h2 className="ag-h" style={{ margin: 0 }}>Conversión a pago por hito</h2>
+            <div className="ag-subtle">De los negocios que llegaron a cada hito, cuántos terminaron pagando.</div>
+          </div>
+          <table className="ag-table" style={{ minWidth: 520 }}>
+            <thead>
+              <tr>
+                <th>Hito</th>
+                <th style={{ textAlign: "right" }}>Negocios</th>
+                <th style={{ textAlign: "right" }}>Pagaron</th>
+                <th style={{ textAlign: "right" }}>Tasa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.conversionPorHito ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="ag-muted" style={{ textAlign: "center", padding: "20px 16px" }}>
+                    {loading ? "Cargando…" : "Sin datos en este rango."}
+                  </td>
+                </tr>
+              ) : (
+                data!.conversionPorHito.map((c) => (
+                  <tr key={c.hito}>
+                    <td style={{ fontWeight: 500 }}>{c.hito}</td>
+                    <td className="ag-num" style={{ textAlign: "right" }}>{c.base}</td>
+                    <td className="ag-num" style={{ textAlign: "right" }}>{c.pagaron}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <span className={rateClass(c.tasaPago)}>{c.tasaPago} %</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          <div className="ag-row ag-subtle" style={{ gap: 14, padding: "10px 16px 14px" }}>
+            <span className="ag-row" style={{ gap: 6 }}>
+              <span className="ag-badge ag-badge--success">50 %</span> o más
+            </span>
+            <span className="ag-row" style={{ gap: 6 }}>
+              <span className="ag-badge ag-badge--warning">25 %</span> o más
+            </span>
+            <span className="ag-row" style={{ gap: 6 }}>
+              <span className="ag-badge">Neutro</span> menos de 25 %
+            </span>
+          </div>
+        </section>
+
+        <div className="ag-alert ag-alert--info">
+          <IconInfoCircle size={20} />
+          <div style={{ fontSize: 14 }}>
+            Los hitos se registran desde el 13/06/2026. Los negocios anteriores no los tienen, así que el embudo solo representa a quienes se registraron después.
+          </div>
+        </div>
+      </div>
+
+      <Drawer opened={!!openStep} onClose={() => setOpenStep(null)} position="right" size={420} title={<b style={{ fontSize: 16 }}>{openStep?.hito}</b>}>
+        {openStep && (
+          <div className="ag-stack" style={{ gap: 10 }}>
+            <div className="ag-subtle">
+              {openStep.total.toLocaleString("es-CO")} {openStep.total === 1 ? "negocio" : "negocios"} · {openStep.pct} % de los registrados
+            </div>
+            <ScrollArea.Autosize mah="calc(100dvh - 140px)">
+              <div className="ag-card">
+                {(openStep.orgs ?? []).map((o) => (
+                  <div key={o.id} style={{ padding: "9px 14px", borderBottom: "1px solid var(--line)", fontSize: 14 }}>
+                    {o.name}
+                  </div>
                 ))}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        </Card>
-
-        <Paper withBorder p="sm" radius="md" bg="gray.0">
-          <Text size="xs" c="dimmed">
-            Los hitos se registran desde el 13/06/2026. Negocios anteriores no tienen estos timestamps, así que el funnel es
-            representativo solo para cohortes registradas después de esa fecha.
-          </Text>
-        </Paper>
-      </Stack>
-    </Container>
+              </div>
+            </ScrollArea.Autosize>
+          </div>
+        )}
+      </Drawer>
+    </div>
   );
 }
