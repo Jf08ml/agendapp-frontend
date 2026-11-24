@@ -4,7 +4,7 @@
 // auditoría. «Nueva organización» abre la ficha en modo creación.
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ActionIcon, Avatar, Button, Menu, Modal, PasswordInput, Skeleton, TextInput, Textarea } from "@mantine/core";
+import { ActionIcon, Avatar, Button, Menu, Modal, PasswordInput, Skeleton, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   IconAlertTriangle,
@@ -19,13 +19,13 @@ import {
   IconMinus,
   IconPlus,
   IconSearch,
-  IconShieldCheck,
   IconTrash,
 } from "@tabler/icons-react";
 import { getOrganizations, Organization, updateOrganization } from "../../services/organizationService";
 import { getAllMemberships, Membership } from "../../services/membershipService";
 import { getOrganizationsActivityOverview, OrganizationActivityItem } from "../../services/platformAnalyticsService";
 import { apiGeneral } from "../../services/axiosConfig";
+import ImpersonateDialog from "./components/ImpersonateDialog";
 import { getOrgUrl } from "../../utils/domainUtils";
 import {
   ACTIVITY_FILTERS,
@@ -76,11 +76,7 @@ export default function SuperadminOrganizations() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | ActivityStatus>("all");
 
-  // Impersonación
   const [impersonateOrg, setImpersonateOrg] = useState<Organization | null>(null);
-  const [impersonateReason, setImpersonateReason] = useState("");
-  const [impersonating, setImpersonating] = useState(false);
-  const [impersonateError, setImpersonateError] = useState("");
 
   // Cambiar contraseña
   const [passwordOrg, setPasswordOrg] = useState<Organization | null>(null);
@@ -155,44 +151,6 @@ export default function SuperadminOrganizations() {
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgs, search, filter, activityByOrg]);
-
-  const handleImpersonate = async () => {
-    if (!impersonateOrg || impersonateReason.trim().length < 5) {
-      setImpersonateError("Escribe la razón del acceso (mínimo 5 caracteres).");
-      return;
-    }
-    setImpersonating(true);
-    setImpersonateError("");
-    try {
-      const res = await apiGeneral.post("/admin/impersonate", {
-        organizationId: impersonateOrg._id,
-        reason: impersonateReason.trim(),
-      });
-      const { exchangeCode, subdomain } = res.data.data;
-
-      // Guardar el token de superadmin antes de ser reemplazado por el de la org
-      const backupToken = localStorage.getItem("app_token");
-      const backupUserId = localStorage.getItem("app_userId");
-      const backupExpiresAt = localStorage.getItem("app_token_expires_at");
-      if (backupToken && backupUserId) {
-        localStorage.setItem("sa_backup", JSON.stringify({ token: backupToken, userId: backupUserId, expiresAt: backupExpiresAt }));
-      }
-
-      // Pestaña nueva: el panel del superadmin sigue abierto en esta.
-      const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-      const url = isDev ? `/exchange?slug=${impersonateOrg.slug}&code=${exchangeCode}` : `https://${subdomain}/exchange?code=${exchangeCode}`;
-      window.open(url, "_blank", "noopener,noreferrer");
-
-      notifications.show({ message: `Se abrió ${impersonateOrg.name} en una pestaña nueva.` });
-      setImpersonateOrg(null);
-      setImpersonateReason("");
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      setImpersonateError(e?.response?.data?.message || "No se pudo generar el acceso. Intenta de nuevo.");
-    } finally {
-      setImpersonating(false);
-    }
-  };
 
   const handleChangePassword = async () => {
     if (!passwordOrg) return;
@@ -367,11 +325,7 @@ export default function SuperadminOrganizations() {
                             <Button
                               size="xs"
                               variant="default"
-                              onClick={() => {
-                                setImpersonateOrg(org);
-                                setImpersonateReason("");
-                                setImpersonateError("");
-                              }}
+                              onClick={() => setImpersonateOrg(org)}
                             >
                               Entrar
                             </Button>
@@ -424,34 +378,7 @@ export default function SuperadminOrganizations() {
         )}
       </div>
 
-      {/* Entrar como administrador (impersonación) */}
-      <Modal opened={!!impersonateOrg} onClose={() => !impersonating && setImpersonateOrg(null)} title={<b>Entrar como administrador de {impersonateOrg?.name}</b>} centered>
-        <div className="ag-stack" style={{ gap: 14 }}>
-          <div className="ag-alert ag-alert--info">
-            <IconShieldCheck size={20} />
-            <div style={{ fontSize: 14 }}>Se abre en una pestaña nueva y dura 60 minutos. El acceso y su razón quedan en el registro de auditoría.</div>
-          </div>
-          <Textarea
-            label="Razón del acceso"
-            required
-            placeholder="Ej.: soporte, el negocio reportó un error en la agenda"
-            value={impersonateReason}
-            onChange={(e) => setImpersonateReason(e.currentTarget.value)}
-            minRows={2}
-            autosize
-            disabled={impersonating}
-            error={impersonateError || undefined}
-          />
-          <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
-            <Button variant="default" onClick={() => setImpersonateOrg(null)} disabled={impersonating}>
-              Cancelar
-            </Button>
-            <Button color="var(--platform)" onClick={handleImpersonate} loading={impersonating}>
-              Entrar como admin
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <ImpersonateDialog org={impersonateOrg} onClose={() => setImpersonateOrg(null)} />
 
       {/* Cambiar contraseña */}
       <Modal opened={!!passwordOrg} onClose={() => !savingPassword && setPasswordOrg(null)} title={<b>Cambiar contraseña de {passwordOrg?.name}</b>} centered>

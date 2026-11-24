@@ -1,36 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Container,
-  Tabs,
-  rem,
-  Group,
-  Title,
-  Button,
-  Text,
-  Divider,
-  Stack,
-} from "@mantine/core";
+// Ficha de una organización del superadmin (rediseño, SuperadminOrganizacionDetalle):
+// «← Organizaciones», encabezado con estado de membresía y actividad, «Entrar
+// como admin», «⋯» y «Guardar cambios». Edición directa (sin modo «Editar»),
+// pestañas en una línea y Administración en tarjetas. El modo creación
+// (/superadmin/organizaciones/nueva) usa la misma pantalla.
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActionIcon, Avatar, Button, Menu, Modal, Skeleton, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { zodResolver } from "../../utils/zodResolver";
 import { notifications } from "@mantine/notifications";
-import { useNavigate, useParams } from "react-router-dom";
-
-import { GrOrganization } from "react-icons/gr";
-import { RiGlobalLine } from "react-icons/ri";
-import {
-  BiLocationPlus,
-  BiCreditCard,
-  BiCalendar,
-  BiArrowBack,
-  BiEdit,
-} from "react-icons/bi";
-import {
-  MdBrandingWatermark,
-  MdBlock,
-  MdNotifications,
-  MdAdminPanelSettings,
-} from "react-icons/md";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { IconAlertTriangle, IconArrowLeft, IconDots, IconLink, IconTrash } from "@tabler/icons-react";
+import { apiGeneral } from "../../services/axiosConfig";
+import { getAllMemberships, getAllPlans, type Membership, type Plan } from "../../services/membershipService";
+import { getOrganizationsActivityOverview, type OrganizationActivityItem } from "../../services/platformAnalyticsService";
+import { getOrgUrl } from "../../utils/domainUtils";
+import ImpersonateDialog from "./components/ImpersonateDialog";
+import { EditMembershipModal } from "./EditMembershipModal";
+import { ACTIVITY_META, MEMBERSHIP_META, activityStatus, badgeClass } from "./organizationsModel";
 
 import {
   getOrganizationById,
@@ -39,7 +26,6 @@ import {
   Organization,
 } from "../../services/organizationService";
 import { uploadImage } from "../../services/imageService";
-import CustomLoader from "../../components/customLoader/CustomLoader";
 
 // Reuse existing tab components
 import ContactTab from "../admin/OrganizationInfo/components/tabs/ContactTab";
@@ -126,7 +112,16 @@ export default function SuperadminOrganizationEdit() {
   const isCreateMode = id === "nueva";
 
   const [loading, setLoading] = useState(!isCreateMode);
-  const [isEditing, setIsEditing] = useState(isCreateMode);
+  const [tab, setTab] = useState("admin");
+  const [membership, setMembership] = useState<Membership | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [activity, setActivity] = useState<OrganizationActivityItem | null>(null);
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [editMembershipOpen, setEditMembershipOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [org, setOrg] = useState<Organization | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -136,6 +131,8 @@ export default function SuperadminOrganizationEdit() {
   const [uploadingPwaIcon, setUploadingPwaIcon] = useState(false);
 
   const isBlockingRef = useRef(false);
+  // Últimos valores guardados: «Descartar» vuelve a ellos.
+  const savedRef = useRef<SuperadminFormValues | null>(null);
 
   const form = useForm<SuperadminFormValues>({
     validate: zodResolver(superadminSchema),
@@ -228,6 +225,7 @@ export default function SuperadminOrganizationEdit() {
             ? structuredClone(normalized as any)
             : JSON.parse(JSON.stringify(normalized))
         );
+        savedRef.current = JSON.parse(JSON.stringify(normalized));
         form.resetDirty();
       } catch (e) {
         console.error(e);
@@ -236,7 +234,7 @@ export default function SuperadminOrganizationEdit() {
           message: "No se pudo cargar la organización",
           color: "red",
         });
-        navigate("/superadmin");
+        navigate("/superadmin/orgs");
       } finally {
         setLoading(false);
       }
@@ -246,11 +244,30 @@ export default function SuperadminOrganizationEdit() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isCreateMode]);
 
-  // Track dirty for exit warning
-  const isDirty = useMemo(() => form.isDirty(), [form]);
+  // Membresía (tarjeta de Administración) y actividad (encabezado)
+  const loadMembership = useCallback(async () => {
+    if (isCreateMode || !id) return;
+    try {
+      const [all, allPlans] = await Promise.all([getAllMemberships(), getAllPlans()]);
+      setPlans(allPlans);
+      setMembership(
+        all.find((m: Membership) => (typeof m.organizationId === "string" ? m.organizationId : (m.organizationId as unknown as { _id?: string } | null)?._id) === id) ?? null
+      );
+    } catch {
+      /* la tarjeta queda sin datos */
+    }
+  }, [id, isCreateMode]);
+
   useEffect(() => {
-    isBlockingRef.current = isEditing && isDirty;
-  }, [isEditing, isDirty]);
+    loadMembership();
+    if (isCreateMode || !id) return;
+    getOrganizationsActivityOverview()
+      .then((list) => setActivity(list.find((a) => a.organizationId === id) ?? null))
+      .catch(() => {});
+  }, [id, isCreateMode, loadMembership]);
+
+  // Aviso al salir con cambios sin guardar
+  isBlockingRef.current = form.isDirty();
 
   useEffect(() => {
     const beforeUnload = (e: BeforeUnloadEvent) => {
@@ -320,12 +337,11 @@ export default function SuperadminOrganizationEdit() {
 
   const handleCancel = () => {
     if (isCreateMode) {
-      navigate("/superadmin");
+      navigate("/superadmin/orgs");
       return;
     }
-    form.setValues((org || {}) as any);
+    if (savedRef.current) form.setValues(JSON.parse(JSON.stringify(savedRef.current)));
     form.resetDirty();
-    setIsEditing(false);
   };
 
   const handleSave = async () => {
@@ -370,7 +386,7 @@ export default function SuperadminOrganizationEdit() {
           message: `${created.name} creada correctamente`,
           color: "green",
         });
-        navigate("/superadmin");
+        navigate("/superadmin/orgs");
       } else {
         if (!id) return;
         // Remove _id from payload
@@ -386,8 +402,8 @@ export default function SuperadminOrganizationEdit() {
           password: "",
         };
         form.setValues(normalized as any);
+        savedRef.current = JSON.parse(JSON.stringify(normalized));
         form.resetDirty();
-        setIsEditing(false);
 
         notifications.show({
           title: "Guardado",
@@ -409,194 +425,221 @@ export default function SuperadminOrganizationEdit() {
     }
   };
 
-  if (loading)
-    return <CustomLoader loadingText="Cargando organización..." />;
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 1120, margin: "0 auto", padding: "24px 16px" }}>
+        <Skeleton height={14} width={120} mb={16} />
+        <Skeleton height={48} width="50%" mb={20} />
+        <Skeleton height={36} mb={16} />
+        <Skeleton height={240} />
+      </div>
+    );
+  }
 
-  const iconStyle = { width: rem(12), height: rem(12) };
+  const membershipMeta = membership ? MEMBERSHIP_META[membership.status] ?? { label: membership.status, tone: "neutral" as const } : null;
+  const activityMeta = !isCreateMode && org ? ACTIVITY_META[activityStatus(org.setupCompleted, activity ?? undefined)] : null;
+  const web = org ? getOrgUrl(org) : null;
+  const dirty = form.isDirty();
+
+  const copyLink = async () => {
+    if (!web) return;
+    try {
+      await navigator.clipboard.writeText(web);
+      notifications.show({ message: `Enlace copiado: ${web}` });
+    } catch {
+      notifications.show({ message: "No se pudo copiar el enlace.", color: "red" });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!org?._id) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await apiGeneral.delete(`/admin/organizations/${org._id}`);
+      notifications.show({ message: `${org.name} se eliminó.` });
+      navigate("/superadmin/orgs");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      setDeleteError(e?.response?.data?.message || "No se pudo eliminar la organización.");
+      setDeleting(false);
+    }
+  };
+
+  const TABS: { value: string; label: string }[] = [
+    { value: "admin", label: "Administración" },
+    { value: "contact", label: "Contacto" },
+    { value: "openingsHours", label: "Horario" },
+    { value: "socialMedia", label: "Redes" },
+    { value: "location", label: "Ubicación" },
+    { value: "onlineBooking", label: "Reservas" },
+    { value: "fidelity", label: "Fidelidad" },
+    { value: "branding", label: "Marca" },
+    { value: "payments", label: "Pagos" },
+    { value: "cancellation", label: "Cancelación" },
+    { value: "reminders", label: "Recordatorios" },
+  ];
+
+  const f = form as any;
 
   return (
-    <Container size="lg" py="md">
-      {/* Header */}
-      <Stack gap="xs" mb="md">
-        <Group justify="space-between" align="center">
-          <Group gap="sm">
-            <Button
-              variant="subtle"
-              size="compact-sm"
-              leftSection={<BiArrowBack size={16} />}
-              onClick={() => navigate("/superadmin")}
+    <div style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 16px 48px" }}>
+      <style>{`
+        .sa-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+        .sa-tabs::-webkit-scrollbar { display: none; }
+        .sa-tabs button { flex: none; border: 0; background: none; padding: 0 0 10px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--ink-muted); font: 500 14px/20px var(--font-sans); cursor: pointer; white-space: nowrap; }
+        .sa-tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--ink); font-weight: 600; }
+      `}</style>
+
+      <Link to="/superadmin/orgs" className="ag-link ag-row" style={{ gap: 4, display: "inline-flex", marginBottom: 12 }}>
+        <IconArrowLeft size={14} /> Organizaciones
+      </Link>
+
+      <div className="ag-row" style={{ justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 20 }}>
+        <div className="ag-row" style={{ gap: 12, flexWrap: "nowrap", minWidth: 0 }}>
+          {!isCreateMode && (
+            <Avatar
+              src={org?.branding?.logoUrl || undefined}
+              size={48}
+              radius="xl"
+              styles={{ root: { background: "var(--surface-hover)", flex: "none" }, placeholder: { color: "var(--ink-muted)", fontWeight: 600 } }}
             >
-              Volver
-            </Button>
-            <Title order={3}>
-              {isCreateMode
-                ? "Nueva organización"
-                : org?.name || "Organización"}
-            </Title>
-          </Group>
-          {!isCreateMode && !isEditing && (
-            <Button
-              leftSection={<BiEdit size={16} />}
-              onClick={() => setIsEditing(true)}
-            >
-              Editar
-            </Button>
+              {(org?.name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("")}
+            </Avatar>
           )}
-        </Group>
-        {!isCreateMode && org?.email && (
-          <Text c="dimmed" size="sm" ml={90}>
-            {org.email}
-          </Text>
-        )}
-      </Stack>
+          <div style={{ minWidth: 0 }}>
+            <div className="ag-row" style={{ gap: 8 }}>
+              <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
+                {isCreateMode ? "Nueva organización" : org?.name || "Organización"}
+              </h1>
+              {membershipMeta && <span className={badgeClass(membershipMeta.tone)}>Membresía: {membershipMeta.label}</span>}
+              {activityMeta && <span className={badgeClass(activityMeta.tone)}>{activityMeta.label}</span>}
+            </div>
+            {!isCreateMode && (
+              <div className="ag-muted" style={{ fontSize: 14, marginTop: 2 }}>
+                {[org?.email, web?.replace(/^https?:\/\//, "")].filter(Boolean).join(" · ")}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="ag-row" style={{ gap: 8, flexWrap: "nowrap" }}>
+          {!isCreateMode && org && (
+            <>
+              <Button variant="default" onClick={() => setImpersonateOpen(true)}>
+                Entrar como admin
+              </Button>
+              <Menu position="bottom-end" withinPortal width={200}>
+                <Menu.Target>
+                  <ActionIcon variant="default" size={36} aria-label="Más acciones">
+                    <IconDots size={18} />
+                  </ActionIcon>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<IconLink size={16} />} disabled={!web} onClick={copyLink}>
+                    {web ? "Copiar enlace" : "Sin dirección web"}
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item
+                    color="red"
+                    leftSection={<IconTrash size={16} />}
+                    onClick={() => {
+                      setDeleteOpen(true);
+                      setDeleteConfirm("");
+                      setDeleteError("");
+                    }}
+                  >
+                    Eliminar organización
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </>
+          )}
+          <Button color="var(--platform)" onClick={handleSave} loading={saving} disabled={!isCreateMode && !dirty}>
+            {isCreateMode ? "Crear organización" : "Guardar cambios"}
+          </Button>
+        </div>
+      </div>
 
-      <Divider my="sm" />
+      <div className="sa-tabs" role="tablist" aria-label="Secciones de la organización">
+        {TABS.map((t) => (
+          <button key={t.value} type="button" role="tab" aria-selected={tab === t.value} onClick={() => setTab(t.value)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <Tabs defaultValue="admin" keepMounted={false}>
-        <Tabs.List style={{ flexWrap: "wrap" }}>
-          <Tabs.Tab
-            value="admin"
-            leftSection={<MdAdminPanelSettings style={iconStyle} />}
-          >
-            Administración
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="contact"
-            leftSection={<GrOrganization style={iconStyle} />}
-          >
-            Contacto
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="openingsHours"
-            leftSection={<GrOrganization style={iconStyle} />}
-          >
-            Horario
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="socialMedia"
-            leftSection={<RiGlobalLine style={iconStyle} />}
-          >
-            Redes
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="location"
-            leftSection={<BiLocationPlus style={iconStyle} />}
-          >
-            Ubicación
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="onlineBooking"
-            leftSection={<BiCalendar style={iconStyle} />}
-          >
-            Reservas
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="fidelity"
-            leftSection={<GrOrganization style={iconStyle} />}
-          >
-            Fidelidad
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="branding"
-            leftSection={<MdBrandingWatermark style={iconStyle} />}
-          >
-            Branding
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="payments"
-            leftSection={<BiCreditCard style={iconStyle} />}
-          >
-            Pagos
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="cancellation"
-            leftSection={<MdBlock style={iconStyle} />}
-          >
-            Cancelación
-          </Tabs.Tab>
-          <Tabs.Tab
-            value="reminders"
-            leftSection={<MdNotifications style={iconStyle} />}
-          >
-            Recordatorios
-          </Tabs.Tab>
-        </Tabs.List>
-
-        <Tabs.Panel value="admin" pt="md">
+      <div style={{ paddingTop: 20 }}>
+        {tab === "admin" && (
           <AdminTab
             form={form}
-            isEditing={isEditing}
             isCreateMode={isCreateMode}
             organizationId={org?._id}
-            currentMembershipId={org?.currentMembershipId}
-            onMembershipCreated={async () => {
-              if (!id) return;
-              const updated = await getOrganizationById(id);
-              if (updated) setOrg(updated);
-            }}
+            membership={membership}
+            onEditMembership={membership ? () => setEditMembershipOpen(true) : undefined}
+            onMembershipCreated={loadMembership}
           />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="contact" pt="md">
-          <ContactTab
-            form={form as any}
-            isEditing={isEditing}
-            domains={form.values.domains || []}
-          />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="openingsHours" pt="md">
-          <OpeningHoursTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="socialMedia" pt="md">
-          <SocialMediaTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="location" pt="md">
-          <LocationTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="onlineBooking" pt="md">
-          <OnlineBookingTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="fidelity" pt="md">
-          <FidelityTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="branding" pt="md">
+        )}
+        {tab === "contact" && <ContactTab form={f} isEditing domains={form.values.domains || []} />}
+        {tab === "openingsHours" && <OpeningHoursTab form={f} isEditing />}
+        {tab === "socialMedia" && <SocialMediaTab form={f} isEditing />}
+        {tab === "location" && <LocationTab form={f} isEditing />}
+        {tab === "onlineBooking" && <OnlineBookingTab form={f} isEditing />}
+        {tab === "fidelity" && <FidelityTab form={f} isEditing />}
+        {tab === "branding" && (
           <BrandingTab
-            form={form as any}
-            isEditing={isEditing}
+            form={f}
+            isEditing
             uploadingLogo={uploadingLogo}
             uploadingFavicon={uploadingFavicon}
             uploadingPwaIcon={uploadingPwaIcon}
             onUpload={onUpload}
           />
-        </Tabs.Panel>
+        )}
+        {tab === "payments" && <PaymentMethodsTab form={f} isEditing />}
+        {tab === "cancellation" && <CancellationPolicyTab form={f} isEditing />}
+        {tab === "reminders" && <ReminderSettingsTab form={f} isEditing />}
+      </div>
 
-        <Tabs.Panel value="payments" pt="md">
-          <PaymentMethodsTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
+      {!isCreateMode && <StickyActionBar isDirty={dirty} saving={saving} onCancel={handleCancel} onSave={handleSave} />}
 
-        <Tabs.Panel value="cancellation" pt="md">
-          <CancellationPolicyTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
+      <ImpersonateDialog org={impersonateOpen ? org : null} onClose={() => setImpersonateOpen(false)} />
 
-        <Tabs.Panel value="reminders" pt="md">
-          <ReminderSettingsTab form={form as any} isEditing={isEditing} />
-        </Tabs.Panel>
-      </Tabs>
+      <EditMembershipModal
+        opened={editMembershipOpen}
+        onClose={() => setEditMembershipOpen(false)}
+        membership={membership}
+        plans={plans}
+        onSuccess={loadMembership}
+      />
 
-      {isEditing && (
-        <StickyActionBar
-          isDirty={isDirty}
-          saving={saving}
-          onCancel={handleCancel}
-          onSave={handleSave}
-        />
-      )}
-    </Container>
+      <Modal opened={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} title={<b>Eliminar {org?.name}</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          <div className="ag-alert ag-alert--danger">
+            <IconAlertTriangle size={20} />
+            <div style={{ fontSize: 14 }}>No se puede deshacer. Se borran todos sus datos: citas, clientes, empleados, servicios, membresías, campañas y más.</div>
+          </div>
+          <TextInput
+            label={
+              <span>
+                Para confirmar, escribe <b>{org?.name}</b>
+              </span>
+            }
+            placeholder={org?.name}
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.currentTarget.value)}
+            disabled={deleting}
+            error={deleteError || undefined}
+          />
+          <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+            <Button variant="default" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button color="red" onClick={handleDelete} loading={deleting} disabled={deleteConfirm !== org?.name}>
+              Eliminar definitivamente
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }
