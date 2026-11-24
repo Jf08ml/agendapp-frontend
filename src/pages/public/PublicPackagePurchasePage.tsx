@@ -9,6 +9,7 @@ import { CountryCode } from "libphonenumber-js";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import InternationalPhoneInput from "../../components/InternationalPhoneInput";
+import { packageSavings } from "../../utils/packagePricing";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { getClientByIdentifier } from "../../services/clientService";
 import {
@@ -379,6 +380,15 @@ export default function PublicPackagePurchasePage() {
               <div className="ag-row" style={{ gap: 10, marginTop: 4, flexWrap: "wrap", fontSize: 13 }}>
                 <b className="ag-num">{hasTiers(pkg) ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}` : formatCurrency(pkg.price ?? 0, currency)}</b>
                 <span className="ag-muted">Vigencia {pkg.validityDays} días</span>
+                {(() => {
+                  const sv = packageSavings(pkg.tiers);
+                  return (
+                    <>
+                      {sv.minPerSession !== null && <span className="ag-muted ag-num">desde {formatCurrency(Math.round(sv.minPerSession), currency)} por sesión</span>}
+                      {sv.upTo >= 1 && <span className="ag-badge ag-badge--success" style={{ height: 20, fontSize: 11 }}>Ahorra hasta {sv.upTo} %</span>}
+                    </>
+                  );
+                })()}
               </div>
               <div className="ag-subtle" style={{ marginTop: 2 }}>{includes(pkg).join(" · ")}</div>
             </div>
