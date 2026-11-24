@@ -34,6 +34,22 @@ import { listReceiptOrders, reviewReceiptOrder, type ReceiptOrder } from "../../
 import { formatCurrency } from "../../../utils/formatCurrency";
 import CashSubtabs from "../../../components/cash/CashSubtabs";
 
+// Motivos rápidos al rechazar (llenan el texto; el cliente lo recibe por WhatsApp)
+const QUICK_REJECT_REASONS = [
+  "El monto no coincide con el valor a pagar.",
+  "El pago no aparece en nuestra cuenta.",
+  "El comprobante no se lee bien. Envía una foto más clara.",
+  "Este comprobante ya se usó en otro pago.",
+  "La cuenta de destino no es la del negocio.",
+];
+
+/** Nota de la IA sin repetir los motivos (antes venían pegados en aiNotes). */
+function extraAiNote(aiNotes?: string, reasons?: string[]): string {
+  let note = aiNotes || "";
+  for (const r of reasons || []) note = note.replace(r, "");
+  return note.replace(/\s+/g, " ").trim();
+}
+
 const TYPE_LABEL: Record<string, string> = {
   reservation: "Reserva",
   class: "Clase",
@@ -512,10 +528,35 @@ export default function ReceiptReviewPage() {
                 <DataRow label="Enviado" value={formatDateTime(current.receipt?.uploadedAt || current.createdAt)} />
               </dl>
 
-              {current.receipt?.aiNotes && (
-                <div className="ag-alert ag-alert--warning">
+              {/* Fase 3: por qué no se aprobó solo (motivos guardados por el servidor) */}
+              {(current.receipt?.reasons?.length ?? 0) > 0 && (
+                <div className="ag-alert ag-alert--warning" style={{ alignItems: "flex-start" }}>
                   <IconAlertTriangle size={20} />
-                  <div>{current.receipt.aiNotes}</div>
+                  <div>
+                    <b>No se aprobó solo porque:</b>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                      {current.receipt!.reasons!.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              {(() => {
+                const note = extraAiNote(current.receipt?.aiNotes, current.receipt?.reasons);
+                return note ? (
+                  <div className={`ag-alert ${current.receipt?.reasons?.length ? "ag-alert--info" : "ag-alert--warning"}`}>
+                    <IconAlertTriangle size={20} />
+                    <div>{note}</div>
+                  </div>
+                ) : null;
+              })()}
+              {current.status === "failed" && current.receipt?.reviewNotes && (
+                <div className="ag-alert">
+                  <IconX size={20} />
+                  <div>
+                    <b>Motivo del rechazo:</b> {current.receipt.reviewNotes}
+                  </div>
                 </div>
               )}
             </div>
@@ -558,8 +599,22 @@ export default function ReceiptReviewPage() {
       <Modal opened={!!rejectFor} onClose={() => setRejectFor(null)} title="Rechazar comprobante" centered zIndex={400}>
         <Stack>
           <Text size="sm" c="var(--ink-muted)">
-            Se cancelará la reserva/inscripción asociada. Opcionalmente indica el motivo.
+            Se cancelará la reserva o inscripción asociada. El cliente recibe el motivo por WhatsApp para que sepa qué corregir.
           </Text>
+          <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }} aria-label="Motivos rápidos">
+            {QUICK_REJECT_REASONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                className="ag-chip"
+                aria-pressed={rejectNotes === r}
+                onClick={() => setRejectNotes(r)}
+                style={{ cursor: "pointer", height: "auto", minHeight: 32, whiteSpace: "normal", textAlign: "left", padding: "6px 12px" }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
           <Textarea
             label="Motivo del rechazo (opcional)"
             value={rejectNotes}
