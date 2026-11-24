@@ -1,42 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // pages/superadmin/SuperadminPlans.tsx
+// Planes de la plataforma (rediseño, SuperadminPlanes): tabla con precio y
+// ciclo, dominio en texto, PayPal en mono o «Sin configurar», y edición en
+// panel lateral con General, Características y Límites.
 import { useEffect, useState } from "react";
-import {
-  Container,
-  Title,
-  Table,
-  Badge,
-  Group,
-  Button,
-  Text,
-  Stack,
-  ActionIcon,
-  Tooltip,
-  Modal,
-  TextInput,
-  NumberInput,
-  Select,
-  Switch,
-  Tabs,
-  Textarea,
-  Divider,
-  Paper,
-  Alert,
-  Loader,
-  Code,
-} from "@mantine/core";
+import { ActionIcon, Button, Drawer, Modal, NumberInput, Select, Skeleton, Switch, TextInput, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import {
-  IconPlus,
-  IconEdit,
-  IconTrash,
-  IconRefresh,
-  IconBuildingBank,
-  IconCreditCard,
-  IconTag,
-  IconX,
-  IconCheck,
-} from "@tabler/icons-react";
+import { IconAlertTriangle, IconEdit, IconInfoCircle, IconPlus, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import {
   getAllPlans,
   createPlan,
@@ -102,6 +72,7 @@ export default function SuperadminPlans() {
 
   // Nuevo característica input
   const [newChar, setNewChar] = useState("");
+  const [planTab, setPlanTab] = useState<"general" | "caracteristicas" | "limites">("general");
 
   // Modal delete
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
@@ -128,6 +99,7 @@ export default function SuperadminPlans() {
     setEditingPlan(null);
     setForm(EMPTY_PLAN);
     setNewChar("");
+    setPlanTab("general");
     setModalOpened(true);
   };
 
@@ -167,6 +139,7 @@ export default function SuperadminPlans() {
       },
     });
     setNewChar("");
+    setPlanTab("general");
     setModalOpened(true);
   };
 
@@ -203,7 +176,7 @@ export default function SuperadminPlans() {
   // ── Guardar ────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.displayName || !form.slug || form.price < 0) {
-      notifications.show({ title: "Campos requeridos", message: "displayName, slug y precio son obligatorios", color: "orange" });
+      notifications.show({ title: "Campos requeridos", message: "El nombre visible, el slug y el precio son obligatorios.", color: "orange" });
       return;
     }
     setSaving(true);
@@ -253,393 +226,311 @@ export default function SuperadminPlans() {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const rows = plans.map((p) => (
-    <Table.Tr key={p._id}>
-      <Table.Td>
-        <Stack gap={2}>
-          <Text fw={600} size="sm">{p.displayName}</Text>
-          <Code style={{ fontSize: 11 }}>{p.slug}</Code>
-        </Stack>
-      </Table.Td>
-      <Table.Td>
-        <Text fw={700}>${p.price} {p.currency}</Text>
-        <Text size="xs" c="dimmed">{billingLabel(p.billingCycle)}</Text>
-      </Table.Td>
-      <Table.Td>
-        <Badge variant="light" color={p.domainType === "custom_domain" ? "grape" : "blue"} size="sm">
-          {p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}
-        </Badge>
-      </Table.Td>
-      <Table.Td>
-        {p.paypalPlanId ? (
-          <Badge color="green" variant="light" size="sm" leftSection={<IconCheck size={10} />}>
-            {p.paypalPlanId}
-          </Badge>
-        ) : (
-          <Badge color="red" variant="light" size="sm" leftSection={<IconX size={10} />}>
-            Sin configurar
-          </Badge>
-        )}
-      </Table.Td>
-      <Table.Td>
-        <Badge color={p.isActive ? "green" : "gray"} variant="dot" size="sm">
-          {p.isActive ? "Activo" : "Inactivo"}
-        </Badge>
-      </Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <Tooltip label="Editar">
-            <ActionIcon variant="light" color="blue" onClick={() => openEdit(p)}>
-              <IconEdit size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Eliminar">
-            <ActionIcon variant="light" color="red" onClick={() => setDeleteTarget(p)}>
-              <IconTrash size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
+  const mono = { fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)", fontSize: 12 } as const;
+  const unlimited = (key: keyof PlanInput["limits"]) => ({
+    placeholder: "Ilimitado",
+    min: 0,
+    value: (form.limits[key] as number | null) ?? "",
+    onChange: (v: string | number) => setLimit(key, v === "" ? null : Number(v)),
+  });
 
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="lg">
-
-        {/* Navegación superadmin (compartida) */}
-
-        {/* Header */}
-        <Group justify="space-between">
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 48px" }}>
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div>
-            <Title order={2}>Gestión de Planes</Title>
-            <Text c="dimmed" size="sm">
-              Crea y edita los planes de la plataforma, incluyendo la configuración de PayPal
-            </Text>
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Planes</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+              Lo que se vende: precio, límites y el plan de PayPal de cada uno.
+            </div>
           </div>
-          <Group gap="xs">
-            <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={fetchPlans}>
+          <div className="ag-row" style={{ gap: 8 }}>
+            <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={fetchPlans} loading={loading}>
               Actualizar
             </Button>
-            <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
-              Nuevo Plan
+            <Button color="var(--platform)" leftSection={<IconPlus size={16} />} onClick={openCreate}>
+              Nuevo plan
             </Button>
-          </Group>
-        </Group>
+          </div>
+        </div>
 
-        {/* Aviso PayPal */}
-        <Alert color="blue" variant="light" icon={<IconCreditCard size={18} />}>
-          <Text size="sm">
-            El <strong>Plan ID de PayPal</strong> es necesario para habilitar el pago con suscripción automática en cada plan.
-            Ve a tu dashboard de PayPal → Productos y planes → [Plan] para obtener el ID (formato <code>P-XXXXX</code>).
-          </Text>
-        </Alert>
+        <div className="ag-alert ag-alert--info">
+          <IconInfoCircle size={20} />
+          <div style={{ fontSize: 14 }}>
+            El <b>Plan ID de PayPal</b> habilita el pago con suscripción automática. Lo encuentras en PayPal › Productos y planes › el plan; tiene el formato{" "}
+            <code style={mono}>P-XXXXX</code>.
+          </div>
+        </div>
 
-        {/* Tabla */}
-        {loading ? (
-          <Stack align="center" py="xl">
-            <Loader />
-            <Text c="dimmed">Cargando planes...</Text>
-          </Stack>
-        ) : (
-          <Paper withBorder radius="md">
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Plan</Table.Th>
-                  <Table.Th>Precio</Table.Th>
-                  <Table.Th>Dominio</Table.Th>
-                  <Table.Th>PayPal Plan ID</Table.Th>
-                  <Table.Th>Estado</Table.Th>
-                  <Table.Th>Acciones</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.length > 0 ? rows : (
-                  <Table.Tr>
-                    <Table.Td colSpan={6}>
-                      <Text ta="center" c="dimmed" py="lg">No hay planes. Crea uno nuevo.</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-        )}
-      </Stack>
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table" style={{ minWidth: 860 }}>
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th>Precio</th>
+                <th>Dominio</th>
+                <th>PayPal</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && plans.length === 0 ? (
+                [0, 1, 2].map((i) => (
+                  <tr key={i}>
+                    <td colSpan={6}>
+                      <Skeleton height={18} />
+                    </td>
+                  </tr>
+                ))
+              ) : plans.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="ag-muted" style={{ textAlign: "center", padding: "32px 16px" }}>
+                    Aún no hay planes. Crea el primero con «Nuevo plan».
+                  </td>
+                </tr>
+              ) : (
+                plans.map((p) => (
+                  <tr key={p._id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{p.displayName}</div>
+                      <div className="ag-subtle" style={mono}>{p.slug}</div>
+                    </td>
+                    <td>
+                      <div className="ag-num" style={{ fontWeight: 600 }}>
+                        ${p.price.toLocaleString()} {p.currency}
+                      </div>
+                      <div className="ag-subtle">{billingLabel(p.billingCycle)}</div>
+                    </td>
+                    <td>{p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}</td>
+                    <td>{p.paypalPlanId ? <span style={mono}>{p.paypalPlanId}</span> : <span className="ag-badge ag-badge--warning">Sin configurar</span>}</td>
+                    <td>{p.isActive ? <span className="ag-badge ag-badge--success">Activo</span> : <span className="ag-badge">Inactivo</span>}</td>
+                    <td>
+                      <div className="ag-row" style={{ gap: 4, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                        <Button size="xs" variant="default" leftSection={<IconEdit size={14} />} onClick={() => openEdit(p)} aria-label={`Editar ${p.displayName}`}>
+                          Editar
+                        </Button>
+                        <ActionIcon variant="subtle" color="gray" onClick={() => setDeleteTarget(p)} aria-label={`Eliminar ${p.displayName}`}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* ── Modal Crear / Editar ──────────────────────────────────────────── */}
-      <Modal
+      {/* ── Panel crear / editar ─────────────────────────────────────────── */}
+      <Drawer
         opened={modalOpened}
-        onClose={() => setModalOpened(false)}
-        title={
-          <Text fw={700} size="lg">
-            {editingPlan ? `Editar: ${editingPlan.displayName}` : "Nuevo Plan"}
-          </Text>
-        }
-        size="xl"
-        centered
+        onClose={() => !saving && setModalOpened(false)}
+        position="right"
+        size={560}
+        title={<b style={{ fontSize: 16 }}>{editingPlan ? `Editar ${editingPlan.displayName}` : "Nuevo plan"}</b>}
+        styles={{ body: { display: "flex", flexDirection: "column", gap: 16 } }}
       >
-        <Tabs defaultValue="general">
-          <Tabs.List mb="md">
-            <Tabs.Tab value="general" leftSection={<IconTag size={14} />}>General</Tabs.Tab>
-            <Tabs.Tab value="caracteristicas">Características</Tabs.Tab>
-            <Tabs.Tab value="limites">Límites</Tabs.Tab>
-          </Tabs.List>
+        <div className="ag-subtabs" role="tablist" aria-label="Secciones del plan" style={{ gap: 20 }}>
+          {(
+            [
+              ["general", "General"],
+              ["caracteristicas", "Características"],
+              ["limites", "Límites"],
+            ] as const
+          ).map(([value, label]) => (
+            <a
+              key={value}
+              href={`#${value}`}
+              role="tab"
+              aria-current={planTab === value ? "page" : undefined}
+              onClick={(e) => {
+                e.preventDefault();
+                setPlanTab(value);
+              }}
+            >
+              {label}
+            </a>
+          ))}
+        </div>
 
-          {/* ── TAB GENERAL ─────────────────────────────────────── */}
-          <Tabs.Panel value="general">
-            <Stack gap="md">
-              <Group grow>
-                <TextInput
-                  label="Nombre visible"
-                  placeholder="Plan Esencial"
-                  required
-                  value={form.displayName}
-                  onChange={(e) => handleDisplayNameChange(e.target.value)}
-                />
-                <Switch
-                  label="Plan activo"
-                  description="Los planes inactivos no se muestran al público"
-                  checked={form.isActive}
-                  onChange={(e) => setField("isActive", e.currentTarget.checked)}
-                  mt="lg"
-                />
-              </Group>
-
-              <Group grow>
-                <TextInput
-                  label="Slug"
-                  placeholder="plan-esencial"
-                  description="Identificador único en URL (auto-generado)"
-                  value={form.slug}
-                  onChange={(e) => setField("slug", e.target.value)}
-                />
-                <TextInput
-                  label="Name (interno)"
-                  placeholder="plan-esencial"
-                  description="Igual al slug, usado internamente"
-                  value={form.name}
-                  onChange={(e) => setField("name", e.target.value)}
-                />
-              </Group>
-
-              <Divider label="Precio y ciclo" />
-
-              <Group grow>
-                <NumberInput
-                  label="Precio"
-                  placeholder="15"
-                  required
-                  min={0}
-                  value={form.price}
-                  onChange={(v) => setField("price", Number(v) || 0)}
-                />
-                <Select
-                  label="Moneda"
-                  data={["USD", "COP", "MXN", "EUR", "BRL", "CLP", "CRC", "ARS"]}
-                  value={form.currency}
-                  onChange={(v) => setField("currency", v || "USD")}
-                />
-                <Select
-                  label="Ciclo de facturación"
-                  data={[
-                    { value: "monthly", label: "Mensual" },
-                    { value: "quarterly", label: "Trimestral" },
-                    { value: "semiannual", label: "Semestral" },
-                    { value: "yearly", label: "Anual" },
-                    { value: "lifetime", label: "De por vida" },
-                  ]}
-                  value={form.billingCycle}
-                  onChange={(v) => setField("billingCycle", v || "monthly")}
-                />
-              </Group>
-
-              <Select
-                label="Tipo de dominio"
-                data={[
-                  { value: "subdomain", label: "Subdominio (ej: minegocio.agenditapp.com)" },
-                  { value: "custom_domain", label: "Dominio propio (ej: miagenda.com)" },
-                ]}
-                value={form.domainType}
-                onChange={(v) => setField("domainType", v || "subdomain")}
-              />
-
-              <Divider label="PayPal" />
-
+        {planTab === "general" && (
+          <div className="ag-stack" style={{ gap: 14 }}>
+            <TextInput label="Nombre visible" placeholder="Plan Esencial" required value={form.displayName} onChange={(e) => handleDisplayNameChange(e.target.value)} />
+            <Switch
+              label="Plan activo"
+              description="Los planes inactivos no se muestran al público."
+              checked={form.isActive}
+              onChange={(e) => setField("isActive", e.currentTarget.checked)}
+            />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <TextInput
-                label="Plan ID de PayPal"
-                placeholder="P-9RU26879V1709291PNHQBEWA"
-                description="ID del plan de suscripción en PayPal (formato P-XXXXX). Necesario para pago automático mensual."
-                leftSection={<IconBuildingBank size={16} />}
-                value={form.paypalPlanId ?? ""}
-                onChange={(e) => setField("paypalPlanId", e.target.value)}
-                styles={{ input: { fontFamily: "monospace" } }}
+                label="Slug"
+                placeholder="plan-esencial"
+                description="Se genera del nombre."
+                value={form.slug}
+                onChange={(e) => setField("slug", e.target.value)}
+                styles={{ input: mono }}
               />
-
-              <Divider label="Descripción interna" />
-
-              <Textarea
-                label="Descripción"
-                placeholder="Descripción interna del plan (no visible al público)"
-                rows={3}
-                value={form.description}
-                onChange={(e) => setField("description", e.target.value)}
+              <TextInput
+                label="Nombre interno"
+                placeholder="plan-esencial"
+                description="Igual al slug."
+                value={form.name}
+                onChange={(e) => setField("name", e.target.value)}
+                styles={{ input: mono }}
               />
-            </Stack>
-          </Tabs.Panel>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <NumberInput label="Precio" required min={0} value={form.price} onChange={(v) => setField("price", Number(v) || 0)} />
+              <Select
+                label="Moneda"
+                data={["USD", "COP", "MXN", "EUR", "BRL", "CLP", "CRC", "ARS"]}
+                value={form.currency}
+                onChange={(v) => setField("currency", v || "USD")}
+                allowDeselect={false}
+              />
+              <Select
+                label="Ciclo"
+                data={[
+                  { value: "monthly", label: "Mensual" },
+                  { value: "quarterly", label: "Trimestral" },
+                  { value: "semiannual", label: "Semestral" },
+                  { value: "yearly", label: "Anual" },
+                  { value: "lifetime", label: "De por vida" },
+                ]}
+                value={form.billingCycle}
+                onChange={(v) => setField("billingCycle", v || "monthly")}
+                allowDeselect={false}
+              />
+            </div>
+            <Select
+              label="Tipo de dominio"
+              data={[
+                { value: "subdomain", label: "Subdominio (minegocio.agenditapp.com)" },
+                { value: "custom_domain", label: "Dominio propio (miagenda.com)" },
+              ]}
+              value={form.domainType}
+              onChange={(v) => setField("domainType", v || "subdomain")}
+              allowDeselect={false}
+            />
+            <TextInput
+              label="Plan ID de PayPal"
+              placeholder="P-9RU26879V1709291PNHQBEWA"
+              description="Necesario para el pago automático."
+              value={form.paypalPlanId ?? ""}
+              onChange={(e) => setField("paypalPlanId", e.target.value)}
+              styles={{ input: mono }}
+            />
+            <Textarea
+              label="Descripción interna"
+              placeholder="No se muestra al público"
+              autosize
+              minRows={3}
+              value={form.description}
+              onChange={(e) => setField("description", e.target.value)}
+            />
+          </div>
+        )}
 
-          {/* ── TAB CARACTERÍSTICAS ──────────────────────────────── */}
-          <Tabs.Panel value="caracteristicas">
-            <Stack gap="md">
-              <Text size="sm" c="dimmed">
-                Lista de características visibles en la tarjeta del plan. Cada ítem aparece como un punto de la lista.
-              </Text>
-
-              {form.characteristics.map((c, i) => (
-                <Group key={i} gap="xs">
-                  <TextInput
-                    style={{ flex: 1 }}
-                    value={c}
-                    onChange={(e) => {
-                      const updated = [...form.characteristics];
-                      updated[i] = e.target.value;
-                      setField("characteristics", updated);
-                    }}
-                  />
-                  <ActionIcon color="red" variant="light" onClick={() => removeCharacteristic(i)}>
-                    <IconX size={16} />
-                  </ActionIcon>
-                </Group>
-              ))}
-
-              <Group gap="xs">
+        {planTab === "caracteristicas" && (
+          <div className="ag-stack" style={{ gap: 10 }}>
+            <div className="ag-muted" style={{ fontSize: 14 }}>Cada línea aparece como un punto en la tarjeta del plan.</div>
+            {form.characteristics.map((c, i) => (
+              <div key={i} className="ag-row" style={{ gap: 6, flexWrap: "nowrap" }}>
                 <TextInput
                   style={{ flex: 1 }}
-                  placeholder="Ej: Hasta 5 profesionales"
-                  value={newChar}
-                  onChange={(e) => setNewChar(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addCharacteristic()}
+                  aria-label={`Característica ${i + 1}`}
+                  value={c}
+                  onChange={(e) => {
+                    const updated = [...form.characteristics];
+                    updated[i] = e.target.value;
+                    setField("characteristics", updated);
+                  }}
                 />
-                <Button variant="light" leftSection={<IconPlus size={14} />} onClick={addCharacteristic}>
-                  Agregar
-                </Button>
-              </Group>
-            </Stack>
-          </Tabs.Panel>
+                <ActionIcon variant="subtle" color="gray" onClick={() => removeCharacteristic(i)} aria-label={`Quitar «${c}»`}>
+                  <IconX size={16} />
+                </ActionIcon>
+              </div>
+            ))}
+            <div className="ag-row" style={{ gap: 6, flexWrap: "nowrap" }}>
+              <TextInput
+                style={{ flex: 1 }}
+                placeholder="Ej.: Hasta 5 profesionales"
+                aria-label="Nueva característica"
+                value={newChar}
+                onChange={(e) => setNewChar(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCharacteristic();
+                  }
+                }}
+              />
+              <Button variant="default" leftSection={<IconPlus size={14} />} onClick={addCharacteristic} disabled={!newChar.trim()}>
+                Agregar
+              </Button>
+            </div>
+          </div>
+        )}
 
-          {/* ── TAB LÍMITES ──────────────────────────────────────── */}
-          <Tabs.Panel value="limites">
-            <Stack gap="md">
-              <Text size="sm" c="dimmed">
-                Los valores numéricos en <strong>null</strong> significan ilimitado.
-                Deja el campo vacío para ilimitado.
-              </Text>
-
-              <Group grow>
-                <NumberInput
-                  label="Máx. profesionales"
-                  description="null = ilimitado"
-                  placeholder="Ilimitado"
-                  min={0}
-                  value={form.limits.maxEmployees ?? ""}
-                  onChange={(v) => setLimit("maxEmployees", v === "" ? null : Number(v))}
-                />
-                <NumberInput
-                  label="Máx. servicios"
-                  placeholder="Ilimitado"
-                  min={0}
-                  value={form.limits.maxServices ?? ""}
-                  onChange={(v) => setLimit("maxServices", v === "" ? null : Number(v))}
-                />
-                <NumberInput
-                  label="Máx. citas/mes"
-                  placeholder="Ilimitado"
-                  min={0}
-                  value={form.limits.maxAppointmentsPerMonth ?? ""}
-                  onChange={(v) => setLimit("maxAppointmentsPerMonth", v === "" ? null : Number(v))}
-                />
-                <NumberInput
-                  label="Máx. citas con WhatsApp/mes"
-                  description="Confirmación y recordatorios automáticos"
-                  placeholder="Ilimitado"
-                  min={0}
-                  value={form.limits.maxWhatsappAppointmentsPerMonth ?? ""}
-                  onChange={(v) => setLimit("maxWhatsappAppointmentsPerMonth", v === "" ? null : Number(v))}
-                />
-                <NumberInput
-                  label="Almacenamiento (GB)"
-                  min={1}
-                  value={form.limits.maxStorageGB ?? 5}
-                  onChange={(v) => setLimit("maxStorageGB", Number(v) || 5)}
-                />
-              </Group>
-
-              <Divider label="Funcionalidades" />
-
-              <Group>
-                {([
-                  ["customBranding", "Branding personalizado"],
-                  ["whatsappIntegration", "Integración WhatsApp"],
+        {planTab === "limites" && (
+          <div className="ag-stack" style={{ gap: 14 }}>
+            <div className="ag-muted" style={{ fontSize: 14 }}>Deja un número vacío para que sea ilimitado.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <NumberInput label="Máx. profesionales" {...unlimited("maxEmployees")} />
+              <NumberInput label="Máx. servicios" {...unlimited("maxServices")} />
+              <NumberInput label="Máx. citas al mes" {...unlimited("maxAppointmentsPerMonth")} />
+              <NumberInput label="Máx. citas con WhatsApp al mes" {...unlimited("maxWhatsappAppointmentsPerMonth")} />
+              <NumberInput label="Almacenamiento (GB)" min={1} value={form.limits.maxStorageGB ?? 5} onChange={(v) => setLimit("maxStorageGB", Number(v) || 5)} />
+            </div>
+            <h3 className="ag-h" style={{ margin: "6px 0 0" }}>Funciones</h3>
+            <div className="ag-stack" style={{ gap: 10 }}>
+              {(
+                [
+                  ["customBranding", "Marca personalizada"],
+                  ["whatsappIntegration", "Integración con WhatsApp"],
                   ["analyticsAdvanced", "Analíticas avanzadas"],
                   ["prioritySupport", "Soporte prioritario"],
                   ["autoReminders", "Recordatorios automáticos"],
                   ["autoConfirmations", "Confirmaciones automáticas"],
                   ["servicePackages", "Paquetes de sesiones"],
-                ] as [keyof PlanInput["limits"], string][]).map(([key, label]) => (
-                  <Switch
-                    key={key}
-                    label={label}
-                    checked={form.limits[key] as boolean}
-                    onChange={(e) => setLimit(key, e.currentTarget.checked)}
-                  />
-                ))}
-              </Group>
-            </Stack>
-          </Tabs.Panel>
-        </Tabs>
+                ] as [keyof PlanInput["limits"], string][]
+              ).map(([key, label]) => (
+                <Switch key={key} label={label} checked={form.limits[key] as boolean} onChange={(e) => setLimit(key, e.currentTarget.checked)} />
+              ))}
+            </div>
+          </div>
+        )}
 
-        <Divider mt="xl" mb="md" />
-        <Group justify="flex-end">
-          <Button variant="light" color="gray" onClick={() => setModalOpened(false)}>
+        <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 14, marginTop: "auto" }}>
+          <Button variant="default" onClick={() => setModalOpened(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            leftSection={<IconCheck size={16} />}
-          >
-            {editingPlan ? "Guardar cambios" : "Crear plan"}
+          <Button color="var(--platform)" onClick={handleSave} loading={saving}>
+            {editingPlan ? "Guardar plan" : "Crear plan"}
           </Button>
-        </Group>
-      </Modal>
+        </div>
+      </Drawer>
 
-      {/* ── Modal Eliminar ────────────────────────────────────────────────── */}
-      <Modal
-        opened={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title={<Text fw={700} c="red">Eliminar plan</Text>}
-        size="sm"
-        centered
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            ¿Estás seguro de que quieres eliminar el plan{" "}
-            <strong>{deleteTarget?.displayName}</strong>? Esta acción no se puede deshacer.
-          </Text>
-          <Alert color="orange" variant="light">
-            <Text size="xs">
-              Asegúrate de que ninguna organización tenga este plan asignado antes de eliminarlo.
-            </Text>
-          </Alert>
-          <Group justify="flex-end">
-            <Button variant="light" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button color="red" loading={deleting} onClick={handleDelete}>
-              Sí, eliminar
+      {/* ── Eliminar ─────────────────────────────────────────────────────── */}
+      <Modal opened={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title={<b>Eliminar {deleteTarget?.displayName}</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          <div className="ag-alert ag-alert--warning">
+            <IconAlertTriangle size={20} />
+            <div style={{ fontSize: 14 }}>No se puede deshacer. Antes revisa que ninguna organización tenga este plan asignado.</div>
+          </div>
+          <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+            <Button variant="default" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
             </Button>
-          </Group>
-        </Stack>
+            <Button color="red" loading={deleting} onClick={handleDelete}>
+              Eliminar plan
+            </Button>
+          </div>
+        </div>
       </Modal>
-    </Container>
+    </div>
   );
 }
