@@ -7,9 +7,23 @@
 import { Alert, Box, ColorInput, FileInput, Grid, Loader, Paper, SegmentedControl, SimpleGrid, Switch, Text, TextInput } from "@mantine/core";
 import { IconCheck, IconChristmasTree, IconExternalLink, IconInfoCircle, IconLock } from "@tabler/icons-react";
 import BrandPreview from "../BrandPreview";
+import InstallPreview from "../InstallPreview";
 import { brandContrastAdvice } from "../../settingsHelpers";
 import { ChristmasDecorations, SantaHat } from "../../../../../components/seasonal/ChristmasDecorations";
 import { CHRISTMAS_SEASON_LABEL } from "../../../../../utils/seasonalTheme";
+import { christmasCountdown } from "../../../../../components/homeTemplates";
+
+/** Hoy (año, mes, día) en la zona del negocio. */
+function todayIn(timeZone?: string | null) {
+  try {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "America/Bogota", year: "numeric", month: "numeric", day: "numeric" }).formatToParts(new Date());
+    const n = (t: string) => Number(p.find((x) => x.type === t)?.value);
+    return { year: n("year"), month: n("month"), day: n("day") };
+  } catch {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+  }
+}
 import { useSelector } from "react-redux";
 import { RootState } from "../../../../../app/store";
 import SectionCard from "../SectionCard";
@@ -125,6 +139,17 @@ export default function BrandingTab({
     // La vista previa de temporada existe solo fuera de producción (?preview=navidad);
     // en producción se ve la web tal cual.
     const previewUrl = `${window.location.origin}/?preview=navidad`;
+    // Cuenta regresiva (Fase 2): cuándo empieza o cuántos días quedan
+    const t = todayIn(form.values.timezone);
+    const countdown = christmasCountdown(t.year, t.month, t.day);
+    const countdownText =
+      countdown.active && !on
+        ? `La temporada ya empezó: actívala para que se vea ${countdown.days === 0 ? "hoy, último día" : `los próximos ${countdown.days === 1 ? "1 día" : `${countdown.days} días`} (hasta el 6 de enero)`}.`
+        : countdown.active
+          ? countdown.text
+          : on
+            ? `Queda lista: ${countdown.text.charAt(0).toLowerCase()}${countdown.text.slice(1)}`
+            : countdown.text;
     return (
       <SectionCard
         title="Decoración navideña"
@@ -144,6 +169,9 @@ export default function BrandingTab({
               disabled={!isEditing}
             />
           </span>
+        </div>
+        <div className="ag-subtle" style={{ marginTop: 4 }} role="status">
+          {countdownText}
         </div>
         {on && (
           <>
@@ -247,6 +275,16 @@ export default function BrandingTab({
               <ColorInput {...form.getInputProps("branding.themeColor")} disabled={brandingDisabled} w={220} />
             )}
             <span className="ag-help">Automático: el navegador usa su color de siempre.</span>
+          </div>
+          <div className="ag-field">
+            <span className="ag-label">Así se ve en el celular</span>
+            <InstallPreview
+              icon={b?.pwaIcon || b?.logoUrl}
+              name={b?.pwaName || form.values.name || ""}
+              shortName={b?.pwaShortName || b?.pwaName || form.values.name || ""}
+              description={b?.pwaDescription}
+              themeColor={custom ? b?.themeColor : null}
+            />
           </div>
         </div>
       </SectionCard>

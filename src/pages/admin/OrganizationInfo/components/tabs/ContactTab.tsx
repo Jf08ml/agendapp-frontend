@@ -12,7 +12,6 @@ import {
   IconClock,
   IconCurrencyDollar,
   IconLink,
-  IconLayoutColumns,
   IconWriting,
   IconClockHour3,
   IconRobot,
@@ -23,6 +22,7 @@ import {
   IconApps,
 } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
+import HomeTemplatePicker from "../../../../../components/HomeTemplatePicker";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
 import { getAllCountries, getAllTimezones, getAllCurrencies } from "../../../../../utils/geoData";
@@ -281,32 +281,19 @@ export default function ContactTab({
         iconColor="violet"
       >
         <Stack gap="md">
-          <Select
-            label="Diseño de página de inicio"
-            description="Elige cómo se mostrará la página principal a tus clientes"
-            leftSection={<IconLayoutColumns size={16} />}
-            {...form.getInputProps("homeLayout")}
-            disabled={!isEditing}
-            data={[
-              { value: "modern", label: "Moderno - Tarjetas en fila con ícono circular" },
-              { value: "minimal", label: "Minimalista - Diseño limpio y simple" },
-              { value: "cards", label: "Tarjetas - Cuadrícula centrada" },
-              {
-                value: "landing",
-                label: canUseLanding
-                  ? "Landing - Página de presentación completa"
-                  : "Landing - Página de presentación completa (Plan Marca/Pro)",
-                disabled: !canUseLanding,
-              },
-              {
-                value: "academy",
-                label: canUseLanding
-                  ? "Academia - Programas y servicios"
-                  : "Academia - Programas y servicios (Plan Marca/Pro)",
-                disabled: !canUseLanding,
-              },
-            ]}
-          />
+          <div>
+            <Text size="sm" fw={500} mb={2}>Plantilla</Text>
+            <Text size="xs" c="dimmed" mb="xs">Cómo se ve la página principal que abren tus clientes.</Text>
+            <HomeTemplatePicker
+              value={form.values.homeLayout}
+              onChange={(layout) => form.setFieldValue("homeLayout", layout)}
+              professionalLanding={canUseLanding}
+              classesEnabled={form.values.enableClassBooking}
+              disabled={!isEditing}
+              name={form.values.name}
+              logoUrl={(form.values.branding as { logoUrl?: string } | undefined)?.logoUrl}
+            />
+          </div>
           <TextInput
             label="Título de bienvenida"
             placeholder="¡Hola! Bienvenido"
