@@ -30,7 +30,8 @@ import { buildClassReserveLink, buildPackageBuyLink } from "../../utils/programP
 import { formatCurrency } from "../../utils/formatCurrency";
 import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
-import { HoursAndLocation, LandingFooter, OpenStatus, useBusinessHours } from "./landingShared";
+import { HoursAndLocation, LandingFooter, OpenStatus } from "./landingShared";
+import { useBusinessHours } from "./useBusinessHours";
 import "./landing.css";
 
 dayjs.extend(utc);

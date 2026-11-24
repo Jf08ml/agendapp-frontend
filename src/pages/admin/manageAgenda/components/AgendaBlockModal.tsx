@@ -1,5 +1,6 @@
 import { useState } from "react";
-import BlockRepeatFields, { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../components/BlockRepeatFields";
+import BlockRepeatFields from "../../../../components/BlockRepeatFields";
+import { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../utils/blockRepeat";
 import { NO_END_DATE } from "../../../../utils/scheduleExceptions";
 import {
   Modal,

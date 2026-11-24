@@ -251,6 +251,8 @@ const MetaConnectionPanel: React.FC<Props> = ({ organizationId }) => {
   useEffect(() => {
     loadStatus();
     loadFbSdk();
+    // Carga inicial por negocio; loadStatus se recrea en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId]);
 
   useEffect(() => {

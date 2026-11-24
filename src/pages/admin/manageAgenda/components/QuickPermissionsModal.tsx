@@ -40,6 +40,9 @@ export default function QuickPermissionsModal({
     if (employee) {
       setCustomPermissions(employee.customPermissions ?? []);
     }
+    // Solo al cambiar de profesional: si el objeto se recrea con el mismo _id no
+    // se deben pisar los permisos que se están editando.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee?._id]);
 
   const rolePermissions = employee?.role?.permissions ?? [];

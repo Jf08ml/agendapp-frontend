@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useMemo, useState } from "react";
 import { Box, Group, Text, ActionIcon, Tooltip, Badge, SegmentedControl, Center, Stack } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";

@@ -222,7 +222,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     };
 
     if (!dateMissing) void load();
-  }, [dates, selectedServices, services, organizationId, dateMissing]);
+  }, [dates, selectedServices, services, organizationId, dateMissing, timeFormat]);
 
   // Handler para selección de bloque
   const handleBlockSelect = (
