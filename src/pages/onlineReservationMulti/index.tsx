@@ -155,7 +155,11 @@ export default function MultiBookingWizard() {
     if (service) {
       setSelected([{ serviceId: preselectedServiceId, employeeId: null }]);
       preselectionApplied.current = true;
+      // «Próximo horario libre» de la landing: directo a fecha y hora (el
+      // calendario se abre solo en el primer día disponible)
+      if (searchParams.get("paso") === "horario") setCurrentStep(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, preselectedServiceId, services]);
 
   // === Responsive helpers ===

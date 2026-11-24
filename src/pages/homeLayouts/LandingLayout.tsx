@@ -27,6 +27,8 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import "dayjs/locale/es";
 import { HoursAndLocation, LandingFooter, OpenStatus } from "./landingShared";
+import { NextFreeBar, NextFreeCard } from "./NextFreeSlot";
+import { useNextFreeSlot } from "./useNextFreeSlot";
 import { useBusinessHours } from "./useBusinessHours";
 import "./landing.css";
 
@@ -61,6 +63,7 @@ export function LandingLayout({
 }: LandingLayoutProps) {
   const navigate = useNavigate();
   const org = useSelector(selectOrganization);
+  const nextFree = useNextFreeSlot(organizationId, enableOnlineBooking);
   const tf = org?.timeFormat;
 
   const [services, setServices] = useState<Service[]>([]);
@@ -137,6 +140,7 @@ export function LandingLayout({
               Ver servicios
             </Button>
           </div>
+          <NextFreeCard slot={nextFree} />
           <div className="ag-row ag-muted" style={{ gap: 20, fontSize: 14 }}>
             {org?.address && (
               <span className="ag-row" style={{ gap: 6 }}>
@@ -317,6 +321,7 @@ export function LandingLayout({
 
       {/* ─── Pie: redes, enlaces y acceso del equipo ───────────────────── */}
       <LandingFooter links={features} />
+      <NextFreeBar slot={nextFree} />
     </Box>
   );
 }
