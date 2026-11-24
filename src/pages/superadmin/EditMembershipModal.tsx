@@ -1,24 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// pages/superadmin/EditMembershipModal.tsx
+// Panel «Editar membresía» del superadmin (rediseño, SuperadminMembresias):
+// antes un modal; ahora panel lateral con Plan, Estado, periodo, último pago,
+// renovación automática y notas internas.
 import { useState, useEffect } from "react";
-import {
-  Modal,
-  Stack,
-  Select,
-  NumberInput,
-  Textarea,
-  Button,
-  Group,
-  Text,
-  Alert,
-  Switch,
-} from "@mantine/core";
+import { Button, Drawer, NumberInput, Select, Switch, Textarea } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import dayjs from "dayjs";
 import { notifications } from "@mantine/notifications";
 import { Membership, Plan } from "../../services/membershipService";
 import { apiGeneral } from "../../services/axiosConfig";
-import { IoAlertCircle } from "react-icons/io5";
 
 interface EditMembershipModalProps {
   opened: boolean;
@@ -28,13 +17,17 @@ interface EditMembershipModalProps {
   onSuccess: () => void;
 }
 
-export function EditMembershipModal({
-  opened,
-  onClose,
-  membership,
-  plans,
-  onSuccess,
-}: EditMembershipModalProps) {
+const STATUS_OPTIONS = [
+  { value: "active", label: "Activa" },
+  { value: "trial", label: "Prueba" },
+  { value: "pending", label: "Pendiente" },
+  { value: "past_due", label: "Vencida (solo lectura)" },
+  { value: "suspended", label: "Suspendida" },
+  { value: "cancelled", label: "Cancelada" },
+  { value: "expired", label: "Expirada" },
+];
+
+export function EditMembershipModal({ opened, onClose, membership, plans, onSuccess }: EditMembershipModalProps) {
   const [loading, setLoading] = useState(false);
   // Solo si se elige otra fecha se envía como día de calendario (el backend la guarda como
   // fin de ese día en la zona de la org); si no, se conserva la hora exacta del pago.
@@ -57,9 +50,7 @@ export function EditMembershipModal({
         status: membership.status,
         currentPeriodStart: new Date(membership.currentPeriodStart),
         currentPeriodEnd: new Date(membership.currentPeriodEnd),
-        lastPaymentDate: membership.lastPaymentDate
-          ? new Date(membership.lastPaymentDate)
-          : null,
+        lastPaymentDate: membership.lastPaymentDate ? new Date(membership.lastPaymentDate) : null,
         lastPaymentAmount: membership.lastPaymentAmount || 0,
         autoRenew: membership.autoRenew || false,
         adminNotes: membership.adminNotes || "",
@@ -70,184 +61,126 @@ export function EditMembershipModal({
 
   const handleSubmit = async () => {
     if (!membership) return;
-
     setLoading(true);
     try {
       await apiGeneral.patch(`/memberships/superadmin/${membership._id}`, {
         planId: formData.planId,
         status: formData.status,
         currentPeriodStart: formData.currentPeriodStart.toISOString(),
-        currentPeriodEnd: endDateTouched
-          ? dayjs(formData.currentPeriodEnd).format("YYYY-MM-DD")
-          : formData.currentPeriodEnd.toISOString(),
+        currentPeriodEnd: endDateTouched ? dayjs(formData.currentPeriodEnd).format("YYYY-MM-DD") : formData.currentPeriodEnd.toISOString(),
         lastPaymentDate: formData.lastPaymentDate?.toISOString() || null,
         lastPaymentAmount: formData.lastPaymentAmount,
         autoRenew: formData.autoRenew,
         adminNotes: formData.adminNotes,
       });
-
-      notifications.show({
-        title: "Éxito",
-        message: "Membresía actualizada correctamente",
-        color: "green",
-      });
-
+      notifications.show({ message: "Membresía guardada." });
       onSuccess();
       onClose();
-    } catch (error: any) {
-      notifications.show({
-        title: "Error",
-        message: error.response?.data?.message || "Error al actualizar membresía",
-        color: "red",
-      });
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { message?: string } } };
+      notifications.show({ message: e.response?.data?.message || "No se pudo guardar la membresía.", color: "red" });
     } finally {
       setLoading(false);
     }
   };
 
-  if (!membership) return null;
-
-  const org = membership.organizationId as any;
+  const org = membership?.organizationId as unknown as { name?: string; email?: string } | undefined;
 
   return (
-    <Modal
-      opened={opened}
-      onClose={onClose}
-      title="Editar Membresía"
-      size="lg"
-      centered
+    <Drawer
+      opened={opened && !!membership}
+      onClose={() => !loading && onClose()}
+      position="right"
+      size={460}
+      title={
+        <div>
+          <b style={{ fontSize: 16 }}>Editar membresía</b>
+          <div className="ag-subtle">
+            {org?.name ?? "—"}
+            {org?.email ? ` · ${org.email}` : ""}
+          </div>
+        </div>
+      }
     >
-      <Stack gap="md">
-        <Alert icon={<IoAlertCircle size={18} />} color="blue">
-          <Text size="sm" fw={600}>
-            {org?.name || "N/A"}
-          </Text>
-          <Text size="xs" c="dimmed">
-            {org?.email || ""}
-          </Text>
-        </Alert>
-
+      <div className="ag-stack" style={{ gap: 14 }}>
         <Select
           label="Plan"
-          placeholder="Selecciona un plan"
           value={formData.planId}
-          onChange={(value) =>
-            setFormData({ ...formData, planId: value || "" })
-          }
-          data={plans.map((plan) => ({
-            value: plan._id,
-            label: `${plan.displayName} - $${plan.price.toLocaleString()}`,
-          }))}
+          onChange={(value) => setFormData({ ...formData, planId: value || "" })}
+          data={plans.map((plan) => ({ value: plan._id, label: `${plan.displayName} · $${plan.price.toLocaleString()} ${plan.currency ?? ""}`.trim() }))}
+          allowDeselect={false}
           required
         />
-
         <Select
           label="Estado"
           value={formData.status}
-          onChange={(value) =>
-            setFormData({
-              ...formData,
-              status: value as any,
-            })
-          }
-          data={[
-            { value: "active", label: "Activa" },
-            { value: "trial", label: "Prueba" },
-            { value: "pending", label: "Pendiente" },
-            { value: "past_due", label: "Vencida (Read-only)" },
-            { value: "suspended", label: "Suspendida" },
-            { value: "cancelled", label: "Cancelada" },
-            { value: "expired", label: "Expirada" },
-          ]}
+          onChange={(value) => setFormData({ ...formData, status: value || "active" })}
+          data={STATUS_OPTIONS}
+          allowDeselect={false}
           required
         />
-
-        <DateInput
-          label="Fecha de Inicio del Período"
-          value={formData.currentPeriodStart}
-          onChange={(date) =>
-            setFormData({
-              ...formData,
-              currentPeriodStart: date || new Date(),
-            })
-          }
-          valueFormat="DD/MM/YYYY"
-          required
-        />
-
-        <DateInput
-          label="Fecha de Vencimiento"
-          description="Tiene acceso completo hasta el final de este día (zona horaria del negocio)"
-          value={formData.currentPeriodEnd}
-          onChange={(date) => {
-            setEndDateTouched(true);
-            setFormData({
-              ...formData,
-              currentPeriodEnd: date || new Date(),
-            });
-          }}
-          valueFormat="DD/MM/YYYY"
-          required
-        />
-
-        <DateInput
-          label="Fecha del Último Pago"
-          value={formData.lastPaymentDate}
-          onChange={(date) =>
-            setFormData({ ...formData, lastPaymentDate: date })
-          }
-          valueFormat="DD/MM/YYYY"
-          clearable
-        />
-
-        <NumberInput
-          label="Monto del Último Pago"
-          value={formData.lastPaymentAmount}
-          onChange={(value) =>
-            setFormData({
-              ...formData,
-              lastPaymentAmount: Number(value),
-            })
-          }
-          prefix="$"
-          thousandSeparator=","
-          min={0}
-        />
-
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <DateInput
+            label="Inicio del periodo"
+            value={formData.currentPeriodStart}
+            onChange={(date) => setFormData({ ...formData, currentPeriodStart: date || new Date() })}
+            valueFormat="DD/MM/YYYY"
+            required
+          />
+          <DateInput
+            label="Vencimiento"
+            value={formData.currentPeriodEnd}
+            onChange={(date) => {
+              setEndDateTouched(true);
+              setFormData({ ...formData, currentPeriodEnd: date || new Date() });
+            }}
+            valueFormat="DD/MM/YYYY"
+            required
+          />
+        </div>
+        <div className="ag-subtle" style={{ marginTop: -6 }}>
+          Tiene acceso completo hasta el final del día de vencimiento, en la zona horaria del negocio.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <DateInput
+            label="Último pago"
+            value={formData.lastPaymentDate}
+            onChange={(date) => setFormData({ ...formData, lastPaymentDate: date })}
+            valueFormat="DD/MM/YYYY"
+            clearable
+          />
+          <NumberInput
+            label="Monto"
+            value={formData.lastPaymentAmount}
+            onChange={(value) => setFormData({ ...formData, lastPaymentAmount: Number(value) || 0 })}
+            prefix="$"
+            thousandSeparator=","
+            min={0}
+          />
+        </div>
         <Switch
-          label="Auto-renovación"
-          description="La membresía se renovará automáticamente al vencer"
+          label="Renovación automática"
+          description="Se renueva sola al vencer."
           checked={formData.autoRenew}
-          onChange={(event) =>
-            setFormData({
-              ...formData,
-              autoRenew: event.currentTarget.checked,
-            })
-          }
+          onChange={(event) => setFormData({ ...formData, autoRenew: event.currentTarget.checked })}
         />
-
         <Textarea
-          label="Notas Administrativas"
-          placeholder="Notas internas sobre esta membresía..."
+          label="Notas internas"
+          placeholder="Solo las ve el equipo de AgenditApp"
           value={formData.adminNotes}
-          onChange={(event) =>
-            setFormData({
-              ...formData,
-              adminNotes: event.currentTarget.value,
-            })
-          }
+          onChange={(event) => setFormData({ ...formData, adminNotes: event.currentTarget.value })}
           minRows={3}
+          autosize
         />
-
-        <Group justify="flex-end" mt="md">
-          <Button variant="light" onClick={onClose} disabled={loading}>
+        <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+          <Button variant="default" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} loading={loading}>
-            Guardar Cambios
+          <Button color="var(--platform)" onClick={handleSubmit} loading={loading}>
+            Guardar membresía
           </Button>
-        </Group>
-      </Stack>
-    </Modal>
+        </div>
+      </div>
+    </Drawer>
   );
 }
