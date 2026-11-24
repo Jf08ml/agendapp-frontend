@@ -151,7 +151,8 @@ export default function Header({ organization, showChristmas = false, platform =
       style={platform ? { background: "var(--surface)", borderBottom: "1px solid var(--line)" } : undefined}
     >
       <Group justify="space-between" wrap="nowrap" gap="md" h="100%">
-        <Anchor component={Link} to="/" underline="never" style={{ minWidth: 0 }}>
+        {/* c="inherit": el nombre toma el color de la barra (on-brand), no el de los enlaces (brand-text, que sobre la marca casi no se ve). */}
+        <Anchor component={Link} to="/" underline="never" c="inherit" style={{ minWidth: 0 }}>
           {brandMark}
         </Anchor>
 
