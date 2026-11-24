@@ -200,7 +200,8 @@ export default function Header({ organization, showChristmas = false, platform =
             {/* Menú (cuando los enlaces no caben): enlaces, redes, app y acceso del
                 equipo. Reemplaza el pie fijo que tenía la web pública. */}
             <Box hiddenFrom="lg">
-              <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
+              {/* Mantine fija --burger-color en negro: en la barra de marca va en on-brand. */}
+              <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" color={platform ? undefined : "var(--on-brand)"} />
             </Box>
             {/* Escritorio ancho: los enlaces se ven; queda solo un acceso discreto del equipo */}
             {!platform && !isAuthenticated && (
