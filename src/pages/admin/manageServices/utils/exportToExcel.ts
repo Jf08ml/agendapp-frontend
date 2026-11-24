@@ -17,6 +17,8 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
     "Citas Simultáneas": service.maxConcurrentAppointments || 1,
     "Activo": service.isActive ? "Sí" : "No",
     "Destacado": service.featured ? "Sí" : "No",
+    // Si falta, al volver a subir el archivo el precio dejaría de estar oculto
+    "Ocultar Precio": service.hidePrice ? "Sí" : "No",
     "Imágenes (URLs)": service.images?.join("; ") || "",
   }));
 
@@ -32,6 +34,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
       "Citas Simultáneas": 1,
       "Activo": "Sí",
       "Destacado": "No",
+      "Ocultar Precio": "No",
       "Imágenes (URLs)": "",
     });
   }
@@ -51,6 +54,7 @@ export const exportServicesToExcel = (services: Service[], organizationName: str
     { wch: 16 },  // Citas Simultáneas
     { wch: 10 },  // Activo
     { wch: 11 },  // Destacado
+    { wch: 14 },  // Ocultar Precio
     { wch: 40 },  // Imágenes
   ];
 

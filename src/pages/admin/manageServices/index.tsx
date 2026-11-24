@@ -613,6 +613,7 @@ const AdminServices: React.FC = () => {
         opened={isBulkUploadModalOpen}
         onClose={() => setIsBulkUploadModalOpen(false)}
         onUploadComplete={loadServices}
+        existingServices={services}
       />
     </div>
   );

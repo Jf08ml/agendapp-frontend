@@ -1,200 +1,101 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef } from "react";
-import {
-  Modal,
-  Button,
-  Group,
-  Text,
-  FileButton,
-  Stack,
-  Alert,
-  Progress,
-  Table,
-  ScrollArea,
-  Badge,
-  Box,
-  Card,
-  List,
-  ThemeIcon,
-} from "@mantine/core";
+// Carga masiva de servicios en pasos (design system, ServiciosPanel):
+// plantilla → archivo → revisión → resultado. Fase 2: el Excel se lee en el
+// navegador y antes de guardar se ve qué se actualiza, qué es nuevo y qué tiene
+// errores (bulkPreview.ts, con las mismas reglas del servidor). Solo se envían
+// las filas nuevas o con cambios.
+import { useMemo, useRef, useState } from "react";
+import { Button, FileButton, Group, Modal } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
-import {
-  IconUpload,
-  IconFileSpreadsheet,
-  IconDownload,
-  IconAlertCircle,
-  IconCheck,
-  IconX,
-  IconInfoCircle,
-} from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconDownload, IconFileSpreadsheet, IconPlus, IconRefresh, IconUpload } from "@tabler/icons-react";
 import * as XLSX from "xlsx";
-import { bulkUploadServices } from "../../../../services/serviceService";
 import { useSelector } from "react-redux";
+import { bulkUploadServices, type Service } from "../../../../services/serviceService";
 import { RootState } from "../../../../app/store";
+import { formatCurrency } from "../../../../utils/formatCurrency";
+import { buildPreview, parseServiceRows, uploadPayload, type PreviewRow, type RowKind } from "../bulkPreview";
 
 interface BulkUploadModalProps {
   opened: boolean;
   onClose: () => void;
   onUploadComplete: () => void;
-}
-
-interface ServiceRow {
-  _id?: string; // Para actualizar servicios existentes
-  name: string;
-  type?: string;
-  description?: string;
-  price: number;
-  duration: number;
-  hidePrice?: boolean;
-  featured?: boolean; // ⭐ Destacado
-  maxConcurrentAppointments?: number;
-  isActive?: boolean; // Para parsear desde Excel
+  /** Servicios actuales (activos e inactivos), para saber qué cambia. */
+  existingServices: Service[];
 }
 
 interface UploadResult {
-  success: Array<{ 
-    row: number; 
-    name: string; 
-    price: number; 
-    duration: number;
-    action?: string; // "CREADO" o "ACTUALIZADO"
-  }>;
-  errors: Array<{ row: number; name: string; error: string }>;
-  totalProcessed: number;
-  totalSuccess: number;
-  totalErrors: number;
-  created: number; // Nuevos servicios creados
-  updated: number; // Servicios actualizados
+  created: number;
+  updated: number;
+  errors: { row: number; name: string; error: string }[];
 }
 
-export default function BulkUploadModal({
-  opened,
-  onClose,
-  onUploadComplete,
-}: BulkUploadModalProps) {
+type Filter = "all" | RowKind;
+
+const KIND_META: Record<RowKind, { label: string; badge: string }> = {
+  new: { label: "Nuevo", badge: "ag-badge ag-badge--info" },
+  update: { label: "Se actualiza", badge: "ag-badge ag-badge--success" },
+  unchanged: { label: "Sin cambios", badge: "ag-badge" },
+  error: { label: "Con error", badge: "ag-badge ag-badge--danger" },
+};
+
+export default function BulkUploadModal({ opened, onClose, onUploadComplete, existingServices }: BulkUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [parsedData, setParsedData] = useState<ServiceRow[]>([]);
+  const [preview, setPreview] = useState<PreviewRow[] | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [result, setResult] = useState<UploadResult | null>(null);
   const resetRef = useRef<() => void>(null);
+  const organizationId = useSelector((s: RootState) => s.auth.organizationId);
+  const currency = useSelector((s: RootState) => s.organization.organization?.currency) || "COP";
+  const money = (n: number) => formatCurrency(n, currency);
 
-  const organizationId = useSelector(
-    (state: RootState) => state.auth.organizationId
-  );
+  const counts = useMemo(() => {
+    const c: Record<RowKind, number> = { new: 0, update: 0, unchanged: 0, error: 0 };
+    preview?.forEach((p) => c[p.kind]++);
+    return c;
+  }, [preview]);
+  const toSave = counts.new + counts.update;
+  const visible = (preview ?? []).filter((p) => filter === "all" || p.kind === filter);
 
-  const handleFileSelect = (selectedFile: File | null) => {
-    if (!selectedFile) return;
-
-    setFile(selectedFile);
-    setUploadResult(null);
-
+  const handleFileSelect = (selected: File | null) => {
+    if (!selected) return;
+    setFile(selected);
+    setResult(null);
+    setFilter("all");
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
-
-        // Mapear y validar datos
-        const services: ServiceRow[] = jsonData.map((row: any) => ({
-          _id: row.ID || row.id || row._id || undefined, // Leer ID de la primera columna
-          name: row["Nombre del Servicio"] || row.Nombre || row.nombre || row.Name || row.name || "",
-          type: row.Tipo || row.tipo || row.Type || row.type || "",
-          description: row.Descripción || row.descripcion || row.Description || row.description || "",
-          price: parseFloat(row.Precio || row.precio || row.Price || row.price || 0),
-          duration: parseInt(row["Duración (minutos)"] || row.Duración || row.duracion || row.Duration || row.duration || 0),
-          hidePrice: row["Ocultar Precio"] === "Sí" || row["Ocultar Precio"] === "Si" || row.hidePrice === true,
-          featured: row.Destacado === "Sí" || row.Destacado === "Si" || row.featured === true,
-          maxConcurrentAppointments: parseInt(row["Citas Simultáneas"] || row["Citas Concurrentes"] || row.maxConcurrentAppointments || 1),
-          isActive: row.Activo === "Sí" || row.Activo === "Si" || row.isActive === true,
-        }));
-
-        setParsedData(services);
-
-        if (services.length === 0) {
-          showNotification({
-            title: "Archivo vacío",
-            message: "El archivo no contiene datos válidos",
-            color: "yellow",
-          });
+        const workbook = XLSX.read(e.target?.result, { type: "binary" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = parseServiceRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet));
+        if (rows.length === 0) {
+          setPreview(null);
+          showNotification({ color: "yellow", title: "Archivo vacío", message: "No encontramos servicios en la primera hoja del archivo." });
+          return;
         }
-      } catch (error) {
-        showNotification({
-          title: "Error al leer el archivo",
-          message: "No se pudo procesar el archivo Excel",
-          color: "red",
-        });
-        console.error(error);
+        setPreview(buildPreview(rows, existingServices, money).rows);
+      } catch {
+        setPreview(null);
+        showNotification({ color: "red", title: "No pudimos leer el archivo", message: "Revisa que sea un Excel (.xlsx o .xls)." });
       }
     };
-    reader.readAsBinaryString(selectedFile);
+    reader.readAsBinaryString(selected);
   };
 
   const handleUpload = async () => {
-    if (!organizationId) {
-      showNotification({
-        title: "Error",
-        message: "No se pudo obtener el ID de la organización",
-        color: "red",
-      });
-      return;
-    }
-
-    if (parsedData.length === 0) {
-      showNotification({
-        title: "Sin datos",
-        message: "No hay datos para cargar",
-        color: "yellow",
-      });
-      return;
-    }
-
+    if (!organizationId || !preview || toSave === 0) return;
+    const { rows, excelRows } = uploadPayload(preview);
     setUploading(true);
     try {
-      const result = await bulkUploadServices(parsedData, organizationId);
-      setUploadResult({
-        ...result,
-        created: result.created ?? 0,
-        updated: result.updated ?? 0,
+      const res = await bulkUploadServices(rows, organizationId);
+      // El servidor numera por posición en el envío: se traduce a la fila del Excel
+      setResult({
+        created: res.created ?? 0,
+        updated: res.updated ?? 0,
+        errors: res.errors.map((er) => ({ ...er, row: excelRows[er.row - 2] ?? er.row })),
       });
-
-      if (result.totalSuccess > 0) {
-        const createdCount = result.created || 0;
-        const updatedCount = result.updated || 0;
-        let message = `Se procesaron ${result.totalSuccess} servicios exitosamente`;
-        
-        if (createdCount > 0 && updatedCount > 0) {
-          message = `${createdCount} creados, ${updatedCount} actualizados`;
-        } else if (createdCount > 0) {
-          message = `Se crearon ${createdCount} servicios`;
-        } else if (updatedCount > 0) {
-          message = `Se actualizaron ${updatedCount} servicios`;
-        }
-
-        showNotification({
-          title: "Carga completada",
-          message: message,
-          color: "green",
-        });
-        onUploadComplete();
-      }
-
-      if (result.totalErrors > 0) {
-        showNotification({
-          title: "Errores detectados",
-          message: `${result.totalErrors} registros no pudieron ser procesados`,
-          color: "orange",
-        });
-      }
-    } catch (error) {
-      showNotification({
-        title: "Error en la carga",
-        message: "Ocurrió un error al procesar los servicios",
-        color: "red",
-      });
-      console.error(error);
+      if (res.totalSuccess > 0) onUploadComplete();
+    } catch {
+      showNotification({ color: "red", title: "No se guardó la carga", message: "Ocurrió un error al guardar los servicios. Inténtalo de nuevo." });
     } finally {
       setUploading(false);
     }
@@ -202,298 +103,208 @@ export default function BulkUploadModal({
 
   const handleDownloadTemplate = () => {
     const template = [
-      {
-        ID: "(dejar vacío para crear nuevo)",
-        "Nombre del Servicio": "Corte de Cabello",
-        Tipo: "Barbería",
-        Descripción: "Corte de cabello clásico",
-        "Duración (minutos)": 30,
-        Precio: 15000,
-        "Citas Simultáneas": 1,
-        Activo: "Sí",
-        Destacado: "Sí",
-        "Imágenes (URLs)": "",
-      },
-      {
-        ID: "(dejar vacío para crear nuevo)",
-        "Nombre del Servicio": "Manicure",
-        Tipo: "Belleza",
-        Descripción: "Manicure completo con esmaltado",
-        "Duración (minutos)": 45,
-        Precio: 25000,
-        "Citas Simultáneas": 2,
-        Activo: "Sí",
-        Destacado: "No",
-        "Imágenes (URLs)": "",
-      },
-      {
-        ID: "(dejar vacío para crear nuevo)",
-        "Nombre del Servicio": "Consulta Médica",
-        Tipo: "Salud",
-        Descripción: "Consulta médica general",
-        "Duración (minutos)": 20,
-        Precio: 50000,
-        "Citas Simultáneas": 1,
-        Activo: "No",
-        Destacado: "No",
-        "Imágenes (URLs)": "",
-      },
+      { ID: "", "Nombre del Servicio": "Corte de cabello", Tipo: "Barbería", Descripción: "Corte clásico", "Duración (minutos)": 30, Precio: 15000, "Citas Simultáneas": 1, Activo: "Sí", Destacado: "Sí", "Ocultar Precio": "No" },
+      { ID: "", "Nombre del Servicio": "Manicure", Tipo: "Belleza", Descripción: "Manicure con esmaltado", "Duración (minutos)": 45, Precio: 25000, "Citas Simultáneas": 2, Activo: "Sí", Destacado: "No", "Ocultar Precio": "No" },
     ];
-
     const worksheet = XLSX.utils.json_to_sheet(template);
-    
-    // Agregar nota informativa
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    const noteRow = range.e.r + 2;
-    
-    worksheet[XLSX.utils.encode_cell({ r: noteRow, c: 0 })] = {
-      v: "NOTA: Nombre, Precio y Duración son obligatorios. La duración se especifica en minutos. Deja el ID vacío para crear nuevos servicios, o copia el ID de servicios existentes para actualizarlos.",
-      t: "s"
-    };
-    
-    // Actualizar rango
-    if (worksheet['!ref']) {
-      const newRange = XLSX.utils.decode_range(worksheet['!ref']);
-      newRange.e.r = noteRow;
-      worksheet['!ref'] = XLSX.utils.encode_range(newRange);
-    }
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Servicios");
     XLSX.writeFile(workbook, "plantilla_servicios.xlsx");
   };
 
-  const handleClose = () => {
+  const reset = () => {
     setFile(null);
-    setParsedData([]);
-    setUploadResult(null);
+    setPreview(null);
+    setResult(null);
+    setFilter("all");
     resetRef.current?.();
+  };
+
+  const handleClose = () => {
+    reset();
     onClose();
   };
 
+  const step = result ? 4 : preview ? 3 : 2;
+
   return (
-    <Modal
-      opened={opened}
-      onClose={handleClose}
-      title="Carga Masiva de Servicios"
-      size="xl"
-      styles={{
-        body: { maxHeight: "70vh", overflowY: "auto" },
-      }}
-    >
-      <Stack gap="md">
-        {/* Instrucciones y plantilla */}
-        <Alert icon={<IconAlertCircle size={16} />} color="blue" variant="light">
-          <Text size="sm" fw={500} mb="xs">
-            Instrucciones para la carga:
-          </Text>
-          <List size="sm" spacing="xs">
-            <List.Item>
-              Descarga la plantilla de Excel y completa los datos de tus servicios
-            </List.Item>
-            <List.Item>
-              <strong>Nombre</strong>, <strong>Precio</strong> y <strong>Duración</strong> son campos obligatorios
-            </List.Item>
-            <List.Item
-              icon={
-                <ThemeIcon color="green" size={20} radius="xl" variant="light">
-                  <IconInfoCircle size={14} />
-                </ThemeIcon>
-              }
-            >
-              La <strong>Duración</strong> se especifica en <strong>minutos</strong>
-            </List.Item>
-            <List.Item
-              icon={
-                <ThemeIcon color="blue" size={20} radius="xl" variant="light">
-                  <IconInfoCircle size={14} />
-                </ThemeIcon>
-              }
-            >
-              <strong>Para actualizar servicios existentes:</strong> Descarga los servicios actuales, copia el ID en la columna ID y haz los cambios deseados
-            </List.Item>
-            <List.Item
-              icon={
-                <ThemeIcon color="purple" size={20} radius="xl" variant="light">
-                  <IconInfoCircle size={14} />
-                </ThemeIcon>
-              }
-            >
-              <strong>Para crear nuevos servicios:</strong> Deja la columna ID vacía
-            </List.Item>
-            <List.Item>Tipo, Descripción e Imágenes son opcionales</List.Item>
-          </List>
-        </Alert>
-
-        <Button
-          leftSection={<IconDownload size={16} />}
-          variant="light"
-          onClick={handleDownloadTemplate}
-          fullWidth
-        >
-          Descargar Plantilla Excel
-        </Button>
-
-        {/* Selector de archivo */}
-        <Card withBorder p="md">
-          <Stack gap="sm">
-            <FileButton
-              resetRef={resetRef}
-              onChange={handleFileSelect}
-              accept=".xlsx,.xls"
-            >
-              {(props) => (
-                <Button
-                  {...props}
-                  leftSection={<IconFileSpreadsheet size={16} />}
-                  variant="outline"
-                  fullWidth
+    <Modal opened={opened} onClose={handleClose} title="Cargar servicios desde Excel" size="xl" styles={{ body: { maxHeight: "75vh", overflowY: "auto" } }}>
+      <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+        {/* Pasos */}
+        <ol className="ag-row" style={{ gap: 6, margin: 0, padding: 0, listStyle: "none", flexWrap: "wrap", fontSize: 13 }}>
+          {["Plantilla", "Archivo", "Revisión", "Listo"].map((label, i) => {
+            const n = i + 1;
+            const done = n < step || (n === 1 && step > 1);
+            const on = n === step;
+            return (
+              <li key={label} className="ag-row" style={{ gap: 6, alignItems: "center", color: on ? "var(--ink)" : "var(--ink-muted)", fontWeight: on ? 600 : 400 }}>
+                {i > 0 && <span aria-hidden style={{ width: 16, height: 1, background: "var(--line-strong)" }} />}
+                <span
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 999,
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 11,
+                    background: on || done ? "var(--ink)" : "var(--surface-hover)",
+                    color: on || done ? "var(--ink-inverse)" : "var(--ink-muted)",
+                  }}
                 >
-                  {file ? file.name : "Seleccionar archivo Excel"}
-                </Button>
-              )}
-            </FileButton>
+                  {done ? <IconCheck size={12} /> : n}
+                </span>
+                {label}
+              </li>
+            );
+          })}
+        </ol>
 
-            {parsedData.length > 0 && !uploadResult && (
-              <Group justify="space-between">
-                <Badge color="blue" size="lg">
-                  {parsedData.length} registros detectados
-                </Badge>
+        {!result && (
+          <>
+            <div className="ag-card" style={{ padding: "var(--space-4)", display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 14 }}>
+                <b>Nombre</b>, <b>Precio</b> y <b>Duración</b> (en minutos) son obligatorios. Para <b>cambiar</b> servicios que ya tienes, usa «Exportar» y edita ese archivo: la columna ID dice cuál es cuál. Para <b>crear</b>, deja el ID vacío.
+              </div>
+              <Group gap="xs">
+                <Button variant="default" size="xs" leftSection={<IconDownload size={14} />} onClick={handleDownloadTemplate}>
+                  Descargar plantilla
+                </Button>
+                <FileButton resetRef={resetRef} onChange={handleFileSelect} accept=".xlsx,.xls">
+                  {(props) => (
+                    <Button {...props} size="xs" variant={preview ? "default" : "filled"} leftSection={<IconFileSpreadsheet size={14} />}>
+                      {file ? `Cambiar archivo (${file.name})` : "Elegir archivo"}
+                    </Button>
+                  )}
+                </FileButton>
+              </Group>
+            </div>
+
+            {preview && (
+              <>
+                {/* Resumen y filtro */}
+                <div className="ag-row" style={{ gap: 8, flexWrap: "wrap" }}>
+                  {(
+                    [
+                      ["all", `Todos (${preview.length})`],
+                      ["update", `Se actualizan (${counts.update})`],
+                      ["new", `Nuevos (${counts.new})`],
+                      ["error", `Con errores (${counts.error})`],
+                      ...(counts.unchanged ? [["unchanged", `Sin cambios (${counts.unchanged})`]] : []),
+                    ] as [Filter, string][]
+                  ).map(([key, label]) => (
+                    <button key={key} type="button" className="ag-chip" aria-pressed={filter === key} onClick={() => setFilter(key)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {counts.error > 0 && (
+                  <div className="ag-alert ag-alert--warning">
+                    <IconAlertTriangle size={18} />
+                    <div style={{ flex: 1, fontSize: 14 }}>
+                      {counts.error === 1 ? "1 fila tiene errores y no se guardará." : `${counts.error} filas tienen errores y no se guardarán.`} Corrígelas en el Excel y vuelve a elegir el archivo, o guarda el resto.
+                    </div>
+                  </div>
+                )}
+
+                <div className="ag-card" style={{ overflowX: "auto" }}>
+                  <table className="ag-table" style={{ minWidth: 640 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: 56 }}>Fila</th>
+                        <th>Servicio</th>
+                        <th className="num">Precio</th>
+                        <th className="num">Duración</th>
+                        <th>Qué pasa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visible.map((p) => (
+                        <tr key={p.row.excelRow}>
+                          <td className="ag-num ag-muted">{p.row.excelRow}</td>
+                          <td>
+                            <b>{p.row.name || "Sin nombre"}</b>
+                            {p.row.type && <div className="ag-subtle">{p.row.type}</div>}
+                          </td>
+                          <td className="num">{Number.isFinite(p.row.price) ? money(p.row.price) : "—"}</td>
+                          <td className="num">{Number.isFinite(p.row.duration) ? `${p.row.duration} min` : "—"}</td>
+                          <td>
+                            <span className={KIND_META[p.kind].badge}>{KIND_META[p.kind].label}</span>
+                            {p.changes.length > 0 && <div className="ag-subtle" style={{ marginTop: 4 }}>{p.changes.join(" · ")}</div>}
+                            {p.message && (
+                              <div style={{ marginTop: 4, fontSize: 13, color: p.kind === "error" ? "var(--danger)" : "var(--ink-muted)" }}>{p.message}</div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {visible.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="ag-muted" style={{ textAlign: "center" }}>
+                            No hay filas en este grupo.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {result && (
+          <div className="ag-stack" style={{ gap: 12 }}>
+            <div className={`ag-alert ${result.errors.length ? "ag-alert--warning" : "ag-alert--success"}`}>
+              {result.errors.length ? <IconAlertTriangle size={18} /> : <IconCheck size={18} />}
+              <div style={{ flex: 1, fontSize: 14 }}>
+                <b>
+                  {[result.created && `${result.created} creado${result.created === 1 ? "" : "s"}`, result.updated && `${result.updated} actualizado${result.updated === 1 ? "" : "s"}`]
+                    .filter(Boolean)
+                    .join(" · ") || "No se guardó ningún servicio"}
+                </b>
+                {result.errors.length > 0 && <div>El servidor rechazó {result.errors.length === 1 ? "1 fila" : `${result.errors.length} filas`}:</div>}
+              </div>
+            </div>
+            {result.errors.length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                {result.errors.map((er) => (
+                  <li key={`${er.row}-${er.name}`}>
+                    Fila {er.row} · {er.name || "Sin nombre"}: {er.error}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Acciones */}
+        <Group justify="flex-end" gap="xs">
+          {result ? (
+            <>
+              <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={reset}>
+                Cargar otro archivo
+              </Button>
+              <Button onClick={handleClose}>Listo</Button>
+            </>
+          ) : (
+            <>
+              <Button variant="subtle" color="gray" onClick={handleClose}>
+                Cancelar
+              </Button>
+              {preview && (
                 <Button
                   onClick={handleUpload}
                   loading={uploading}
-                  leftSection={<IconUpload size={16} />}
-                  color="green"
+                  disabled={toSave === 0}
+                  leftSection={counts.update && !counts.new ? <IconUpload size={16} /> : <IconPlus size={16} />}
                 >
-                  Cargar Servicios
+                  {toSave === 0 ? "Nada que guardar" : `Guardar ${toSave === 1 ? "1 servicio" : `${toSave} servicios`}`}
                 </Button>
-              </Group>
-            )}
-          </Stack>
-        </Card>
-
-        {/* Barra de progreso */}
-        {uploading && (
-          <Box>
-            <Text size="sm" mb="xs">
-              Procesando servicios...
-            </Text>
-            <Progress value={100} animated />
-          </Box>
-        )}
-
-        {/* Resultados */}
-        {uploadResult && (
-          <Card withBorder p="md">
-            <Stack gap="md">
-              <Group justify="space-between">
-                <Text fw={600} size="lg">
-                  Resultados de la Carga
-                </Text>
-                <Group gap="xs">
-                  <Badge color="green" size="lg" leftSection={<IconCheck size={12} />}>
-                    {uploadResult.totalSuccess} Éxitos
-                  </Badge>
-                  <Badge color="red" size="lg" leftSection={<IconX size={12} />}>
-                    {uploadResult.totalErrors} Errores
-                  </Badge>
-                </Group>
-              </Group>
-
-              {/* Resumen de creados/actualizados */}
-              {(uploadResult.created !== undefined || uploadResult.updated !== undefined) && (
-                <Group gap="sm" justify="center">
-                  {(uploadResult.created || 0) > 0 && (
-                    <Badge color="blue" size="md">
-                      Creados: {uploadResult.created}
-                    </Badge>
-                  )}
-                  {(uploadResult.updated || 0) > 0 && (
-                    <Badge color="cyan" size="md">
-                      Actualizados: {uploadResult.updated}
-                    </Badge>
-                  )}
-                </Group>
               )}
-
-              {uploadResult.success.length > 0 && (
-                <Box>
-                  <Text fw={500} size="sm" mb="xs" c="green">
-                    Servicios procesados exitosamente:
-                  </Text>
-                  <ScrollArea h={200}>
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Fila</Table.Th>
-                          <Table.Th>Nombre</Table.Th>
-                          <Table.Th>Acción</Table.Th>
-                          <Table.Th>Precio</Table.Th>
-                          <Table.Th>Duración</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {uploadResult.success.map((item, idx) => (
-                          <Table.Tr key={idx}>
-                            <Table.Td>{item.row}</Table.Td>
-                            <Table.Td>{item.name}</Table.Td>
-                            <Table.Td>
-                              <Badge size="sm" color={item.action === 'CREADO' ? 'blue' : 'cyan'}>
-                                {item.action || 'CREADO'}
-                              </Badge>
-                            </Table.Td>
-                            <Table.Td>{item.price}</Table.Td>
-                            <Table.Td>{item.duration} min</Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </ScrollArea>
-                </Box>
-              )}
-
-              {uploadResult.errors.length > 0 && (
-                <Box>
-                  <Text fw={500} size="sm" mb="xs" c="red">
-                    Errores detectados:
-                  </Text>
-                  <ScrollArea h={200}>
-                    <Table striped highlightOnHover>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Fila</Table.Th>
-                          <Table.Th>Nombre</Table.Th>
-                          <Table.Th>Error</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {uploadResult.errors.map((error, idx) => (
-                          <Table.Tr key={idx}>
-                            <Table.Td>{error.row}</Table.Td>
-                            <Table.Td>{error.name}</Table.Td>
-                            <Table.Td>
-                              <Text size="xs" c="red">
-                                {error.error}
-                              </Text>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  </ScrollArea>
-                </Box>
-              )}
-            </Stack>
-          </Card>
-        )}
-
-        {/* Botones de acción */}
-        <Group justify="flex-end">
-          <Button variant="subtle" onClick={handleClose}>
-            Cerrar
-          </Button>
+            </>
+          )}
         </Group>
-      </Stack>
+      </div>
     </Modal>
   );
 }
