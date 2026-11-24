@@ -157,7 +157,7 @@ const ClientList: React.FC<ClientListProps> = ({
                 {stats && <th>Última visita</th>}
                 {stats && <th className="num">Visitas</th>}
                 {stats && <th className="num">Total gastado</th>}
-                {loyaltyEnabled && <th className="num">Servicios</th>}
+                {loyaltyEnabled && <th className="num" title="Servicios que suman a la tarjeta de fidelidad">Sellos</th>}
                 {loyaltyEnabled && <th className="num">Referidos</th>}
                 {loyaltyEnabled && <th>Fidelidad</th>}
                 <th aria-label="Acciones" />

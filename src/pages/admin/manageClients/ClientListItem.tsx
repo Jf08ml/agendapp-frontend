@@ -1,5 +1,5 @@
 // Fila de cliente (rediseño, ClientesPanel): en escritorio, fila de tabla
-// (Cliente con nombre y teléfono · Servicios · Referidos · Premio · «⋯»); en
+// (Cliente con nombre y teléfono · Sellos · Referidos · Premio · «⋯»); en
 // móvil, fila compacta con los mismos datos en texto normal. Tocar la fila abre
 // la ficha lateral; las acciones van en el menú «⋯».
 import React from "react";
@@ -121,7 +121,7 @@ const ClientListItem: React.FC<ClientListItemProps> = React.memo((props) => {
             <div className="ag-row" style={{ paddingLeft: 44, gap: 8 }}>
               {loyaltyEnabled && (
                 <span className="ag-subtle">
-                  {client.servicesTaken} {client.servicesTaken === 1 ? "servicio" : "servicios"} · {client.referralsMade}{" "}
+                  {client.servicesTaken} {client.servicesTaken === 1 ? "sello" : "sellos"} · {client.referralsMade}{" "}
                   {client.referralsMade === 1 ? "referido" : "referidos"}
                 </span>
               )}
