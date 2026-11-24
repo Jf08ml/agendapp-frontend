@@ -73,6 +73,8 @@ import { MpDepositNotice } from "../../components/MpDepositNotice";
 import { getServicesByOrganizationId, type Service } from "../../services/serviceService";
 import { computeDepositTotal, resolveDepositRule, uniformDepositPercentage } from "../../utils/deposit";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
+import AddToCalendarButton from "../../components/AddToCalendarButton";
+import { savePendingCalendar, type CalendarEvent } from "../../utils/addToCalendar";
 
 interface BookingChatPanelProps {
   // Ausente cuando la org solo tiene el asistente IA habilitado — no hay
@@ -191,15 +193,36 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
   const [pendingPayload, setPendingPayload] = useState<BookingPayload | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [reservationDone, setReservationDone] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [reservationError, setReservationError] = useState<string | null>(null);
 
   // Servicios de la org: el abono puede ser distinto por servicio (% o monto fijo),
-  // así que para avisar/cobrar bien hay que conocer la regla de cada uno.
+  // así que para avisar/cobrar bien hay que conocer la regla de cada uno. También
+  // dan nombre y duración al evento de «Agregar a mi calendario».
   const [orgServices, setOrgServices] = useState<Service[]>([]);
   useEffect(() => {
-    if (!org?._id || !org.requireReservationDeposit) return;
+    if (!org?._id) return;
     getServicesByOrganizationId(org._id).then(setOrgServices).catch(() => setOrgServices([]));
-  }, [org?._id, org?.requireReservationDeposit]);
+  }, [org?._id]);
+
+  // La cita del chat como evento: la hora llega sin zona (la del negocio) y el
+  // fin sale de la duración de los servicios.
+  const calendarFor = (payload: BookingPayload | null): CalendarEvent[] => {
+    if (!payload?.startDate) return [];
+    const svcs = payload.services
+      .map((ps) => orgServices.find((o) => o._id === ps.serviceId))
+      .filter((x): x is Service => !!x);
+    const names = svcs.map((x) => x.name).join(", ");
+    return [
+      {
+        title: [names || "Cita", org?.name].filter(Boolean).join(" · "),
+        start: payload.startDate,
+        durationMinutes: svcs.reduce((acc, x) => acc + (x.duration ?? 0), 0) || undefined,
+        timezone: org?.timezone,
+        location: org?.address,
+      },
+    ];
+  };
 
   const depositFor = (payload: BookingPayload | null) => {
     const svcs = (payload?.services ?? [])
@@ -350,6 +373,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
           chatSessionId: sessionId.current,
         });
         if (checkout?.checkoutUrl) {
+          savePendingCalendar(checkout.externalReference, calendarFor(pendingPayload));
           window.location.href = checkout.checkoutUrl;
           return;
         }
@@ -385,6 +409,7 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
       // Complemento (best-effort): el backend ya marcó la conversión en la misma
       // request, esto solo cubre el caso de que el endpoint server-side cambie.
       markBookingConverted(sessionId.current).catch(() => {});
+      setCalendarEvents(calendarFor(pendingPayload));
       setReservationDone(true);
       setPendingPayload(null);
     } catch (err: unknown) {
@@ -479,6 +504,8 @@ export default function BookingChatPanel({ onBack, preselectedService }: Booking
             Tu cita ha sido registrada. Si necesitas cancelar o modificar, el negocio te indicará los pasos.
           </Text>
         </Stack>
+
+        <AddToCalendarButton events={calendarEvents} fileName={org?.name} />
 
         {/* Separador + widget de satisfacción */}
         <Divider w="100%" maw={340} label={

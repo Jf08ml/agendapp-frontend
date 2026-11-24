@@ -12,6 +12,7 @@ import { RootState } from "../../app/store";
 import { formatInTimezone, formatFullDateInTimezone } from "../../utils/timezoneUtils";
 import cancellationService from "../../services/cancellationService";
 import RescheduleCard from "./RescheduleCard";
+import AddToCalendarButton from "../../components/AddToCalendarButton";
 
 interface AppointmentInfo {
   id: string;
@@ -239,6 +240,15 @@ export const PublicCancelPage: React.FC = () => {
   }
 
   if (confirmed) {
+    const confirmedList = isGroupList ? appointments.filter((a) => selectedAppointments.includes(a.id)) : appointments.slice(0, 1);
+    const calendarEvents = confirmedList.map((a) => ({
+      title: [a.serviceName, info?.organizationName].filter(Boolean).join(" · "),
+      start: a.startDate,
+      end: a.endDate,
+      timezone: tz,
+      location: organization?.address,
+      uid: a.id,
+    }));
     return (
       <div style={shell}>
         <div className="ag-card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
@@ -249,7 +259,10 @@ export const PublicCancelPage: React.FC = () => {
           <div className="ag-muted" style={{ fontSize: 14 }}>
             {isGroupList ? `Confirmaste ${n(selectedAppointments.length)}.` : "Confirmaste tu asistencia."} {info?.organizationName} ya recibió el aviso.
           </div>
-          <Button component={Link} to="/" variant="subtle" color="gray" mt={4}>
+          <div style={{ marginTop: 4 }}>
+            <AddToCalendarButton events={calendarEvents} fileName={info?.organizationName} />
+          </div>
+          <Button component={Link} to="/" variant="subtle" color="gray">
             Volver al inicio
           </Button>
         </div>

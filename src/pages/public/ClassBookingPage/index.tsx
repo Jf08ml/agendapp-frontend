@@ -18,6 +18,8 @@ import {
 } from "../../../services/packageService";
 import { createClassCheckout, createReceiptClassCheckout } from "../../../services/collectionService";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import AddToCalendarButton from "../../../components/AddToCalendarButton";
+import { savePendingCalendar, type CalendarEvent } from "../../../utils/addToCalendar";
 
 import StepSelectClass from "./StepSelectClass";
 import StepSelectSession from "./StepSelectSession";
@@ -84,6 +86,21 @@ export default function ClassBookingWizard() {
   const [pkgRemaining, setPkgRemaining] = useState<number>(0);
   const [usePkg, setUsePkg] = useState(true);
   // Con varias sesiones el paquete debe cubrirlas todas (el backend lo exige).
+  // «Agregar a mi calendario»: cada sesión elegida (las fechas llegan con zona).
+  const calendarEvents = (): CalendarEvent[] =>
+    selectedSessions.map((ses) => {
+      const room = typeof ses.roomId === "object" ? ses.roomId?.name : undefined;
+      const teacher = typeof ses.employeeId === "object" ? ses.employeeId?.names : undefined;
+      return {
+        title: [selectedClass?.name || "Clase", organization?.name].filter(Boolean).join(" · "),
+        start: ses.startDate,
+        end: ses.endDate,
+        timezone: organization?.timezone,
+        location: organization?.address,
+        description: [teacher && `Con ${teacher}`, room && `Salón: ${room}`].filter(Boolean).join(" · ") || undefined,
+        uid: ses._id,
+      };
+    });
   const pkgCoversAll = !!pkgId && pkgRemaining >= selectedSessions.length;
   const usingPackage = usePkg && pkgCoversAll;
 
@@ -306,6 +323,7 @@ export default function ClassBookingWizard() {
       if (useMp) {
         const checkout = await createClassCheckout(classCheckoutPayload);
         if (checkout?.checkoutUrl) {
+          savePendingCalendar(checkout.externalReference, calendarEvents());
           window.location.href = checkout.checkoutUrl;
           return; // navegamos fuera; el webhook confirma la inscripción
         }
@@ -477,8 +495,9 @@ export default function ClassBookingWizard() {
             {finishName ? `${finishName.split(" ")[0]}, te` : "Te"} enviamos por WhatsApp la confirmación y los detalles de tu clase.
           </div>
           <div className="ag-row" style={{ gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
-            <Button onClick={() => navigate("/mis-reservas")}>Ver mis reservas</Button>
-            <Button variant="default" onClick={handleNewBooking}>
+            <AddToCalendarButton events={calendarEvents()} fileName={organization?.name} />
+            <Button variant="default" onClick={() => navigate("/mis-reservas")}>Ver mis reservas</Button>
+            <Button variant="subtle" color="gray" onClick={handleNewBooking}>
               Hacer otra reserva
             </Button>
           </div>

@@ -53,6 +53,8 @@ import { ReservationDepositAlert } from "../../components/ReservationDepositAler
 import { MpDepositNotice } from "../../components/MpDepositNotice";
 import { computeDepositTotal, uniformDepositPercentage } from "../../utils/deposit";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
+import AddToCalendarButton from "../../components/AddToCalendarButton";
+import { savePendingCalendar, type CalendarEvent } from "../../utils/addToCalendar";
 
 type BookingMode = "chat" | "manual";
 
@@ -281,6 +283,35 @@ export default function MultiBookingWizard() {
     return dayjs(last.to).format(getTimeFormatStr(tf));
   })());
 
+  // «Agregar a mi calendario»: la cita (o cada cita de la serie) con la hora
+  // del negocio; sin zona se interpreta en organization.timezone.
+  const buildCalendarEvents = (): CalendarEvent[] => {
+    if (!times) return [];
+    const names = selectedServiceDocs.map((s) => s.name).join(", ");
+    const pros = Array.from(
+      new Set(
+        times.intervals
+          .map((iv) => employees.find((e) => e._id === iv.employeeId)?.names)
+          .filter((n): n is string => !!n)
+      )
+    );
+    const base = {
+      title: `${names || "Cita"} · ${organization?.name ?? ""}`.replace(/ · $/, ""),
+      timezone: organization?.timezone,
+      location: organization?.address,
+      description: pros.length ? `Con ${pros.join(", ")}` : undefined,
+      durationMinutes: totalMin || undefined,
+    };
+    const occurrences = recurrencePattern.type === "weekly" ? (seriesPreview?.occurrences ?? []).filter((o) => o.status === "available") : [];
+    if (occurrences.length > 0) {
+      return occurrences.map((o) => ({ ...base, start: o.startDate, end: o.endDate }));
+    }
+    const last = times.intervals[times.intervals.length - 1];
+    const start = (times as any).startTimeStr ?? times.startTime ?? times.intervals[0]?.from;
+    const end = last ? (last.endStr ?? last.to) : undefined;
+    return start ? [{ ...base, start, end }] : [];
+  };
+
   // Payloads
   const buildMultiplePayload = (): CreateMultipleReservationsPayload => {
     const block = times as MultiServiceBlockSelection;
@@ -331,6 +362,7 @@ export default function MultiBookingWizard() {
       if (useMp) {
         const checkout = await createReservationCheckout({ ...payload, source: "manual_booking" });
         if (checkout?.checkoutUrl) {
+          savePendingCalendar(checkout.externalReference, buildCalendarEvents());
           window.location.href = checkout.checkoutUrl; // redirección al checkout de MP
           return;
         }
@@ -739,6 +771,7 @@ export default function MultiBookingWizard() {
               </Box>
             )}
 
+          <AddToCalendarButton events={buildCalendarEvents()} fileName={organization?.name} size="lg" fullWidth />
           <Button component={Link} to="/mis-reservas" variant="default" size="lg" fullWidth>
             Ver mis reservas
           </Button>
