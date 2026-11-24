@@ -2,6 +2,34 @@ import { Stack, NumberInput, Switch, Group, Text } from "@mantine/core";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
+import { IconEye } from "@tabler/icons-react";
+import { clientPolicyLines } from "../../settingsHelpers";
+
+/** «Así lo ve tu cliente»: la política en las frases del enlace de su cita. */
+function ClientPolicyPreview({ form }: { form: UseFormReturnType<FormValues> }) {
+  const v = form.values;
+  const lines = clientPolicyLines({
+    cancelMinHours: v.cancellationPolicy?.minHoursBeforeAppointment,
+    preventCancellingConfirmed: v.cancellationPolicy?.preventCancellingConfirmed,
+    rescheduleEnabled: v.reschedulePolicy?.enabled,
+    maxReschedules: v.reschedulePolicy?.maxReschedules,
+    rescheduleMinHours: v.reschedulePolicy?.minHoursBeforeAppointment,
+  });
+  return (
+    <div className="ag-card" style={{ padding: "var(--space-4)", background: "var(--surface-hover)" }}>
+      <div className="ag-row" style={{ gap: 6, alignItems: "center", marginBottom: 8 }}>
+        <IconEye size={16} stroke={1.75} />
+        <b style={{ fontSize: 14 }}>Así lo ve tu cliente</b>
+      </div>
+      <div className="ag-muted" style={{ fontSize: 13, marginBottom: 8 }}>En el enlace de su cita (confirmación y recordatorio):</div>
+      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4, fontSize: 14 }}>
+        {lines.map((l) => (
+          <li key={l}>{l}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function CancellationPolicyTab({
   form,
@@ -93,6 +121,8 @@ export default function CancellationPolicyTab({
           )}
         </Stack>
       </SectionCard>
+
+      <ClientPolicyPreview form={form} />
     </Stack>
   );
 }

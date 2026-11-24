@@ -4,8 +4,10 @@
 // - "pwa": App instalable (ícono, favicon, nombres, descripción, color del navegador).
 // - "season": Temporada (decoración navideña con vista previa y «Ver en mi web»).
 // `branding.footerTextColor` ya no se edita (el pie de la web es neutro); el valor guardado no se toca.
-import { Alert, Box, ColorInput, FileInput, Loader, Paper, SegmentedControl, SimpleGrid, Switch, Text, TextInput } from "@mantine/core";
-import { IconCheck, IconChristmasTree, IconExternalLink, IconLock } from "@tabler/icons-react";
+import { Alert, Box, ColorInput, FileInput, Grid, Loader, Paper, SegmentedControl, SimpleGrid, Switch, Text, TextInput } from "@mantine/core";
+import { IconCheck, IconChristmasTree, IconExternalLink, IconInfoCircle, IconLock } from "@tabler/icons-react";
+import BrandPreview from "../BrandPreview";
+import { brandContrastAdvice } from "../../settingsHelpers";
 import { ChristmasDecorations, SantaHat } from "../../../../../components/seasonal/ChristmasDecorations";
 import { CHRISTMAS_SEASON_LABEL } from "../../../../../utils/seasonalTheme";
 import { useSelector } from "react-redux";
@@ -253,7 +255,10 @@ export default function BrandingTab({
 
   // part === "brand"
   const selectedFont = FONT_OPTIONS.find((f) => f.value === (b?.fontFamily ?? "inter")) ?? FONT_OPTIONS[0];
+  const advice = brandContrastAdvice(b?.primaryColor);
   return (
+    <Grid gutter="md" align="flex-start">
+    <Grid.Col span={{ base: 12, lg: 7 }}>
     <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
       {planAlert}
       <SectionCard title="Logo" description="Se ve en el encabezado de tu web, en la reserva en línea y en la tarjeta de fidelidad.">
@@ -288,6 +293,27 @@ export default function BrandingTab({
             disabled={brandingDisabled}
           />
         </SimpleGrid>
+        {advice && (
+          <Alert
+            mt="md"
+            variant="light"
+            color={advice.tone === "success" ? "green" : "blue"}
+            icon={advice.tone === "success" ? <IconCheck size={16} /> : <IconInfoCircle size={16} />}
+          >
+            <Text size="sm">
+              {advice.text}
+              {advice.adjustedText && (
+                <>
+                  {" "}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: advice.adjustedText, fontWeight: 600 }}>
+                    <span aria-hidden style={{ width: 10, height: 10, borderRadius: 3, background: advice.adjustedText, display: "inline-block" }} />
+                    Así se ven tus enlaces
+                  </span>
+                </>
+              )}
+            </Text>
+          </Alert>
+        )}
       </SectionCard>
 
       <SectionCard title="Tipografía" description="Se aplica en tu web, la reserva en línea y tu panel.">
@@ -321,5 +347,18 @@ export default function BrandingTab({
         </div>
       </SectionCard>
     </div>
+    </Grid.Col>
+    <Grid.Col span={{ base: 12, lg: 5 }} style={{ position: "sticky", top: 16 }}>
+      <SectionCard title="Vista previa" description="Así se verá tu web con estos cambios, antes de guardar.">
+        <BrandPreview
+          name={form.values.name}
+          logoUrl={b?.logoUrl}
+          primaryColor={b?.primaryColor}
+          secondaryColor={b?.secondaryColor}
+          fontCss={selectedFont.css}
+        />
+      </SectionCard>
+    </Grid.Col>
+    </Grid>
   );
 }

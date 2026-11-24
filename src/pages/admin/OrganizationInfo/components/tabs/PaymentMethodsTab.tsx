@@ -26,6 +26,7 @@ import { BiPlus, BiEdit, BiTrash, BiInfoCircle } from "react-icons/bi";
 import { uploadImage } from "../../../../../services/imageService";
 import { notifications } from "@mantine/notifications";
 import { FormValues } from "../../schema";
+import DepositExample from "../DepositExample";
 
 // Tipo local para el formulario (sin valores null)
 type PaymentMethodFormData = {
@@ -46,7 +47,10 @@ export default function PaymentMethodsTab({
   form,
   isEditing,
   part,
+  organizationId,
 }: PaymentMethodsTabProps & {
+  /** Organización editada (superadmin); por defecto, la del dominio. */
+  organizationId?: string;
   /** "methods": Cobros › Métodos de pago; "deposits": Cobros › Abonos. */
   part?: "methods" | "deposits";
 }) {
@@ -224,6 +228,17 @@ export default function PaymentMethodsTab({
                   disabled={!isEditing}
                 />
               )}
+
+              <DepositExample
+                organizationId={organizationId}
+                config={{
+                  requireReservationDeposit: true,
+                  reservationDepositType: depositType,
+                  reservationDepositPercentage: Number(depositPercentage) || 0,
+                  reservationDepositFixedAmount: Number(depositFixedAmount) || 0,
+                  currency: form.values.currency ?? undefined,
+                }}
+              />
 
               <Text size="xs" c="dimmed">
                 Esta es la regla general. Puedes definir un abono distinto (porcentaje o monto fijo) en cada
