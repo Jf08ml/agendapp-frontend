@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { textOn } from "../../../theme/brandTokens";
 import { Box, Text, ScrollArea } from "@mantine/core";
 import { format, isSameDay, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -345,7 +346,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                         height: 26,
                         borderRadius: "50%",
                         background: empColor,
-                        color: "#fff",
+                        color: textOn(empColor),
                         fontSize: 10,
                         fontWeight: 700,
                         display: "flex",
