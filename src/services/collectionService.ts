@@ -7,6 +7,7 @@ import {
   apiPackagePublic,
 } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
+import { throwIfSlotTaken } from "./reservationService";
 
 export type OrderStatus =
   | "created"
@@ -205,6 +206,7 @@ export const createReceiptReservationCheckout = async (
     const { data } = await apiGeneral.post("/collection/receipt/reservation", payload);
     return data.data as ReceiptCheckoutResult;
   } catch (error) {
+    throwIfSlotTaken(error); // otra persona está pagando ese cupo
     handleAxiosError(error, "No se pudo iniciar el pago por transferencia");
   }
 };
