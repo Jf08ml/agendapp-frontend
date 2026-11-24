@@ -8,11 +8,15 @@ import { Button, Skeleton } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { IconCalendarEvent, IconCheck, IconInfoCircle, IconLock } from "@tabler/icons-react";
 import cancellationService, { type RescheduleInfo, type RescheduleSlot } from "../../services/cancellationService";
+import { getBookingRescheduleInfo, getBookingRescheduleSlots, rescheduleBooking } from "../../services/clientBookingsService";
 import { formatFullDateInTimezone, todayInTimezone } from "../../utils/timezoneUtils";
 import { formatTimeLabel } from "../../utils/timeOfDay";
 
 interface RescheduleCardProps {
-  token: string;
+  /** Token del enlace de la cita (/cancel). */
+  token?: string;
+  /** Desde Mis reservas: enlace del cliente + id de la cita (Fase 3). */
+  booking?: { token: string; id: string };
   /** Se llama tras reagendar con éxito (la página recarga la info de la cita). */
   onRescheduled: () => void;
   /** Avisa si el cliente abrió el cambio de fecha (la página oculta sus otras acciones). */
@@ -31,7 +35,14 @@ const errorMessage = (err: unknown, fallback: string) =>
 
 const amPm = (s: string) => s.replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
 
-const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, onOpenChange, onAvailability, openRequest = 0 }) => {
+const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, booking, onRescheduled, onOpenChange, onAvailability, openRequest = 0 }) => {
+  // Mismo flujo con dos orígenes: el enlace de la cita o Mis reservas.
+  const key = booking ? `${booking.token}:${booking.id}` : token ?? "";
+  const api = {
+    info: () => (booking ? getBookingRescheduleInfo(booking.token, booking.id) : cancellationService.getRescheduleInfo(token ?? "")),
+    slots: (date: string) => (booking ? getBookingRescheduleSlots(booking.token, booking.id, date) : cancellationService.getRescheduleSlots(token ?? "", date)),
+    move: (datetime: string) => (booking ? rescheduleBooking(booking.token, booking.id, datetime) : cancellationService.rescheduleByToken(token ?? "", datetime)),
+  };
   const [info, setInfo] = useState<RescheduleInfo | null>(null);
   const [open, setOpenState] = useState(false);
   const [date, setDate] = useState<Date | null>(null);
@@ -49,8 +60,8 @@ const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, o
 
   useEffect(() => {
     let alive = true;
-    cancellationService
-      .getRescheduleInfo(token)
+    api
+      .info()
       .then((res) => {
         if (!alive) return;
         setInfo(res.data);
@@ -65,7 +76,7 @@ const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, o
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [key]);
 
   useEffect(() => {
     if (openRequest > 0) {
@@ -82,7 +93,7 @@ const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, o
       setSlots(null);
       setError(null);
       try {
-        const res = await cancellationService.getRescheduleSlots(token, toDateStr(d));
+        const res = await api.slots(toDateStr(d));
         setSlots(res.data?.slots ?? []);
       } catch (err) {
         setError(errorMessage(err, "No se pudieron cargar los horarios."));
@@ -91,7 +102,8 @@ const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, o
         setLoadingSlots(false);
       }
     },
-    [token]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key]
   );
 
   if (doneLabel) {
@@ -153,7 +165,7 @@ const RescheduleCard: React.FC<RescheduleCardProps> = ({ token, onRescheduled, o
     setSaving(true);
     setError(null);
     try {
-      const res = await cancellationService.rescheduleByToken(token, selected.datetime);
+      const res = await api.move(selected.datetime);
       setDoneLabel(fmtFull(res.data?.startDate ?? selected.datetime).replace(/^./, (c) => c.toLowerCase()));
       onOpenChange?.(false);
       onRescheduled();

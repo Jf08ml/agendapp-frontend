@@ -178,6 +178,8 @@ const MyBookings: React.FC = () => {
       <MyBookingsView
         data={data}
         onCancel={setToCancel}
+        rescheduleToken={token}
+        onRescheduled={() => void load()}
         footer={
           <div className="ag-subtle" style={{ textAlign: "center" }}>
             Este enlace es personal; no lo compartas. ¿No eres {firstName || "tú"}?{" "}
