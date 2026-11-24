@@ -9,6 +9,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { getOrderStatus, type OrderStatus } from "../../services/collectionService";
 import { trackReservationConversion } from "../../utils/orgGoogleTags";
+import AddToCalendarButton from "../../components/AddToCalendarButton";
+import { readPendingCalendar } from "../../utils/addToCalendar";
 
 const POLL_INTERVAL_MS = 4000; // cada 4 segundos
 const MAX_ATTEMPTS = 15; // ~60 segundos
@@ -159,6 +161,8 @@ export default function PublicReservationPaymentPage() {
   }
 
   if (pageStatus === "paid") {
+    // Guardado al salir hacia Mercado Pago (reserva web, chat o clase)
+    const calendarEvents = orderType === "reservation" || orderType === "class" ? readPendingCalendar(ref) : [];
     return card(
       <>
         <ResultIcon tone="success">
@@ -166,7 +170,12 @@ export default function PublicReservationPaymentPage() {
         </ResultIcon>
         {title(copy.paidTitle)}
         <div className="ag-muted" style={{ fontSize: 14 }}>{copy.paidText}</div>
-        <Button size="md" onClick={() => navigate(copy.donePath)} mt={4}>
+        {calendarEvents.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <AddToCalendarButton events={calendarEvents} fileName={organization?.name} />
+          </div>
+        )}
+        <Button size="md" variant={calendarEvents.length > 0 ? "default" : "filled"} onClick={() => navigate(copy.donePath)} mt={calendarEvents.length > 0 ? 0 : 4}>
           {copy.doneLabel}
         </Button>
       </>
