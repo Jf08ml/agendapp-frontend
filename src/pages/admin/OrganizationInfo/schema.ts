@@ -190,6 +190,12 @@ export const schema = z.object({
       googleAdsConversionLabel: z
         .union([z.string().regex(/^[A-Za-z0-9_-]+$/, "Solo letras, números, guiones y guion bajo"), z.literal("")])
         .optional(),
+      metaPixelId: z
+        .union([z.string().trim().regex(/^\d{10,20}$/, "Solo números (ej: 1234567890123456)"), z.literal("")])
+        .optional(),
+      tiktokPixelId: z
+        .union([z.string().trim().regex(/^[A-Z0-9]{15,30}$/, "Letras mayúsculas y números (ej: C4ABCD1234EFGH5678IJ)"), z.literal("")])
+        .optional(),
     })
     .optional(),
 
