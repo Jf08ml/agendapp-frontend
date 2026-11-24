@@ -1,12 +1,13 @@
-import {
-  Stack, TextInput, Textarea, Group, Button, Text, Paper,
-  SimpleGrid, Badge, Divider, Alert, Box, useMantineTheme, Tooltip,
-} from "@mantine/core";
-import { IconInfoCircle, IconLock } from "@tabler/icons-react";
+// Configuración inicial › Presentación (design system, ConfiguracionInicial ·
+// Fase 2): mensaje de bienvenida y las 3 plantillas nuevas. Esencial queda
+// elegida por defecto; Estudio y Academia se ven con «Pro».
+import { Stack, TextInput, Textarea, Group, Button, Text, Paper, Divider, Alert } from "@mantine/core";
+import { IconInfoCircle } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../admin/OrganizationInfo/schema";
+import HomeTemplatePicker from "../../../components/HomeTemplatePicker";
 
 interface Props {
   form: UseFormReturnType<FormValues>;
@@ -15,170 +16,14 @@ interface Props {
   saving: boolean;
 }
 
-// ── Mini-previews de cada layout ────────────────────────────────────────────
-
-function PreviewModern({ title, description, primary }: { title: string; description: string; primary: string }) {
-  const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
-  return (
-    <Box style={{ width: "100%", height: "100%", background: "#f8f9fa", padding: 8 }}>
-      {/* Título */}
-      <Text size="xs" fw={700} ta="center" c="#111" mb={3} lineClamp={1} style={{ fontSize: 9, lineHeight: 1.2 }}>
-        {title || "¡Hola! Bienvenido"}
-      </Text>
-      <Text size="xs" ta="center" c="dimmed" mb={6} lineClamp={2} style={{ fontSize: 7, lineHeight: 1.3 }}>
-        {description || "Estamos felices de tenerte aquí."}
-      </Text>
-      {/* Cards 2 columnas con icono circular + texto, en fila */}
-      <SimpleGrid cols={2} spacing={4}>
-        {rows.map((r) => (
-          <Box key={r} style={{ background: "#fff", borderRadius: 6, border: "1px solid #e9ecef", padding: "4px 5px", display: "flex", alignItems: "center", gap: 4 }}>
-            <Box style={{ width: 14, height: 14, borderRadius: "50%", background: primary, flexShrink: 0 }} />
-            <Text style={{ fontSize: 7, fontWeight: 600, color: "#333" }}>{r}</Text>
-          </Box>
-        ))}
-      </SimpleGrid>
-    </Box>
-  );
-}
-
-function PreviewMinimal({ title, description, primary }: { title: string; description: string; primary: string }) {
-  const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
-  return (
-    <Box style={{ width: "100%", height: "100%", background: "#fff", padding: 8 }}>
-      <Text fw={700} ta="center" c="#111" mb={3} style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>
-        {title || "¡Hola! Bienvenido"}
-      </Text>
-      <Text ta="center" c="#999" mb={7} style={{ fontSize: 7, lineHeight: 1.3 }} lineClamp={2}>
-        {description || "Estamos felices de tenerte aquí."}
-      </Text>
-      {/* Lista vertical, ícono con fondo tenue, sin sombra a la vista */}
-      <Stack gap={4}>
-        {rows.map((r) => (
-          <Box key={r} style={{ borderRadius: 5, border: "1px solid #e9ecef", padding: "3px 6px", display: "flex", alignItems: "center", gap: 5 }}>
-            <Box style={{ width: 10, height: 10, borderRadius: 3, background: `${primary}20`, flexShrink: 0 }} />
-            <Text style={{ fontSize: 7, fontWeight: 600, color: "#333" }}>{r}</Text>
-          </Box>
-        ))}
-      </Stack>
-    </Box>
-  );
-}
-
-function PreviewCards({ title, description, primary }: { title: string; description: string; primary: string }) {
-  const rows = ["Reserva", "Servicios", "Fidelidad", "Ubicación"];
-  return (
-    <Box style={{ width: "100%", height: "100%", background: "#fff", padding: 8 }}>
-      {/* Hero centrado, sin card ni gradiente */}
-      <Box style={{ textAlign: "center", marginBottom: 6 }}>
-        <Text fw={700} c="#111" style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>{title || "¡Hola! Bienvenido"}</Text>
-        <Text c="dimmed" style={{ fontSize: 7, lineHeight: 1.3, marginTop: 2 }} lineClamp={2}>{description || "Estamos felices de tenerte aquí."}</Text>
-      </Box>
-      {/* Cards 2 col, ícono cuadrado centrado arriba, título debajo */}
-      <SimpleGrid cols={2} spacing={4}>
-        {rows.map((r) => (
-          <Box key={r} style={{ background: "#fff", borderRadius: 6, border: "1px solid #dee2e6", padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <Box style={{ width: 16, height: 16, borderRadius: 4, background: primary }} />
-            <Text style={{ fontSize: 7, fontWeight: 700, color: "#333", textAlign: "center" }}>{r}</Text>
-          </Box>
-        ))}
-      </SimpleGrid>
-    </Box>
-  );
-}
-
-function PreviewLanding({ title, description, primary }: { title: string; description: string; primary: string }) {
-  return (
-    <Box style={{ width: "100%", height: "100%", background: "#fff", overflow: "hidden" }}>
-      {/* Hero gradient */}
-      <Box style={{ background: `linear-gradient(135deg, ${primary} 0%, ${primary}cc 100%)`, padding: "8px 8px 10px", marginBottom: 5, position: "relative" }}>
-        <Box style={{ position: "absolute", top: -10, right: -10, width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", filter: "blur(8px)" }} />
-        <Text fw={900} ta="center" c="white" style={{ fontSize: 9, lineHeight: 1.2 }} lineClamp={1}>{title || "¡Hola! Bienvenido"}</Text>
-        <Text ta="center" c="white" style={{ fontSize: 7, lineHeight: 1.2, opacity: 0.9, marginTop: 2 }} lineClamp={2}>{description || "Estamos felices de tenerte aquí."}</Text>
-      </Box>
-      {/* Servicios grid 3 cols */}
-      <Box style={{ padding: "0 6px 4px" }}>
-        <Text style={{ fontSize: 7, fontWeight: 700, textAlign: "center", color: "#333", marginBottom: 4 }}>Nuestros Servicios</Text>
-        <SimpleGrid cols={3} spacing={3}>
-          {["Serv. 1", "Serv. 2", "Serv. 3"].map((s) => (
-            <Box key={s} style={{ borderRadius: 4, border: "1px solid #dee2e6", padding: "3px 2px", textAlign: "center" }}>
-              <Box style={{ width: "100%", height: 14, background: `${primary}22`, borderRadius: 3, marginBottom: 2 }} />
-              <Text style={{ fontSize: 6, fontWeight: 600, color: "#555" }}>{s}</Text>
-            </Box>
-          ))}
-        </SimpleGrid>
-      </Box>
-      {/* Acciones */}
-      <Box style={{ background: "#f8f9fa", padding: "4px 6px" }}>
-        <Text style={{ fontSize: 7, fontWeight: 700, textAlign: "center", color: "#333", marginBottom: 3 }}>¿Qué deseas hacer?</Text>
-        <SimpleGrid cols={3} spacing={3}>
-          {["Reserva", "Servicios", "Ubicación"].map((a) => (
-            <Box key={a} style={{ borderRadius: 4, border: "1px solid #dee2e6", background: "#fff", padding: "3px 2px", textAlign: "center" }}>
-              <Box style={{ width: 12, height: 12, borderRadius: "50%", background: primary, margin: "0 auto 2px" }} />
-              <Text style={{ fontSize: 6, fontWeight: 600, color: "#555" }}>{a}</Text>
-            </Box>
-          ))}
-        </SimpleGrid>
-      </Box>
-    </Box>
-  );
-}
-
-// ── Datos de layouts ─────────────────────────────────────────────────────────
-
-const LAYOUTS = [
-  {
-    id: "modern",
-    label: "Moderno",
-    description: "Fondo claro, tarjetas en fila con icono circular y texto a la izquierda.",
-    color: "violet" as const,
-  },
-  {
-    id: "minimal",
-    label: "Minimalista",
-    description: "Fondo blanco, lista de acciones con borde sutil. Elegante y limpio.",
-    color: "gray" as const,
-  },
-  {
-    id: "cards",
-    label: "Tarjetas",
-    description: "Fondo blanco, acciones en cuadrícula centrada con icono cuadrado arriba.",
-    color: "blue" as const,
-  },
-  {
-    id: "landing",
-    label: "Landing",
-    description: "Hero colorido, sección de servicios y acciones rápidas abajo.",
-    color: "teal" as const,
-  },
-] as const;
-
-type LayoutId = typeof LAYOUTS[number]["id"];
-
-// ── Componente principal ─────────────────────────────────────────────────────
-
 export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Props) {
-  const theme = useMantineTheme();
-  const primary = theme.colors[theme.primaryColor][6];
-  const selectedLayout = (form.values.homeLayout as LayoutId | undefined) ?? "modern";
   const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseLanding = planLimits?.professionalLanding !== false;
-
-  const title = form.values.welcomeTitle ?? "";
-  const description = form.values.welcomeDescription ?? "";
-
-  const renderPreview = (id: LayoutId) => {
-    switch (id) {
-      case "modern":   return <PreviewModern   title={title} description={description} primary={primary} />;
-      case "minimal":  return <PreviewMinimal  title={title} description={description} primary={primary} />;
-      case "cards":    return <PreviewCards    title={title} description={description} primary={primary} />;
-      case "landing":  return <PreviewLanding  title={title} description={description} primary={primary} />;
-    }
-  };
 
   return (
     <Stack gap="lg">
       <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" radius="md">
-        Personaliza el mensaje de bienvenida y elige cómo se verá tu página pública. La vista previa se actualiza en tiempo real.
+        Escribe cómo saludas a tus clientes y elige cómo se verá tu página. Puedes cambiarlo cuando quieras en Ajustes.
       </Alert>
 
       {/* Mensaje de bienvenida */}
@@ -195,7 +40,7 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
           <Textarea
             label="Descripción de bienvenida"
             description="Una frase que describa tu negocio o invite al cliente a reservar"
-            placeholder="Ej: Aquí te mereces lo mejor. Agenda tu cita ✨"
+            placeholder="Ej: Aquí te mereces lo mejor. Agenda tu cita"
             {...form.getInputProps("welcomeDescription")}
             minRows={2}
             autosize
@@ -203,55 +48,21 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
         </Stack>
       </Paper>
 
-      {/* Selector de layout con preview */}
+      {/* Plantilla */}
       <Paper withBorder p="md" radius="md">
-        <Text fw={700} size="sm" mb="xs">Diseño de página pública</Text>
+        <Text fw={700} size="sm" mb="xs">Plantilla de tu página</Text>
         <Text size="xs" c="dimmed" mb="md">
-          Elige la apariencia de tu página de inicio. La vista previa muestra cómo verán tu negocio los clientes.
+          Esencial funciona para la mayoría de negocios. Estudio y Academia son parte de los planes Marca y Pro.
         </Text>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-          {LAYOUTS.map((layout) => {
-            const isSelected = selectedLayout === layout.id;
-            const isLocked = layout.id === "landing" && !canUseLanding;
-            return (
-              <Tooltip
-                key={layout.id}
-                label="Disponible en Plan Marca/Pro"
-                disabled={!isLocked}
-                withArrow
-              >
-                <Box
-                  onClick={() => !isLocked && form.setFieldValue("homeLayout", layout.id)}
-                  style={{
-                    cursor: isLocked ? "not-allowed" : "pointer",
-                    borderRadius: 12,
-                    border: isSelected
-                      ? `2px solid var(--mantine-color-${layout.color}-6)`
-                      : "1px solid var(--mantine-color-gray-3)",
-                    overflow: "hidden",
-                    transition: "all 0.15s",
-                    boxShadow: isSelected ? `0 0 0 3px var(--mantine-color-${layout.color}-1)` : undefined,
-                    opacity: isLocked ? 0.5 : 1,
-                  }}
-                >
-                  {/* Preview visual */}
-                  <Box style={{ height: 180, overflow: "hidden", borderBottom: "1px solid var(--mantine-color-gray-2)" }}>
-                    {renderPreview(layout.id as LayoutId)}
-                  </Box>
-                  {/* Label + descripción */}
-                  <Box p="sm" style={{ background: isSelected ? `var(--mantine-color-${layout.color}-0)` : "#fff" }}>
-                    <Group gap="xs" mb={4}>
-                      <Text fw={700} size="sm">{layout.label}</Text>
-                      {isSelected && <Badge size="xs" color={layout.color}>Seleccionado</Badge>}
-                      {isLocked && <Badge size="xs" color="gray" leftSection={<IconLock size={10} />}>Plan Marca/Pro</Badge>}
-                    </Group>
-                    <Text size="xs" c="dimmed">{layout.description}</Text>
-                  </Box>
-                </Box>
-              </Tooltip>
-            );
-          })}
-        </SimpleGrid>
+        <HomeTemplatePicker
+          value={form.values.homeLayout}
+          onChange={(layout) => form.setFieldValue("homeLayout", layout)}
+          professionalLanding={canUseLanding}
+          classesEnabled={form.values.enableClassBooking}
+          name={form.values.name}
+          logoUrl={(form.values.branding as { logoUrl?: string } | undefined)?.logoUrl}
+          plansPath={null}
+        />
       </Paper>
 
       <Divider />
