@@ -282,6 +282,10 @@ export interface ReceiptOrder {
     aiConfidence?: number;
     aiVerdict?: "match" | "mismatch" | "unreadable";
     aiNotes?: string;
+    /** Por qué no se aprobó solo (Fase 3; ausente en comprobantes anteriores). */
+    reasons?: string[];
+    /** Motivo que escribió el negocio al rechazar. */
+    reviewNotes?: string;
     reviewStatus?: string;
     /** El pago se validó pero la reserva no se pudo confirmar (ej. profesional ocupado). */
     fulfillError?: string | null;
