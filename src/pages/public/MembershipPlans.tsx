@@ -10,6 +10,11 @@ import { formatCurrency } from "../../utils/formatCurrency";
 import { AGENDITAPP_SUPPORT_WA_URL } from "../../utils/panelAccess";
 import { ActivatePlanModal } from "../../components/ActivatePlanModal";
 
+// Plan recomendado (borde y botón principal) y regla de planes que se venden:
+// igual que Mi membresía, sin el plan demo y solo planes con precio.
+const RECOMMENDED_SLUG = "plan-esencial";
+const isSellable = (p: { slug: string; price?: number }) => p.slug !== "plan-demo" && (p.price ?? 0) > 0;
+
 interface PlanPublic {
   _id: string;
   name: string;
@@ -35,7 +40,7 @@ export default function MembershipPlans() {
     apiPlansPublic
       .get("/public")
       .then((res) => {
-        setPlans(res.data?.data || []);
+        setPlans(((res.data?.data || []) as PlanPublic[]).filter(isSellable));
         setStatus("ok");
       })
       .catch(() => setStatus("error"));
@@ -87,8 +92,19 @@ export default function MembershipPlans() {
         </div>
       ) : (
         <div className="pl-grid">
-          {plans.map((p) => (
-            <div key={p._id} className="ag-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+          {plans.map((p) => {
+            const recommended = p.slug === RECOMMENDED_SLUG;
+            return (
+            <div
+              key={p._id}
+              className="ag-card"
+              style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14, ...(recommended ? { border: "2px solid var(--platform)", padding: 23 } : {}) }}
+            >
+              {recommended && (
+                <span className="ag-badge" style={{ alignSelf: "flex-start", background: "var(--platform)", color: "#fff" }}>
+                  Recomendado
+                </span>
+              )}
               <div className="ag-row" style={{ justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
                 <b style={{ fontSize: 17, lineHeight: "24px" }}>{p.displayName}</b>
                 <span className="ag-badge ag-badge--outline">{p.domainType === "custom_domain" ? "Dominio propio" : "Subdominio"}</span>
@@ -112,6 +128,7 @@ export default function MembershipPlans() {
               <Button
                 mt="auto"
                 color="var(--platform)"
+                variant={recommended ? "filled" : "outline"}
                 onClick={() => {
                   setSelectedPlan(p);
                   setModalOpen(true);
@@ -120,7 +137,8 @@ export default function MembershipPlans() {
                 Activar plan
               </Button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
