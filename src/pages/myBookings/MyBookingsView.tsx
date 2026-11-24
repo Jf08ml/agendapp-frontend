@@ -7,6 +7,7 @@ import { Button, Collapse } from "@mantine/core";
 import { IconCalendarEvent, IconCalendarPlus, IconChevronDown, IconChevronUp, IconClock, IconLock, IconSchool, IconUser } from "@tabler/icons-react";
 import type { MyBookings, MyBookingType } from "../../services/clientBookingsService";
 import { bookingFormatters, TYPE_NOUN } from "./bookingFormat";
+import RescheduleCard from "../public/RescheduleCard";
 
 type Tone = "success" | "warning" | "info" | "danger" | "neutral";
 
@@ -51,9 +52,13 @@ interface Props {
   /** Aviso bajo el saludo (p. ej. cómo cancelar en modo consulta). */
   notice?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Enlace personal del cliente: habilita «Cambiar fecha u hora» en cada cita (Fase 3). */
+  rescheduleToken?: string;
+  /** Tras reagendar: recargar la lista. */
+  onRescheduled?: () => void;
 }
 
-const MyBookingsView: React.FC<Props> = ({ data, onCancel, notice, footer }) => {
+const MyBookingsView: React.FC<Props> = ({ data, onCancel, notice, footer, rescheduleToken, onRescheduled }) => {
   const [showHistory, setShowHistory] = useState(false);
   const { dayLabel, timeLabel, time } = bookingFormatters(data);
 
@@ -122,6 +127,13 @@ const MyBookingsView: React.FC<Props> = ({ data, onCancel, notice, footer }) => 
       {meta(IconCalendarEvent, dayLabel(row.startDate))}
       {meta(IconClock, timeLabel(row.startDate, row.endDate))}
       {row.person && meta(IconUser, `${row.personLabel} ${row.person}`)}
+      {/* Cambiar fecha u hora: mismas reglas que el enlace de la cita; si el
+          negocio no lo permite no aparece, y si esta cita no se puede, dice por qué */}
+      {rescheduleToken && row.type === "appointment" && (
+        <div style={{ marginTop: 6 }}>
+          <RescheduleCard booking={{ token: rescheduleToken, id: row.id }} onRescheduled={() => onRescheduled?.()} />
+        </div>
+      )}
       {onCancel && row.canCancel && (
         <div style={{ marginTop: 6 }}>
           <Button variant="subtle" color="red" size="xs" px={0} onClick={() => onCancel(row)}>
