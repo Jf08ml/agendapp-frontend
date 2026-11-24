@@ -56,3 +56,11 @@ test("brand-accent usa secondaryColor y, sin él, la marca", () => {
   assert.equal(buildBrandTokens("#000000", "#C9A96E", "light")["brand-accent"], "#c9a96e");
   assert.equal(buildBrandTokens("#2f6f5e", undefined, "light")["brand-accent"], "#2f6f5e");
 });
+
+test("textOn: texto legible sobre cualquier color", async () => {
+  const { textOn } = await import("../src/theme/brandTokens.ts");
+  assert.equal(textOn("#1c3461"), "#ffffff"); // azul oscuro → blanco
+  assert.equal(textOn("#f5d90a"), "#1a1b1e"); // amarillo → ink
+  assert.equal(textOn("var(--pro-1)"), "#ffffff"); // variable CSS → como antes
+  assert.equal(textOn(null), "#ffffff");
+});

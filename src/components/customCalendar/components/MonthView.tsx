@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { textOn } from "../../../theme/brandTokens";
 import { Box, Text } from "@mantine/core";
 import {
   eachDayOfInterval,
@@ -310,7 +311,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         height: 17,
                         borderRadius: "50%",
                         background: av.color,
-                        color: "#fff",
+                        color: textOn(av.color),
                         fontSize: 8,
                         fontWeight: 700,
                         display: "flex",

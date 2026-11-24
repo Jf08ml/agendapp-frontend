@@ -95,6 +95,12 @@ export function onBrandColor(brand: string, scheme: Scheme = "light"): string {
   return contrast(brand, "#ffffff") >= contrast(brand, dark) ? "#ffffff" : dark;
 }
 
+/** Texto legible sobre un color cualquiera (p. ej. el de un profesional): si
+ *  no es un hex (una variable CSS), blanco como antes. */
+export function textOn(background: string | null | undefined): string {
+  return isHexColor(background) ? onBrandColor(background) : "#ffffff";
+}
+
 /**
  * Escala de 10 tonos para Mantine (0 = más claro, 9 = más oscuro) con la marca
  * exacta en el índice 6 (`primaryShade`), así el botón `filled` usa el color

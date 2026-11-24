@@ -9,7 +9,7 @@ import { allNavLinks, findActiveLink, type NavGroup } from "./adminNavigation";
 import { NAV_ICONS, orgInitials } from "./navIcons";
 
 /** Logo del negocio (32px) o sus iniciales en un círculo de marca. */
-export function OrgMark({ size = 32 }: { size?: number }) {
+export function OrgMark({ size = 32, onBrand = false }: { size?: number; onBrand?: boolean }) {
   const organization = useSelector((s: RootState) => s.organization.organization);
   const logoUrl = organization?.branding?.logoUrl;
   return (
@@ -19,8 +19,9 @@ export function OrgMark({ size = 32 }: { size?: number }) {
       size={size}
       radius="xl"
       styles={{
-        root: { background: logoUrl ? "transparent" : "var(--brand)", flexShrink: 0 },
-        placeholder: { color: "var(--on-brand)", fontSize: 12, fontWeight: 600 },
+        // Sobre la barra de marca las iniciales van invertidas para no desaparecer.
+        root: { background: logoUrl ? "transparent" : onBrand ? "var(--on-brand)" : "var(--brand)", flexShrink: 0 },
+        placeholder: { color: onBrand ? "var(--brand)" : "var(--on-brand)", fontSize: 12, fontWeight: 600 },
         image: { objectFit: "cover" },
       }}
     >
@@ -46,9 +47,11 @@ interface AdminNavbarProps {
   showBrand?: boolean;
   /** Contadores por clave de ítem (p. ej. reservas por confirmar). */
   badges?: Partial<Record<string, string | null>>;
+  /** Barra lateral en el color del negocio (texto en var(--on-brand)). */
+  onBrand?: boolean;
 }
 
-export default function AdminNavbar({ groups, onNavigate, showBrand = true, badges }: AdminNavbarProps) {
+export default function AdminNavbar({ groups, onNavigate, showBrand = true, badges, onBrand = false }: AdminNavbarProps) {
   const location = useLocation();
   const organization = useSelector((s: RootState) => s.organization.organization);
   const activeTo = useMemo(
@@ -57,11 +60,11 @@ export default function AdminNavbar({ groups, onNavigate, showBrand = true, badg
   );
 
   return (
-    <Stack gap="md" h="100%" style={{ minHeight: 0 }}>
+    <Stack gap="md" h="100%" style={{ minHeight: 0 }} className={onBrand ? "ag-nav-brand" : undefined}>
       {showBrand && (
         <Group gap="sm" wrap="nowrap" px="xs" style={{ flexShrink: 0 }}>
-          <OrgMark />
-          <Text fw={600} fz={15} c="var(--ink)" truncate>
+          <OrgMark onBrand={onBrand} />
+          <Text fw={600} fz={15} c={onBrand ? "inherit" : "var(--ink)"} truncate>
             {organization?.name}
           </Text>
         </Group>
@@ -71,7 +74,7 @@ export default function AdminNavbar({ groups, onNavigate, showBrand = true, badg
         <Stack gap="md">
           {groups.map((group) => (
             <Box key={group.title} component="nav" aria-label={group.title}>
-              <Text style={eyebrow} px="sm" pb={6}>
+              <Text style={eyebrow} px="sm" pb={6} className="ag-nav-eyebrow">
                 {group.title}
               </Text>
               <Stack gap={2}>
@@ -137,7 +140,7 @@ export default function AdminNavbar({ groups, onNavigate, showBrand = true, badg
         </Stack>
       </ScrollArea>
 
-      <Text fz="xs" c="var(--ink-subtle)" px="sm" style={{ flexShrink: 0 }}>
+      <Text fz="xs" c="var(--ink-subtle)" px="sm" style={{ flexShrink: 0 }} className="ag-nav-powered">
         Impulsado por{" "}
         <Anchor
           href="https://www.agenditapp.com?utm_source=app-dashboard&utm_medium=referral&utm_campaign=powered-by"

@@ -122,8 +122,9 @@ export default function Header({ organization, showChristmas = false, platform =
           size={32}
           radius="xl"
           styles={{
-            root: { background: logoUrl ? "transparent" : "var(--brand)", flexShrink: 0 },
-            placeholder: { color: "var(--on-brand)", fontSize: 12, fontWeight: 600 },
+            // Header en el color del negocio: las iniciales van invertidas.
+            root: { background: logoUrl ? "transparent" : "var(--on-brand)", flexShrink: 0 },
+            placeholder: { color: "var(--brand)", fontSize: 12, fontWeight: 600 },
             image: { objectFit: "cover" },
           }}
         >
@@ -131,7 +132,7 @@ export default function Header({ organization, showChristmas = false, platform =
         </Avatar>
       </SantaHat>
       {name ? (
-        <Text fw={600} fz={15} c="var(--ink)" truncate maw={220}>
+        <Text fw={600} fz={15} c="inherit" truncate maw={220}>
           {name}
         </Text>
       ) : (
@@ -145,7 +146,9 @@ export default function Header({ organization, showChristmas = false, platform =
       component="header"
       h="100%"
       px={{ base: "md", md: "xl" }}
-      style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)" }}
+      // Web del negocio: header en su color (ag-brandbar). Plataforma: neutro.
+      className={platform ? undefined : "ag-brandbar"}
+      style={platform ? { background: "var(--surface)", borderBottom: "1px solid var(--line)" } : undefined}
     >
       <Group justify="space-between" wrap="nowrap" gap="md" h="100%">
         <Anchor component={Link} to="/" underline="never" style={{ minWidth: 0 }}>
@@ -163,7 +166,8 @@ export default function Header({ organization, showChristmas = false, platform =
                 underline="never"
                 fz="sm"
                 fw={isActive(l.to) ? 600 : 500}
-                c={isActive(l.to) ? "var(--ink)" : "var(--ink-muted)"}
+                c="inherit"
+                style={{ opacity: isActive(l.to) ? 1 : 0.82 }}
               >
                 {l.label}
               </Anchor>

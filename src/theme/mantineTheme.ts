@@ -6,12 +6,14 @@ import {
   Button,
   Card,
   createTheme,
+  defaultVariantColorsResolver,
   Drawer,
   Modal,
   NavLink,
   Switch,
   Tabs,
   type CSSVariablesResolver,
+  type VariantColorsResolver,
   type MantineThemeOverride,
 } from "@mantine/core";
 import {
@@ -21,6 +23,19 @@ import {
 } from "./brandTokens";
 
 const SCRIM = { color: "#0c0d10", backgroundOpacity: 0.48 } as const;
+
+// Texto sobre rellenos de marca (Button, ActionIcon, Badge, ThemeIcon… en
+// variante filled): siempre var(--on-brand), el mismo cálculo de contraste
+// 4.5:1 de brandTokens. El autoContrast de Mantine usa otro umbral y con
+// algunas marcas (verde azulado, rosa) dejaba texto oscuro sobre fondo medio.
+const BRAND_COLORS = new Set([undefined, "brand", "custom"]);
+const variantColorResolver: VariantColorsResolver = (input) => {
+  const result = defaultVariantColorsResolver(input);
+  if (input.variant === "filled" && BRAND_COLORS.has(input.color as string | undefined)) {
+    return { ...result, color: "var(--on-brand)" };
+  }
+  return result;
+};
 
 export function createAppTheme(brand: string, fontFamily: string): MantineThemeOverride {
   const scale = generateBrandScale(brand);
@@ -57,6 +72,7 @@ export function createAppTheme(brand: string, fontFamily: string): MantineThemeO
     // --mantine-primary-color-contrast.
     autoContrast: true,
     luminanceThreshold: 0.3,
+    variantColorResolver,
 
     defaultRadius: "md",
     radius: { xs: "2px", sm: "4px", md: "8px", lg: "16px", xl: "32px" },
@@ -93,9 +109,11 @@ export function createAppTheme(brand: string, fontFamily: string): MantineThemeO
       }),
 
       // ag-subtabs: subrayado en ink, no en la marca (si no se pide otro color)
+      // En la variante pills el fondo activo es ink: el texto va en ink-inverse
+      // (antes Mantine calculaba un texto oscuro sobre el fondo oscuro).
       Tabs: Tabs.extend({
         vars: (_theme, props) =>
-          props.color ? { root: {} } : { root: { "--tabs-color": "var(--ink)" } },
+          props.color ? { root: {} } : { root: { "--tabs-color": "var(--ink)", "--tabs-text-color": "var(--ink-inverse)" } },
         styles: { tab: { fontWeight: 500 } },
       }),
 

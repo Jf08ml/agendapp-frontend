@@ -82,7 +82,8 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
       styles={{
         main: { background: "var(--surface-muted)" },
         header: { background: "var(--surface)", borderBottom: "1px solid var(--line)" },
-        navbar: { background: "var(--surface-raised)", borderRight: "1px solid var(--line)" },
+        // Barra lateral en el color del negocio: la señal de pertenencia del panel.
+        navbar: { background: "var(--brand)", color: "var(--on-brand)", borderRight: "none" },
         footer: { background: "var(--surface-raised)", borderTop: "1px solid var(--line)" },
       }}
     >
@@ -135,7 +136,7 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
-        <AdminNavbar groups={groups} badges={navBadges} />
+        <AdminNavbar groups={groups} badges={navBadges} onBrand />
       </AppShell.Navbar>
 
       <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>

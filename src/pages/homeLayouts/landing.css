@@ -90,3 +90,21 @@
 .lnd-morerow { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 15px; }
 .lnd-morerow:hover { color: var(--brand-text); }
 .lnd-morerow__icon { width: 32px; height: 32px; flex: none; border-radius: var(--radius-full); background: var(--surface-hover); color: var(--ink-muted); display: grid; place-items: center; }
+
+/* Inicio en el color del negocio: la primera sección de cada plantilla
+   (Estudio, Esencial, Academia) va a todo el ancho en var(--brand) con texto
+   on-brand; los botones se invierten como en el header. */
+.lnd > section:first-child { background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 100vmax var(--brand); clip-path: inset(0 -100vmax); }
+.lnd > section:first-child .lnd-lead, .lnd > section:first-child .ag-muted, .lnd > section:first-child .ag-subtle { color: var(--on-brand); opacity: .85; }
+.lnd > section:first-child .ag-open { color: var(--on-brand); }
+.lnd > section:first-child .ag-open i { box-shadow: 0 0 0 2px var(--on-brand); }
+.lnd > section:first-child .mantine-Button-root:is([data-variant="filled"], :not([data-variant])) { background: var(--on-brand); color: var(--brand); }
+.lnd > section:first-child .mantine-Button-root:is([data-variant="filled"], :not([data-variant])):hover { background: color-mix(in srgb, var(--on-brand) 88%, var(--brand)); }
+.lnd > section:first-child .mantine-Button-root[data-variant="default"] { background: transparent; color: var(--on-brand); border-color: color-mix(in srgb, var(--on-brand) 50%, transparent); }
+.lnd > section:first-child .mantine-Button-root[data-variant="default"]:hover { background: color-mix(in srgb, var(--on-brand) 12%, transparent); }
+
+/* Pie en el color del negocio. */
+.lnd-footer { background: var(--brand); color: var(--on-brand); border-top: none; }
+.lnd-footer__links a { color: var(--on-brand); opacity: .82; }
+.lnd-footer__links a:hover { color: var(--on-brand); opacity: 1; }
+.lnd-footer .ag-iconbtn { color: var(--on-brand); }

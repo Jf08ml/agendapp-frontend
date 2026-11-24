@@ -262,3 +262,24 @@
 /* Pestañas internas: sin barra de scroll (ni vertical ni horizontal), sin perder el desplazamiento táctil */
 .ag-subtabs { overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .ag-subtabs::-webkit-scrollbar { display: none; }
+
+/* Barra lateral del panel en el color del negocio (AdminShell). Todo el texto
+   usa var(--on-brand), que ya trae el contraste calculado para cada marca. */
+.ag-nav-brand { color: var(--on-brand); }
+.ag-nav-brand .ag-nav-eyebrow { color: var(--on-brand) !important; opacity: .7; }
+.ag-nav-brand .ag-nav-powered, .ag-nav-brand .ag-nav-powered a { color: var(--on-brand) !important; opacity: .75; }
+.ag-nav-brand .mantine-NavLink-root { color: var(--on-brand); }
+.ag-nav-brand .mantine-NavLink-root:hover { background: color-mix(in srgb, var(--on-brand) 10%, transparent); }
+.ag-nav-brand .mantine-NavLink-root[data-active], .ag-nav-brand .mantine-NavLink-root[data-active]:hover { background: color-mix(in srgb, var(--on-brand) 18%, transparent); color: var(--on-brand); }
+.ag-nav-brand .mantine-NavLink-root[data-active] .mantine-NavLink-label { font-weight: 600; }
+.ag-nav-brand .mantine-NavLink-chevron, .ag-nav-brand .mantine-NavLink-section { color: inherit; }
+
+/* Barra de marca de la web pública del negocio (Header). El botón principal se
+   invierte (fondo on-brand, texto brand) para no fundirse con la barra. */
+.ag-brandbar { background: var(--brand); color: var(--on-brand); --burger-color: var(--on-brand); }
+.ag-brandbar .mantine-Button-root:is([data-variant="filled"], :not([data-variant])) { background: var(--on-brand); color: var(--brand); }
+.ag-brandbar .mantine-Button-root:is([data-variant="filled"], :not([data-variant])):hover { background: color-mix(in srgb, var(--on-brand) 88%, var(--brand)); }
+.ag-brandbar .mantine-Button-root[data-variant="default"] { background: transparent; color: var(--on-brand); border-color: color-mix(in srgb, var(--on-brand) 45%, transparent); }
+.ag-brandbar .mantine-Button-root[data-variant="default"]:hover { background: color-mix(in srgb, var(--on-brand) 12%, transparent); }
+.ag-brandbar .mantine-ActionIcon-root { color: var(--on-brand); }
+.ag-brandbar .mantine-ActionIcon-root:hover { background: color-mix(in srgb, var(--on-brand) 12%, transparent); }
