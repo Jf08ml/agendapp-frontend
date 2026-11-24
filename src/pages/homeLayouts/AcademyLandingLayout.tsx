@@ -28,6 +28,8 @@ import { getAvailableSessions, getClassesByOrganization, ClassSession, ClassType
 import { listPublicPackages, PublicPackageItem } from "../../services/collectionService";
 import { buildClassReserveLink, buildPackageBuyLink } from "../../utils/programPurchase";
 import { formatCurrency } from "../../utils/formatCurrency";
+import { packageSavings } from "../../utils/packagePricing";
+import { useMediaQuery } from "@mantine/hooks";
 import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
 import { HoursAndLocation, LandingFooter, OpenStatus } from "./landingShared";
@@ -73,6 +75,7 @@ export function AcademyLandingLayout({ features, welcomeTitle, welcomeDescriptio
   const org = useSelector(selectOrganization);
   const currency = org?.currency || "COP";
   const tz = org?.timezone || "America/Bogota";
+  const isMobile = useMediaQuery("(max-width: 48em)");
   const tf = org?.timeFormat;
   const classBooking = !!org?.enableClassBooking;
   const { weeklyHours, status } = useBusinessHours();
@@ -170,6 +173,17 @@ export function AcademyLandingLayout({ features, welcomeTitle, welcomeDescriptio
     if (diff === 1) return "Mañana";
     return d.format("dddd D").replace(/^./, (c) => c.toUpperCase());
   };
+
+  // Próxima clase con cupo (mismo dato que «Próximas clases»)
+  const nextSession = sessions.find((s) => s.capacity - s.enrolledCount > 0) ?? null;
+  const nextStart = nextSession ? dayjs(nextSession.startDate).tz(tz) : null;
+  const nextClassName = nextSession && typeof nextSession.classId !== "string" ? nextSession.classId?.name : null;
+  const nextSessionText = nextStart
+    ? [`${dayLabel(nextStart).replace(/^(Hoy|Mañana)$/, (m) => m.toLowerCase())} ${fmtTime(nextStart)}`, nextClassName].filter(Boolean).join(" · ")
+    : "";
+  const nextSessionLink = nextSession
+    ? `/reservar-clase?classId=${typeof nextSession.classId === "string" ? nextSession.classId : nextSession.classId._id}&sessionId=${nextSession._id}`
+    : "/reservar-clase";
 
   const sectionHead = (eyebrow: string, title: string, link?: { to: string; label: string }) => (
     <div className="lnd-sectionhead">
@@ -348,6 +362,16 @@ export function AcademyLandingLayout({ features, welcomeTitle, welcomeDescriptio
                       <span className="ag-price" style={{ fontSize: 20, lineHeight: "26px" }}>
                         {tiered ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}` : formatCurrency(pkg.price ?? 0, currency)}
                       </span>
+                      {tiered &&
+                        (() => {
+                          const sv = packageSavings(pkg.tiers);
+                          return sv.minPerSession !== null ? (
+                            <div className="ag-row" style={{ gap: 8, alignItems: "center", marginTop: -6 }}>
+                              <span className="ag-subtle ag-num">desde {formatCurrency(Math.round(sv.minPerSession), currency)} por sesión</span>
+                              {sv.upTo >= 1 && <span className="ag-badge ag-badge--success">Ahorra hasta {sv.upTo} %</span>}
+                            </div>
+                          ) : null;
+                        })()}
                       {tiered && (
                         <div className="ag-row" style={{ gap: 6 }}>
                           {pkg.tiers!.map((t) => (
@@ -473,6 +497,26 @@ export function AcademyLandingLayout({ features, welcomeTitle, welcomeDescriptio
       )}
 
       <LandingFooter links={features} />
+
+      {/* Barra inferior en móvil (Fase 2): la próxima clase con cupo y «Reservar clase» */}
+      {isMobile && classBooking && nextSession && (
+        <>
+          <div aria-hidden="true" style={{ height: 76 }} />
+          <div className="ag-summary" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20 }}>
+            <div className="ag-summary__text">
+              <div className="ag-summary__title" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {org?.name}
+              </div>
+              <div className="ag-summary__sub ag-num" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                Próxima clase: {nextSessionText}
+              </div>
+            </div>
+            <Button component={Link} to={nextSessionLink} size="md">
+              Reservar clase
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
