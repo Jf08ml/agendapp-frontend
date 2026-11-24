@@ -23,6 +23,9 @@ import { IoInformationCircleOutline } from "react-icons/io5";
 import { RootState } from "../../../../app/store";
 import TimeOfDayInput from "../../../../components/TimeOfDayInput";
 import { formatTimeLabel } from "../../../../utils/timeOfDay";
+import { notifications } from "@mantine/notifications";
+import { IconCopy } from "@tabler/icons-react";
+import { copyDayToOpenDays, daysChangedByCopy } from "../settingsHelpers";
 
 const DAY_LABELS = [
   { value: 0, label: "Domingo", short: "Dom" },
@@ -162,6 +165,19 @@ export default function WeeklyScheduleSection({
     onChange({ ...value, schedule: newSchedule });
   };
 
+  // «Copiar lunes a todos»: horas y descansos del lunes a los demás días
+  // abiertos; los cerrados siguen cerrados.
+  const monday = schedule.find((d) => d.day === 1);
+  const copyTargets = daysChangedByCopy(schedule, 1);
+  const handleCopyMonday = () => {
+    onChange({ ...value, schedule: copyDayToOpenDays(schedule, 1) });
+    notifications.show({
+      color: "green",
+      title: "Horario copiado",
+      message: `El horario del lunes quedó en ${copyTargets === 1 ? "1 día más" : `${copyTargets} días más`}. Los días cerrados siguen cerrados.`,
+    });
+  };
+
   return (
     <Box>
       <Alert
@@ -190,6 +206,22 @@ export default function WeeklyScheduleSection({
 
       <Collapse in={enabled}>
         <Stack gap="md">
+          {monday?.isOpen && (
+            <Group justify="space-between" gap="xs" wrap="wrap">
+              <Text size="sm" c="dimmed">
+                ¿Abres igual casi todos los días? Ajusta el lunes y cópialo.
+              </Text>
+              <Button
+                variant="default"
+                size="xs"
+                leftSection={<IconCopy size={14} />}
+                onClick={handleCopyMonday}
+                disabled={disabled || copyTargets === 0}
+              >
+                Copiar lunes a todos
+              </Button>
+            </Group>
+          )}
           {schedule.map((daySchedule) => {
             const dayInfo = DAY_LABELS.find((d) => d.value === daySchedule.day);
             if (!dayInfo) return null;

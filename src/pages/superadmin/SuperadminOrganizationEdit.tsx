@@ -595,7 +595,7 @@ export default function SuperadminOrganizationEdit() {
             onUpload={onUpload}
           />
         )}
-        {tab === "payments" && <PaymentMethodsTab form={f} isEditing />}
+        {tab === "payments" && <PaymentMethodsTab form={f} isEditing organizationId={org?._id} />}
         {tab === "cancellation" && <CancellationPolicyTab form={f} isEditing />}
         {tab === "reminders" && <ReminderSettingsTab form={f} isEditing />}
       </div>
