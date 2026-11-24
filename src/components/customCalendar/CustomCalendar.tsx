@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { Appointment, type AppointmentMove } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
-import DayView from "./components/DayView";
+import DayView, { type DaySummary } from "./components/DayView";
 import WeekView from "./components/WeekView";
 import DayDetailPanel from "./components/DayDetailPanel";
 import {
@@ -127,6 +127,12 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<CalendarView>(readDefaultView);
   const [dayMode, setDayMode] = useState<DayMode>(readDayMode);
+  // Totales de la vista Día (los calcula DayView) y lista de canceladas desplegada
+  const [daySummary, setDaySummary] = useState<DaySummary | null>(null);
+  const [showCancelled, setShowCancelled] = useState(false);
+  useEffect(() => {
+    if (!daySummary?.cancelled) setShowCancelled(false);
+  }, [daySummary?.cancelled]);
   const changeDayMode = useCallback((value: DayMode) => {
     setDayMode(value);
     try {
@@ -306,7 +312,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Barra del calendario (ag-pagehead): Hoy, anterior/siguiente, fecha y vista */}
       <Group justify="space-between" align="center" mb="xs" gap="xs" style={{ flexShrink: 0 }} wrap="wrap">
-        <Group gap={6} align="center" wrap="nowrap" style={{ minWidth: 0 }}>
+        {/* En móvil puede partirse: el resumen del día baja bajo la fecha en vez de cortarla */}
+        <Group gap={6} align="center" wrap={isMobile ? "wrap" : "nowrap"} style={{ minWidth: 0 }}>
           <Button variant="default" size="compact-sm" onClick={goToToday}>
             Hoy
           </Button>
@@ -319,6 +326,29 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           <Text fw={600} fz={isMobile ? 14 : 15} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {rangeLabel}
           </Text>
+          {viewMode === "day" && daySummary && (
+            <Group gap={6} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
+              <Text fz={13} c="var(--ink-subtle)" aria-hidden>
+                ·
+              </Text>
+              <Text fz={13} c="var(--ink-muted)" style={{ whiteSpace: "nowrap" }}>
+                {daySummary.appointments} {daySummary.appointments === 1 ? "cita" : "citas"}
+                {" · "}
+                {daySummary.clients} {daySummary.clients === 1 ? "cliente" : "clientes"}
+              </Text>
+              {daySummary.cancelled > 0 && (
+                <Button
+                  variant="subtle"
+                  color="red"
+                  size="compact-xs"
+                  onClick={() => setShowCancelled((v) => !v)}
+                  aria-expanded={showCancelled}
+                >
+                  {daySummary.cancelled} cancelada{daySummary.cancelled !== 1 ? "s" : ""}
+                </Button>
+              )}
+            </Group>
+          )}
         </Group>
 
         <Group gap={6} align="center" wrap="wrap" justify="flex-end">
@@ -505,6 +535,8 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           <DayView
             day={currentDate}
             mode={dayMode}
+            showCancelled={showCancelled}
+            onSummaryChange={setDaySummary}
             onOpenModal={onOpenModal}
             employees={employees}
             getAppointmentsForDay={getAllAppointmentsForDay}

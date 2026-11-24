@@ -7,7 +7,7 @@
 // Abre en Tarjetas (también en móvil) salvo que la persona haya elegido Lista;
 // el selector y lo que se recuerda viven en CustomCalendar (barra del calendario).
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Box, Group, Badge, Flex, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
+import { Box, Group, Badge, Flex, Collapse, Text, ActionIcon, Tooltip } from "@mantine/core";
 import { useElementSize, useMediaQuery } from "@mantine/hooks";
 import { isSameMonth } from "date-fns";
 import dayjs from "dayjs";
@@ -15,6 +15,12 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { IconTrash } from "@tabler/icons-react";
 import type { DayMode } from "../CustomCalendar";
+
+export interface DaySummary {
+  appointments: number;
+  clients: number;
+  cancelled: number;
+}
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment, type AppointmentMove } from "../../../services/appointmentService";
@@ -48,6 +54,10 @@ interface DayViewProps {
   day: Date;
   /** Tarjetas o Lista (el selector está en la barra del calendario) */
   mode: DayMode;
+  /** Mostrar la lista de canceladas (se abre desde «N canceladas» en la barra del calendario) */
+  showCancelled: boolean;
+  /** Totales del día para la barra del calendario */
+  onSummaryChange?: (summary: DaySummary) => void;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
@@ -63,17 +73,11 @@ interface DayViewProps {
   onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
 }
 
-const pill = {
-  padding: "3px 10px",
-  borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 600,
-  whiteSpace: "nowrap" as const,
-};
-
 const DayView: FC<DayViewProps> = ({
   day,
   mode,
+  showCancelled,
+  onSummaryChange,
   onOpenModal,
   getAppointmentsForDay,
   fetchAppointmentsForDay,
@@ -99,7 +103,6 @@ const DayView: FC<DayViewProps> = ({
   const [fetchingLocalDay, setFetchingLocalDay] = useState(false);
   const [currentLinePosition, setCurrentLinePosition] = useState<number | null>(null);
   const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<string[]>([]);
-  const [showCancelled, setShowCancelled] = useState(false);
 
   // Citas del día desde la data del mes ya cargado
   const appointmentsFromMonth = useMemo(() => getAppointmentsForDay(day), [day, getAppointmentsForDay]);
@@ -190,6 +193,15 @@ const DayView: FC<DayViewProps> = ({
     return new Set(clientIds).size;
   }, [activeAppointments]);
 
+  // Los totales se muestran en la barra del calendario, junto a la fecha
+  useEffect(() => {
+    onSummaryChange?.({
+      appointments: activeAppointments.length,
+      clients: totalUniqueClients,
+      cancelled: cancelledAppointments.length,
+    });
+  }, [activeAppointments.length, totalUniqueClients, cancelledAppointments.length, onSummaryChange]);
+
   const { startHour, endHour } = useMemo(() => {
     const orgStartHour = organization?.openingHours?.start
       ? parseInt(organization.openingHours.start.split(":")[0], 10)
@@ -241,34 +253,11 @@ const DayView: FC<DayViewProps> = ({
         overflow: "hidden",
       }}
     >
-      {/* Barra delgada: totales del día (Tarjetas/Lista está en la barra del calendario) */}
-      <Box style={{ borderBottom: "1px solid var(--line)", background: "var(--surface-muted)", padding: "4px 10px", flexShrink: 0 }}>
-        <Group gap="md" align="center" style={{ flexWrap: "wrap" }}>
-          <Group gap={6} align="center">
-            <Box style={{ ...pill, background: "var(--brand-soft)", color: "var(--brand-text)" }}>
-              {activeAppointments.length} {activeAppointments.length === 1 ? "cita" : "citas"}
-            </Box>
-            <Box style={{ ...pill, background: "var(--surface-raised)", border: "1px solid var(--line)", color: "var(--ink-muted)" }}>
-              {totalUniqueClients} {totalUniqueClients === 1 ? "cliente" : "clientes"}
-            </Box>
-            {cancelledAppointments.length > 0 && (
-              <Box
-                component="button"
-                type="button"
-                onClick={() => setShowCancelled((v) => !v)}
-                aria-expanded={showCancelled}
-                style={{ ...pill, border: 0, cursor: "pointer", background: "var(--danger-soft)", color: "var(--danger)" }}
-              >
-                {cancelledAppointments.length} cancelada{cancelledAppointments.length !== 1 ? "s" : ""}
-              </Box>
-            )}
-          </Group>
-        </Group>
-
-        {/* Citas canceladas del día */}
+      {/* Citas canceladas del día: se despliegan desde «N canceladas» en la barra del
+          calendario (ahí van también los totales, para no gastar una fila aquí) */}
+      <Box style={{ background: "var(--surface-muted)", flexShrink: 0 }}>
         <Collapse in={showCancelled && cancelledAppointments.length > 0}>
-          <Divider my="xs" color="var(--line)" />
-          <Box style={{ maxHeight: 200, overflowY: "auto" }}>
+          <Box style={{ maxHeight: 200, overflowY: "auto", padding: "8px 10px 2px", borderBottom: "1px solid var(--line)" }}>
             {cancelledAppointments.map((apt) => (
               <Box
                 key={apt._id}

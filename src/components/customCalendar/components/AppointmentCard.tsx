@@ -331,14 +331,23 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           )}
         </Flex>
 
-        {/* Servicio (solo si el bloque es de más de 30 min) */}
-        {!isShort && (
-          <Text style={{ fontSize: 13, lineHeight: "17px", color: muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {appointment.service ? appointment.service.name : "Sin servicio"}
-            {appointment.packageSession &&
-              ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
-          </Text>
-        )}
+        {/* Servicio: siempre visible y completo (salta de línea en vez de cortarse
+            con «…»). Va antes del pie, así que si falta alto lo que se esconde
+            son las insignias; al pasar el mouse la tarjeta crece (ag-appt-slot). */}
+        <Text
+          style={{
+            fontSize: isShort ? 12 : 13,
+            lineHeight: isShort ? "15px" : "17px",
+            color: muted,
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+            flexShrink: 0,
+          }}
+        >
+          {appointment.service ? appointment.service.name : "Sin servicio"}
+          {appointment.packageSession &&
+            ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
+        </Text>
 
         {/* Pie: estado en palabra + ícono, insignias y avisos de WhatsApp */}
         {!isShort && (

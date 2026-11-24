@@ -209,6 +209,11 @@
 /* Agenda: arrastre y vista semana */
 .ag-appt--dragging { box-shadow: var(--shadow-lg); transform: rotate(-1.5deg); border-color: var(--brand-text); }
 .ag-appt--ghost { border: 1.5px dashed var(--brand-text); background: var(--brand-soft); }
+/* Agenda Día: al pasar el mouse, la cita crece hasta mostrar todo su contenido
+   (servicio largo o cita corta) y queda por encima de las vecinas. */
+@media (hover: hover) {
+  .ag-appt-slot:hover { height: auto !important; z-index: 3 !important; box-shadow: var(--shadow-md); border-radius: var(--radius-md); }
+}
 .ag-appt--mini { padding: 6px 8px; gap: 0; width: auto; }
 .ag-appt--mini .ag-appt__client { font-size: 13px; line-height: 17px; }
 .ag-appt--mini .ag-appt__time { font-size: 11px; line-height: 15px; }

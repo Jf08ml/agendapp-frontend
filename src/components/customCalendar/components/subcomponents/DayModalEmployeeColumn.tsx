@@ -350,11 +350,14 @@ const DayModalEmployeeColumn: FC<EmployeeColumnProps> = ({
       return (
         <Box
           key={appointment._id}
+          // Al pasar el mouse crece hasta mostrar todo (servicio largo, cita corta)
+          className="ag-appt-slot"
           style={{
             position: "absolute",
             top: `${top}px`,
             left: `calc(${leftPercent}% + ${gapPx / 2}px)`,
             width: `calc(${widthPercent}% - ${gapPx}px)`,
+            minHeight: `${height}px`,
             height: isExpanded(appointment) ? "auto" : `${height}px`,
             zIndex: isExpanded(appointment) ? 2 : 1,
             overflow: "hidden",
