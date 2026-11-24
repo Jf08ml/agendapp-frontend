@@ -25,6 +25,7 @@ import {
   ORG_CONFIG_LOAD_FAILED,
   ORG_CONFIG_NOT_FOUND,
 } from "./features/organization/sliceOrganization";
+import { IconShieldCheck } from "@tabler/icons-react";
 import OrgLoadError from "./components/OrgLoadError";
 import OrgLoadingSkeleton from "./components/OrgLoadingSkeleton";
 import SuperadminShell from "./layouts/SuperadminShell";
@@ -278,35 +279,40 @@ function AppContent() {
   const banners = (
     <>
       {isImpersonating && (
+        // Modo soporte (rediseño): barra de plataforma, no del negocio.
         <div
+          role="status"
           style={{
-            background: "#1A1A2E",
-            borderBottom: "2px solid #E040FB",
+            background: "var(--platform)",
+            color: "#fff",
             padding: "8px 16px",
-            textAlign: "center",
-            fontSize: "14px",
-            color: "#E040FB",
+            fontSize: 14,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "12px",
+            gap: 12,
+            flexWrap: "wrap",
           }}
         >
-          <span>🛠️ Sesión de soporte técnico activa — estás operando como admin de <strong>{organization?.name || "esta organización"}</strong></span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <IconShieldCheck size={18} />
+            Estás en modo soporte como admin de <strong>{organization?.name || "este negocio"}</strong>
+          </span>
           <button
+            type="button"
             onClick={handleReturnToSuperadmin}
             style={{
-              background: "#E040FB",
-              color: "white",
+              background: "#fff",
+              color: "var(--platform)",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: 6,
               padding: "4px 12px",
               cursor: "pointer",
               fontWeight: 600,
-              fontSize: "13px",
+              fontSize: 13,
             }}
           >
-            Volver al panel de superadmin
+            Volver a la plataforma
           </button>
         </div>
       )}
