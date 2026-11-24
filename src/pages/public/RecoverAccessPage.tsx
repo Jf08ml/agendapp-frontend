@@ -64,6 +64,8 @@ export default function RecoverAccessPage() {
 
   const turnstileRef = useRef<TurnstileInstance>(null);
   const tokenResolverRef = useRef<((t: string) => void) | null>(null);
+  // Cloudflare pidió marcar la casilla: el widget queda visible y no se resetea.
+  const turnstileInteractiveRef = useRef(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const linkHandled = useRef(false);
 
@@ -106,7 +108,7 @@ export default function RecoverAccessPage() {
 
   const getTurnstileToken = useCallback(async (): Promise<string> => {
     if (turnstileToken) return turnstileToken;
-    if (!turnstileRef.current) return "";
+    if (!turnstileRef.current || turnstileInteractiveRef.current) return "";
     return new Promise<string>((resolve) => {
       const timer = setTimeout(() => {
         tokenResolverRef.current = null;
@@ -134,6 +136,12 @@ export default function RecoverAccessPage() {
     try {
       // El captcha solo aplica a la búsqueda general de app.agenditapp.com.
       const token = isGlobal ? await getTurnstileToken() : "";
+      if (isGlobal && !token && turnstileInteractiveRef.current) {
+        // No resetear: borraría la casilla que hay que marcar.
+        setError("Marca la casilla de verificación y vuelve a tocar Buscar mi cuenta.");
+        setLoading(false);
+        return;
+      }
       const found = await lookupAccounts(identifier, {
         organizationId: scopedOrgId ?? undefined,
         turnstileToken: token || undefined,
@@ -144,9 +152,12 @@ export default function RecoverAccessPage() {
     } catch (err) {
       setError(accessErrorMessage(err));
     } finally {
-      // El token de Turnstile sirve una sola vez.
-      turnstileRef.current?.reset?.();
-      setTurnstileToken("");
+      // El token de Turnstile sirve una sola vez (pero no borrar la casilla
+      // que la persona aún tiene que marcar).
+      if (!turnstileInteractiveRef.current) {
+        turnstileRef.current?.reset?.();
+        setTurnstileToken("");
+      }
       setLoading(false);
     }
   };
@@ -336,14 +347,19 @@ export default function RecoverAccessPage() {
             <Turnstile
               ref={turnstileRef}
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-              options={{ size: "invisible" }}
+              // "invisible" era una caja de 0×0 px: si Cloudflare pedía marcar la
+              // casilla nadie la veía. Así se muestra solo cuando hace falta.
+              options={{ size: "flexible", appearance: "interaction-only" }}
+              onBeforeInteractive={() => { turnstileInteractiveRef.current = true; }}
+              onAfterInteractive={() => { turnstileInteractiveRef.current = false; }}
               onSuccess={(token) => {
+                turnstileInteractiveRef.current = false;
                 setTurnstileToken(token);
                 tokenResolverRef.current?.(token);
                 tokenResolverRef.current = null;
               }}
               onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileToken("")}
+              onError={(code) => { console.warn("Turnstile error", code); setTurnstileToken(""); }}
             />
           )}
           {errorAlert}

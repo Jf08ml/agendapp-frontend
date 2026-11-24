@@ -107,6 +107,31 @@ function AppContent() {
       window.history.replaceState({}, "", clean);
     }
   }, [location.search, location.pathname, isAuthenticated, isSuperadmin, openChat]);
+
+  // El onboarding IA solo deja entrar a la agenda mientras el chat está abierto.
+  // Una recarga cierra el chat (sin ?asistente=onboarding): limpiar el flag antes
+  // del primer render para que ProtectedRoute devuelva al wizard, que ofrece
+  // seguir con lo que ya se creó.
+  useState(() => {
+    if (!new URLSearchParams(window.location.search).has("asistente")) {
+      sessionStorage.removeItem("ai_onboarding_active");
+    }
+  });
+
+  // Cerrar el chat sin haber terminado la configuración vuelve al wizard (las 3
+  // opciones). Solo se sale de ahí completando (IA o paso a paso) o con datos de
+  // ejemplo. La conversación sigue en memoria si vuelve a elegir IA.
+  const prevChatOpen = useRef(chatOpen);
+  useEffect(() => {
+    const wasOpen = prevChatOpen.current;
+    prevChatOpen.current = chatOpen;
+    if (!wasOpen || chatOpen) return;
+    if (sessionStorage.getItem("ai_onboarding_active") !== "1") return;
+    sessionStorage.removeItem("ai_onboarding_active");
+    if (organization?.setupCompleted === false) {
+      navigate("/configuracion-inicial", { replace: true });
+    }
+  }, [chatOpen, organization?.setupCompleted, navigate]);
   const hasRedirected = useRef(false);
   const domainInfo = useMemo(() => extractTenantFromHost(), []);
   const isSignupDomain = domainInfo.type === "signup";

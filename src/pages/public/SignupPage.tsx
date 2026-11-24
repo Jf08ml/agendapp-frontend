@@ -110,6 +110,8 @@ export default function SignupPage() {
   const [turnstileToken, setTurnstileToken] = useState<string>("");
   const turnstileRef = useRef<TurnstileInstance>(null);
   const tokenResolverRef = useRef<((t: string) => void) | null>(null);
+  // Cloudflare pidió marcar la casilla: el widget queda visible y no se resetea.
+  const turnstileInteractiveRef = useRef(false);
 
   const [agentName, setAgentName] = useState<string | null>(null);
 
@@ -247,7 +249,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
       let token = turnstileToken;
-      if (!token && turnstileRef.current) {
+      if (!token && turnstileRef.current && !turnstileInteractiveRef.current) {
         token = await new Promise<string>((resolve, reject) => {
           tokenResolverRef.current = resolve;
           const t = setTimeout(() => { tokenResolverRef.current = null; reject(new Error("turnstile_timeout")); }, 8000);
@@ -256,8 +258,14 @@ export default function SignupPage() {
         }).catch(() => "");
       }
       if (!token) {
-        setError("No pudimos verificar que eres una persona. Intenta de nuevo.");
-        turnstileRef.current?.reset?.(); setTurnstileToken(""); setIsSubmitting(false); return;
+        if (turnstileInteractiveRef.current) {
+          // Resetear borraría la casilla que la persona tiene que marcar.
+          setError("Marca la casilla de verificación de abajo y vuelve a tocar Crear cuenta.");
+        } else {
+          setError("No pudimos verificar que eres una persona. Intenta de nuevo.");
+          turnstileRef.current?.reset?.(); setTurnstileToken("");
+        }
+        setIsSubmitting(false); return;
       }
       // El backend envía el CompleteRegistration a Meta (CAPI) al crear la cuenta;
       // el Pixel usa el mismo event_id para que Meta lo cuente una sola vez.
@@ -574,14 +582,22 @@ export default function SignupPage() {
                   <Turnstile
                     ref={turnstileRef}
                     siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
-                    options={{ size: "invisible" }}
+                    // Antes era size "invisible": un contenedor de 0×0 px. Cuando Cloudflare
+                    // pedía marcar la casilla (VPN, navegador de Instagram/Facebook,
+                    // varios intentos), nadie podía verla y el registro fallaba a los 8 s.
+                    // "interaction-only" la muestra solo cuando hace falta.
+                    options={{ size: "flexible", appearance: "interaction-only" }}
+                    onBeforeInteractive={() => { turnstileInteractiveRef.current = true; }}
+                    onAfterInteractive={() => { turnstileInteractiveRef.current = false; }}
                     onSuccess={(token) => {
+                      turnstileInteractiveRef.current = false;
                       setTurnstileToken(token);
+                      setError(null);
                       tokenResolverRef.current?.(token);
                       tokenResolverRef.current = null;
                     }}
                     onExpire={() => setTurnstileToken("")}
-                    onError={() => setTurnstileToken("")}
+                    onError={(code) => { console.warn("Turnstile error", code); setTurnstileToken(""); }}
                   />
 
                   {error && (
