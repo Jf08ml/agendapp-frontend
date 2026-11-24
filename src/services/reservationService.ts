@@ -127,6 +127,7 @@ export const createReservationCheckout = async (
     );
     return response.data.data;
   } catch (error) {
+    throwIfSlotTaken(error); // otra persona está pagando ese cupo
     handleAxiosError(error, "No se pudo iniciar el pago del depósito");
   }
 };
@@ -217,17 +218,25 @@ export const createMultipleReservations = async (
     }
     return response.data.data;
   } catch (error) {
-    // 409 SLOT_TAKEN: el horario se ocupó al confirmar (otra persona reservó segundos antes)
-    if (axios.isAxiosError(error) && error.response?.data?.data?.code === SLOT_TAKEN_CODE) {
-      const slotErr = new Error(
-        error.response.data.message || "Ese horario se acaba de ocupar. Elige otro horario."
-      ) as Error & { code?: string };
-      slotErr.code = SLOT_TAKEN_CODE;
-      throw slotErr;
-    }
+    throwIfSlotTaken(error);
     handleAxiosError(error, "Error al crear reservas múltiples");
   }
 };
+
+/**
+ * 409 SLOT_TAKEN: el horario se ocupó al confirmar (otra persona reservó o
+ * está pagando ese cupo). Lanza un error con `code` para que la reserva
+ * devuelva a la clienta al paso de horarios (isSlotTakenError).
+ */
+export function throwIfSlotTaken(error: unknown): void {
+  if (axios.isAxiosError(error) && error.response?.data?.data?.code === SLOT_TAKEN_CODE) {
+    const slotErr = new Error(
+      error.response.data.message || "Ese horario se acaba de ocupar. Elige otro horario."
+    ) as Error & { code?: string };
+    slotErr.code = SLOT_TAKEN_CODE;
+    throw slotErr;
+  }
+}
 
 export const SLOT_TAKEN_CODE = "SLOT_TAKEN";
 
