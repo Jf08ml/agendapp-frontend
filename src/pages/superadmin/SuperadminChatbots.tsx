@@ -1,32 +1,14 @@
 // pages/superadmin/SuperadminChatbots.tsx
+// Chatbots IA (rediseño, SuperadminChatbots): 8 cifras sin emoji, pestañas
+// Chat web / Agente admin por WhatsApp / Organizaciones con más uso, estados
+// con ícono y la conversación con su revisión en panel lateral.
 import { useEffect, useMemo, useState } from "react";
-import {
-  Container,
-  Title,
-  Text,
-  Stack,
-  Group,
-  Card,
-  Paper,
-  SimpleGrid,
-  Badge,
-  Table,
-  Divider,
-  Loader,
-  Select,
-  Button,
-  ScrollArea,
-  Modal,
-  Pagination,
-  Checkbox,
-  Textarea,
-  Box,
-  Tabs,
-} from "@mantine/core";
+import { Button, Checkbox, Drawer, Pagination, Select, Skeleton, Textarea } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
+import { IconAlertTriangle, IconCalendarCheck, IconCircleCheck, IconCircleX, IconClock } from "@tabler/icons-react";
 import {
   getChatbotStats,
   getChatbotSessions,
@@ -44,31 +26,13 @@ import {
 
 dayjs.locale("es");
 
-function KpiCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: string;
-}) {
+function KpiCard({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
-    <Paper withBorder p="md" radius="md">
-      <Stack gap={4}>
-        <Text size="sm" c="dimmed">
-          {label}
-        </Text>
-        <Text fw={700} size="xl">
-          {value}
-        </Text>
-        {hint && (
-          <Text size="xs" c="dimmed">
-            {hint}
-          </Text>
-        )}
-      </Stack>
-    </Paper>
+    <div className="ag-card" style={{ padding: "12px 14px", minWidth: 0 }}>
+      <div className="ag-muted" style={{ fontSize: 13 }}>{label}</div>
+      <div className="ag-num" style={{ font: "600 22px/28px var(--mantine-font-family)" }}>{value}</div>
+      {hint && <div className="ag-subtle">{hint}</div>}
+    </div>
   );
 }
 
@@ -76,7 +40,7 @@ const fmtNum = (n: number | undefined) => (n ?? 0).toLocaleString("es-CO");
 
 type ModalMessage = { role: "user" | "assistant"; content: string };
 
-/** Bloque de revisión reusado en el modal, tanto para sesiones de ChatLog como del agente WhatsApp. */
+/** Bloque de revisión del panel, para sesiones de ChatLog y del agente WhatsApp. */
 function ReviewPanel({
   reviewed,
   onReviewedChange,
@@ -99,58 +63,50 @@ function ReviewPanel({
   lastReview?: ChatSessionReview;
 }) {
   return (
-    <Paper withBorder p="sm" radius="md" bg="gray.0">
-      <Stack gap="xs">
-        <Group justify="space-between" wrap="wrap">
-          <Text fw={600} size="sm">
-            Revisión
-          </Text>
-          {lastReview?.reviewed && (
-            <Text size="xs" c="dimmed">
-              Revisado por {lastReview.reviewedBy || "—"}
-              {lastReview.reviewedAt
-                ? ` · ${dayjs(lastReview.reviewedAt).format("DD/MM/YYYY HH:mm")}`
-                : ""}
-            </Text>
-          )}
-        </Group>
-        <Checkbox
-          label="Marcado como revisado"
-          checked={reviewed}
-          onChange={(e) => onReviewedChange(e.currentTarget.checked)}
-        />
-        <Select
-          label="Categoría del hallazgo"
-          placeholder="Sin categoría"
-          data={REVIEW_CATEGORIES}
-          value={category}
-          onChange={onCategoryChange}
-          clearable
-          size="sm"
-        />
-        <Textarea
-          label="Notas"
-          placeholder="Qué se encontró, qué debería ajustarse..."
-          value={notes}
-          onChange={(e) => onNotesChange(e.currentTarget.value)}
-          autosize
-          minRows={2}
-          size="sm"
-        />
-        <Group justify="flex-end">
-          <Button size="sm" loading={saving} onClick={onSave}>
-            Guardar revisión
-          </Button>
-        </Group>
-      </Stack>
-    </Paper>
+    <section className="ag-card" style={{ padding: 14, background: "var(--surface-muted)", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="ag-row" style={{ justifyContent: "space-between", gap: 8 }}>
+        <b style={{ fontSize: 14 }}>Revisión</b>
+        {lastReview?.reviewed && (
+          <span className="ag-subtle">
+            Revisada por {lastReview.reviewedBy || "—"}
+            {lastReview.reviewedAt ? ` · ${dayjs(lastReview.reviewedAt).format("DD/MM/YYYY HH:mm")}` : ""}
+          </span>
+        )}
+      </div>
+      <Checkbox label="Marcada como revisada" checked={reviewed} onChange={(e) => onReviewedChange(e.currentTarget.checked)} />
+      <Select label="Categoría del hallazgo" placeholder="Sin categoría" data={REVIEW_CATEGORIES} value={category} onChange={onCategoryChange} clearable />
+      <Textarea label="Notas" placeholder="Qué se encontró y qué habría que ajustar" value={notes} onChange={(e) => onNotesChange(e.currentTarget.value)} autosize minRows={2} />
+      <Button color="var(--platform)" loading={saving} onClick={onSave} style={{ alignSelf: "flex-end" }}>
+        Guardar revisión
+      </Button>
+    </section>
   );
 }
+
+const STATE_META = {
+  reviewed: { label: "Revisada", cls: "ag-badge--success", Icon: IconCircleCheck },
+  converted: { label: "Convertida", cls: "ag-badge--success", Icon: IconCalendarCheck },
+  prepared: { label: "Preparada", cls: "ag-badge--info", Icon: IconClock },
+  limit: { label: "Límite de rondas", cls: "ag-badge--warning", Icon: IconAlertTriangle },
+  error: { label: "Error", cls: "ag-badge--danger", Icon: IconCircleX },
+} as const;
+
+function StateBadge({ kind }: { kind: keyof typeof STATE_META }) {
+  const { label, cls, Icon } = STATE_META[kind];
+  return (
+    <span className={`ag-badge ${cls}`} style={{ gap: 4 }}>
+      <Icon size={13} stroke={2} />
+      {label}
+    </span>
+  );
+}
+
+const TYPE_LABEL: Record<string, string> = { booking: "Reserva", admin: "Admin" };
 
 export default function SuperadminChatbots() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ChatbotStats | null>(null);
-  const [activeTab, setActiveTab] = useState<string | null>("web");
+  const [activeTab, setActiveTab] = useState<string>("web");
 
   // ── ChatLog (chat web / booking WhatsApp) ──────────────────────────────────
   const [sessions, setSessions] = useState<ChatbotSession[]>([]);
@@ -334,460 +290,317 @@ export default function SuperadminChatbots() {
 
   const modalOpen = !!selectedSession || !!selectedWaSession;
 
+  const resetPage = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setPage(1);
+  };
+
+  const filterSelect = (value: string | null, onChange: (v: string | null) => void, placeholder: string, data: { value: string; label: string }[], w: number) => (
+    <Select value={value} onChange={onChange} placeholder={placeholder} aria-label={placeholder} clearable data={data} w={w} />
+  );
+
+  const tabs: [string, string][] = [
+    ["web", "Chat web"],
+    ["wa", "Agente admin por WhatsApp"],
+    ["orgs", "Organizaciones con más uso"],
+  ];
+
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="lg">
-        {/* Navegación superadmin (compartida) */}
-
-        {/* Header + filtros */}
-        <Card withBorder radius="md" p="md">
-          <Group justify="space-between" align="flex-end" wrap="wrap">
-            <div>
-              <Title order={2}>Analítica de chatbots IA</Title>
-              <Text c="dimmed" size="sm">
-                Uso, conversión, costos y revisión de los asistentes (booking público, admin web y
-                agente admin por WhatsApp)
-              </Text>
+    <div style={{ maxWidth: 1240, margin: "0 auto", padding: "24px 16px 48px" }}>
+      <div className="ag-stack" style={{ gap: 20 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
+          <div>
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Chatbots</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+              Uso, conversión, costo y revisión de los asistentes: reservas, admin web y agente admin por WhatsApp.
             </div>
-            <Group gap="sm" align="flex-end">
-              <DatePickerInput
-                type="range"
-                label="Rango de fechas"
-                placeholder="Selecciona un rango"
-                value={range}
-                onChange={setRange}
-                locale="es"
-                dropdownType="modal"
+          </div>
+          <DatePickerInput type="range" aria-label="Rango de fechas" value={range} onChange={setRange} locale="es" valueFormat="D MMM YYYY" dropdownType="modal" style={{ minWidth: 240 }} />
+        </div>
+
+        <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", opacity: loading && stats ? 0.6 : 1 }}>
+          {loading && !stats ? (
+            Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} height={92} radius="md" />)
+          ) : (
+            <>
+              <KpiCard label="Sesiones de reserva" value={fmtNum(bookingStats?.sesiones)} hint={`${fmtNum(adminStats?.sesiones)} del asistente admin`} />
+              <KpiCard
+                label="Conversión total"
+                value={`${stats?.funnelBooking.tasaConversionTotal ?? 0} %`}
+                hint={`${fmtNum(stats?.funnelBooking.reservasCreadas)} reservas de ${fmtNum(stats?.funnelBooking.sesiones)} sesiones`}
               />
-              {loading && <Loader size="sm" />}
-            </Group>
-          </Group>
-        </Card>
+              <KpiCard
+                label="Reservas preparadas"
+                value={`${stats?.funnelBooking.tasaPreparacion ?? 0} %`}
+                hint={`${fmtNum(stats?.funnelBooking.conPayloadPreparado)} llegaron a confirmar; ${stats?.funnelBooking.tasaConversionPayload ?? 0} % convirtió`}
+              />
+              <KpiCard
+                label="Tokens"
+                value={fmtNum(totalTokens)}
+                hint={`Entrada y salida${bookingFeedback ? ` · satisfacción ${bookingFeedback.ratingPromedio.toFixed(1)}/5 (${bookingFeedback.total})` : ""}`}
+              />
+              <KpiCard
+                label="Rondas promedio (reserva)"
+                value={(bookingStats?.rondasPromedio ?? 0).toFixed(1)}
+                hint={`${((bookingStats?.duracionPromedioMs ?? 0) / 1000).toFixed(1)} s de duración promedio`}
+              />
+              <KpiCard label="Llegaron al límite" value={fmtNum((bookingStats?.conRoundLimit ?? 0) + (adminStats?.conRoundLimit ?? 0))} hint="Agotaron las rondas sin resolver" />
+              <KpiCard label="Con error" value={fmtNum((bookingStats?.conError ?? 0) + (adminStats?.conError ?? 0))} hint="Fallaron al procesar" />
+              <KpiCard label="Por revisar" value={fmtNum(totalSesiones - totalRevisadas)} hint={`${fmtNum(totalRevisadas)} de ${fmtNum(totalSesiones)} revisadas (chat web)`} />
+            </>
+          )}
+        </div>
 
-        {/* KPIs */}
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
-          <KpiCard
-            label="💬 Sesiones de booking"
-            value={fmtNum(bookingStats?.sesiones)}
-            hint={`${fmtNum(adminStats?.sesiones)} sesiones del bot admin`}
-          />
-          <KpiCard
-            label="🎯 Conversión total"
-            value={`${stats?.funnelBooking.tasaConversionTotal ?? 0}%`}
-            hint={`${fmtNum(stats?.funnelBooking.reservasCreadas)} reservas creadas de ${fmtNum(stats?.funnelBooking.sesiones)} sesiones`}
-          />
-          <KpiCard
-            label="🧾 Payloads preparados"
-            value={`${stats?.funnelBooking.tasaPreparacion ?? 0}%`}
-            hint={`${fmtNum(stats?.funnelBooking.conPayloadPreparado)} sesiones llegaron al botón de confirmar (${stats?.funnelBooking.tasaConversionPayload ?? 0}% de ellas convirtió)`}
-          />
-          <KpiCard
-            label="🪙 Tokens consumidos"
-            value={fmtNum(totalTokens)}
-            hint={`Entrada + salida, ambos bots${bookingFeedback ? ` · satisfacción ${bookingFeedback.ratingPromedio.toFixed(1)}/5 (${bookingFeedback.total})` : ""}`}
-          />
-        </SimpleGrid>
+        <section className="ag-stack" style={{ gap: 14 }}>
+          <nav className="ag-subtabs" aria-label="Vistas de chatbots" style={{ gap: 20 }}>
+            {tabs.map(([v, l]) => (
+              <a
+                key={v}
+                href={`#${v}`}
+                aria-current={activeTab === v ? "page" : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab(v);
+                }}
+              >
+                {l}
+              </a>
+            ))}
+          </nav>
 
-        <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="md">
-          <KpiCard
-            label="🔁 Rondas promedio (booking)"
-            value={(bookingStats?.rondasPromedio ?? 0).toFixed(1)}
-            hint={`${((bookingStats?.duracionPromedioMs ?? 0) / 1000).toFixed(1)}s de duración promedio`}
-          />
-          <KpiCard
-            label="⚠️ Sesiones con round-limit"
-            value={fmtNum((bookingStats?.conRoundLimit ?? 0) + (adminStats?.conRoundLimit ?? 0))}
-            hint="El agente agotó las rondas sin resolver"
-          />
-          <KpiCard
-            label="❌ Sesiones con error"
-            value={fmtNum((bookingStats?.conError ?? 0) + (adminStats?.conError ?? 0))}
-            hint="Excepciones durante el procesamiento"
-          />
-          <KpiCard
-            label="🔍 Revisión pendiente (ChatLog)"
-            value={fmtNum(totalSesiones - totalRevisadas)}
-            hint={`${fmtNum(totalRevisadas)} de ${fmtNum(totalSesiones)} ya revisadas`}
-          />
-        </SimpleGrid>
+          {activeTab === "web" && (
+            <>
+              <div className="ag-row" style={{ gap: 8, flexWrap: "wrap" }}>
+                {filterSelect(typeFilter, resetPage(setTypeFilter), "Todos los tipos", [
+                  { value: "booking", label: "Reserva" },
+                  { value: "admin", label: "Admin" },
+                ], 160)}
+                {filterSelect(channelFilter, resetPage(setChannelFilter), "Todos los canales", [
+                  { value: "web", label: "Web" },
+                  { value: "whatsapp", label: "WhatsApp" },
+                ], 170)}
+                {filterSelect(reviewedFilter, resetPage(setReviewedFilter), "Revisadas y sin revisar", [
+                  { value: "true", label: "Revisadas" },
+                  { value: "false", label: "Sin revisar" },
+                ], 200)}
+                <Checkbox label="Solo convertidas" checked={onlyConverted} onChange={(e) => resetPage(setOnlyConverted)(e.currentTarget.checked)} />
+                <Checkbox label="Solo con error" checked={onlyErrors} onChange={(e) => resetPage(setOnlyErrors)(e.currentTarget.checked)} />
+              </div>
+              <div className="ag-card" style={{ overflowX: "auto", opacity: sessionsLoading ? 0.6 : 1 }}>
+                <table className="ag-table" style={{ minWidth: 900 }}>
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Organización</th>
+                      <th>Tipo</th>
+                      <th>Canal</th>
+                      <th style={{ textAlign: "right" }}>Rondas</th>
+                      <th style={{ textAlign: "right" }}>Tokens</th>
+                      <th>Estado</th>
+                      <th aria-label="Acciones" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sessions.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="ag-muted" style={{ textAlign: "center", padding: "24px 16px" }}>
+                          {sessionsLoading ? "Cargando…" : "No hay sesiones con estos filtros."}
+                        </td>
+                      </tr>
+                    ) : (
+                      sessions.map((s) => (
+                        <tr key={s._id}>
+                          <td className="ag-num" style={{ whiteSpace: "nowrap" }}>{dayjs(s.createdAt).format("DD/MM HH:mm")}</td>
+                          <td>{s.organizationId?.name || "—"}</td>
+                          <td>{TYPE_LABEL[s.type] ?? s.type}</td>
+                          <td className="ag-muted">{s.channel === "whatsapp" ? "WhatsApp" : "Web"}</td>
+                          <td className="ag-num" style={{ textAlign: "right" }}>{s.rounds}</td>
+                          <td className="ag-num" style={{ textAlign: "right" }}>{fmtNum(s.inputTokens + s.outputTokens)}</td>
+                          <td>
+                            <div className="ag-row" style={{ gap: 4 }}>
+                              {s.review?.reviewed && <StateBadge kind="reviewed" />}
+                              {s.reservationCreated && <StateBadge kind="converted" />}
+                              {!s.reservationCreated && s.bookingPayload != null && <StateBadge kind="prepared" />}
+                              {s.hitRoundLimit && <StateBadge kind="limit" />}
+                              {s.error && <StateBadge kind="error" />}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            <Button size="xs" variant="default" onClick={() => openSession(s)}>
+                              Ver
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {pages > 1 && <Pagination value={page} onChange={setPage} total={pages} size="sm" style={{ alignSelf: "center" }} />}
+            </>
+          )}
 
-        {/* Desglose por organización */}
-        <Card withBorder radius="md" p="md">
-          <Text fw={700} size="lg" mb="xs">
-            Top organizaciones por uso
-          </Text>
-          <Divider mb="sm" />
-          <ScrollArea>
-            <Table withTableBorder striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Organización</Table.Th>
-                  <Table.Th>Sesiones</Table.Th>
-                  <Table.Th>Booking</Table.Th>
-                  <Table.Th>Admin</Table.Th>
-                  <Table.Th>Reservas creadas</Table.Th>
-                  <Table.Th>Tokens</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {(stats?.porOrganizacion ?? []).map((row) => (
-                  <Table.Tr key={row.organizationId}>
-                    <Table.Td>
-                      <Text fw={600} size="sm">
-                        {row.nombre}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>{row.sesiones}</Table.Td>
-                    <Table.Td>{row.booking}</Table.Td>
-                    <Table.Td>{row.admin}</Table.Td>
-                    <Table.Td>
-                      {row.convertidas}
-                      {row.conPayload > 0 && (
-                        <Text span size="xs" c="dimmed">
-                          {" "}
-                          / {row.conPayload} preparadas
-                        </Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>{fmtNum(row.inputTokens + row.outputTokens)}</Table.Td>
-                  </Table.Tr>
-                ))}
-                {(!stats || stats.porOrganizacion.length === 0) && (
-                  <Table.Tr>
-                    <Table.Td colSpan={6}>
-                      <Text c="dimmed" ta="center">
-                        No hay datos para el rango seleccionado.
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
+          {activeTab === "wa" && (
+            <>
+              <div className="ag-row" style={{ gap: 8, justifyContent: "space-between" }}>
+                <div className="ag-subtle">Conversaciones del equipo de cada negocio con el agente IA por WhatsApp. Este canal no registra tokens ni rondas.</div>
+                {filterSelect(
+                  waReviewedFilter,
+                  (v) => {
+                    setWaReviewedFilter(v);
+                    setWaPage(1);
+                  },
+                  "Revisadas y sin revisar",
+                  [
+                    { value: "true", label: "Revisadas" },
+                    { value: "false", label: "Sin revisar" },
+                  ],
+                  200
                 )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        </Card>
-
-        {/* Sesiones + revisión */}
-        <Card withBorder radius="md" p="md">
-          <Tabs value={activeTab} onChange={setActiveTab}>
-            <Tabs.List mb="sm">
-              <Tabs.Tab value="web">Chat web (admin + booking)</Tabs.Tab>
-              <Tabs.Tab value="wa">Agente admin por WhatsApp</Tabs.Tab>
-            </Tabs.List>
-
-            <Tabs.Panel value="web">
-              <Group justify="space-between" mb="xs" wrap="wrap">
-                <Text fw={700} size="lg">
-                  Sesiones recientes
-                </Text>
-                <Group gap="sm">
-                  <Select
-                    value={typeFilter}
-                    onChange={(v) => {
-                      setTypeFilter(v);
-                      setPage(1);
-                    }}
-                    placeholder="Todos los tipos"
-                    clearable
-                    data={[
-                      { value: "booking", label: "Booking" },
-                      { value: "admin", label: "Admin" },
-                    ]}
-                    size="sm"
-                    w={150}
-                  />
-                  <Select
-                    value={channelFilter}
-                    onChange={(v) => {
-                      setChannelFilter(v);
-                      setPage(1);
-                    }}
-                    placeholder="Todos los canales"
-                    clearable
-                    data={[
-                      { value: "web", label: "Web" },
-                      { value: "whatsapp", label: "WhatsApp" },
-                    ]}
-                    size="sm"
-                    w={160}
-                  />
-                  <Select
-                    value={reviewedFilter}
-                    onChange={(v) => {
-                      setReviewedFilter(v);
-                      setPage(1);
-                    }}
-                    placeholder="Todas"
-                    clearable
-                    data={[
-                      { value: "true", label: "Revisadas" },
-                      { value: "false", label: "Sin revisar" },
-                    ]}
-                    size="sm"
-                    w={150}
-                  />
-                  <Checkbox
-                    label="Solo convertidas"
-                    checked={onlyConverted}
-                    onChange={(e) => {
-                      setOnlyConverted(e.currentTarget.checked);
-                      setPage(1);
-                    }}
-                  />
-                  <Checkbox
-                    label="Solo con error"
-                    checked={onlyErrors}
-                    onChange={(e) => {
-                      setOnlyErrors(e.currentTarget.checked);
-                      setPage(1);
-                    }}
-                  />
-                  {sessionsLoading && <Loader size="xs" />}
-                </Group>
-              </Group>
-              <Divider mb="sm" />
-              <ScrollArea>
-                <Table withTableBorder striped highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Fecha</Table.Th>
-                      <Table.Th>Organización</Table.Th>
-                      <Table.Th>Tipo</Table.Th>
-                      <Table.Th>Canal</Table.Th>
-                      <Table.Th>Rondas</Table.Th>
-                      <Table.Th>Tokens</Table.Th>
-                      <Table.Th>Estado</Table.Th>
-                      <Table.Th></Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {sessions.map((s) => (
-                      <Table.Tr key={s._id}>
-                        <Table.Td>{dayjs(s.createdAt).format("DD/MM HH:mm")}</Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{s.organizationId?.name || "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge size="sm" variant="light" color={s.type === "booking" ? "blue" : "grape"}>
-                            {s.type}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="sm" c="dimmed">
-                            {s.channel === "whatsapp" ? "WhatsApp" : "Web"}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>{s.rounds}</Table.Td>
-                        <Table.Td>{fmtNum(s.inputTokens + s.outputTokens)}</Table.Td>
-                        <Table.Td>
-                          <Group gap={4}>
-                            {s.review?.reviewed && (
-                              <Badge size="sm" color="teal" variant="filled">
-                                Revisada
-                              </Badge>
-                            )}
-                            {s.reservationCreated && (
-                              <Badge size="sm" color="green" variant="light">
-                                Convertida
-                              </Badge>
-                            )}
-                            {!s.reservationCreated && s.bookingPayload != null && (
-                              <Badge size="sm" color="yellow" variant="light">
-                                Preparada
-                              </Badge>
-                            )}
-                            {s.hitRoundLimit && (
-                              <Badge size="sm" color="orange" variant="light">
-                                Round limit
-                              </Badge>
-                            )}
-                            {s.error && (
-                              <Badge size="sm" color="red" variant="light">
-                                Error
-                              </Badge>
-                            )}
-                          </Group>
-                        </Table.Td>
-                        <Table.Td>
-                          <Button size="compact-xs" variant="subtle" onClick={() => openSession(s)}>
-                            Ver chat
-                          </Button>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                    {sessions.length === 0 && !sessionsLoading && (
-                      <Table.Tr>
-                        <Table.Td colSpan={8}>
-                          <Text c="dimmed" ta="center">
-                            No hay sesiones con los filtros seleccionados.
-                          </Text>
-                        </Table.Td>
-                      </Table.Tr>
+              </div>
+              <div className="ag-card" style={{ overflowX: "auto", opacity: waSessionsLoading ? 0.6 : 1 }}>
+                <table className="ag-table" style={{ minWidth: 620 }}>
+                  <thead>
+                    <tr>
+                      <th>Última actividad</th>
+                      <th>Organización</th>
+                      <th style={{ textAlign: "right" }}>Mensajes</th>
+                      <th>Estado</th>
+                      <th aria-label="Acciones" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waSessions.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="ag-muted" style={{ textAlign: "center", padding: "24px 16px" }}>
+                          {waSessionsLoading ? "Cargando…" : "No hay sesiones con estos filtros."}
+                        </td>
+                      </tr>
+                    ) : (
+                      waSessions.map((s) => (
+                        <tr key={s.sessionId}>
+                          <td className="ag-num" style={{ whiteSpace: "nowrap" }}>{dayjs(s.lastMessageAt).format("DD/MM HH:mm")}</td>
+                          <td>{s.organizationId?.name || "—"}</td>
+                          <td className="ag-num" style={{ textAlign: "right" }}>{s.messageCount}</td>
+                          <td>{s.review?.reviewed ? <StateBadge kind="reviewed" /> : <span className="ag-muted">Sin revisar</span>}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <Button size="xs" variant="default" onClick={() => void openWaSession(s)}>
+                              Ver
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
                     )}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
-              {pages > 1 && (
-                <Group justify="center" mt="md">
-                  <Pagination value={page} onChange={setPage} total={pages} size="sm" />
-                </Group>
-              )}
-            </Tabs.Panel>
+                  </tbody>
+                </table>
+              </div>
+              {waPages > 1 && <Pagination value={waPage} onChange={setWaPage} total={waPages} size="sm" style={{ alignSelf: "center" }} />}
+            </>
+          )}
 
-            <Tabs.Panel value="wa">
-              <Group justify="space-between" mb="xs" wrap="wrap">
-                <Text fw={700} size="lg">
-                  Sesiones del agente admin (WhatsApp)
-                </Text>
-                <Group gap="sm">
-                  <Select
-                    value={waReviewedFilter}
-                    onChange={(v) => {
-                      setWaReviewedFilter(v);
-                      setWaPage(1);
-                    }}
-                    placeholder="Todas"
-                    clearable
-                    data={[
-                      { value: "true", label: "Revisadas" },
-                      { value: "false", label: "Sin revisar" },
-                    ]}
-                    size="sm"
-                    w={150}
-                  />
-                  {waSessionsLoading && <Loader size="xs" />}
-                </Group>
-              </Group>
-              <Text size="xs" c="dimmed" mb="xs">
-                Conversaciones del staff con el agente IA vía WhatsApp (número de plataforma). No hay
-                métricas de tokens/rondas para este canal.
-              </Text>
-              <Divider mb="sm" />
-              <ScrollArea>
-                <Table withTableBorder striped highlightOnHover>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Última actividad</Table.Th>
-                      <Table.Th>Organización</Table.Th>
-                      <Table.Th>Mensajes</Table.Th>
-                      <Table.Th>Estado</Table.Th>
-                      <Table.Th></Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {waSessions.map((s) => (
-                      <Table.Tr key={s.sessionId}>
-                        <Table.Td>{dayjs(s.lastMessageAt).format("DD/MM HH:mm")}</Table.Td>
-                        <Table.Td>
-                          <Text size="sm">{s.organizationId?.name || "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>{s.messageCount}</Table.Td>
-                        <Table.Td>
-                          {s.review?.reviewed && (
-                            <Badge size="sm" color="teal" variant="filled">
-                              Revisada
-                            </Badge>
-                          )}
-                        </Table.Td>
-                        <Table.Td>
-                          <Button size="compact-xs" variant="subtle" onClick={() => void openWaSession(s)}>
-                            Ver chat
-                          </Button>
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                    {waSessions.length === 0 && !waSessionsLoading && (
-                      <Table.Tr>
-                        <Table.Td colSpan={5}>
-                          <Text c="dimmed" ta="center">
-                            No hay sesiones con los filtros seleccionados.
-                          </Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                  </Table.Tbody>
-                </Table>
-              </ScrollArea>
-              {waPages > 1 && (
-                <Group justify="center" mt="md">
-                  <Pagination value={waPage} onChange={setWaPage} total={waPages} size="sm" />
-                </Group>
-              )}
-            </Tabs.Panel>
-          </Tabs>
-        </Card>
-      </Stack>
+          {activeTab === "orgs" && (
+            <div className="ag-card" style={{ overflowX: "auto" }}>
+              <table className="ag-table" style={{ minWidth: 700 }}>
+                <thead>
+                  <tr>
+                    <th>Organización</th>
+                    <th style={{ textAlign: "right" }}>Sesiones</th>
+                    <th style={{ textAlign: "right" }}>Reserva</th>
+                    <th style={{ textAlign: "right" }}>Admin</th>
+                    <th style={{ textAlign: "right" }}>Reservas creadas</th>
+                    <th style={{ textAlign: "right" }}>Tokens</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(stats?.porOrganizacion ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="ag-muted" style={{ textAlign: "center", padding: "24px 16px" }}>
+                        No hay datos en este rango.
+                      </td>
+                    </tr>
+                  ) : (
+                    stats!.porOrganizacion.map((row) => (
+                      <tr key={row.organizationId}>
+                        <td style={{ fontWeight: 600 }}>{row.nombre}</td>
+                        <td className="ag-num" style={{ textAlign: "right" }}>{row.sesiones}</td>
+                        <td className="ag-num" style={{ textAlign: "right" }}>{row.booking}</td>
+                        <td className="ag-num" style={{ textAlign: "right" }}>{row.admin}</td>
+                        <td className="ag-num" style={{ textAlign: "right" }}>
+                          {row.convertidas}
+                          {row.conPayload > 0 && <span className="ag-subtle"> / {row.conPayload} preparadas</span>}
+                        </td>
+                        <td className="ag-num" style={{ textAlign: "right" }}>{fmtNum(row.inputTokens + row.outputTokens)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
 
-      {/* Modal: conversación completa (compartido entre ambas pestañas) */}
-      <Modal
+      {/* Panel: conversación y revisión */}
+      <Drawer
         opened={modalOpen}
         onClose={closeModal}
+        position="right"
+        size={560}
         title={
-          <Group gap="xs">
-            <Text fw={600}>Conversación</Text>
-            {selectedSession && (
-              <Badge size="sm" variant="light">
-                {selectedSession.organizationId?.name || "—"} · {selectedSession.type}
-              </Badge>
-            )}
-            {selectedWaSession && (
-              <Badge size="sm" variant="light">
-                {selectedWaSession.organizationId?.name || "—"} · agente WhatsApp
-              </Badge>
-            )}
-          </Group>
+          <div>
+            <b style={{ fontSize: 16 }}>Conversación</b>
+            <div className="ag-subtle">
+              {selectedSession
+                ? `${selectedSession.organizationId?.name || "—"} · ${TYPE_LABEL[selectedSession.type] ?? selectedSession.type}`
+                : selectedWaSession
+                  ? `${selectedWaSession.organizationId?.name || "—"} · agente WhatsApp`
+                  : ""}
+            </div>
+          </div>
         }
-        size="lg"
       >
-        {selectedSession && (
-          <Stack gap="sm">
-            <Group gap="xs">
-              <Badge size="sm" variant="outline">
-                {selectedSession.rounds} rondas
-              </Badge>
-              <Badge size="sm" variant="outline">
-                {fmtNum(selectedSession.inputTokens + selectedSession.outputTokens)} tokens
-              </Badge>
-              {selectedSession.toolsUsed?.length > 0 && (
-                <Badge size="sm" variant="outline">
-                  {selectedSession.toolsUsed.join(", ")}
-                </Badge>
-              )}
-            </Group>
-            {selectedSession.error && (
-              <Paper withBorder p="sm" radius="md" bg="red.0">
-                <Text size="sm" c="red.8">
-                  Error: {selectedSession.error}
-                </Text>
-              </Paper>
-            )}
-          </Stack>
-        )}
         {(selectedSession || selectedWaSession) && (
-          <Stack gap="sm" mt="sm">
+          <div className="ag-stack" style={{ gap: 14 }}>
+            {selectedSession && (
+              <div className="ag-row" style={{ gap: 6 }}>
+                <span className="ag-badge ag-badge--outline">{selectedSession.rounds} rondas</span>
+                <span className="ag-badge ag-badge--outline">{fmtNum(selectedSession.inputTokens + selectedSession.outputTokens)} tokens</span>
+                {selectedSession.toolsUsed?.length > 0 && <span className="ag-badge ag-badge--outline">{selectedSession.toolsUsed.join(", ")}</span>}
+              </div>
+            )}
+            {selectedSession?.error && (
+              <div className="ag-alert ag-alert--danger">
+                <IconCircleX size={20} />
+                <div style={{ fontSize: 14 }}>Error: {selectedSession.error}</div>
+              </div>
+            )}
             {waModalLoading ? (
-              <Group justify="center" py="md">
-                <Loader size="sm" />
-              </Group>
+              <div className="ag-stack" style={{ gap: 8 }}>
+                <Skeleton height={40} width="70%" />
+                <Skeleton height={40} width="60%" style={{ alignSelf: "flex-end" }} />
+              </div>
             ) : (
-              <Stack gap="xs">
+              <div className="ag-stack" style={{ gap: 8 }}>
                 {modalMessages.map((m, i) => (
-                  <Box
+                  <div
                     key={i}
                     style={{
                       alignSelf: m.role === "user" ? "flex-end" : "flex-start",
                       maxWidth: "85%",
+                      padding: "8px 12px",
+                      borderRadius: 12,
+                      fontSize: 14,
+                      lineHeight: "20px",
+                      whiteSpace: "pre-wrap",
+                      background: m.role === "user" ? "var(--brand-soft)" : "var(--surface-muted)",
+                      border: "1px solid var(--line)",
                     }}
                   >
-                    <Paper withBorder p="xs" radius="md" bg={m.role === "user" ? "blue.0" : "gray.0"}>
-                      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-                        {m.content}
-                      </Text>
-                    </Paper>
-                  </Box>
+                    {m.content}
+                  </div>
                 ))}
-              </Stack>
+              </div>
             )}
-
             <ReviewPanel
               reviewed={reviewChecked}
               onReviewedChange={setReviewChecked}
@@ -799,9 +612,9 @@ export default function SuperadminChatbots() {
               saving={reviewSaving}
               lastReview={selectedSession?.review || selectedWaSession?.review}
             />
-          </Stack>
+          </div>
         )}
-      </Modal>
-    </Container>
+      </Drawer>
+    </div>
   );
 }
