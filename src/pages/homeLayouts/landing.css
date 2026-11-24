@@ -97,6 +97,8 @@
 .lnd > section:first-child { background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 100vmax var(--brand); clip-path: inset(0 -100vmax); }
 .lnd > section:first-child .lnd-lead, .lnd > section:first-child .ag-muted, .lnd > section:first-child .ag-subtle { color: var(--on-brand); opacity: .85; }
 .lnd > section:first-child .ag-open { color: var(--on-brand); }
+/* Tarjetas sobre la portada de marca (p. ej. «Próximo horario libre»): fondo claro, textos normales */
+.lnd > section:first-child .ag-card .ag-subtle, .lnd > section:first-child .ag-card .ag-muted { color: var(--ink-subtle); opacity: 1; }
 .lnd > section:first-child .ag-open i { box-shadow: 0 0 0 2px var(--on-brand); }
 .lnd > section:first-child .mantine-Button-root:is([data-variant="filled"], :not([data-variant])) { background: var(--on-brand); color: var(--brand); }
 .lnd > section:first-child .mantine-Button-root:is([data-variant="filled"], :not([data-variant])):hover { background: color-mix(in srgb, var(--on-brand) 88%, var(--brand)); }

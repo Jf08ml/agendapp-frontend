@@ -14,6 +14,8 @@ import { selectOrganization } from "../../features/organization/sliceOrganizatio
 import { formatCurrency } from "../../utils/formatCurrency";
 import { HoursAndLocation, LandingFooter, OpenStatus, type LandingFeature } from "./landingShared";
 import { useBusinessHours } from "./useBusinessHours";
+import { NextFreeBar } from "./NextFreeSlot";
+import { useNextFreeSlot } from "./useNextFreeSlot";
 import "./landing.css";
 
 export interface EssentialLayoutProps {
@@ -28,10 +30,11 @@ const SERVICES_LIMIT = 6;
 // Estas dos dejan de ser tarjetas: son el «Reservar» del header y el bloque de servicios
 const NOT_IN_MORE = ["/online-reservation", "/servicios-precios", "/location"];
 
-export function EssentialLayout({ features, welcomeTitle, welcomeDescription, organizationId }: EssentialLayoutProps) {
+export function EssentialLayout({ features, welcomeTitle, welcomeDescription, organizationId, enableOnlineBooking = true }: EssentialLayoutProps) {
   const navigate = useNavigate();
   const org = useSelector(selectOrganization);
   const { status } = useBusinessHours();
+  const nextFree = useNextFreeSlot(organizationId, enableOnlineBooking);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -143,6 +146,7 @@ export function EssentialLayout({ features, welcomeTitle, welcomeDescription, or
       </section>
 
       <LandingFooter links={[]} />
+      <NextFreeBar slot={nextFree} />
     </div>
   );
 }

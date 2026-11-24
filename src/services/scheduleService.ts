@@ -125,6 +125,23 @@ export const updateEmployeeSchedule = async (
 };
 
 // Obtener días disponibles de un profesional en un rango de fechas
+/** «Próximo horario libre» de las landings (Fase 3). null si no hay en 14 días. */
+export interface NextFreeSlot {
+  datetime: string;
+  date: string;
+  time: string;
+  serviceId: string;
+  serviceName: string;
+  employeeId: string;
+}
+
+export const getNextFreeSlot = async (organizationId: string, serviceId?: string): Promise<NextFreeSlot | null> => {
+  const response = await apiGeneral.get<Response<NextFreeSlot | null>>(`/schedule/next-free/${organizationId}`, {
+    params: serviceId ? { serviceId } : undefined,
+  });
+  return response.data.data ?? null;
+};
+
 export const getEmployeeAvailableDays = async (
   employeeId: string,
   startDate: string,
