@@ -7,9 +7,12 @@ import { useMediaQuery } from "@mantine/hooks";
 import { Client } from "../../../services/clientService";
 import ClientListItem from "./ClientListItem";
 import ClientDetailDrawer from "./ClientDetailDrawer";
+import type { ClientStat } from "./clientSegments";
 
 interface ClientListProps {
   clients: Client[];
+  /** Cifras por cliente (null mientras cargan). */
+  stats?: Record<string, ClientStat> | null;
   error: string | null;
   onRegisterService: (clientId: string) => void;
   onReferral: (clientId: string) => void;
@@ -24,6 +27,7 @@ interface ClientListProps {
 
 const ClientList: React.FC<ClientListProps> = ({
   clients,
+  stats = null,
   error,
   onRegisterService,
   onReferral,
@@ -133,6 +137,8 @@ const ClientList: React.FC<ClientListProps> = ({
               key={client._id}
               client={client}
               isMobile
+              stat={stats?.[client._id]}
+              showStats={!!stats}
               selected={client._id === selectedClientId}
               onOpenDetail={setSelectedClientId}
               onRegisterService={onRegisterService}
@@ -148,6 +154,9 @@ const ClientList: React.FC<ClientListProps> = ({
             <thead>
               <tr>
                 <th>Cliente</th>
+                {stats && <th>Última visita</th>}
+                {stats && <th className="num">Visitas</th>}
+                {stats && <th className="num">Total gastado</th>}
                 {loyaltyEnabled && <th className="num">Servicios</th>}
                 {loyaltyEnabled && <th className="num">Referidos</th>}
                 {loyaltyEnabled && <th>Fidelidad</th>}
@@ -160,6 +169,8 @@ const ClientList: React.FC<ClientListProps> = ({
                   key={client._id}
                   client={client}
                   isMobile={false}
+                  stat={stats?.[client._id]}
+                  showStats={!!stats}
                   selected={client._id === selectedClientId}
                   onOpenDetail={setSelectedClientId}
                   onRegisterService={onRegisterService}

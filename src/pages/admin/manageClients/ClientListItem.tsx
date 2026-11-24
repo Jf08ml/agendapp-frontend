@@ -10,9 +10,15 @@ import { RootState } from "../../../app/store";
 import { selectOrganization } from "../../../features/organization/sliceOrganization";
 import { Client } from "../../../services/clientService";
 import { getCountryFlag } from "../../../utils/countryHelper";
+import { formatCurrency } from "../../../utils/formatCurrency";
+import { lastVisitLabel, type ClientStat } from "./clientSegments";
 
 interface ClientListItemProps {
   client: Client;
+  /** Cifras del servidor; undefined mientras cargan. */
+  stat?: ClientStat;
+  /** Mostrar las cifras de visitas (ya cargaron). */
+  showStats?: boolean;
   isMobile: boolean;
   selected?: boolean;
   onOpenDetail: (clientId: string) => void;
@@ -35,7 +41,7 @@ function ActionsMenu({
   onRegisterService,
   onReferral,
   onEditClient,
-}: Omit<ClientListItemProps, "isMobile" | "selected">) {
+}: Omit<ClientListItemProps, "isMobile" | "selected" | "stat" | "showStats">) {
   return (
     <Menu position="bottom-end" withinPortal shadow="lg">
       <Menu.Target>
@@ -67,8 +73,9 @@ function ActionsMenu({
 }
 
 const ClientListItem: React.FC<ClientListItemProps> = React.memo((props) => {
-  const { client, isMobile, selected, onOpenDetail } = props;
+  const { client, isMobile, selected, onOpenDetail, stat, showStats } = props;
   const organization = useSelector((state: RootState) => selectOrganization(state));
+  const currency = organization?.currency || "COP";
   const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
   const rewardReady = loyaltyEnabled && !!(client.hasServiceDiscount || client.hasReferralBenefit);
   const phone = `${client.phone_country ? `${getCountryFlag(client.phone_country)} ` : ""}${client.phoneNumber ?? ""}`;
@@ -104,6 +111,12 @@ const ClientListItem: React.FC<ClientListItemProps> = React.memo((props) => {
       >
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           {who}
+          {showStats && (
+            <div className="ag-subtle" style={{ paddingLeft: 44 }}>
+              {lastVisitLabel(stat?.lastVisit)}
+              {stat?.visits ? ` · ${stat.visits} ${stat.visits === 1 ? "visita" : "visitas"}` : ""}
+            </div>
+          )}
           {(loyaltyEnabled || rewardReady) && (
             <div className="ag-row" style={{ paddingLeft: 44, gap: 8 }}>
               {loyaltyEnabled && (
@@ -128,6 +141,9 @@ const ClientListItem: React.FC<ClientListItemProps> = React.memo((props) => {
       style={{ cursor: "pointer" }}
     >
       <td>{who}</td>
+      {showStats && <td style={{ whiteSpace: "nowrap" }}>{lastVisitLabel(stat?.lastVisit)}</td>}
+      {showStats && <td className="num">{stat?.visits ?? 0}</td>}
+      {showStats && <td className="num">{stat?.totalSpent ? formatCurrency(stat.totalSpent, currency) : "—"}</td>}
       {loyaltyEnabled && <td className="num">{client.servicesTaken}</td>}
       {loyaltyEnabled && <td className="num">{client.referralsMade}</td>}
       {loyaltyEnabled && <td>{reward || <span className="ag-subtle">—</span>}</td>}
