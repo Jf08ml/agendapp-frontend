@@ -64,8 +64,10 @@ test("desactivar se nota como cambio", () => {
   assert.deepEqual(rows[0].changes, ["Se desactiva"]);
 });
 
-test("descripción vacía en el archivo se avisa como borrado", () => {
+test("columnas vacías o ausentes no cambian el servicio (como el servidor)", () => {
   const [row] = parseServiceRows([{ ID: "a1", Nombre: "Corte", Precio: 1, Duración: 10 }]);
-  const { rows } = buildPreview([row], [{ _id: "a1", name: "Corte", price: 1, duration: 10, description: "Clásico" }]);
-  assert.deepEqual(rows[0].changes, ["Se borra la descripción"]);
+  const existing = [{ _id: "a1", name: "Corte", price: 1, duration: 10, description: "Clásico", type: "Barbería", featured: true, hidePrice: true, isActive: false, maxConcurrentAppointments: 3 }];
+  const { rows } = buildPreview([row], existing);
+  assert.equal(rows[0].kind, "unchanged");
+  assert.deepEqual(rows[0].changes, []);
 });

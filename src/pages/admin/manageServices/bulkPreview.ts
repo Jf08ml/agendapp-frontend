@@ -160,15 +160,15 @@ export function buildPreview(
       if (r.name !== cur.name) changes.push(`Nombre: ${cur.name} → ${r.name}`);
       if (r.price !== Number(cur.price)) changes.push(`Precio: ${money(Number(cur.price))} → ${money(r.price)}`);
       if (r.duration !== Number(cur.duration)) changes.push(`Duración: ${cur.duration} → ${r.duration} min`);
-      if ((r.type ?? "") !== (cur.type ?? "")) changes.push(`Categoría: ${cur.type || "sin categoría"} → ${r.type || "sin categoría"}`);
-      if ((r.description ?? "") !== (cur.description ?? "")) changes.push(r.description ? "Cambia la descripción" : "Se borra la descripción");
-      // El servidor guarda «No» cuando la columna viene vacía
-      if (!!r.hidePrice !== !!cur.hidePrice) changes.push(`Ocultar precio: ${yn(cur.hidePrice)} → ${yn(r.hidePrice)}`);
-      if (!!r.featured !== !!cur.featured) changes.push(`Destacado: ${yn(cur.featured)} → ${yn(r.featured)}`);
-      const newActive = r.isActive !== false;
-      if (newActive !== (cur.isActive !== false)) changes.push(newActive ? "Se activa" : "Se desactiva");
-      const newMax = r.maxConcurrentAppointments ?? 1;
-      if (newMax !== (cur.maxConcurrentAppointments ?? 1)) changes.push(`Citas simultáneas: ${cur.maxConcurrentAppointments ?? 1} → ${newMax}`);
+      // Campos opcionales: si la celda viene vacía o falta la columna, el
+      // servidor no los toca (bulkServiceRow en el backend), así que no cambian.
+      if (r.type !== undefined && r.type !== (cur.type ?? "")) changes.push(`Categoría: ${cur.type || "sin categoría"} → ${r.type}`);
+      if (r.description !== undefined && r.description !== (cur.description ?? "")) changes.push("Cambia la descripción");
+      if (r.hidePrice !== undefined && r.hidePrice !== !!cur.hidePrice) changes.push(`Ocultar precio: ${yn(cur.hidePrice)} → ${yn(r.hidePrice)}`);
+      if (r.featured !== undefined && r.featured !== !!cur.featured) changes.push(`Destacado: ${yn(cur.featured)} → ${yn(r.featured)}`);
+      if (r.isActive !== undefined && r.isActive !== (cur.isActive !== false)) changes.push(r.isActive ? "Se activa" : "Se desactiva");
+      if (r.maxConcurrentAppointments !== undefined && r.maxConcurrentAppointments !== (cur.maxConcurrentAppointments ?? 1))
+        changes.push(`Citas simultáneas: ${cur.maxConcurrentAppointments ?? 1} → ${r.maxConcurrentAppointments}`);
       return { row: r, kind: changes.length ? "update" : "unchanged", changes };
     }
     const key = norm(r.name);
