@@ -34,7 +34,6 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { notifications } from "@mantine/notifications";
 import { formatCurrency } from "../../utils/formatCurrency";
-import SuperadminNav from "./SuperadminNav";
 import {
   getPlatformOverview,
   getPlatformTimeSeries,
@@ -170,7 +169,6 @@ export default function SuperadminAnalytics() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header + filtros */}
         <Card withBorder radius="md" p="md">

@@ -41,7 +41,6 @@ import { notifications } from "@mantine/notifications";
 import { DateInput } from "@mantine/dates";
 import dayjs from "dayjs";
 import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
-import SuperadminNav from "./SuperadminNav";
 import { IoAlertCircle } from "react-icons/io5";
 import { EditMembershipModal } from "./EditMembershipModal";
 
@@ -334,7 +333,6 @@ export default function SuperadminManagement() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">

@@ -19,7 +19,6 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { BiEdit, BiTrash, BiLink } from "react-icons/bi";
-import SuperadminNav from "./SuperadminNav";
 import {
   agentService,
   Agent,
@@ -194,7 +193,6 @@ export default function SuperadminAgents() {
     <div style={{ maxWidth: 1200, margin: "auto", padding: 24 }}>
       {/* Navegación superadmin (compartida) */}
       <Group mb="lg">
-        <SuperadminNav />
       </Group>
 
       <Group justify="space-between" mb="md">

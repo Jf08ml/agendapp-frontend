@@ -37,7 +37,6 @@ import {
   IconX,
   IconCheck,
 } from "@tabler/icons-react";
-import SuperadminNav from "./SuperadminNav";
 import {
   getAllPlans,
   createPlan,
@@ -309,7 +308,6 @@ export default function SuperadminPlans() {
       <Stack gap="lg">
 
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">

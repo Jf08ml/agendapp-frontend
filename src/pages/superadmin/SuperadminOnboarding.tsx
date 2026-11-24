@@ -7,7 +7,6 @@ import {
 import { DatePickerInput } from "@mantine/dates";
 import { IconBulb } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import SuperadminNav from "./SuperadminNav";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
@@ -63,7 +62,6 @@ export default function SuperadminOnboarding() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header + filtros */}
         <Card withBorder radius="md" p="md">

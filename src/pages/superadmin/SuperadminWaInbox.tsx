@@ -22,7 +22,6 @@ import { notifications } from "@mantine/notifications";
 import { IconBrandWhatsapp, IconCheck, IconChecks, IconAlertTriangle } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import SuperadminNav from "./SuperadminNav";
 import {
   getConversations,
   getConversationMessages,
@@ -214,7 +213,6 @@ export default function SuperadminWaInbox() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
-        <SuperadminNav />
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" align="flex-start">

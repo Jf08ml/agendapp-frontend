@@ -1,11 +1,9 @@
 // Solicitudes de mejora (rediseño, SuperadminSolicitudes): chips de estado con
 // conteo (calculados en el navegador), tabla y panel lateral para responder.
-// La navegación de plataforma (SuperadminNav) se rediseña aparte.
 import { useEffect, useMemo, useState } from "react";
 import { Button, Drawer, Select, Skeleton, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconInfoCircle, IconRefresh } from "@tabler/icons-react";
-import SuperadminNav from "./SuperadminNav";
 import {
   adminGetFeatureRequests,
   adminUpdateFeatureRequest,
@@ -89,7 +87,6 @@ export default function SuperadminFeatureRequests() {
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 16px 48px" }}>
       <div className="ag-stack" style={{ gap: 16 }}>
-        <SuperadminNav />
 
         <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div>

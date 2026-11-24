@@ -6,7 +6,6 @@ import {
 } from "@mantine/core";
 import { IconBulb, IconCalendarStats, IconWorldWww, IconUserOff, IconMessage2 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
-import SuperadminNav from "./SuperadminNav";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
@@ -321,7 +320,6 @@ export default function SuperadminImpactReports() {
   return (
     <Container size="xl" py="xl">
       <Stack gap="lg">
-        <SuperadminNav />
 
         <Card withBorder radius="md" p="md">
           <Group justify="space-between" align="flex-end" wrap="wrap">

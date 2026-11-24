@@ -32,7 +32,6 @@ import {
   IconEye,
   IconEyeOff,
 } from "@tabler/icons-react";
-import SuperadminNav from "./SuperadminNav";
 import {
   adminGetAnnouncements,
   adminCreateAnnouncement,
@@ -283,7 +282,6 @@ export default function SuperadminAnnouncements() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header */}
         <Group justify="space-between">

@@ -25,7 +25,6 @@ import {
 } from "@mantine/core";
 import { BiEdit, BiKey, BiUserCheck, BiTrash, BiLink } from "react-icons/bi";
 import { notifications } from "@mantine/notifications";
-import SuperadminNav from "./SuperadminNav";
 import {
   getOrganizations,
   Organization,
@@ -452,7 +451,6 @@ export default function SuperadminOrganizations() {
     <div style={{ maxWidth: 1100, margin: "auto", padding: 24 }}>
       {/* Navegación superadmin (compartida) */}
       <Group mb="lg">
-        <SuperadminNav />
       </Group>
 
       <Group justify="space-between" mb="md">

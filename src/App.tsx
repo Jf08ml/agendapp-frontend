@@ -27,6 +27,8 @@ import {
 } from "./features/organization/sliceOrganization";
 import OrgLoadError from "./components/OrgLoadError";
 import OrgLoadingSkeleton from "./components/OrgLoadingSkeleton";
+import SuperadminShell from "./layouts/SuperadminShell";
+import { isSuperadminPanelPath } from "./layouts/superadminNavigation";
 
 import { ChristmasDecorations } from "./components/seasonal/ChristmasDecorations";
 import {
@@ -269,6 +271,8 @@ function AppContent() {
   // quien navega tiene sesión. Registro y superadmin: shell de plataforma.
   const useAdminShell = isAuthenticated && !isSuperadmin && isAdminPath(location.pathname);
   const isPlatformScreen = isSuperadmin || isSuperadminPath || (isSignupDomain && !organization);
+  // Superadmin con sesión: su propio shell con la navegación de plataforma.
+  const useSuperadminShell = isAuthenticated && isSuperadmin && isSuperadminPanelPath(location.pathname);
 
   // Banners del panel: sesión de soporte y estado de la membresía
   const banners = (
@@ -348,7 +352,9 @@ function AppContent() {
       <Analytics />
 
 
-      {useAdminShell ? (
+      {useSuperadminShell ? (
+        <SuperadminShell>{routes}</SuperadminShell>
+      ) : useAdminShell ? (
         <AdminShell banners={banners} chatOpen={chatOpen} onToggleChat={toggleChat}>
           {routes}
         </AdminShell>

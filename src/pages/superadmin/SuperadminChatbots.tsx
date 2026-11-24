@@ -25,7 +25,6 @@ import {
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { notifications } from "@mantine/notifications";
-import SuperadminNav from "./SuperadminNav";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
@@ -339,7 +338,6 @@ export default function SuperadminChatbots() {
     <Container size="xl" py="xl">
       <Stack gap="lg">
         {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
 
         {/* Header + filtros */}
         <Card withBorder radius="md" p="md">
