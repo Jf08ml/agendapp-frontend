@@ -4,15 +4,17 @@
 // Dos modos, como antes («Calendario» / «Compacta»):
 //   - Tarjetas: una columna por profesional, con el arrastre que ya existía.
 //   - Lista: una fila por cita (antes «Compacta», una grilla de horas).
-// En móvil abre en Lista; en escritorio, en Tarjetas.
+// Abre en Tarjetas (también en móvil) salvo que la persona haya elegido Lista;
+// el selector y lo que se recuerda viven en CustomCalendar (barra del calendario).
 import React, { FC, useState, useEffect, useMemo } from "react";
-import { Box, Group, Badge, Flex, SegmentedControl, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
+import { Box, Group, Badge, Flex, Collapse, Text, Divider, ActionIcon, Tooltip } from "@mantine/core";
 import { useElementSize, useMediaQuery } from "@mantine/hooks";
 import { isSameMonth } from "date-fns";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { IconLayoutColumns, IconList, IconTrash } from "@tabler/icons-react";
+import { IconTrash } from "@tabler/icons-react";
+import type { DayMode } from "../CustomCalendar";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment, type AppointmentMove } from "../../../services/appointmentService";
@@ -39,12 +41,13 @@ import CustomLoader from "../../../components/customLoader/CustomLoader";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const DAY_MODE_KEY = "agenda_day_mode";
 const TIME_COLUMN_WIDTH = 80; // DayModalTimeColumn
 
 interface DayViewProps {
   /** Día que se muestra (lo controla la barra del calendario) */
   day: Date;
+  /** Tarjetas o Lista (el selector está en la barra del calendario) */
+  mode: DayMode;
   onOpenModal: (selectedDay: Date, interval: Date, employeeId?: string) => void;
   getAppointmentsForDay: (day: Date) => Appointment[];
   fetchAppointmentsForDay: (day: Date) => Promise<Appointment[]>;
@@ -70,6 +73,7 @@ const pill = {
 
 const DayView: FC<DayViewProps> = ({
   day,
+  mode,
   onOpenModal,
   getAppointmentsForDay,
   fetchAppointmentsForDay,
@@ -90,24 +94,6 @@ const DayView: FC<DayViewProps> = ({
   const timeFormat = organization?.timeFormat || "12h";
 
   const isSmallScreen = useMediaQuery("(max-width: 768px)", false, { getInitialValueInEffect: false });
-  // Tarjetas (columnas por profesional) o Lista; se recuerda lo último elegido
-  const [mode, setMode] = useState<"calendar" | "compact">(() => {
-    try {
-      const saved = localStorage.getItem(DAY_MODE_KEY);
-      if (saved === "calendar" || saved === "compact") return saved;
-    } catch {
-      /* sin almacenamiento */
-    }
-    return window.matchMedia?.("(max-width: 768px)").matches ? "compact" : "calendar";
-  });
-  const changeMode = (value: "calendar" | "compact") => {
-    setMode(value);
-    try {
-      localStorage.setItem(DAY_MODE_KEY, value);
-    } catch {
-      /* sin almacenamiento */
-    }
-  };
 
   const [localDayAppointments, setLocalDayAppointments] = useState<Appointment[] | null>(null);
   const [fetchingLocalDay, setFetchingLocalDay] = useState(false);
@@ -255,34 +241,9 @@ const DayView: FC<DayViewProps> = ({
         overflow: "hidden",
       }}
     >
-      {/* Barra: Tarjetas / Lista + totales del día */}
-      <Box style={{ borderBottom: "1px solid var(--line)", background: "var(--surface-muted)", padding: "8px 12px", flexShrink: 0 }}>
-        <Group gap="md" align="center" justify="space-between" style={{ flexWrap: "wrap" }}>
-          <SegmentedControl
-            size="xs"
-            value={mode}
-            onChange={(value) => changeMode(value as "calendar" | "compact")}
-            data={[
-              {
-                value: "calendar",
-                label: (
-                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <IconLayoutColumns size={14} />
-                    <span>Tarjetas</span>
-                  </Box>
-                ),
-              },
-              {
-                value: "compact",
-                label: (
-                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <IconList size={14} />
-                    <span>Lista</span>
-                  </Box>
-                ),
-              },
-            ]}
-          />
+      {/* Barra delgada: totales del día (Tarjetas/Lista está en la barra del calendario) */}
+      <Box style={{ borderBottom: "1px solid var(--line)", background: "var(--surface-muted)", padding: "4px 10px", flexShrink: 0 }}>
+        <Group gap="md" align="center" style={{ flexWrap: "wrap" }}>
           <Group gap={6} align="center">
             <Box style={{ ...pill, background: "var(--brand-soft)", color: "var(--brand-text)" }}>
               {activeAppointments.length} {activeAppointments.length === 1 ? "cita" : "citas"}

@@ -20,6 +20,7 @@ import {
   Avatar,
   Stack,
   Text,
+  VisuallyHidden,
 } from "@mantine/core";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
@@ -1383,130 +1384,8 @@ const ScheduleView: React.FC = () => {
         <CustomLoader loadingText="Enviando recordatorios.." overlay />
       )}
 
-      {/* Header V3 */}
-      <Box
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          flexShrink: 0,
-          padding: isMobile ? "2px 2px 4px" : "2px 4px 6px",
-        }}
-      >
-        {/* Título de página (title-2): la fecha y la vista van en la barra del calendario */}
-        <h1
-          style={{
-            margin: 0,
-            font: `600 ${isMobile ? 20 : 24}px/30px var(--mantine-font-family)`,
-            letterSpacing: "-0.015em",
-            color: "var(--ink)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Agenda
-        </h1>
-
-        {/* Right: WA pill (compact on mobile) + create btn + actions menu */}
-        <Group gap={isMobile ? 6 : 8} align="center" style={{ flexShrink: 0 }}>
-          <WhatsAppStatusPill
-            code={code}
-            reason={reason}
-            onRecheck={recheck}
-            onConfigure={() => navigate("/gestionar-whatsapp")}
-            blocked={organization?.planLimits?.whatsappIntegration === false}
-            compact={isMobile}
-          />
-
-          {(hasPermission("appointments:create") || hasPermission("appointments:manage_own_blocks")) && employees.length > 0 && (
-            isMobile ? (
-              <Tooltip label="Bloquear horario" withArrow>
-                <ActionIcon
-                  variant="light"
-                  color="gray"
-                  size="md"
-                  onClick={() => setBlockModalOpened(true)}
-                  aria-label="Bloquear horario"
-                >
-                  <IconCalendarOff size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ) : (
-              <Button
-                size="xs"
-                variant="default"
-                leftSection={<IconCalendarOff size={16} />}
-                onClick={() => setBlockModalOpened(true)}
-              >
-                Bloquear
-              </Button>
-            )
-          )}
-
-          {role === "admin" && employees.length > 0 && (
-            <Menu position="bottom-end" withArrow shadow="md">
-              <Menu.Target>
-                <Tooltip label="Permisos de profesionales" withArrow>
-                  <ActionIcon variant="subtle" size="md">
-                    <IconShieldCog size={18} />
-                  </ActionIcon>
-                </Tooltip>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Label>Selecciona un profesional</Menu.Label>
-                {employees.map((emp) => (
-                  <Menu.Item
-                    key={emp._id}
-                    leftSection={
-                      <Avatar
-                        src={emp.profileImage || undefined}
-                        size="xs"
-                        radius="xl"
-                      >
-                        {emp.names?.[0]}
-                      </Avatar>
-                    }
-                    onClick={() => setPermissionsEmployee(emp)}
-                  >
-                    <Text size="sm">{emp.names}</Text>
-                    <Text size="xs" c="dimmed">{emp.position}</Text>
-                  </Menu.Item>
-                ))}
-              </Menu.Dropdown>
-            </Menu>
-          )}
-
-          <SchedulerQuickActionsMenu
-            onOpenSearch={() => setShowSearchModal(true)}
-            onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
-            onAddAppointment={() => openModal(new Date(), new Date())}
-            onReorderEmployees={() => setReorderModalOpened(true)}
-            onOpenAvailability={() => setAvailabilityModalOpened(true)}
-            onSendReminders={handleSendDailyReminders}
-            isWhatsappReady={isWhatsAppReady}
-            sendingReminders={sendingReminders}
-            reasonForDisabled={reason}
-            canSearchAppointments={hasPermission("appointments:search_schedule")}
-            canCreate={hasPermission("appointments:create")}
-            canSendReminders={hasPermission("appointments:send_reminders")}
-            canReorderEmployees={hasPermission("appointments:reorderemployees")}
-            canViewAvailability={hasPermission("appointments:search_schedule")}
-            reminderDate={reminderDate}
-            onChangeReminderDate={setReminderDate}
-          />
-
-          {showGettingStarted && gsPrefs.collapsed && (
-            <GettingStartedToggle steps={gsSteps} onOpen={() => gsPrefs.setCollapsed(false)} />
-          )}
-
-          {/* Único botón principal de la página (en móvil va flotante, abajo) */}
-          {!isMobile && hasPermission("appointments:create") && (
-            <Button size="sm" leftSection={<IconPlus size={16} />} onClick={() => openModal(new Date(), new Date())}>
-              Nueva cita
-            </Button>
-          )}
-        </Group>
-      </Box>
+      {/* Título accesible; las acciones van en la barra del calendario para ahorrar alto */}
+      <VisuallyHidden component="h1">Agenda</VisuallyHidden>
 
       {/* Primeros pasos en móvil: arriba de la agenda, solo los pendientes */}
       {gsExpanded && isMobile && (
@@ -1563,6 +1442,106 @@ const ScheduleView: React.FC = () => {
           loadingMonth={loadingMonth}
           fetchAppointmentsForDay={fetchAppointmentsForDay}
           timezone={organizationTimezone}
+          toolbarActions={
+            <Group gap={isMobile ? 6 : 8} align="center" style={{ flexShrink: 0 }}>
+              <WhatsAppStatusPill
+                code={code}
+                reason={reason}
+                onRecheck={recheck}
+                onConfigure={() => navigate("/gestionar-whatsapp")}
+                blocked={organization?.planLimits?.whatsappIntegration === false}
+                compact={isMobile}
+              />
+    
+              {(hasPermission("appointments:create") || hasPermission("appointments:manage_own_blocks")) && employees.length > 0 && (
+                isMobile ? (
+                  <Tooltip label="Bloquear horario" withArrow>
+                    <ActionIcon
+                      variant="light"
+                      color="gray"
+                      size="md"
+                      onClick={() => setBlockModalOpened(true)}
+                      aria-label="Bloquear horario"
+                    >
+                      <IconCalendarOff size={18} />
+                    </ActionIcon>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    size="xs"
+                    variant="default"
+                    leftSection={<IconCalendarOff size={16} />}
+                    onClick={() => setBlockModalOpened(true)}
+                  >
+                    Bloquear
+                  </Button>
+                )
+              )}
+    
+              {role === "admin" && employees.length > 0 && (
+                <Menu position="bottom-end" withArrow shadow="md">
+                  <Menu.Target>
+                    <Tooltip label="Permisos de profesionales" withArrow>
+                      <ActionIcon variant="subtle" size="md">
+                        <IconShieldCog size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Selecciona un profesional</Menu.Label>
+                    {employees.map((emp) => (
+                      <Menu.Item
+                        key={emp._id}
+                        leftSection={
+                          <Avatar
+                            src={emp.profileImage || undefined}
+                            size="xs"
+                            radius="xl"
+                          >
+                            {emp.names?.[0]}
+                          </Avatar>
+                        }
+                        onClick={() => setPermissionsEmployee(emp)}
+                      >
+                        <Text size="sm">{emp.names}</Text>
+                        <Text size="xs" c="dimmed">{emp.position}</Text>
+                      </Menu.Item>
+                    ))}
+                  </Menu.Dropdown>
+                </Menu>
+              )}
+    
+              <SchedulerQuickActionsMenu
+                onOpenSearch={() => setShowSearchModal(true)}
+                onReloadMonth={() => fetchAppointmentsForMonth(currentDate)}
+                onAddAppointment={() => openModal(new Date(), new Date())}
+                onReorderEmployees={() => setReorderModalOpened(true)}
+                onOpenAvailability={() => setAvailabilityModalOpened(true)}
+                onSendReminders={handleSendDailyReminders}
+                isWhatsappReady={isWhatsAppReady}
+                sendingReminders={sendingReminders}
+                reasonForDisabled={reason}
+                canSearchAppointments={hasPermission("appointments:search_schedule")}
+                canCreate={hasPermission("appointments:create")}
+                canSendReminders={hasPermission("appointments:send_reminders")}
+                canReorderEmployees={hasPermission("appointments:reorderemployees")}
+                canViewAvailability={hasPermission("appointments:search_schedule")}
+                reminderDate={reminderDate}
+                onChangeReminderDate={setReminderDate}
+              />
+    
+              {showGettingStarted && gsPrefs.collapsed && (
+                <GettingStartedToggle steps={gsSteps} onOpen={() => gsPrefs.setCollapsed(false)} />
+              )}
+    
+              {/* Único botón principal de la página (en móvil va flotante, abajo) */}
+              {!isMobile && hasPermission("appointments:create") && (
+                <Button size="sm" leftSection={<IconPlus size={16} />} onClick={() => openModal(new Date(), new Date())}>
+                  Nueva cita
+                </Button>
+              )}
+            </Group>
+          }
           onExceptionDeleted={(employeeId, updatedExceptions) => {
             setEmployees((prev) =>
               prev.map((e) =>

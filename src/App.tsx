@@ -172,13 +172,19 @@ function AppContent() {
     }
   }, [currentVersion]);
 
-  // Redirigir a agenda en carga inicial si está autenticado (no aplica para superadmin)
+  // Redirigir a agenda solo cuando la app se ABRE en "/" con sesión (no aplica para
+  // superadmin). En cuanto se navega a otra ruta deja de aplicar: «Ver mi web» del
+  // menú lleva a "/" y debe mostrar la web pública, no rebotar a la agenda.
   useEffect(() => {
-    if (isAuthenticated && !isSuperadmin && location.pathname === "/" && !hasRedirected.current) {
+    if (location.pathname !== "/") {
+      hasRedirected.current = true;
+      return;
+    }
+    if (isAuthenticated && !isSuperadmin && !hasRedirected.current) {
       hasRedirected.current = true;
       navigate("/gestionar-agenda", { replace: true });
     }
-    if (isAuthenticated && isSuperadmin && location.pathname === "/" && !hasRedirected.current) {
+    if (isAuthenticated && isSuperadmin && !hasRedirected.current) {
       hasRedirected.current = true;
       navigate("/superadmin/orgs", { replace: true });
     }

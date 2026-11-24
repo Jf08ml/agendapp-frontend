@@ -2,10 +2,10 @@
 // escritorio, header neutro con campana de notificaciones y menú de usuario, y
 // en móvil una barra inferior (Agenda, Clientes, Caja, WhatsApp, Más). Sin el
 // footer fijo de 30px de antes.
-import { AppShell, Box, Button, Drawer, Group, Text, UnstyledButton } from "@mantine/core";
+import { AppShell, Box, Burger, Button, Drawer, Group, Text, UnstyledButton } from "@mantine/core";
 import { useDisclosure, useMediaQuery } from "@mantine/hooks";
 import { IconBell, IconRobot } from "@tabler/icons-react";
-import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
@@ -30,6 +30,16 @@ import {
 
 // Mismo punto de corte que el `md` de Mantine (62em): por debajo, tabbar.
 const DESKTOP_QUERY = "(min-width: 62em)";
+// Barra lateral de escritorio abierta/cerrada; se recuerda por navegador.
+const NAV_OPEN_KEY = "admin_nav_open";
+
+function readNavOpen(): boolean {
+  try {
+    return localStorage.getItem(NAV_OPEN_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 interface AdminShellProps {
   children: ReactNode;
@@ -43,6 +53,18 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
   const location = useLocation();
   const isDesktop = useMediaQuery(DESKTOP_QUERY, true, { getInitialValueInEffect: false });
   const [moreOpened, { open: openMore, close: closeMore }] = useDisclosure(false);
+  const [navOpen, setNavOpen] = useState(readNavOpen);
+  const toggleNav = useCallback(() => {
+    setNavOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(NAV_OPEN_KEY, next ? "1" : "0");
+      } catch {
+        /* sin almacenamiento */
+      }
+      return next;
+    });
+  }, []);
 
   const { hasPermission } = usePermissions();
   const organization = useSelector((s: RootState) => s.organization.organization);
@@ -77,7 +99,7 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
     <AppShell
       layout="alt"
       header={{ height: 60 }}
-      navbar={{ width: 264, breakpoint: "md", collapsed: { mobile: true } }}
+      navbar={{ width: 264, breakpoint: "md", collapsed: { mobile: true, desktop: !navOpen } }}
       footer={{ height: 60, collapsed: isDesktop }}
       styles={{
         main: { background: "var(--surface-muted)" },
@@ -96,7 +118,25 @@ export default function AdminShell({ children, banners, chatOpen, onToggleChat }
               {organization.name}
             </Text>
           </Group>
-          <Box visibleFrom="md" />
+          {/* Escritorio: botón para abrir/cerrar la barra lateral; cerrada, la marca pasa al header */}
+          <Group gap="sm" wrap="nowrap" visibleFrom="md" style={{ minWidth: 0 }}>
+            <Burger
+              opened={navOpen}
+              onClick={toggleNav}
+              size="sm"
+              color="var(--ink)"
+              aria-label={navOpen ? "Cerrar menú lateral" : "Abrir menú lateral"}
+              title={navOpen ? "Cerrar menú lateral" : "Abrir menú lateral"}
+            />
+            {!navOpen && (
+              <>
+                <OrgMark />
+                <Text fw={600} fz={15} c="var(--ink)" truncate>
+                  {organization.name}
+                </Text>
+              </>
+            )}
+          </Group>
 
           <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
             <Button

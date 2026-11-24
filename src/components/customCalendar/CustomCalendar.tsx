@@ -34,8 +34,12 @@ import {
   Box,
   Tooltip,
   Select,
+  Center,
+  VisuallyHidden,
 } from "@mantine/core";
 import {
+  IconLayoutColumns,
+  IconList,
   IconCalendar,
   IconChevronLeft,
   IconChevronRight,
@@ -61,6 +65,20 @@ function readDefaultView(): CalendarView {
   return "day";
 }
 
+// Vista Día: Tarjetas (columnas por profesional) o Lista; se recuerda lo último elegido.
+const DAY_MODE_KEY = "agenda_day_mode";
+export type DayMode = "calendar" | "compact";
+
+function readDayMode(): DayMode {
+  try {
+    const saved = localStorage.getItem(DAY_MODE_KEY);
+    if (saved === "calendar" || saved === "compact") return saved;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return "calendar";
+}
+
 interface CustomCalendarProps {
   employees: Employee[];
   services?: Service[];
@@ -82,6 +100,8 @@ interface CustomCalendarProps {
   timezone?: string;
   /** Se llama tras eliminar un bloqueo desde el calendario */
   onExceptionDeleted: (employeeId: string, updatedExceptions: EmployeeScheduleException[]) => void;
+  /** Acciones de la página (WhatsApp, Bloquear, Nueva cita…) al final de la barra del calendario */
+  toolbarActions?: React.ReactNode;
 }
 
 const CustomCalendar: React.FC<CustomCalendarProps> = ({
@@ -103,8 +123,18 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   fetchAppointmentsForDay,
   timezone = "America/Bogota",
   onExceptionDeleted,
+  toolbarActions,
 }) => {
   const [viewMode, setViewMode] = useState<CalendarView>(readDefaultView);
+  const [dayMode, setDayMode] = useState<DayMode>(readDayMode);
+  const changeDayMode = useCallback((value: DayMode) => {
+    setDayMode(value);
+    try {
+      localStorage.setItem(DAY_MODE_KEY, value);
+    } catch {
+      /* sin almacenamiento */
+    }
+  }, []);
   const [defaultView, setDefaultView] = useState<CalendarView>(readDefaultView);
   const [panelDay, setPanelDay] = useState<Date>(new Date());
   const [isMaximized, setIsMaximized] = useState(false);
@@ -291,7 +321,38 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           </Text>
         </Group>
 
-        <Group gap={6} align="center" wrap="nowrap">
+        <Group gap={6} align="center" wrap="wrap" justify="flex-end">
+          {viewMode === "day" && (
+            <SegmentedControl
+              size="xs"
+              value={dayMode}
+              onChange={(v) => changeDayMode(v as DayMode)}
+              data={[
+                {
+                  value: "calendar",
+                  label: (
+                    <Tooltip label="Tarjetas por profesional" withArrow>
+                      <Center>
+                        <IconLayoutColumns size={16} />
+                        <VisuallyHidden>Tarjetas</VisuallyHidden>
+                      </Center>
+                    </Tooltip>
+                  ),
+                },
+                {
+                  value: "compact",
+                  label: (
+                    <Tooltip label="Lista" withArrow>
+                      <Center>
+                        <IconList size={16} />
+                        <VisuallyHidden>Lista</VisuallyHidden>
+                      </Center>
+                    </Tooltip>
+                  ),
+                },
+              ]}
+            />
+          )}
           {viewMode === "week" && employees.length > 1 && (
             <Select
               size="xs"
@@ -339,6 +400,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
               {defaultView === viewMode ? <IconPinnedFilled size={16} /> : <IconPin size={16} />}
             </ActionIcon>
           </Tooltip>
+          {toolbarActions}
         </Group>
       </Group>
 
@@ -442,6 +504,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         {viewMode === "day" ? (
           <DayView
             day={currentDate}
+            mode={dayMode}
             onOpenModal={onOpenModal}
             employees={employees}
             getAppointmentsForDay={getAllAppointmentsForDay}
