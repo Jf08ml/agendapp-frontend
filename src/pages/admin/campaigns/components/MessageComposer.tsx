@@ -99,6 +99,9 @@ export default function MessageComposer({
       })
       .catch(() => {})
       .finally(() => setLoadingTemplates(false));
+    // templateName solo se usa para restaurar la selección al cargar las
+    // plantillas; no hay que volver a pedirlas cada vez que el usuario elige otra.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMeta, orgId]);
 
   function handleTemplateSelect(name: string | null) {

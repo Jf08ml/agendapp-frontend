@@ -155,13 +155,13 @@ export const useSchedule = (options: UseScheduleOptions = {}) => {
     if (date && organizationId) {
       fetchAvailableSlots(date, organizationId, employeeId, serviceDuration);
     }
-  }, [date, organizationId, employeeId, serviceDuration]);
+  }, [date, organizationId, employeeId, serviceDuration, fetchAvailableSlots]);
 
   useEffect(() => {
     if (organizationId) {
       fetchOpenDays(organizationId);
     }
-  }, [organizationId]);
+  }, [organizationId, fetchOpenDays]);
 
   return {
     // Estado

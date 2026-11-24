@@ -178,7 +178,7 @@ export default function ClassBookingWizard() {
         setPkgId(null);
         setPkgRemaining(0);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [currentStep, selectedClass?._id, organization?._id, identifierField, attendee.phone_e164, attendee.phone, attendee.email, attendee.documentId]);
 
   if (!organization?._id) {

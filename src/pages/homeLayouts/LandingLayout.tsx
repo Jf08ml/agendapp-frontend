@@ -26,7 +26,8 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import "dayjs/locale/es";
-import { HoursAndLocation, LandingFooter, OpenStatus, useBusinessHours } from "./landingShared";
+import { HoursAndLocation, LandingFooter, OpenStatus } from "./landingShared";
+import { useBusinessHours } from "./useBusinessHours";
 import "./landing.css";
 
 dayjs.extend(utc);

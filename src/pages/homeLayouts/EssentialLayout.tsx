@@ -12,7 +12,8 @@ import { IconChevronRight, IconClock, IconPhoto } from "@tabler/icons-react";
 import { getServicesByOrganizationId, Service } from "../../services/serviceService";
 import { selectOrganization } from "../../features/organization/sliceOrganization";
 import { formatCurrency } from "../../utils/formatCurrency";
-import { HoursAndLocation, LandingFooter, OpenStatus, useBusinessHours, type LandingFeature } from "./landingShared";
+import { HoursAndLocation, LandingFooter, OpenStatus, type LandingFeature } from "./landingShared";
+import { useBusinessHours } from "./useBusinessHours";
 import "./landing.css";
 
 export interface EssentialLayoutProps {

@@ -140,6 +140,9 @@ const ModalCreateEditPackage: React.FC<ModalCreateEditPackageProps> = ({
     }
     setServiceSearch("");
     setClassSearch("");
+    // availableServices/availableClasses solo dan nombres de respaldo al abrir;
+    // si cambian con el modal abierto no hay que reiniciar el formulario.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [servicePackage, isOpen]);
 
   const handleToggleTiers = (checked: boolean) => {

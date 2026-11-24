@@ -106,7 +106,7 @@ function AppContent() {
       const clean = location.pathname;
       window.history.replaceState({}, "", clean);
     }
-  }, [location.search, isAuthenticated, isSuperadmin, openChat]);
+  }, [location.search, location.pathname, isAuthenticated, isSuperadmin, openChat]);
   const hasRedirected = useRef(false);
   const domainInfo = useMemo(() => extractTenantFromHost(), []);
   const isSignupDomain = domainInfo.type === "signup";

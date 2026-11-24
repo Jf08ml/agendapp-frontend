@@ -30,7 +30,8 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../../../app/store";
 import TimeOfDayInput from "../../../../components/TimeOfDayInput";
 import { formatTimeLabel } from "../../../../utils/timeOfDay";
-import BlockRepeatFields, { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../components/BlockRepeatFields";
+import BlockRepeatFields from "../../../../components/BlockRepeatFields";
+import { DEFAULT_REPEAT, repeatError, repeatPayload, type BlockRepeatValue } from "../../../../utils/blockRepeat";
 import { NO_END_DATE, describeRecurrence, hasNoEnd, listUpcomingOccurrences } from "../../../../utils/scheduleExceptions";
 import {
   getEmployeeSchedule,

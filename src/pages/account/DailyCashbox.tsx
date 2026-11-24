@@ -355,7 +355,7 @@ const DailyCashbox: React.FC = () => {
       setInterval("daily");
       setTimeout(() => document.getElementById("arqueo")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [urlTab]);
   // Cambiar de pestaña a mano quita el ?tab= para que la pestaña de arriba no quede desfasada
   const openTabFromUser = (tab: string) => {
