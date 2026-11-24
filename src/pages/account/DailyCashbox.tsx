@@ -84,6 +84,7 @@ import {
 } from "@tabler/icons-react";
 import { useSearchParams } from "react-router-dom";
 import CashSubtabs from "../../components/cash/CashSubtabs";
+import PendingReceiptsNotice from "../../components/cash/PendingReceiptsNotice";
 import { toSpanishMeridiem } from "../../utils/timeFormatUtils";
 
 import {
@@ -2114,6 +2115,8 @@ const DailyCashbox: React.FC = () => {
 
         {/* Pestañas internas de Caja y pagos */}
         <CashSubtabs />
+
+        <PendingReceiptsNotice />
 
         {/* ── Cifras (StatTile neutros: el color queda para los estados) ── */}
         <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm">

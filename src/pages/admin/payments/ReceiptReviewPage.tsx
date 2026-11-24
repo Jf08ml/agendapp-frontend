@@ -28,7 +28,7 @@ import {
 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { RootState } from "../../../app/store";
 import { listReceiptOrders, reviewReceiptOrder, type ReceiptOrder } from "../../../services/collectionService";
 import { formatCurrency } from "../../../utils/formatCurrency";
@@ -112,6 +112,8 @@ export default function ReceiptReviewPage() {
   const [reviewedInQueue, setReviewedInQueue] = useState(0);
   const organization = useSelector((s: RootState) => s.organization.organization);
   const isMobile = useMediaQuery("(max-width: 48em)");
+  // Desde el aviso de Caja: ?abrir=<id> abre uno; ?revisar=1 arranca la cola
+  const [params, setParams] = useSearchParams();
 
   const load = async (status: "in_review" | "all" = filter) => {
     setLoading(true);
@@ -161,6 +163,17 @@ export default function ReceiptReviewPage() {
     setReviewedInQueue(0);
     setOpenId(ids[0]);
   };
+
+  useEffect(() => {
+    if (loading) return;
+    const abrir = params.get("abrir");
+    const revisar = params.get("revisar");
+    if (!abrir && !revisar) return;
+    if (abrir && orders.some((o) => o._id === abrir)) setOpenId(abrir);
+    else if (revisar) startQueue();
+    setParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // reviewReceiptOrder lanza el error del servidor (handleAxiosError): antes no se
   // atrapaba, el botón quedaba "cargando" para siempre y el motivo nunca se veía.

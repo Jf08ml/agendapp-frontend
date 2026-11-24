@@ -32,6 +32,7 @@ dayjs.extend(weekOfYear);
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { formatCurrency } from "../../../utils/formatCurrency";
+import { changeVs, previousRange, type Change } from "./periodCompare";
 import { getAppointmentsAggregatedByOrganizationId } from "../../../services/appointmentService";
 
 import {
@@ -219,6 +220,32 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analí
     void load();
   }, [organization?._id, range[0], range[1], reloadKey]);
 
+  // Periodo anterior (misma duración, justo antes) para comparar las cifras.
+  // Se pide aparte: si falla, las cifras se muestran sin comparación.
+  const prevRange = useMemo(
+    () => (range[0] && range[1] ? previousRange(range[0], range[1]) : null),
+    [range]
+  );
+  const [prevAppointments, setPrevAppointments] = useState<Appointment[] | null>(null);
+  useEffect(() => {
+    if (!organization?._id || !prevRange) {
+      setPrevAppointments(null);
+      return;
+    }
+    let alive = true;
+    setPrevAppointments(null);
+    getAppointmentsByOrganizationId(
+      organization._id,
+      dayjs(prevRange[0]).startOf("day").toISOString(),
+      dayjs(prevRange[1]).endOf("day").toISOString()
+    )
+      .then((list) => alive && setPrevAppointments(list))
+      .catch(() => alive && setPrevAppointments(null));
+    return () => {
+      alive = false;
+    };
+  }, [organization?._id, prevRange, reloadKey]);
+
   // Filtrado por rango + selects (TODAS las citas)
   const filtered = useMemo(() => {
     return appointments.filter((a) => {
@@ -238,6 +265,24 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analí
   const totalRevenue = filtered.reduce((acc, a) => acc + getAppointmentPrice(a, services), 0);
   
   const ticketAvg = totalAppts ? totalRevenue / totalAppts : 0;
+
+  // Las mismas cifras en el periodo anterior, con los mismos filtros
+  const prevTotals = useMemo(() => {
+    if (!prevAppointments || !prevRange) return null;
+    const list = prevAppointments.filter((a) => {
+      if (!within(new Date(a.startDate), prevRange[0], dayjs(prevRange[1]).endOf("day").toDate())) return false;
+      if (employeeId && (a.employee as any)?._id !== employeeId) return false;
+      if (serviceId && (a.service as any)?._id !== serviceId) return false;
+      return true;
+    });
+    const revenue = list.reduce((acc, a) => acc + getAppointmentPrice(a, services), 0);
+    return {
+      revenue,
+      appts: list.length,
+      customers: new Set(list.map((a) => (a.client as any)?._id ?? a.client)).size,
+      ticket: list.length ? revenue / list.length : 0,
+    };
+  }, [prevAppointments, prevRange, employeeId, serviceId, services]);
 
   // Serie temporal (TODAS las citas) - preferimos buckets del backend (timezone-aware)
   const [timeSeries, setTimeSeries] = useState<any[]>([]);
@@ -430,12 +475,13 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analí
   const newClients = byClient.filter((c) => !c.esRecurrente).length;
   const vipClients = byClient.filter((c) => c.citas >= 5).length;
 
-  const kpis = [
-    { label: "Ingresos", value: formatCurrency(totalRevenue, currency), hint: `${formatCurrency(totalRevenue / days, currency)} por día` },
-    { label: "Citas", value: String(totalAppts), hint: `${(totalAppts / days).toFixed(1)} por día` },
-    { label: "Clientes únicos", value: String(totalCustomers), hint: `${newClients} nuevos · ${vipClients} VIP` },
-    { label: "Ticket promedio", value: formatCurrency(ticketAvg, currency), hint: "Por cita" },
+  const kpis: { label: string; value: string; hint: string; change: Change | null }[] = [
+    { label: "Ingresos", value: formatCurrency(totalRevenue, currency), hint: `${formatCurrency(totalRevenue / days, currency)} por día`, change: prevTotals && changeVs(totalRevenue, prevTotals.revenue) },
+    { label: "Citas", value: String(totalAppts), hint: `${(totalAppts / days).toFixed(1)} por día`, change: prevTotals && changeVs(totalAppts, prevTotals.appts) },
+    { label: "Clientes únicos", value: String(totalCustomers), hint: `${newClients} nuevos · ${vipClients} VIP`, change: prevTotals && changeVs(totalCustomers, prevTotals.customers) },
+    { label: "Ticket promedio", value: formatCurrency(ticketAvg, currency), hint: "Por cita", change: prevTotals && changeVs(ticketAvg, prevTotals.ticket) },
   ];
+  const prevLabel = prevRange ? `${dayjs(prevRange[0]).format("D MMM")} – ${dayjs(prevRange[1]).format("D MMM YYYY")}` : "";
 
   const axisTick = { fill: "var(--ink-subtle)", fontSize: 11 };
 
@@ -499,6 +545,10 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analí
           </div>
         )}
 
+        {prevTotals && !loading && (
+          <div className="ag-subtle" style={{ marginBottom: -4 }}>Comparado con el periodo anterior: {prevLabel}.</div>
+        )}
+
         {/* Cifras */}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12 }}>
           {kpis.map((k) => (
@@ -516,6 +566,20 @@ const AdminAnalyticsDashboard: React.FC<{ title?: string }> = ({ title = "Analí
                     {k.value}
                   </div>
                   <div className="ag-subtle">{k.hint}</div>
+                  {k.change && (
+                    <div
+                      title={`Comparado con ${prevLabel}`}
+                      style={{
+                        fontSize: 12,
+                        marginTop: 4,
+                        fontWeight: k.change.tone === "neutral" ? 400 : 600,
+                        color: k.change.tone === "success" ? "var(--success)" : k.change.tone === "danger" ? "var(--danger)" : "var(--ink-subtle)",
+                      }}
+                    >
+                      {k.change.tone === "success" ? "▲ " : k.change.tone === "danger" ? "▼ " : ""}
+                      {k.change.text}
+                    </div>
+                  )}
                 </>
               )}
             </div>

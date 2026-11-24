@@ -23,6 +23,25 @@ interface StockFields {
 export const isLowStock = (p: StockFields) =>
   p.trackStock && p.lowStockThreshold > 0 && p.stockQuantity <= p.lowStockThreshold;
 
+/**
+ * Aviso agrupado de stock bajo (Fase 2): productos activos en o bajo su umbral,
+ * del más urgente al menos, y la frase del aviso con hasta `shown` nombres.
+ */
+export function lowStockSummary<T extends StockFields & { name: string; active: boolean }>(
+  products: T[],
+  shown = 3
+): { items: T[]; text: string } | null {
+  const items = products
+    .filter((p) => p.active && isLowStock(p))
+    .sort((a, b) => a.stockQuantity / a.lowStockThreshold - b.stockQuantity / b.lowStockThreshold || a.name.localeCompare(b.name, "es"));
+  if (items.length === 0) return null;
+  const names = items.slice(0, shown).map((p) => `${p.name} (${p.stockQuantity <= 0 ? "agotado" : p.stockQuantity})`);
+  const rest = items.length - names.length;
+  const list = rest > 0 ? `${names.join(", ")} y ${rest} más` : names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}` : names[0];
+  const head = items.length === 1 ? "1 producto con stock bajo" : `${items.length} productos con stock bajo`;
+  return { items, text: `${head}: ${list}.` };
+}
+
 /** Comisión en texto claro para la tabla. */
 export function productCommissionText(
   type: "percentage" | "fixed" | null | undefined,
