@@ -1,7 +1,8 @@
 import { FC } from "react";
 import { Box, Text } from "@mantine/core";
 import { format, addMinutes } from "date-fns";
-import { HOUR_HEIGHT } from "../DayModal";
+import { HOUR_HEIGHT } from "../dayGrid";
+import { toSpanishMeridiem } from "../../../../utils/timeFormatUtils";
 
 interface TimeColumnProps {
   timeIntervals: Date[];
@@ -14,7 +15,7 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals, timeFormat }) 
   return (
     <Box
       style={{
-        backgroundColor: "#FFFFFF",
+        backgroundColor: "var(--surface-raised)",
         borderRight: "1px solid #E7E2D6",
         width: "80px",
       }}
@@ -60,13 +61,13 @@ const DayModalTimeColumn: FC<TimeColumnProps> = ({ timeIntervals, timeFormat }) 
                     top: -8,
                     left: 4,
                     fontSize: isMainHour ? 10 : 9,
-                    color: isMainHour ? "#404760" : "#8B92A6",
-                    backgroundColor: "#FFFFFF",
+                    color: isMainHour ? "var(--ink-muted)" : "var(--ink-subtle)",
+                    backgroundColor: "var(--surface-raised)",
                     padding: "0 4px",
                     borderRadius: 999,
                   }}
                 >
-                  {format(date, timeFormat === "24h" ? "HH:mm" : "h:mm a")}
+                  {toSpanishMeridiem(format(date, timeFormat === "24h" ? "HH:mm" : "h:mm a"))}
                 </Text>
               </Box>
             );

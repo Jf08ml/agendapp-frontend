@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  Modal,
+  Drawer,
   Stack,
   TextInput,
   NumberInput,
@@ -9,11 +9,9 @@ import {
   Group,
   Text,
   Switch,
-  Title,
   Divider,
   Select,
   SimpleGrid,
-  ThemeIcon,
   Box,
   Image,
   ActionIcon,
@@ -21,7 +19,7 @@ import {
 } from "@mantine/core";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { showNotification } from "@mantine/notifications";
-import { IconPackage, IconPhotoPlus, IconCircleXFilled } from "@tabler/icons-react";
+import { IconPhotoPlus, IconCircleXFilled } from "@tabler/icons-react";
 import { Product } from "../../../../services/productService";
 import { uploadImage } from "../../../../services/imageService";
 import { ImageUploadField } from "../../components/MediaUploadFields";
@@ -177,23 +175,12 @@ const ProductModal: React.FC<ProductModalProps> = ({
   const handleRemoveImage = () => setForm((prev) => ({ ...prev, imageUrl: "" }));
 
   return (
-    <Modal
+    <Drawer
       opened={isOpen}
+      position="right"
       onClose={onClose}
-      title={
-        <Group gap="xs">
-          <ThemeIcon variant="light" size="lg" radius="md">
-            <IconPackage size={20} />
-          </ThemeIcon>
-          <Title order={3}>
-            {isEditing ? "Editar producto" : "Nuevo producto"}
-          </Title>
-        </Group>
-      }
+      title={isEditing ? "Editar producto" : "Nuevo producto"}
       size="lg"
-      centered
-      radius="md"
-      overlayProps={{ blur: 2 }}
     >
       <Stack gap="md">
         <TextInput
@@ -506,7 +493,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
           </Group>
         </Group>
       </Stack>
-    </Modal>
+    </Drawer>
   );
 };
 

@@ -1,46 +1,33 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container,
-  Title,
-  Text,
   Textarea,
   Button,
   Alert,
-  Badge,
-  Stack,
   Group,
   ActionIcon,
   Tooltip,
-  Divider,
-  Card,
   Loader,
   Box,
-  rem,
-  Modal,
   Switch,
-  NavLink,
-  ScrollArea,
-  Paper,
-  ThemeIcon,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
+import {
+  MESSAGE_GROUPS,
+  fromReadable,
+  isMessageOn,
+  labelFor,
+  messageToggle,
+  previewText,
+  toReadable,
+} from "./whatsappMessages/messagesModel";
 import {
   IconDeviceFloppy,
   IconRestore,
-  IconEye,
-  IconCopy,
   IconInfoCircle,
-  IconArrowLeft,
-  IconDotsVertical,
-  IconPhone,
-  IconVideo,
-  IconAlertCircle,
-  IconSettings,
   IconChevronLeft,
-  IconMessage,
-  IconClock,
-  IconBell,
 } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -51,6 +38,8 @@ import whatsappTemplateService, {
 import { handleAxiosError } from "../../utils/handleAxiosError";
 import MetaTemplateFormTab, { MetaTemplateStatus } from "./MetaTemplateFormTab";
 import MetaTemplatesPanel from "./manageWhatsapp/MetaTemplatesPanel";
+import WhatsappTabs from "../../components/whatsapp/WhatsappTabs";
+import { useSearchParams } from "react-router-dom";
 import { listMetaTemplates, MetaTemplateDraftSaved } from "../../services/organizationService";
 
 // ─── Metadata de plantillas ───────────────────────────────────────────────────
@@ -58,7 +47,7 @@ import { listMetaTemplates, MetaTemplateDraftSaved } from "../../services/organi
 const templateInfo = {
   scheduleAppointment: {
     title: "Confirmación de Cita",
-    shortTitle: "Confirmación (individual)",
+    shortTitle: "Confirmación (una cita)",
     description: "Mensaje enviado cuando se agenda una cita individual",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -72,7 +61,7 @@ const templateInfo = {
   },
   scheduleAppointmentBatch: {
     title: "Confirmación de Citas",
-    shortTitle: "Confirmación de citas",
+    shortTitle: "Confirmación (varias citas)",
     description: "Mensaje enviado cuando se agendan varias citas juntas",
     variables: [
       { name: "{{names}}", desc: "Nombre del cliente" },
@@ -360,24 +349,18 @@ const templateInfo = {
   },
 };
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
-
-const SIDEBAR_GROUPS = [
-  { label: "Citas", keys: ["scheduleAppointmentBatch", "recurringAppointmentSeries", "rescheduleAppointment", "rescheduleAppointmentSeries"] },
-  { label: "Recordatorios", keys: ["reminder", "secondReminder"] },
-  { label: "Reservas", keys: ["statusReservationPending"] },
-  { label: "Reservas (próx.)", keys: ["statusReservationApproved", "statusReservationRejected"], disabled: true, disabledReason: "Próximamente disponible" },
-  { label: "Clientes", keys: ["clientConfirmationAck", "clientCancellationAck", "clientNoShowAck", "myBookingsLink"] },
-  { label: "Tienda", keys: ["paymentReceived"] },
-  { label: "Fidelidad", keys: ["loyaltyServiceReward", "loyaltyReferralReward", "loyaltyServiceProgress", "loyaltyReferralProgress", "loyaltyCardLink"] },
-  { label: "Cumpleaños", keys: ["birthdayGreeting"] },
-  { label: "Seguimiento", keys: ["followUpReminder"] },
-  { label: "Reseñas en Google", keys: ["googleReviewRequest"] },
-  { label: "Mensajes del sistema", keys: ["adminPaymentAlert", "adminNewOrderAlert"] },
-] as const;
+const eyebrowStyle: React.CSSProperties = {
+  fontSize: 12,
+  lineHeight: "16px",
+  fontWeight: 600,
+  letterSpacing: "0.1em",
+  textTransform: "uppercase",
+  color: "var(--ink-subtle)",
+};
 
 // Nombre Meta por defecto para mostrar estado en sidebar
 const META_DEFAULT_NAMES: Record<string, string> = {
+  scheduleAppointment: "confirmacion_cita",
   scheduleAppointmentBatch: "confirmacion_cita",
   recurringAppointmentSeries: "citas_recurrentes",
   rescheduleAppointment: "cita_reprogramada",
@@ -404,12 +387,6 @@ const META_DEFAULT_NAMES: Record<string, string> = {
   adminNewOrderAlert: "aviso_pedido_admin",
 };
 
-const META_STATUS_DOT: Record<string, string> = {
-  APPROVED: "var(--mantine-color-green-6)",
-  PENDING: "var(--mantine-color-yellow-6)",
-  REJECTED: "var(--mantine-color-red-6)",
-  DISABLED: "var(--mantine-color-gray-5)",
-};
 
 type TemplateType = keyof typeof templateInfo;
 const templateKeys = Object.keys(templateInfo) as TemplateType[];
@@ -417,22 +394,24 @@ const templateKeys = Object.keys(templateInfo) as TemplateType[];
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function WhatsappTemplateEditor() {
+  // «Plantillas de Meta» es su propia pestaña de WhatsApp (?vista=plantillas-meta)
+  const [searchParams] = useSearchParams();
+  const metaTemplatesView = searchParams.get("vista") === "plantillas-meta";
   const { organization } = useSelector((state: RootState) => state.organization);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const isWide = useMediaQuery("(min-width: 1280px)");
 
-  const [selectedKey, setSelectedKey] = useState<string>("scheduleAppointmentBatch");
+  const [selectedKey, setSelectedKey] = useState<string>("scheduleAppointment");
   const [mobileView, setMobileView] = useState<"list" | "editor">("list");
 
   const [templates, setTemplates] = useState<WhatsappTemplates | null>(null);
   const [metaTemplates, setMetaTemplates] = useState<MetaTemplateStatus[] | undefined>(undefined);
   const [metaDrafts, setMetaDrafts] = useState<Record<string, MetaTemplateDraftSaved>>({});
-  const [defaultTemplates, setDefaultTemplates] = useState<Record<string, string>>({});
+  const [, setDefaultTemplates] = useState<Record<string, string>>({});
   const [editedTemplates, setEditedTemplates] = useState<Record<string, string>>({});
-  const [preview, setPreview] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const [templateSettings, setTemplateSettings] = useState<WhatsappTemplateSettings>({
     scheduleAppointment: true,
@@ -530,85 +509,108 @@ export default function WhatsappTemplateEditor() {
     } finally { setSaving(false); }
   };
 
-  const handlePreview = async (key: string) => {
+  // ─── Interruptores (se guardan al instante) ──────────────────────────────────
+  // El backend REEMPLAZA enabledTypes completo: el payload siempre lleva todas las claves.
+  const buildSettingsPayload = (s: WhatsappTemplateSettings): WhatsappTemplateSettings => ({
+    scheduleAppointment: s.scheduleAppointment,
+    scheduleAppointmentBatch: s.scheduleAppointmentBatch,
+    recurringAppointmentSeries: s.recurringAppointmentSeries,
+    rescheduleAppointment: s.rescheduleAppointment ?? true,
+    rescheduleAppointmentSeries: s.rescheduleAppointmentSeries ?? true,
+    reminder: s.reminder,
+    secondReminder: s.secondReminder,
+    statusReservationPending: s.statusReservationPending,
+    statusReservationApproved: s.statusReservationApproved,
+    statusReservationRejected: s.statusReservationRejected,
+    clientConfirmationAck: s.clientConfirmationAck,
+    clientCancellationAck: s.clientCancellationAck,
+    clientNoShowAck: s.clientNoShowAck,
+    loyaltyServiceReward: s.loyaltyServiceReward,
+    loyaltyReferralReward: s.loyaltyReferralReward,
+    loyaltyServiceProgress: s.loyaltyServiceProgress ?? false,
+    loyaltyReferralProgress: s.loyaltyReferralProgress ?? false,
+    birthdayGreeting: s.birthdayGreeting,
+    followUpReminder: s.followUpReminder,
+    googleReviewRequest: s.googleReviewRequest ?? false,
+    paymentReceived: s.paymentReceived ?? true,
+    adminPaymentAlert: s.adminPaymentAlert ?? true,
+    adminNewOrderAlert: s.adminNewOrderAlert ?? true,
+  });
+
+  const [togglingKey, setTogglingKey] = useState<string | null>(null);
+  const toggleMessage = async (key: string, on: boolean) => {
+    const t = messageToggle(key);
+    if (t.kind !== "switch" || !organization?._id) return;
+    const prev = templateSettings;
+    const next = { ...prev } as Record<string, boolean>;
+    t.settings.forEach((k) => (next[k] = on));
+    setTemplateSettings(next as unknown as WhatsappTemplateSettings);
+    setTogglingKey(key);
     try {
-      const text = await whatsappTemplateService.previewTemplate(key, editedTemplates[key]);
-      setPreview(text);
-      setPreviewModalOpen(true);
+      await whatsappTemplateService.updateTemplateSettings(organization._id, buildSettingsPayload(next as unknown as WhatsappTemplateSettings));
+      notifications.show({ color: "green", message: on ? "Mensaje encendido: se enviará automáticamente." : "Mensaje apagado: ya no se envía." });
     } catch (error) {
-      try { handleAxiosError(error, "Error al generar preview"); }
+      setTemplateSettings(prev);
+      try { handleAxiosError(error, "No se pudo cambiar el mensaje"); }
       catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
+    } finally {
+      setTogglingKey(null);
     }
   };
 
-  const handleSaveSettings = async () => {
+  const [savingBenefit, setSavingBenefit] = useState(false);
+  const saveBirthdayBenefit = async () => {
     if (!organization?._id) return;
+    setSavingBenefit(true);
     try {
-      setSaving(true);
-      const validSettings: WhatsappTemplateSettings = {
-        scheduleAppointment: templateSettings.scheduleAppointment,
-        scheduleAppointmentBatch: templateSettings.scheduleAppointmentBatch,
-        recurringAppointmentSeries: templateSettings.recurringAppointmentSeries,
-        // 🔄 Reprogramación — siempre en el payload (el backend reemplaza enabledTypes completo)
-        rescheduleAppointment: templateSettings.rescheduleAppointment ?? true,
-        rescheduleAppointmentSeries: templateSettings.rescheduleAppointmentSeries ?? true,
-        reminder: templateSettings.reminder,
-        secondReminder: templateSettings.secondReminder,
-        statusReservationPending: templateSettings.statusReservationPending,
-        statusReservationApproved: templateSettings.statusReservationApproved,
-        statusReservationRejected: templateSettings.statusReservationRejected,
-        clientConfirmationAck: templateSettings.clientConfirmationAck,
-        clientCancellationAck: templateSettings.clientCancellationAck,
-        clientNoShowAck: templateSettings.clientNoShowAck,
-        loyaltyServiceReward: templateSettings.loyaltyServiceReward,
-        loyaltyReferralReward: templateSettings.loyaltyReferralReward,
-        // 📊 Progreso de fidelidad — nuevo, default false; siempre en el payload por el mismo motivo que paymentReceived
-        loyaltyServiceProgress: templateSettings.loyaltyServiceProgress ?? false,
-        loyaltyReferralProgress: templateSettings.loyaltyReferralProgress ?? false,
-        birthdayGreeting: templateSettings.birthdayGreeting,
-        followUpReminder: templateSettings.followUpReminder,
-        // ⭐ Pedido de reseña en Google — apagado por defecto; siempre en el payload
-        googleReviewRequest: templateSettings.googleReviewRequest ?? false,
-        // 🛍️ Pago recibido (tienda) — el backend REEMPLAZA todo enabledTypes,
-        // así que este toggle DEBE ir siempre en el payload.
-        paymentReceived: templateSettings.paymentReceived ?? true,
-        // 🔔 Mensajes del sistema (avisos al admin) — mismo motivo: siempre en el payload
-        adminPaymentAlert: templateSettings.adminPaymentAlert ?? true,
-        adminNewOrderAlert: templateSettings.adminNewOrderAlert ?? true,
-      };
-      await whatsappTemplateService.updateTemplateSettings(organization._id, validSettings);
       await whatsappTemplateService.updateBirthdayBenefit(organization._id, birthdayBenefit);
-      setMessage({ type: "success", text: "Configuración de envíos actualizada correctamente" });
+      notifications.show({ color: "green", message: "Beneficio de cumpleaños guardado." });
     } catch (error) {
-      try { handleAxiosError(error, "Error al guardar configuración"); }
+      try { handleAxiosError(error, "No se pudo guardar el beneficio"); }
       catch (err) { setMessage({ type: "error", text: (err as Error).message }); }
-    } finally { setSaving(false); }
+    } finally {
+      setSavingBenefit(false);
+    }
   };
 
-  const handleCopyDefault = (key: string) => {
-    setEditedTemplates((prev) => ({ ...prev, [key]: defaultTemplates[key] }));
-    setMessage({ type: "success", text: "Plantilla por defecto copiada al editor" });
-  };
-
+  // En móvil la lista y el editor son pantallas distintas: cada cambio empieza arriba
+  // (el scroll lo lleva el <main> del panel).
+  const scrollPanelTop = () => document.querySelector("main")?.scrollTo({ top: 0 });
   const handleSelectKey = (key: string) => {
     setSelectedKey(key);
-    if (isMobile) setMobileView("editor");
+    if (isMobile) {
+      setMobileView("editor");
+      scrollPanelTop();
+    }
   };
 
-  // ─── Helpers sidebar ─────────────────────────────────────────────────────────
+  // ─── Helpers ────────────────────────────────────────────────────────────────
 
   const isMeta = organization?.waConnectionType === "meta";
 
-  function getMetaStatusDot(key: string): { color: string; title: string } | null {
+  function getMetaStatus(key: string): { tone: string; title: string } | null {
     if (!metaTemplates) return null;
     const name = META_DEFAULT_NAMES[key];
     if (!name) return null;
     const found = metaTemplates.find((t) => t.name === name);
-    if (!found) return { color: "var(--mantine-color-gray-4)", title: "No enviada" };
-    const color = META_STATUS_DOT[found.status] ?? "var(--mantine-color-gray-5)";
-    const titles: Record<string, string> = { APPROVED: "Aprobada", PENDING: "En revisión", REJECTED: "Rechazada", DISABLED: "Desactivada" };
-    return { color, title: titles[found.status] ?? found.status };
+    if (!found) return { tone: "", title: "No enviada a Meta" };
+    const map: Record<string, { tone: string; title: string }> = {
+      APPROVED: { tone: "success", title: "Aprobada por Meta" },
+      PENDING: { tone: "warning", title: "En revisión" },
+      REJECTED: { tone: "danger", title: "Rechazada por Meta" },
+      DISABLED: { tone: "", title: "Desactivada" },
+    };
+    return map[found.status] ?? { tone: "", title: found.status };
   }
+
+  // «Confirmación de Cita» → «Confirmación de cita» (respeta Google)
+  const sentenceCase = (s: string) =>
+    s
+      .split(" ")
+      .map((w, i) => (i === 0 || w === "Google" ? w : w.charAt(0).toLowerCase() + w.slice(1)))
+      .join(" ");
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Loading ─────────────────────────────────────────────────────────────────
 
@@ -625,741 +627,342 @@ export default function WhatsappTemplateEditor() {
   if (!templates) {
     return (
       <Container size="xl" py="xl">
-        <Alert color="red" title="Error">Error al cargar las plantillas</Alert>
+        <Alert color="red" title="No se pudieron cargar los mensajes">
+          <Button size="xs" variant="outline" mt="xs" onClick={loadTemplates}>Reintentar</Button>
+        </Alert>
       </Container>
     );
   }
 
-  const showSidebar = !isMobile || mobileView === "list";
+  const showList = !isMobile || mobileView === "list";
   const showEditor = !isMobile || mobileView === "editor";
-  const currentInfo =
-    selectedKey !== "settings" && selectedKey !== "campaign_templates"
-      ? templateInfo[selectedKey as TemplateType]
-      : null;
+  const key = selectedKey as TemplateType;
+  const currentInfo = templateInfo[key];
+  const varNames = currentInfo?.variables.map((v) => v.name) ?? [];
+  const internal = editedTemplates[key] ?? "";
+  const readable = toReadable(internal, varNames);
+  const savedContent = templates[key]?.content ?? "";
+  const isDirty = internal !== savedContent;
+  const isCustom = !!templates[key]?.isCustom;
+  const toggle = messageToggle(key);
+  const on = isMessageOn(key, templateSettings as unknown as Record<string, boolean>);
+
+  const insertVariable = (label: string) => {
+    const el = textareaRef.current;
+    const token = `[${label}]`;
+    const start = el?.selectionStart ?? readable.length;
+    const end = el?.selectionEnd ?? readable.length;
+    const nextReadable = readable.slice(0, start) + token + readable.slice(end);
+    handleTemplateChange(key, fromReadable(nextReadable, varNames));
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+
+  const renderToggle = (k: string) => {
+    const t = messageToggle(k);
+    if (t.kind === "always") return <span className="ag-badge">{t.label}</span>;
+    if (t.kind === "soon") return <span className="ag-badge">Próximamente</span>;
+    const needsGoogle = k === "googleReviewRequest" && !organization?.googleBusiness?.placeId;
+    const checked = isMessageOn(k, templateSettings as unknown as Record<string, boolean>);
+    return (
+      <Switch
+        aria-label={checked ? "Apagar mensaje" : "Encender mensaje"}
+        checked={checked}
+        disabled={togglingKey === k || (needsGoogle && !checked)}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => toggleMessage(k, e.currentTarget.checked)}
+      />
+    );
+  };
 
   // ─── JSX ─────────────────────────────────────────────────────────────────────
 
-  return (
-    <>
-      <Container size="xl" py="md">
-        <Stack gap="md">
+  const list = (
+    <div className="ag-card" style={{ padding: 0, overflow: "hidden", alignSelf: "start" }}>
+      {MESSAGE_GROUPS.map((group) => (
+        <div key={group.label}>
+          <div style={{ padding: "10px 16px", background: "var(--surface-muted)", borderBottom: "1px solid var(--line)" }}>
+            <span style={eyebrowStyle}>{group.label}</span>
+          </div>
+          {group.keys.map((k) => {
+            const info = templateInfo[k as TemplateType];
+            if (!info) return null;
+            const soon = messageToggle(k).kind === "soon";
+            const selected = !soon && selectedKey === k;
+            const metaStatus = isMeta ? getMetaStatus(k) : null;
+            return (
+              <div
+                key={k}
+                className="ag-list-row"
+                role={soon ? undefined : "button"}
+                tabIndex={soon ? -1 : 0}
+                aria-current={selected ? "true" : undefined}
+                onClick={soon ? undefined : () => handleSelectKey(k)}
+                onKeyDown={(e) => !soon && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), handleSelectKey(k))}
+                style={{
+                  padding: "10px 16px",
+                  gap: 12,
+                  cursor: soon ? "default" : "pointer",
+                  background: selected ? "var(--brand-soft)" : undefined,
+                  opacity: soon ? 0.6 : 1,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }}>
+                    <b style={{ fontSize: 14 }}>{info.shortTitle}</b>
+                    {!isMeta && templates[k as TemplateType]?.isCustom && <span className="ag-badge ag-badge--brand" style={{ height: 20, fontSize: 11 }}>Personalizado</span>}
+                    {metaStatus && (
+                      <span className={`ag-badge${metaStatus.tone ? ` ag-badge--${metaStatus.tone}` : ""}`} style={{ height: 20, fontSize: 11 }}>
+                        {metaStatus.title}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {renderToggle(k)}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
 
-          {/* ── Cabecera ─────────────────────────────────────────── */}
-          <Group align="center" gap="sm">
-            <ThemeIcon size="lg" radius="md" variant="light" color="green">
-              <IconMessage size={18} />
-            </ThemeIcon>
-            <Box>
-              <Title order={3} lh={1.2}>Mensajes de WhatsApp</Title>
-              <Text size="xs" c="dimmed">Personaliza los mensajes que se envían automáticamente</Text>
-            </Box>
-            {isMeta ? (
-              <Badge color="blue" size="sm" ml="auto">Meta Cloud API</Badge>
-            ) : (
-              <Badge color="green" size="sm" ml="auto">Baileys</Badge>
+  const editorHeader = (
+    <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)" }}>
+      <div className="ag-row" style={{ gap: 8, alignItems: "flex-start" }}>
+        {isMobile && (
+          <ActionIcon variant="subtle" color="gray" onClick={() => { setMobileView("list"); scrollPanelTop(); }} aria-label="Volver a la lista">
+            <IconChevronLeft size={18} />
+          </ActionIcon>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="ag-row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <h2 className="ag-h" style={{ margin: 0 }}>{sentenceCase(currentInfo.title)}</h2>
+            {toggle.kind === "switch" && (
+              <span className={`ag-badge${on ? " ag-badge--success" : ""}`}>{on ? "Encendido" : "Apagado"}</span>
+            )}
+            {toggle.kind === "always" && <span className="ag-badge">{toggle.label}</span>}
+          </div>
+          <div className="ag-muted" style={{ fontSize: 14, marginTop: 2 }}>{currentInfo.description}</div>
+        </div>
+        {isMobile && renderToggle(key)}
+      </div>
+    </div>
+  );
+
+  const editorNotes = (
+    <>
+      {toggle.kind === "switch" && !on && (
+        <div className="ag-alert ag-alert--warning">
+          <IconInfoCircle size={20} />
+          <div>Este mensaje está apagado: no se envía. Puedes editarlo igual y encenderlo cuando quieras.</div>
+        </div>
+      )}
+      {(key === "adminPaymentAlert" || key === "adminNewOrderAlert") && (
+        <div className="ag-alert ag-alert--info">
+          <IconInfoCircle size={20} />
+          <div>
+            Este aviso llega a tu WhatsApp (el del negocio), enviado desde tu propio número. Si no tienes WhatsApp conectado, sale desde el número de
+            AgenditApp con un formato estándar.
+          </div>
+        </div>
+      )}
+      {key === "googleReviewRequest" && (
+        <div className="ag-alert ag-alert--info">
+          <IconInfoCircle size={20} />
+          <div>
+            Unas 2 horas después de que la cita queda como «Asistió» (entre 9:00 a. m. y 8:00 p. m.). Máximo un mensaje por cliente cada 6 meses, y
+            a todos por igual: Google no permite pedir reseñas solo a quienes quedaron contentos.
+            {!organization?.googleBusiness?.placeId && (
+              <b style={{ display: "block", marginTop: 4 }}>Para encenderlo, busca tu negocio en Ajustes › Ubicación › «Tu perfil de Google».</b>
+            )}
+          </div>
+        </div>
+      )}
+      {key === "birthdayGreeting" && (
+        <div className="ag-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+          <Textarea
+            label="Beneficio de cumpleaños"
+            description="Lo que reemplaza [Beneficio de cumpleaños] en el mensaje. Solo a clientes con fecha de nacimiento registrada."
+            placeholder="Ej: 20% de descuento en tu próximo servicio"
+            autosize
+            minRows={2}
+            value={birthdayBenefit}
+            onChange={(e) => setBirthdayBenefit(e.currentTarget.value)}
+          />
+          <Group justify="flex-end">
+            <Button size="xs" variant="outline" onClick={saveBirthdayBenefit} loading={savingBenefit}>
+              Guardar beneficio
+            </Button>
+          </Group>
+        </div>
+      )}
+      {key === "followUpReminder" && (
+        <div className="ag-alert ag-alert--info">
+          <IconInfoCircle size={20} />
+          <div>Se envía cuando un cliente no ha vuelto por el servicio de seguimiento que configuras en cada servicio (ej: retoque).</div>
+        </div>
+      )}
+    </>
+  );
+
+  const bubble = (
+    <div style={{ background: "#ECE5DD", borderRadius: "var(--radius-md)", padding: 16 }}>
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "8px 8px 8px 2px",
+          padding: "8px 10px",
+          maxWidth: "92%",
+          boxShadow: "0 1px 0.5px rgba(0,0,0,0.13)",
+          color: "#303030",
+          fontSize: 14,
+          lineHeight: "20px",
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {previewText(internal, organization?.name || "Tu negocio") || <span style={{ color: "#999" }}>El mensaje está vacío.</span>}
+        <div style={{ textAlign: "right", fontSize: 11, color: "#999", marginTop: 4 }}>10:00</div>
+      </div>
+    </div>
+  );
+
+  const baileysEditor = (
+    <div className="ag-stack" style={{ gap: 14, padding: 20 }}>
+      {editorNotes}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isWide ? "minmax(0, 1fr) 300px" : "minmax(0, 1fr)",
+          gap: 20,
+          alignItems: "start",
+        }}
+      >
+        <div className="ag-stack" style={{ gap: 10, minWidth: 0 }}>
+          <div className="ag-row" style={{ justifyContent: "space-between" }}>
+            <b style={{ fontSize: 14 }}>Mensaje</b>
+            <span className={`ag-badge${isCustom ? " ag-badge--brand" : ""}`}>{isCustom ? "Personalizado" : "Mensaje original"}</span>
+          </div>
+          <Textarea
+            ref={textareaRef}
+            value={readable}
+            onChange={(e) => handleTemplateChange(key, fromReadable(e.currentTarget.value, varNames))}
+            placeholder="Escribe tu mensaje aquí..."
+            minRows={10}
+            autosize
+            maxRows={24}
+            aria-label="Texto del mensaje"
+          />
+          <div>
+            <div className="ag-subtle" style={{ marginBottom: 6 }}>Insertar dato (se reemplaza al enviar):</div>
+            <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }}>
+              {currentInfo.variables.map((v) => {
+                const label = labelFor(v.name.replace(/[{}]/g, ""));
+                return (
+                  <Tooltip key={v.name} label={v.desc} withArrow openDelay={300}>
+                    <button
+                      type="button"
+                      className="ag-badge ag-badge--outline"
+                      style={{ cursor: "pointer", font: "500 12px/16px var(--font-sans)" }}
+                      onClick={() => insertVariable(label)}
+                    >
+                      + {label}
+                    </button>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+          <Group gap="xs" mt={4}>
+            <Button leftSection={<IconDeviceFloppy size={16} />} onClick={() => handleSave(key)} loading={saving} disabled={!isDirty}>
+              Guardar mensaje
+            </Button>
+            {isDirty && (
+              <Button variant="default" onClick={() => handleTemplateChange(key, savedContent)} disabled={saving}>
+                Descartar cambios
+              </Button>
+            )}
+            {isCustom && !isDirty && (
+              <Button variant="subtle" color="gray" leftSection={<IconRestore size={16} />} onClick={() => handleRestore(key)} loading={saving}>
+                Volver al mensaje original
+              </Button>
             )}
           </Group>
+        </div>
+        <div className="ag-stack" style={{ gap: 8, position: isWide ? "sticky" : undefined, top: 16 }}>
+          <b style={{ fontSize: 14 }}>Vista previa</b>
+          {bubble}
+          <div className="ag-subtle">Con datos de ejemplo.</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Box p={{ base: "sm", md: "lg" }}>
+        <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+          <WhatsappTabs
+            subtitle={
+              metaTemplatesView
+                ? "Plantillas aprobadas por Meta para usar en tus campañas."
+                : "Lo que reciben tus clientes en cada momento. Enciende, apaga o personaliza cada mensaje."
+            }
+          />
 
           {message && (
-            <Alert
-              color={message.type === "error" ? "red" : "green"}
-              withCloseButton
-              onClose={() => setMessage(null)}
-            >
+            <Alert color={message.type === "error" ? "red" : "green"} withCloseButton onClose={() => setMessage(null)}>
               {message.text}
             </Alert>
           )}
 
-          {/* ── Layout principal ─────────────────────────────────── */}
-          <Paper withBorder radius="md" style={{ overflow: "hidden" }}>
-            <Box style={{ display: "flex", minHeight: rem(580) }}>
-
-              {/* ── Sidebar ──────────────────────────────────────── */}
-              {showSidebar && (
-                <Box
-                  style={{
-                    width: isMobile ? "100%" : rem(240),
-                    flexShrink: 0,
-                    borderRight: isMobile ? "none" : "1px solid var(--mantine-color-gray-3)",
-                    display: "flex",
-                    flexDirection: "column",
-                    background: "var(--mantine-color-gray-0)",
-                  }}
-                >
-                  {/* Título sidebar */}
-                  <Box
-                    px="md"
-                    py="sm"
-                    style={{ borderBottom: "1px solid var(--mantine-color-gray-3)" }}
-                  >
-                    <Group justify="space-between">
-                      <Text size="sm" fw={600} c="dimmed">Plantillas</Text>
-                      {isMeta && metaTemplates === undefined && <Loader size="xs" />}
-                    </Group>
-                  </Box>
-
-                  <ScrollArea style={{ flex: 1 }}>
-                    {SIDEBAR_GROUPS.map((group, gi) => (
-                      <Box key={group.label}>
-                        {gi > 0 && <Divider />}
-                        <Group px="md" pt="sm" pb={rem(4)} gap={6} wrap="nowrap">
-                          <Text
-                            size="xs"
-                            fw={700}
-                            tt="uppercase"
-                            c="dimmed"
-                            style={{ letterSpacing: "0.05em" }}
-                          >
-                            {group.label}
-                          </Text>
-                          {"disabled" in group && group.disabled && (
-                            <Tooltip label={group.disabledReason} position="right" withArrow>
-                              <IconClock size={12} color="var(--mantine-color-dimmed)" />
-                            </Tooltip>
-                          )}
-                        </Group>
-                        {group.keys.map((key) => {
-                          const dot = isMeta ? getMetaStatusDot(key) : null;
-                          const isCustom = !isMeta && templates[key as TemplateType]?.isCustom;
-                          const isGroupDisabled = "disabled" in group && group.disabled;
-                          const navLink = (
-                            <NavLink
-                              key={key}
-                              label={
-                                <Text size="sm" lineClamp={1} c={isGroupDisabled ? "dimmed" : undefined}>
-                                  {templateInfo[key as TemplateType].shortTitle}
-                                </Text>
-                              }
-                              active={!isGroupDisabled && selectedKey === key}
-                              onClick={isGroupDisabled ? undefined : () => handleSelectKey(key)}
-                              disabled={isGroupDisabled}
-                              rightSection={
-                                !isGroupDisabled && dot ? (
-                                  <Tooltip label={dot.title} position="right" withArrow>
-                                    <Box
-                                      style={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: "50%",
-                                        background: dot.color,
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                  </Tooltip>
-                                ) : !isGroupDisabled && isCustom ? (
-                                  <Tooltip label="Personalizada" position="right" withArrow>
-                                    <Box
-                                      style={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: "50%",
-                                        background: "var(--mantine-color-teal-6)",
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                  </Tooltip>
-                                ) : null
-                              }
-                              styles={{
-                                root: { paddingInline: rem(12) },
-                              }}
-                            />
-                          );
-                          return isGroupDisabled ? (
-                            <Tooltip key={key} label={group.disabledReason} position="right" withArrow>
-                              <Box>{navLink}</Box>
-                            </Tooltip>
-                          ) : navLink;
-                        })}
-                      </Box>
-                    ))}
-
-                    {isMeta && (
-                      <>
-                        <Divider my="xs" />
-                        <NavLink
-                          label={<Text size="sm">Plantillas de campaña</Text>}
-                          leftSection={<IconBell size={15} />}
-                          active={selectedKey === "campaign_templates"}
-                          onClick={() => handleSelectKey("campaign_templates")}
-                          styles={{ root: { paddingInline: rem(12) } }}
-                        />
-                      </>
-                    )}
-
-                    <Divider my="xs" />
-                    <NavLink
-                      label={<Text size="sm">Configuración de envíos</Text>}
-                      leftSection={<IconSettings size={15} />}
-                      active={selectedKey === "settings"}
-                      onClick={() => handleSelectKey("settings")}
-                      styles={{ root: { paddingInline: rem(12) } }}
-                    />
-                  </ScrollArea>
-
-                  {/* Leyenda dots — solo Meta */}
-                  {isMeta && (
-                    <Box
-                      px="md"
-                      py="xs"
-                      style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}
-                    >
-                      <Box
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: `${rem(4)} ${rem(8)}`,
-                        }}
-                      >
-                        {[
-                          { color: "var(--mantine-color-green-6)", label: "Aprobada" },
-                          { color: "var(--mantine-color-yellow-6)", label: "En revisión" },
-                          { color: "var(--mantine-color-red-6)", label: "Rechazada" },
-                          { color: "var(--mantine-color-gray-4)", label: "No enviada" },
-                        ].map(({ color, label }) => (
-                          <Group key={label} gap={rem(4)} wrap="nowrap">
-                            <Box style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
-                            <Text size="xs" c="dimmed" lineClamp={1}>{label}</Text>
-                          </Group>
-                        ))}
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-              )}
-
-              {/* ── Panel editor ─────────────────────────────────── */}
-              {showEditor && (
-                <Box style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-
-                  {/* Header del editor */}
-                  <Box
-                    px="lg"
-                    py="sm"
-                    style={{ borderBottom: "1px solid var(--mantine-color-gray-3)", background: "white" }}
-                  >
-                    <Group justify="space-between" wrap="nowrap">
-                      <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                        {isMobile && (
-                          <ActionIcon variant="subtle" color="gray" onClick={() => setMobileView("list")}>
-                            <IconChevronLeft size={18} />
-                          </ActionIcon>
-                        )}
-                        <Box style={{ minWidth: 0 }}>
-                          <Text fw={600} size="md" lineClamp={1}>
-                            {selectedKey === "settings"
-                              ? "Configuración de envíos"
-                              : selectedKey === "campaign_templates"
-                              ? "Plantillas de campaña"
-                              : currentInfo?.title}
-                          </Text>
-                          {selectedKey === "campaign_templates" ? (
-                            <Text size="xs" c="dimmed" lineClamp={1}>
-                              Crea y gestiona plantillas aprobadas por Meta para usar en campañas
-                            </Text>
-                          ) : currentInfo ? (
-                            <Text size="xs" c="dimmed" lineClamp={1}>{currentInfo.description}</Text>
-                          ) : null}
-                        </Box>
-                      </Group>
-
-                      {/* Botón preview Baileys */}
-                      {!isMeta && selectedKey !== "settings" && (
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<IconEye size={13} />}
-                          onClick={() => handlePreview(selectedKey)}
-                          style={{ flexShrink: 0 }}
-                        >
-                          Vista previa
-                        </Button>
-                      )}
-                    </Group>
-                  </Box>
-
-                  {/* Cuerpo del editor */}
-                  <ScrollArea style={{ flex: 1 }}>
-                    <Box p="lg">
-                      {/* 🔔 Nota para los mensajes del sistema (avisos al admin) */}
-                      {(selectedKey === "adminPaymentAlert" || selectedKey === "adminNewOrderAlert") && (
-                        <Alert icon={<IconInfoCircle size={18} />} color="teal" variant="light" radius="md" mb="md">
-                          <Text size="sm">
-                            Este mensaje se envía a tu WhatsApp (el del negocio) desde tu propio número.
-                            Si no tienes WhatsApp conectado, se envía desde el número de AgenditApp con un formato estándar.
-                          </Text>
-                        </Alert>
-                      )}
-                      {selectedKey === "campaign_templates" && organization?._id ? (
-                        // ── Panel plantillas de campaña (Meta) ────
-                        <MetaTemplatesPanel organizationId={organization._id} />
-
-                      ) : selectedKey === "settings" ? (
-                        // ── Panel configuración ───────────────────
-                        <Stack gap="md">
-                          <Alert icon={<IconInfoCircle size={18} />} color="blue" variant="light" radius="md">
-                            <Text size="sm">
-                              Habilita o deshabilita el envío automático de cada tipo de mensaje.
-                            </Text>
-                          </Alert>
-
-                          <Stack gap="xs">
-                            {[
-                              { key: "scheduleAppointment", label: "Confirmación de cita individual", desc: "Al crear una cita individual" },
-                              { key: "scheduleAppointmentBatch", label: "Confirmación de citas múltiples", desc: "Al crear varias citas juntas" },
-                              { key: "recurringAppointmentSeries", label: "Confirmación de citas recurrentes", desc: "Al crear una serie de citas" },
-                              { key: "rescheduleAppointment", label: "Aviso de cita reprogramada", desc: "Al reprogramar una cita desde la agenda (si dejas marcada la casilla al guardar)" },
-                              { key: "rescheduleAppointmentSeries", label: "Aviso de citas reprogramadas (serie)", desc: "Al reprogramar \"esta y las siguientes\" de una serie" },
-                              { key: "statusReservationPending", label: "Notificación de reserva recibida", desc: "Cuando el cliente solicita una reserva (política manual)" },
-                              { key: "clientConfirmationAck", label: "Agradecimiento por confirmación", desc: "Cuando el cliente confirma asistencia" },
-                              { key: "clientCancellationAck", label: "Aviso de cancelación al cliente", desc: "Cuando el cliente cancela" },
-                              { key: "clientNoShowAck", label: "Aviso de no asistencia", desc: "Cuando se marca como no asistió" },
-                              { key: "paymentReceived", label: "Pago recibido (tienda)", desc: "Cuando se confirma el pago de un pedido de la tienda" },
-                            ].map(({ key, label, desc }) => (
-                              <Paper key={key} withBorder p="sm" radius="md">
-                                <Group justify="space-between">
-                                  <Box>
-                                    <Text size="sm" fw={500}>{label}</Text>
-                                    <Text size="xs" c="dimmed">{desc}</Text>
-                                  </Box>
-                                  <Switch
-                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) => {
-                                      const checked = e.currentTarget.checked;
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
-                                    }}
-                                  />
-                                </Group>
-                              </Paper>
-                            ))}
-
-                            <Alert icon={<IconAlertCircle size={18} />} color="green" radius="md">
-                              <Group justify="space-between">
-                                <Box>
-                                  <Text size="sm" fw={500}>Recordatorios de citas</Text>
-                                  <Text size="xs" c="dimmed">Se envían automáticamente 24h antes de cada cita</Text>
-                                </Box>
-                                <Badge color="green" variant="filled">Siempre activo</Badge>
-                              </Group>
-                            </Alert>
-
-                            <Divider label="Plan de fidelidad" labelPosition="center" />
-
-                            {[
-                              { key: "loyaltyServiceReward", label: "Premio de fidelidad (servicios)", desc: "Al completar meta de servicios" },
-                              { key: "loyaltyReferralReward", label: "Premio de referidos", desc: "Al completar meta de referidos" },
-                              { key: "loyaltyServiceProgress", label: "Progreso de fidelidad (servicios)", desc: "Al registrar un servicio, antes de completar la meta" },
-                              { key: "loyaltyReferralProgress", label: "Progreso de referidos", desc: "Al registrar un referido, antes de completar la meta" },
-                            ].map(({ key, label, desc }) => (
-                              <Paper key={key} withBorder p="sm" radius="md">
-                                <Group justify="space-between">
-                                  <Box>
-                                    <Text size="sm" fw={500}>{label}</Text>
-                                    <Text size="xs" c="dimmed">{desc}</Text>
-                                  </Box>
-                                  <Switch
-                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) => {
-                                      const checked = e.currentTarget.checked;
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
-                                    }}
-                                  />
-                                </Group>
-                              </Paper>
-                            ))}
-
-                            <Divider label="Cumpleaños" labelPosition="center" />
-
-                            <Paper withBorder p="sm" radius="md">
-                              <Group justify="space-between">
-                                <Box>
-                                  <Text size="sm" fw={500}>Saludo de cumpleaños</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Se envía automáticamente el día del cumpleaños del cliente (requiere fecha de nacimiento registrada)
-                                  </Text>
-                                </Box>
-                                <Switch
-                                  checked={templateSettings.birthdayGreeting ?? false}
-                                  onChange={(e) => {
-                                    const checked = e.currentTarget.checked;
-                                    setTemplateSettings((prev) => ({ ...prev, birthdayGreeting: checked }));
-                                  }}
-                                />
-                              </Group>
-                            </Paper>
-
-                            {templateSettings.birthdayGreeting && (
-                              <Textarea
-                                label="Beneficio de cumpleaños"
-                                description="Texto que reemplaza {{beneficio}} en el mensaje (ej: 20% de descuento en tu próximo servicio)"
-                                placeholder="Ej: 20% de descuento en tu próximo servicio"
-                                autosize
-                                minRows={2}
-                                value={birthdayBenefit}
-                                onChange={(e) => setBirthdayBenefit(e.currentTarget.value)}
-                              />
-                            )}
-
-                            <Divider label="Seguimiento entre servicios" labelPosition="center" />
-
-                            <Paper withBorder p="sm" radius="md">
-                              <Group justify="space-between">
-                                <Box>
-                                  <Text size="sm" fw={500}>Recordatorio de seguimiento</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Se envía cuando un cliente no ha vuelto por el servicio de seguimiento configurado en cada servicio (ej: retoque)
-                                  </Text>
-                                </Box>
-                                <Switch
-                                  checked={templateSettings.followUpReminder ?? false}
-                                  onChange={(e) => {
-                                    const checked = e.currentTarget.checked;
-                                    setTemplateSettings((prev) => ({ ...prev, followUpReminder: checked }));
-                                  }}
-                                />
-                              </Group>
-                            </Paper>
-
-                            <Divider label="Reseñas en Google" labelPosition="center" />
-
-                            <Paper withBorder p="sm" radius="md">
-                              <Group justify="space-between" wrap="nowrap">
-                                <Box>
-                                  <Text size="sm" fw={500}>Pedir reseña en Google después de la cita</Text>
-                                  <Text size="xs" c="dimmed">
-                                    Unas 2 horas después de que una cita queda como «Asistió» (entre 9:00 a.m. y 8:00 p.m.),
-                                    el cliente recibe el enlace para dejar su reseña. Máximo un mensaje por cliente cada 6 meses.
-                                  </Text>
-                                </Box>
-                                <Switch
-                                  checked={templateSettings.googleReviewRequest ?? false}
-                                  disabled={!organization?.googleBusiness?.placeId && !templateSettings.googleReviewRequest}
-                                  onChange={(e) => {
-                                    const checked = e.currentTarget.checked;
-                                    setTemplateSettings((prev) => ({ ...prev, googleReviewRequest: checked }));
-                                  }}
-                                />
-                              </Group>
-                              {!organization?.googleBusiness?.placeId && (
-                                <Text size="xs" c="orange.7" mt={6}>
-                                  Primero busca tu negocio en Google desde Mi negocio → Ubicación → «Tu perfil de Google».
-                                </Text>
-                              )}
-                              <Text size="xs" c="dimmed" mt={6}>
-                                Se le pide a todos los clientes atendidos por igual: Google no permite pedir reseñas solo a
-                                quienes quedaron contentos.
-                              </Text>
-                            </Paper>
-
-                            <Divider label="Mensajes del sistema (a tu WhatsApp)" labelPosition="center" />
-
-                            {[
-                              { key: "adminPaymentAlert", label: "Aviso de pago recibido", desc: "Cuando llega o se valida un comprobante de pago" },
-                              { key: "adminNewOrderAlert", label: "Nuevo pedido en la tienda", desc: "Cuando un cliente hace un pedido en tu tienda" },
-                            ].map(({ key, label, desc }) => (
-                              <Paper key={key} withBorder p="sm" radius="md">
-                                <Group justify="space-between">
-                                  <Box>
-                                    <Text size="sm" fw={500}>{label}</Text>
-                                    <Text size="xs" c="dimmed">{desc}</Text>
-                                  </Box>
-                                  <Switch
-                                    checked={(templateSettings as Record<string, boolean>)[key] ?? true}
-                                    onChange={(e) => {
-                                      const checked = e.currentTarget.checked;
-                                      setTemplateSettings((prev) => ({ ...prev, [key]: checked }));
-                                    }}
-                                  />
-                                </Group>
-                              </Paper>
-                            ))}
-                          </Stack>
-
-                          <Group justify="flex-end">
-                            <Button
-                              leftSection={<IconDeviceFloppy size={16} />}
-                              onClick={handleSaveSettings}
-                              loading={saving}
-                            >
-                              Guardar configuración
-                            </Button>
-                          </Group>
-                        </Stack>
-
-                      ) : isMeta && organization?._id ? (
-                        // ── Editor Meta ───────────────────────────
-                        <MetaTemplateFormTab
-                          key={selectedKey}
-                          templateKey={selectedKey}
-                          organizationId={organization._id}
-                          metaTemplates={metaTemplates}
-                          metaTemplateDrafts={metaTemplates === undefined ? undefined : metaDrafts}
-                          onRefreshMetaTemplates={loadMetaTemplates}
-                        />
-
-                      ) : (
-                        // ── Editor Baileys ────────────────────────
-                        <Box
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr",
-                            gap: rem(20),
-                            alignItems: "start",
-                          }}
-                          className="baileys-editor-grid"
-                        >
-                          <style>{`
-                            @media (min-width: 900px) {
-                              .baileys-editor-grid { grid-template-columns: 1fr 280px !important; }
-                              .baileys-vars-panel { position: sticky; top: ${rem(20)}; }
-                            }
-                          `}</style>
-
-                          {/* Textarea */}
-                          <Stack gap="sm">
-                            <Group justify="space-between">
-                              <Group gap="xs">
-                                <Text fw={600}>Editor de mensaje</Text>
-                                {templates[selectedKey as TemplateType]?.isCustom ? (
-                                  <Badge color="teal" variant="light" size="sm">Personalizado</Badge>
-                                ) : (
-                                  <Badge color="gray" variant="light" size="sm">Por defecto</Badge>
-                                )}
-                              </Group>
-                              <Tooltip label="Copiar plantilla por defecto como punto de partida">
-                                <Button
-                                  variant="subtle"
-                                  size="xs"
-                                  leftSection={<IconCopy size={14} />}
-                                  onClick={() => handleCopyDefault(selectedKey)}
-                                >
-                                  Copiar original
-                                </Button>
-                              </Tooltip>
-                            </Group>
-
-                            <Textarea
-                              value={editedTemplates[selectedKey] || ""}
-                              onChange={(e) => handleTemplateChange(selectedKey, e.target.value)}
-                              placeholder="Escribe tu mensaje aquí..."
-                              minRows={16}
-                              autosize
-                              maxRows={30}
-                              styles={{
-                                input: {
-                                  fontFamily: "'Courier New', monospace",
-                                  fontSize: rem(13),
-                                  lineHeight: 1.6,
-                                },
-                              }}
-                            />
-
-                            <Group gap="xs">
-                              <Button
-                                leftSection={<IconDeviceFloppy size={16} />}
-                                onClick={() => handleSave(selectedKey)}
-                                loading={saving}
-                              >
-                                Guardar
-                              </Button>
-                              {templates[selectedKey as TemplateType]?.isCustom && (
-                                <Button
-                                  variant="outline"
-                                  color="orange"
-                                  leftSection={<IconRestore size={16} />}
-                                  onClick={() => handleRestore(selectedKey)}
-                                  loading={saving}
-                                >
-                                  Restaurar original
-                                </Button>
-                              )}
-                            </Group>
-                          </Stack>
-
-                          {/* Variables panel */}
-                          <Box className="baileys-vars-panel">
-                            <Card withBorder radius="md" p="md">
-                              <Text fw={600} mb="xs">Variables disponibles</Text>
-                              <Text size="xs" c="dimmed" mb="md">
-                                Haz clic para copiar. Se reemplazan con datos reales al enviar.
-                              </Text>
-                              <Divider mb="md" />
-                              <Stack gap="xs">
-                                {currentInfo?.variables.map((v) => (
-                                  <Box
-                                    key={v.name}
-                                    p="xs"
-                                    style={{
-                                      borderRadius: rem(6),
-                                      cursor: "pointer",
-                                      transition: "background-color 0.15s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = "var(--mantine-color-gray-1)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = "transparent";
-                                    }}
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(v.name);
-                                      setMessage({ type: "success", text: `Copiado: ${v.name}` });
-                                      setTimeout(() => setMessage(null), 2000);
-                                    }}
-                                  >
-                                    <Badge
-                                      variant="light"
-                                      color="blue"
-                                      size="sm"
-                                      fullWidth
-                                      style={{ fontFamily: "monospace", cursor: "pointer" }}
-                                    >
-                                      {v.name}
-                                    </Badge>
-                                    <Text size="xs" c="dimmed" mt={2} pl={4}>{v.desc}</Text>
-                                  </Box>
-                                ))}
-                              </Stack>
-                            </Card>
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  </ScrollArea>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        </Stack>
-      </Container>
-
-      {/* ── Modal preview Baileys ─────────────────────────────────────── */}
-      <Modal
-        opened={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        size="md"
-        padding={0}
-        radius="lg"
-        centered
-        withCloseButton={false}
-        styles={{ body: { padding: 0 }, content: { overflow: "hidden" } }}
-      >
-        <Box
-          style={{
-            background: "linear-gradient(180deg, #1e1e1e 0%, #2d2d2d 100%)",
-            padding: rem(16),
-            borderRadius: rem(12),
-          }}
-        >
-          <Box
-            style={{
-              background: "white",
-              borderRadius: rem(32),
-              overflow: "hidden",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-              position: "relative",
-            }}
-          >
-            {/* Notch */}
-            <Box
+          {metaTemplatesView && organization?._id ? (
+            <div className="ag-card" style={{ padding: 20 }}>
+              <MetaTemplatesPanel organizationId={organization._id} />
+            </div>
+          ) : (
+            <div
               style={{
-                position: "absolute",
-                top: 0,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: rem(120),
-                height: rem(24),
-                background: "black",
-                borderRadius: `0 0 ${rem(16)} ${rem(16)}`,
-                zIndex: 10,
-              }}
-            />
-            {/* Header WA */}
-            <Box style={{ background: "#075E54", padding: `${rem(40)} ${rem(16)} ${rem(12)}`, color: "white" }}>
-              <Group justify="space-between" align="center">
-                <Group gap="xs">
-                  <ActionIcon variant="transparent" color="white" size="lg">
-                    <IconArrowLeft size={24} />
-                  </ActionIcon>
-                  <Box
-                    style={{
-                      width: rem(40), height: rem(40), borderRadius: "50%",
-                      background: "#25D366", display: "flex", alignItems: "center",
-                      justifyContent: "center", fontWeight: 700, fontSize: rem(18),
-                    }}
-                  >
-                    {organization?.name?.charAt(0).toUpperCase() || "A"}
-                  </Box>
-                  <Box>
-                    <Text fw={600} size="md" c="white">{organization?.name || "Mi Negocio"}</Text>
-                    <Text size="xs" c="rgba(255,255,255,0.7)">en línea</Text>
-                  </Box>
-                </Group>
-                <Group gap="md">
-                  <ActionIcon variant="transparent" color="white"><IconVideo size={22} /></ActionIcon>
-                  <ActionIcon variant="transparent" color="white"><IconPhone size={22} /></ActionIcon>
-                  <ActionIcon variant="transparent" color="white"><IconDotsVertical size={22} /></ActionIcon>
-                </Group>
-              </Group>
-            </Box>
-            {/* Conversación */}
-            <Box
-              style={{
-                background: "#ECE5DD",
-                padding: rem(16),
-                minHeight: rem(350),
-                maxHeight: rem(450),
-                overflowY: "auto",
+                display: "grid",
+                gridTemplateColumns: isMobile ? "minmax(0, 1fr)" : "320px minmax(0, 1fr)",
+                gap: "var(--space-4)",
+                alignItems: "start",
               }}
             >
-              <Box style={{ display: "flex", justifyContent: "flex-start", marginBottom: rem(8) }}>
-                <Box
-                  style={{
-                    background: "white",
-                    borderRadius: `${rem(8)} ${rem(8)} ${rem(8)} ${rem(2)}`,
-                    padding: rem(10),
-                    maxWidth: "82%",
-                    boxShadow: "0 1px 0.5px rgba(0,0,0,0.13)",
-                  }}
-                >
-                  <Text
-                    size="sm"
-                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5, color: "#303030" }}
-                  >
-                    {preview}
-                  </Text>
-                  <Text size="xs" c="dimmed" ta="right" mt={4} style={{ fontSize: rem(11) }}>
-                    {new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                  </Text>
-                </Box>
-              </Box>
-              <Box mt="xl" style={{ textAlign: "center" }}>
-                <Paper p="xs" radius="md" bg="rgba(255,255,255,0.8)" style={{ display: "inline-block" }}>
-                  <Text size="xs" c="dimmed">Vista previa con datos de ejemplo</Text>
-                </Paper>
-              </Box>
-            </Box>
-            {/* Barra input simulada */}
-            <Box style={{ background: "#F0F0F0", padding: rem(8), borderTop: "1px solid #e0e0e0" }}>
-              <Group gap="xs">
-                <Box
-                  style={{
-                    flex: 1, background: "white", borderRadius: rem(20),
-                    padding: `${rem(8)} ${rem(16)}`, border: "1px solid #ddd",
-                  }}
-                >
-                  <Text size="sm" c="dimmed">Escribe un mensaje...</Text>
-                </Box>
-                <ActionIcon size="lg" radius="xl" variant="filled" style={{ background: "#25D366" }}>
-                  <Text size="lg">🎤</Text>
-                </ActionIcon>
-              </Group>
-            </Box>
-          </Box>
-          <Button fullWidth mt="md" variant="light" onClick={() => setPreviewModalOpen(false)}>
-            Cerrar
-          </Button>
-        </Box>
-      </Modal>
+              {showList && list}
+              {showEditor && currentInfo && (
+                <div className="ag-card" style={{ padding: 0, minWidth: 0 }}>
+                  {editorHeader}
+                  {isMeta && organization?._id ? (
+                    <div style={{ padding: 20 }}>
+                      {key === "scheduleAppointment" && (
+                        <div className="ag-alert ag-alert--info" style={{ marginBottom: 14 }}>
+                          <IconInfoCircle size={20} />
+                          <div>Con la API de Meta, la confirmación de una cita y la de varias usan la misma plantilla aprobada («confirmacion_cita»).</div>
+                        </div>
+                      )}
+                      <MetaTemplateFormTab
+                        key={selectedKey}
+                        templateKey={key === "scheduleAppointment" ? "scheduleAppointmentBatch" : selectedKey}
+                        organizationId={organization._id}
+                        metaTemplates={metaTemplates}
+                        metaTemplateDrafts={metaTemplates === undefined ? undefined : metaDrafts}
+                        onRefreshMetaTemplates={loadMetaTemplates}
+                      />
+                    </div>
+                  ) : (
+                    baileysEditor
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Box>
     </>
   );
 }

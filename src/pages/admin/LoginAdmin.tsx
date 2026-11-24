@@ -1,49 +1,31 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  TextInput,
-  Button,
-  Text,
-  Card,
-  Flex,
-  Checkbox,
-  Loader,
-} from "@mantine/core";
-import { useNavigate } from "react-router-dom";
+// Acceso del equipo (rediseño, AccesoEquipo): tarjeta clara con el logo del
+// negocio, etiquetas visibles, mostrar/ocultar contraseña, «¿Olvidaste tu
+// contraseña?» junto a la etiqueta y el error en línea bajo el campo. La
+// lógica de inicio de sesión no cambia.
+import React, { useState, useEffect } from "react";
+import { Anchor, Button, Checkbox, Group, PasswordInput, Text, TextInput } from "@mantine/core";
+import { IconAlertCircle } from "@tabler/icons-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { loginSuccess } from "../../features/auth/sliceAuth";
 import { login } from "../../services/authService";
-import { IoEye, IoEyeOff } from "react-icons/io5";
-import { useMediaQuery } from "@mantine/hooks";
 import { RootState } from "../../app/store";
-import colors from "../../theme/colores";
 import { extractTenantFromHost } from "../../utils/domainUtils";
 import { AGENDITAPP_SUPPORT_WA_URL, loginFailureMessage, RECOVER_ACCESS_PATH } from "../../utils/panelAccess";
-
-const isColorDark = (hexColor: string): boolean => {
-  // Calcula el brillo promedio del color (0-255)
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness < 128; // oscuro si < 128
-};
+import AuthCard from "../../components/auth/AuthCard";
 
 const LoginAdmin: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigate();
   const dispatch = useDispatch();
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
-  );
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
-  const isMobile = useMediaQuery("(max-width: 768px)") ?? false;
-
+  // «Recordar mi correo»: solo guarda el correo en este navegador para
+  // precargarlo; la sesión dura lo mismo con o sin la casilla.
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
     if (savedEmail) {
@@ -51,13 +33,6 @@ const LoginAdmin: React.FC = () => {
       setRememberMe(true);
     }
   }, []);
-
-  const primaryColor = organization?.branding?.primaryColor || "#ffffff";
-
-  // Determinar color de texto contrastante
-  const contrastText = useMemo(() => {
-    return isColorDark(primaryColor) ? "#FFFFFF" : "#1A1A1A";
-  }, [primaryColor]);
 
   const handleLogin = async () => {
     setIsLoading(true);
@@ -109,141 +84,100 @@ const LoginAdmin: React.FC = () => {
   // organización". Explicar dónde se entra.
   if (extractTenantFromHost().type === "signup") {
     return (
-      <Flex justify="center" align="center" style={{ height: "100%" }}>
-        <Card withBorder shadow="md" radius="md" p="xl" style={{ width: isMobile ? "90%" : 440, margin: "auto" }}>
-          <Text size="xl" fw={700} mb="sm">
-            Entra desde el enlace de tu negocio
-          </Text>
-          <Text size="sm" mb="sm">
-            Cada negocio tiene su propio enlace, por ejemplo{" "}
-            <Text span fw={700}>tunegocio.agenditapp.com/login-admin</Text>. Ahí inicias sesión con tu
-            correo y tu contraseña.
-          </Text>
-          <Text size="sm" c="dimmed" mb="lg">
-            Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes o
-            olvidaste tu contraseña, te enviamos un código para entrar.
-          </Text>
-          <Button component="a" href={RECOVER_ACCESS_PATH} fullWidth mb="sm">
-            Entrar con un código
-          </Button>
-          <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth variant="light">
-            Escribir a soporte por WhatsApp
-          </Button>
-        </Card>
-      </Flex>
+      <AuthCard platform title="Entra desde el enlace de tu negocio">
+        <Text size="sm">
+          Cada negocio tiene su propio enlace, por ejemplo{" "}
+          <Text span fw={600}>tunegocio.agenditapp.com/login-admin</Text>. Ahí inicias sesión con tu correo y tu
+          contraseña.
+        </Text>
+        <Text size="sm" c="var(--ink-muted)">
+          Lo encuentras en el correo y el WhatsApp de bienvenida de AgenditApp. Si no lo tienes o olvidaste tu
+          contraseña, te enviamos un código para entrar.
+        </Text>
+        <Button component="a" href={RECOVER_ACCESS_PATH} fullWidth size="lg">
+          Entrar con un código
+        </Button>
+        <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth variant="default">
+          Escribir a soporte por WhatsApp
+        </Button>
+      </AuthCard>
     );
   }
 
-  return (
-    <Flex justify="center" align="center" style={{ height: "100%" }}>
-      <Card
-        style={{
-          width: isMobile ? "90%" : "auto",
-          margin: "auto",
-          padding: "2rem",
-          backgroundColor: primaryColor,
-          color: contrastText,
-          borderRadius: "12px",
-          boxShadow: "0 0 20px rgba(0, 0, 0, 0.5)",
-          transition: "all 0.3s ease",
-        }}
-      >
-        <Text size="xl" mb="xl" fw={700}>
-          ¡Bienvenido!
-        </Text>
+  const showClientLink =
+    (organization?.enableOnlineBooking ?? true) || !!organization?.enableClassBooking;
 
+  return (
+    <AuthCard title="Acceso para el equipo">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!isLoading) void handleLogin();
+        }}
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}
+      >
         <TextInput
-          placeholder="Ingresa tu correo *"
+          label="Correo"
+          type="email"
+          autoComplete="username"
+          placeholder="tu@correo.com"
           value={email}
           onChange={(event) => setEmail(event.currentTarget.value)}
           required
-          mb="md"
-          styles={{
-            input: {
-              backgroundColor: "rgba(255,255,255,0.9)",
-              color: "#000",
-            }
-          }}
+          withAsterisk={false}
         />
 
-        <div style={{ position: "relative", marginBottom: "1rem" }}>
-          <TextInput
-            placeholder="Ingresa tu contraseña *"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(event) => setPassword(event.currentTarget.value)}
-            required
-            styles={{
-              input: {
-                backgroundColor: "rgba(255,255,255,0.9)",
-                color: "#000",
-              }
-            }}
-          />
-          <Button
-            variant="subtle"
-            size="xs"
-            onClick={() => setShowPassword(!showPassword)}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: "-0.5rem",
-              transform: "translateY(-50%)",
-              color: contrastText,
-            }}
-          >
-            {showPassword ? <IoEyeOff size={16} /> : <IoEye size={16} />}
-          </Button>
-        </div>
+        <PasswordInput
+          // «¿Olvidaste tu contraseña?» junto a la etiqueta (solo dueños: los
+          // empleados piden el cambio al administrador)
+          label={
+            <Group justify="space-between" wrap="nowrap" w="100%" gap="xs">
+              <span>Contraseña</span>
+              <Anchor href={RECOVER_ACCESS_PATH} className="ag-link" underline="never">
+                ¿Olvidaste tu contraseña?
+              </Anchor>
+            </Group>
+          }
+          styles={{ label: { display: "flex", width: "100%" } }}
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => setPassword(event.currentTarget.value)}
+          required
+          withAsterisk={false}
+          visibilityToggleButtonProps={{ "aria-label": "Mostrar u ocultar la contraseña" }}
+          error={
+            error ? (
+              <span style={{ display: "inline-flex", gap: 4, alignItems: "flex-start" }}>
+                <IconAlertCircle size={14} style={{ flex: "none", marginTop: 2 }} />
+                {error}
+              </span>
+            ) : undefined
+          }
+        />
 
         <Checkbox
-          label="Recordar mis datos"
+          size="xs"
+          label="Recordar mi correo en este dispositivo"
           checked={rememberMe}
           onChange={(event) => setRememberMe(event.currentTarget.checked)}
-          mb="md"
-          styles={{
-            label: { color: contrastText },
-            input: {
-              borderColor: contrastText,
-            },
-          }}
+          styles={{ label: { color: "var(--ink-muted)" } }}
         />
 
-        {error && (
-          <Text c={contrastText === "#FFFFFF" ? "#FFD2D2" : colors.errorText} mb="md">
-            {error}
-          </Text>
-        )}
-
-        <Button
-          fullWidth
-          variant="filled"
-          onClick={handleLogin}
-          disabled={isLoading}
-          color={isColorDark(primaryColor) ? "gray.0" : "dark"}
-          style={{
-            backgroundColor: isColorDark(primaryColor)
-              ? "#FFFFFF"
-              : "#000000",
-            color: isColorDark(primaryColor) ? "#000000" : "#FFFFFF",
-            transition: "0.2s",
-          }}
-          leftSection={isLoading && <Loader size="xs" />}
-        >
-          {isLoading ? "Iniciando sesión..." : "Iniciar sesión"}
+        <Button type="submit" fullWidth size="lg" loading={isLoading}>
+          Iniciar sesión
         </Button>
+      </form>
 
-        {/* Solo dueños: los empleados piden el cambio al administrador. */}
-        <Text size="sm" ta="center" mt="md">
-          <a
-            href={RECOVER_ACCESS_PATH}
-            style={{ color: contrastText, textDecoration: "underline" }}
-          >
-            ¿Olvidaste tu contraseña?
-          </a>
-        </Text>
-      </Card>
-    </Flex>
+      {showClientLink && (
+        <p className="ag-subtle" style={{ margin: 0, textAlign: "center" }}>
+          ¿Eres cliente?{" "}
+          <Link className="ag-link" to="/mis-reservas">
+            Ver mis reservas
+          </Link>
+        </p>
+      )}
+    </AuthCard>
   );
 };
 

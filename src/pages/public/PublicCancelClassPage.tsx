@@ -1,19 +1,15 @@
+// Cancelar una inscripción a clase desde su enlace (rediseño, CancelarCita):
+// resumen de la inscripción, qué pasa al cancelar y «Sí, cancelar inscripción».
 import React, { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import {
-  Container, Paper, Title, Text, Button, Alert, Loader, Center,
-  Stack, Group, Card, Badge, Checkbox, Divider,
-} from "@mantine/core";
-import { MdEventBusy, MdCheckCircle, MdError } from "react-icons/md";
-import {
-  formatFullDateInTimezone,
-  formatInTimezone,
-} from "../../utils/timezoneUtils";
-import {
-  getEnrollmentByToken,
-  cancelEnrollmentByToken,
-  EnrollmentCancelInfo,
-} from "../../services/classService";
+import { Link, useSearchParams } from "react-router-dom";
+import { Button, Checkbox, Skeleton } from "@mantine/core";
+import { IconCalendarPlus, IconInfoCircle } from "@tabler/icons-react";
+import { formatFullDateInTimezone, formatInTimezone } from "../../utils/timezoneUtils";
+import { getEnrollmentByToken, cancelEnrollmentByToken, EnrollmentCancelInfo } from "../../services/classService";
+
+const shell = { maxWidth: 520, margin: "0 auto", padding: "32px 16px 48px" } as const;
+const h1 = { margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" } as const;
+const amPm = (s: string) => s.replace(/\s?AM\b/i, " a. m.").replace(/\s?PM\b/i, " p. m.");
 
 export const PublicCancelClassPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -29,7 +25,7 @@ export const PublicCancelClassPage: React.FC = () => {
 
   const load = useCallback(async () => {
     if (!token) {
-      setError("Enlace inválido: falta el token.");
+      setError("Al enlace le falta información.");
       setLoading(false);
       return;
     }
@@ -37,16 +33,14 @@ export const PublicCancelClassPage: React.FC = () => {
     try {
       const data = await getEnrollmentByToken(token);
       if (!data) {
-        setError("No se encontró la inscripción o el enlace expiró.");
+        setError("No encontramos la inscripción o el enlace venció.");
       } else {
         setInfo(data);
         // Pre-seleccionar las cancelables (futuras y no canceladas)
-        setSelected(
-          data.enrollments.filter((e) => !e.isCancelled && !e.isPast).map((e) => e.id)
-        );
+        setSelected(data.enrollments.filter((e) => !e.isCancelled && !e.isPast).map((e) => e.id));
       }
     } catch {
-      setError("No se encontró la inscripción o el enlace expiró.");
+      setError("No encontramos la inscripción o el enlace venció.");
     } finally {
       setLoading(false);
     }
@@ -63,145 +57,116 @@ export const PublicCancelClassPage: React.FC = () => {
   const handleCancel = async () => {
     if (!token) return;
     setCancelling(true);
+    setError(null);
     try {
-      const ids = showCheckboxes ? selected : undefined;
-      const result = await cancelEnrollmentByToken(token, ids);
-      if (result) {
-        setCancelled(true);
-      } else {
-        setError("No se pudo cancelar la inscripción. Intenta nuevamente.");
-      }
+      const result = await cancelEnrollmentByToken(token, showCheckboxes ? selected : undefined);
+      if (result) setCancelled(true);
+      else setError("No se pudo cancelar. Intenta de nuevo.");
     } catch {
-      setError("No se pudo cancelar la inscripción. Intenta nuevamente.");
+      setError("No se pudo cancelar. Intenta de nuevo.");
     } finally {
       setCancelling(false);
     }
   };
 
-  const toggle = (id: string) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggle = (id: string) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // ── Estados de pantalla ──────────────────────────────
   if (loading) {
     return (
-      <Center h="100vh">
-        <Stack align="center" gap="sm">
-          <Loader />
-          <Text c="dimmed">Cargando tu inscripción…</Text>
-        </Stack>
-      </Center>
+      <div style={shell}>
+        <Skeleton height={28} width={240} mb={20} />
+        <Skeleton height={110} radius="md" mb={16} />
+        <Skeleton height={44} radius="md" />
+      </div>
     );
   }
 
   if (error && !info) {
     return (
-      <Container size="sm" py="xl">
-        <Paper withBorder p="xl" radius="md">
-          <Stack align="center" gap="md">
-            <MdError size={48} color="var(--mantine-color-red-6)" />
-            <Title order={3} ta="center">Enlace no válido</Title>
-            <Text c="dimmed" ta="center">{error}</Text>
-          </Stack>
-        </Paper>
-      </Container>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center" }}>
+          <h1 style={{ ...h1, fontSize: 20 }}>Este enlace ya no funciona</h1>
+          <div className="ag-muted" style={{ fontSize: 14, margin: "6px 0 16px" }}>{error}</div>
+          <Button component={Link} to="/mis-reservas">
+            Ver mis reservas
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (cancelled) {
     return (
-      <Container size="sm" py="xl">
-        <Paper withBorder p="xl" radius="md">
-          <Stack align="center" gap="md">
-            <MdCheckCircle size={48} color="var(--mantine-color-green-6)" />
-            <Title order={3} ta="center">Inscripción cancelada</Title>
-            <Text c="dimmed" ta="center">
-              Hemos cancelado tu inscripción. Si fue un error, comunícate con {info?.organizationName}.
-            </Text>
-          </Stack>
-        </Paper>
-      </Container>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+          <h1 style={{ ...h1, fontSize: 22 }}>Tu inscripción quedó cancelada</h1>
+          <div className="ag-muted" style={{ fontSize: 14 }}>
+            {info?.organizationName} ya recibió el aviso y tu cupo quedó libre. Si fue un error, escríbele al negocio.
+          </div>
+          <Button component={Link} to="/reservar-clase" leftSection={<IconCalendarPlus size={16} />} mt={6}>
+            Ver otras clases
+          </Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container size="sm" py="xl">
-      <Paper withBorder p="xl" radius="md">
-        <Stack gap="md">
-          <Group gap="xs">
-            <MdEventBusy size={28} color="var(--mantine-color-red-6)" />
-            <Title order={3}>Cancelar inscripción</Title>
-          </Group>
-          <Text size="sm" c="dimmed">
-            {info?.organizationName}
-          </Text>
+    <div style={shell}>
+      <div className="ag-stack" style={{ gap: 18 }}>
+        <div>
+          <h1 style={h1}>Cancelar inscripción</h1>
+          <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>{info?.organizationName}</div>
+        </div>
 
-          <Divider />
+        <div className="ag-card" style={{ padding: 0, overflow: "hidden" }}>
+          {info?.enrollments.map((e) => {
+            const blocked = e.isCancelled || e.isPast;
+            const day = formatFullDateInTimezone(e.startDate, tz, "dddd D [de] MMMM");
+            return (
+              <div key={e.id} className="ag-list-row" style={{ padding: "12px 16px", gap: 12, opacity: blocked ? 0.55 : 1 }}>
+                {showCheckboxes && !blocked && <Checkbox checked={selected.includes(e.id)} onChange={() => toggle(e.id)} aria-label={e.className} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <b style={{ fontSize: 14 }}>{e.className}</b>
+                  {e.attendeeName && <div className="ag-subtle">{e.attendeeName}</div>}
+                  <div style={{ fontSize: 13 }}>
+                    {day.charAt(0).toUpperCase() + day.slice(1)} · {amPm(formatInTimezone(e.startDate, tz))} – {amPm(formatInTimezone(e.endDate, tz))}
+                  </div>
+                </div>
+                {e.isCancelled ? <span className="ag-badge">Cancelada</span> : e.isPast ? <span className="ag-badge">Finalizada</span> : null}
+              </div>
+            );
+          })}
+        </div>
 
-          <Stack gap="xs">
-            {info?.enrollments.map((e) => {
-              const blocked = e.isCancelled || e.isPast;
-              return (
-                <Card key={e.id} withBorder radius="md" p="sm" opacity={blocked ? 0.6 : 1}>
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group gap="sm" wrap="nowrap">
-                      {showCheckboxes && !blocked && (
-                        <Checkbox
-                          checked={selected.includes(e.id)}
-                          onChange={() => toggle(e.id)}
-                        />
-                      )}
-                      <div>
-                        <Text fw={600} size="sm">{e.className}</Text>
-                        <Text size="xs" c="dimmed">{e.attendeeName}</Text>
-                        <Text size="xs">
-                          {formatFullDateInTimezone(e.startDate, tz, "dddd D [de] MMMM")}
-                          {" · "}
-                          {formatInTimezone(e.startDate, tz)} – {formatInTimezone(e.endDate, tz)}
-                        </Text>
-                      </div>
-                    </Group>
-                    {e.isCancelled ? (
-                      <Badge color="red" variant="light">Cancelada</Badge>
-                    ) : e.isPast ? (
-                      <Badge color="gray" variant="light">Finalizada</Badge>
-                    ) : null}
-                  </Group>
-                </Card>
-              );
-            })}
-          </Stack>
+        {error && (
+          <div className="ag-alert ag-alert--danger">
+            <IconInfoCircle size={20} />
+            <div>{error}</div>
+          </div>
+        )}
 
-          {cancelable.length === 0 ? (
-            <Alert color="gray">
-              No hay inscripciones que se puedan cancelar (ya finalizaron o fueron canceladas).
-            </Alert>
-          ) : !confirmStep ? (
-            <Button color="red" fullWidth onClick={() => setConfirmStep(true)}>
-              Cancelar inscripción
+        {cancelable.length === 0 ? (
+          <div className="ag-subtle" style={{ textAlign: "center" }}>No hay inscripciones que se puedan cancelar: ya finalizaron o se cancelaron.</div>
+        ) : !confirmStep ? (
+          <Button variant="subtle" color="red" size="md" fullWidth onClick={() => setConfirmStep(true)}>
+            Cancelar inscripción
+          </Button>
+        ) : (
+          <div className="ag-stack" style={{ gap: 10 }}>
+            <div className="ag-muted" style={{ fontSize: 14 }}>
+              Liberas tu cupo y {info?.organizationName} recibe el aviso. No se puede deshacer; si pagaste, el reembolso depende de la política del negocio.
+            </div>
+            <Button color="red" size="md" fullWidth loading={cancelling} disabled={showCheckboxes && selected.length === 0} onClick={handleCancel}>
+              {showCheckboxes ? `Sí, cancelar ${selected.length === 1 ? "1 inscripción" : `${selected.length} inscripciones`}` : "Sí, cancelar inscripción"}
             </Button>
-          ) : (
-            <Stack gap="xs">
-              <Alert color="red">
-                ¿Seguro que deseas cancelar? Esta acción no se puede deshacer.
-              </Alert>
-              <Group grow>
-                <Button variant="default" onClick={() => setConfirmStep(false)}>
-                  Volver
-                </Button>
-                <Button
-                  color="red"
-                  loading={cancelling}
-                  disabled={showCheckboxes && selected.length === 0}
-                  onClick={handleCancel}
-                >
-                  Sí, cancelar
-                </Button>
-              </Group>
-            </Stack>
-          )}
-        </Stack>
-      </Paper>
-    </Container>
+            <Button variant="default" fullWidth onClick={() => setConfirmStep(false)} disabled={cancelling}>
+              No, mantenerla
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

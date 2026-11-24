@@ -1,4 +1,4 @@
-import { Center, Anchor, Text, useMantineTheme, Box } from "@mantine/core";
+import { Center, Anchor, Text, Box } from "@mantine/core";
 import { useSelector } from "react-redux";
 import { RootState } from "../app/store";
 import { BiCalendar } from "react-icons/bi";
@@ -9,8 +9,6 @@ import { IconSchool, IconPackage, IconBuildingStore, IconCalendarSearch } from "
 import { ModernLayout, MinimalLayout, CardsLayout, LandingLayout, AcademyLandingLayout } from "./HomeLayouts";
 
 export default function Home() {
-  const theme = useMantineTheme();
-  const primary = theme.colors[theme.primaryColor][6];
   const organization = useSelector(
     (state: RootState) => state.organization.organization
   );
@@ -47,7 +45,7 @@ export default function Home() {
       // Si el plan incluye paquetes y hay un medio de cobro online: Mercado Pago
       // conectado o métodos de transferencia (compra vía comprobante con IA).
       show:
-        (organization as any)?.planLimits?.servicePackages !== false &&
+        organization?.planLimits?.servicePackages !== false &&
         (!!organization?.mpCollect?.connected ||
           ((organization?.paymentMethods?.length ?? 0) > 0)),
     },
@@ -74,9 +72,10 @@ export default function Home() {
 
   const features = allFeatures.filter((f) => f.show !== false);
 
-  const welcomeTitle = organization?.welcomeTitle || "¡Hola! Bienvenido";
-  const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás! ✨";
-  const planLimits = (organization as any)?.planLimits;
+  // Sin título propio: el nombre del negocio (LandingEsencial), no un saludo genérico
+  const welcomeTitle = organization?.welcomeTitle || organization?.name || "Bienvenido";
+  const welcomeDescription = organization?.welcomeDescription || "Estamos felices de tenerte aquí. Mereces lo mejor, ¡y aquí lo encontrarás!";
+  const planLimits = organization?.planLimits;
   const rawLayout = (organization?.homeLayout || "modern") as "modern" | "minimal" | "cards" | "landing" | "academy";
   // Si el plan no permite landing (downgrade), caer a modern sin tocar la BD
   const homeLayout =
@@ -125,7 +124,7 @@ export default function Home() {
             <Text
               span
               fw={800} 
-              c={primary} 
+              c="var(--platform)"
             >
               AgenditApp
             </Text>

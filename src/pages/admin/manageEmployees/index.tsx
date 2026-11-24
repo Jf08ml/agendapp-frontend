@@ -1,26 +1,15 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// Profesionales (rediseño, ProfesionalesPanel): pestañas Equipo · Horarios
+// (?tab=equipo|horarios). Equipo: buscador, segmento de estado y tabla (lista
+// en móvil) con acciones con nombre en «⋯». El editor es un panel lateral.
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Title,
-  Group,
-  Divider,
-  Button,
-  Grid,
-  TextInput,
-  Container,
-  Card,
-  SegmentedControl,
-  Skeleton,
-  Center,
-  Stack,
-  Text,
-  Tabs,
-} from "@mantine/core";
+import { Button, SegmentedControl, Text } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
-import { BsSearch } from "react-icons/bs";
-import { BiCalendar, BiGroup } from "react-icons/bi";
+import { IconAlertTriangle, IconPlus, IconSearch, IconUsers } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
+import { openConfirmModal } from "@mantine/modals";
+import { Link, useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
 import {
   createEmployee,
   updateEmployee,
@@ -28,49 +17,42 @@ import {
   getEmployeesByOrganizationId,
   type Employee,
 } from "../../../services/employeeService";
+import { getServicesByOrganizationId, type Service } from "../../../services/serviceService";
 import ModalCreateEdit from "./components/ModalCreateEditEmployee";
-import {
-  getServicesByOrganizationId,
-  type Service,
-} from "../../../services/serviceService";
-import EmployeeCard from "./components/EmployeeCard";
+import EmployeeRow from "./components/EmployeeRow";
 import EmployeeDetailsModal from "./components/EmployeeDetailsModal";
 import AdvanceModal from "./components/AdvanceModal";
 import IncomeModal from "./components/IncomeModal";
 import ScheduleOverview from "./components/ScheduleOverview";
-import { openConfirmModal } from "@mantine/modals";
-import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
-import CustomLoader from "../../../components/customLoader/CustomLoader";
+import { selectOrganization } from "../../../features/organization/sliceOrganization";
+import { formatCurrency } from "../../../utils/formatCurrency";
+import { commissionLabel } from "./employeeView";
 
 const AdminEmployees: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "horarios" ? "schedules" : "employees";
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebouncedValue(search, 250);
-
-  const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  const [status, setStatus] = useState<"all" | "active" | "inactive">("active");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
-    null
-  );
-
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [profileRefresh, setProfileRefresh] = useState(0);
 
   const [initialLoaded, setInitialLoaded] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<string | null>("employees");
-
-  const organizationId = useSelector(
-    (state: RootState) => (state.auth as any)?.organizationId
-  );
+  const organizationId = useSelector((state: RootState) => state.auth.organizationId);
+  const currency = useSelector(selectOrganization)?.currency || "COP";
 
   useEffect(() => {
     if (!organizationId) return;
@@ -78,122 +60,55 @@ const AdminEmployees: React.FC = () => {
   }, [organizationId]);
 
   const loadAll = async () => {
-    setLoading(true);
+    setLoadError(false);
     try {
       const [emps, svcs] = await Promise.all([
         getEmployeesByOrganizationId(organizationId!),
         getServicesByOrganizationId(organizationId!),
       ]);
-      // Activos arriba
-      const ordered = [...emps].sort(
-        (a, b) => Number(b.isActive) - Number(a.isActive)
-      );
-      setEmployees(ordered);
+      setEmployees(emps);
       setServices(svcs);
     } catch (error) {
       console.error(error);
-      showNotification({
-        title: "Error",
-        message: "No se pudo cargar profesionales/servicios",
-        color: "red",
-      });
+      setLoadError(true);
     } finally {
-      setLoading(false);
       setInitialLoaded(true);
     }
   };
 
   const filtered = useMemo(() => {
     let data = [...employees];
-
-    // Buscar
     if (debouncedSearch.trim()) {
       const q = debouncedSearch.toLowerCase();
       data = data.filter(
         (e) =>
           e.names.toLowerCase().includes(q) ||
-          e.position.toLowerCase().includes(q) ||
-          e.email.toLowerCase().includes(q) ||
-          e.phoneNumber.includes(q)
+          (e.position || "").toLowerCase().includes(q) ||
+          (e.email || "").toLowerCase().includes(q) ||
+          (e.phoneNumber || "").includes(q)
       );
     }
-
-    // Estado
-    if (status !== "all") {
-      data = data.filter((e) =>
-        status === "active" ? e.isActive : !e.isActive
-      );
-    }
-
-    // Orden simple: por nombre para consistencia
+    if (status !== "all") data = data.filter((e) => (status === "active" ? e.isActive : !e.isActive));
+    // Por nombre, con los activos primero
     data.sort((a, b) => a.names.localeCompare(b.names, "es"));
-
-    // Activos primero siempre
     data.sort((a, b) => Number(b.isActive) - Number(a.isActive));
-
     return data;
   }, [employees, debouncedSearch, status]);
 
-  // Acciones CRUD
+  // Guardar: el editor ya valida campos, servicios y correo/teléfono repetidos bajo cada campo
   const handleSaveEmployee = async (employee: Employee) => {
     const commission = employee.commissionValue ?? 0;
-
-    // Validation: check for duplicate email or phone (excluding current employee)
-    const duplicateEmail = employees.find(
-      (e) => e._id !== employee._id && e.email === employee.email.trim()
-    );
-    if (duplicateEmail) {
-      showNotification({
-        title: "Validación",
-        message: "Ya existe un profesional con ese correo electrónico",
-        color: "orange",
-      });
-      throw new Error("Duplicate email");
-    }
-
-    const duplicatePhone = employees.find(
-      (e) => e._id !== employee._id && e.phoneNumber === employee.phoneNumber.trim()
-    );
-    if (duplicatePhone) {
-      showNotification({
-        title: "Validación",
-        message: "Ya existe un profesional con ese número de teléfono",
-        color: "orange",
-      });
-      throw new Error("Duplicate phone");
-    }
-
-    // Validation: at least one service selected
-    if (!employee.services || employee.services.length === 0) {
-      showNotification({
-        title: "Validación",
-        message: "Debes seleccionar al menos un servicio para el profesional",
-        color: "orange",
-      });
-      throw new Error("No services selected");
-    }
-
     try {
       if (employee._id) {
-        await updateEmployee(employee._id, {
-          ...employee,
-          commissionValue: commission,
-        });
+        await updateEmployee(employee._id, { ...employee, commissionValue: commission });
       } else {
-        if (!organizationId) {
-          showNotification({
-            title: "Error",
-            message: "Organización no definida",
-            color: "red",
-          });
-          throw new Error("Organization not defined");
-        }
+        if (!organizationId) throw new Error("Organización no definida");
         await createEmployee({
           ...employee,
           organizationId,
           password: employee.password || "",
           commissionValue: commission,
-        } as any);
+        } as Parameters<typeof createEmployee>[0]);
       }
       await loadAll();
       setIsModalOpen(false);
@@ -203,77 +118,70 @@ const AdminEmployees: React.FC = () => {
         message: "Guardado correctamente",
         color: "green",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      const message = error.response?.data?.message || error.message || "No se pudo guardar el profesional";
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
       showNotification({
-        title: "Error",
-        message,
+        title: "No se pudo guardar",
+        message: err.response?.data?.message || err.message || "No se pudo guardar el profesional",
         color: "red",
       });
-      throw error; // Re-throw to keep modal open
+      throw error; // el panel sigue abierto
     }
   };
 
-  const handleDeleteEmployee = async (employeeId: string) => {
+  const setActive = async (employee: Employee, next: boolean) => {
+    try {
+      await updateEmployee(employee._id, { isActive: next });
+      await loadAll();
+      showNotification({
+        title: next ? "Profesional activado" : "Profesional desactivado",
+        message: next ? `${employee.names} vuelve a aparecer para agendar.` : `${employee.names} ya no aparece para agendar.`,
+        color: "green",
+      });
+    } catch (error) {
+      console.error(error);
+      showNotification({ title: "Error", message: "No se pudo actualizar el estado", color: "red" });
+    }
+  };
+
+  const handleActiveEmployee = (employee: Employee, next: boolean) => {
     openConfirmModal({
-      title: "Eliminar profesional",
+      title: next ? `Activar a ${employee.names}` : `Desactivar a ${employee.names}`,
       centered: true,
-      children: <Text>¿Seguro que deseas eliminar este profesional?</Text>,
+      children: (
+        <Text size="sm">
+          {next
+            ? `${employee.names} volverá a aparecer para agendar.`
+            : `${employee.names} dejará de aparecer para agendar. Sus citas futuras se mantienen.`}
+        </Text>
+      ),
+      labels: { confirm: next ? "Activar" : "Desactivar", cancel: "Cancelar" },
+      onConfirm: () => void setActive(employee, next),
+    });
+  };
+
+  const handleDeleteEmployee = (employee: Employee) => {
+    openConfirmModal({
+      title: `Eliminar a ${employee.names}`,
+      centered: true,
+      children: (
+        <Text size="sm">
+          Se elimina del equipo. Si tiene citas registradas no se puede eliminar y se desactiva en su lugar.
+        </Text>
+      ),
       labels: { confirm: "Eliminar", cancel: "Cancelar" },
       confirmProps: { color: "red" },
       onConfirm: async () => {
         try {
-          await deleteEmployee(employeeId);
+          await deleteEmployee(employee._id);
           await loadAll();
-          showNotification({
-            title: "Eliminado",
-            message: "Profesional eliminado",
-            color: "green",
-          });
+          showNotification({ title: "Eliminado", message: `${employee.names} se eliminó del equipo.`, color: "green" });
         } catch (error) {
           console.error(error);
-          // fallback a desactivar
-          showNotification({
-            title: "No se pudo eliminar",
-            message: "Se intentará desactivar el profesional.",
-            color: "yellow",
-          });
-          await handleActiveEmployee(employeeId, false);
-        }
-      },
-    });
-  };
-
-  const handleActiveEmployee = async (employeeId: string, next = true) => {
-    openConfirmModal({
-      title: next ? "Activar profesional" : "Desactivar profesional",
-      centered: true,
-      children: (
-        <Text>
-          {next
-            ? "Se mostrará para agendar citas. ¿Confirmas?"
-            : "Se ocultará para agendar citas. ¿Confirmas?"}
-        </Text>
-      ),
-      labels: { confirm: "Confirmar", cancel: "Cancelar" },
-      confirmProps: { color: "green" },
-      onConfirm: async () => {
-        try {
-          await updateEmployee(employeeId, { isActive: next } as any);
-          await loadAll();
-          showNotification({
-            title: next ? "Profesional activado" : "Profesional desactivado",
-            message: "Cambio aplicado",
-            color: "green",
-          });
-        } catch (error) {
-          console.error(error);
-          showNotification({
-            title: "Error",
-            message: "No se pudo actualizar el estado",
-            color: "red",
-          });
+          // Igual que antes: si no se puede eliminar, se desactiva
+          if (employee.isActive) await setActive(employee, false);
+          else showNotification({ title: "No se pudo eliminar", message: "Tiene citas registradas.", color: "yellow" });
         }
       },
     });
@@ -283,7 +191,7 @@ const AdminEmployees: React.FC = () => {
     setEditingEmployee({
       ...employee,
       services: (employee.services || [])
-        .map((srv: any) => services.find((s) => s._id === srv._id)!)
+        .map((srv) => services.find((s) => s._id === srv._id)!)
         .filter(Boolean),
     });
     setIsModalOpen(true);
@@ -304,134 +212,159 @@ const AdminEmployees: React.FC = () => {
     setSelectedEmployee(employee);
   };
 
-  if (loading && !initialLoaded) return <CustomLoader />;
+  const money = (n: number) => formatCurrency(n, currency);
+  const commissionOf = (e: Employee) => commissionLabel(e.commissionType, e.commissionValue, money);
+  const rowActions = {
+    onOpenProfile: showEmployeeDetailsModal,
+    onEdit: handleEditEmployee,
+    onAdvance: handleShowAdvanceModal,
+    onIncome: handleShowIncomeModal,
+    onToggleActive: (e: Employee) => handleActiveEmployee(e, !e.isActive),
+    onDelete: handleDeleteEmployee,
+  };
+  const openNew = () => {
+    setEditingEmployee(null);
+    setIsModalOpen(true);
+  };
+  const counts = {
+    active: employees.filter((e) => e.isActive).length,
+    inactive: employees.filter((e) => !e.isActive).length,
+  };
 
   return (
-    <Container fluid>
-      {/* Header */}
-      <Card mb="md">
-        <Group justify="space-between" align="center" mb="md">
-          <Title order={isMobile ? 3 : 2}>Administrar Profesionales</Title>
-        </Group>
+    <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
+      <div className="ag-stack" style={{ gap: "var(--space-3)" }}>
+        <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Profesionales</h1>
+        <nav className="ag-subtabs" aria-label="Profesionales">
+          <Link to="?tab=equipo" aria-current={activeTab === "employees" ? "page" : undefined}>
+            Equipo <span className="ag-badge">{counts.active}</span>
+          </Link>
+          <Link to="?tab=horarios" aria-current={activeTab === "schedules" ? "page" : undefined}>
+            Horarios
+          </Link>
+        </nav>
+      </div>
 
-        <Tabs value={activeTab} onChange={setActiveTab}>
-          <Tabs.List>
-            <Tabs.Tab value="employees" leftSection={<BiGroup size={16} />}>
-              Profesionales
-            </Tabs.Tab>
-            <Tabs.Tab value="schedules" leftSection={<BiCalendar size={16} />}>
-              Vista de Horarios
-            </Tabs.Tab>
-          </Tabs.List>
-
-          <Tabs.Panel value="employees" pt="md">
-            {/* Toolbar de filtros simplificada */}
-            <Card withBorder radius="md" p="md" mb="md">
-              <Stack gap="sm">
-                <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
-                  <TextInput
-                    leftSection={<BsSearch />}
-                    placeholder="Buscar por nombre, cargo, correo o teléfono…"
-                    value={search}
-                    onChange={(e) => setSearch(e.currentTarget.value)}
-                    w={isMobile ? "100%" : 340}
-                  />
-
-                  <SegmentedControl
-                    value={status}
-                    onChange={(v: any) => setStatus(v)}
-                    data={[
-                      { label: "Todos", value: "all" },
-                      { label: "Activos", value: "active" },
-                      { label: "Inactivos", value: "inactive" },
-                    ]}
-                    size={isMobile ? "xs" : "sm"}
-                  />
-
-                  <Group gap="sm">
-                    <Button variant="subtle" onClick={() => { setSearch(""); setStatus("all"); }}>
-                      Limpiar filtros
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setIsModalOpen(true);
-                        setEditingEmployee(null);
-                      }}
-                    >
-                      Agregar profesional
-                    </Button>
-                  </Group>
-                </Group>
-              </Stack>
-            </Card>
-
-            <Divider my="sm" />
-
-            {/* Grid */}
-            {!initialLoaded ? (
-              <Grid>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Grid.Col span={{ base: 12, md: 6, lg: 3 }} key={i}>
-                    <Card withBorder radius="md" p="md">
-                      <Skeleton height={72} circle mb="sm" />
-                      <Skeleton height={12} width="60%" mb="xs" />
-                      <Skeleton height={10} width="40%" mb="xs" />
-                      <Skeleton height={10} width="30%" />
-                    </Card>
-                  </Grid.Col>
-                ))}
-              </Grid>
-            ) : filtered.length === 0 ? (
-              <Center mih={240}>
-                <Stack align="center" gap="xs">
-                  <Text c="dimmed">
-                    No hay profesionales para los filtros aplicados.
-                  </Text>
-                  <Button
-                    variant="light"
-                    onClick={() => {
-                      setSearch("");
-                      setStatus("all");
-                    }}
-                  >
-                    Limpiar filtros
-                  </Button>
-                </Stack>
-              </Center>
-            ) : (
-              <Grid>
-                {filtered.map((employee) => (
-                  <Grid.Col
-                    span={{ base: 12, md: 6, lg: 3 }}
-                    key={employee._id}
-                  >
-                    <EmployeeCard
-                      employee={employee}
-                      onEdit={handleEditEmployee}
-                      onDelete={handleDeleteEmployee}
-                      onActive={(id) => handleActiveEmployee(id, true)}
-                      onViewDetails={showEmployeeDetailsModal}
-                      onShowAdvanceModal={handleShowAdvanceModal}
-                      onShowIncomeModal={handleShowIncomeModal}
-                    />
-                  </Grid.Col>
-                ))}
-              </Grid>
-            )}
-          </Tabs.Panel>
-
-          <Tabs.Panel value="schedules" pt="md">
-            {activeTab === "schedules" && (
-              <ScheduleOverview
-                organizationId={organizationId!}
-                employees={employees.filter((e) => e.isActive)}
+      {activeTab === "schedules" ? (
+        <ScheduleOverview organizationId={organizationId!} employees={employees.filter((e) => e.isActive)} />
+      ) : (
+        <>
+          {/* Filtros y acción principal */}
+          <div className="ag-row" style={{ gap: 8 }}>
+            <div className="ag-search" style={{ flex: isMobile ? "1 1 100%" : "0 1 320px" }}>
+              <input
+                className="ag-input"
+                type="search"
+                placeholder="Buscar por nombre, cargo, correo o teléfono"
+                aria-label="Buscar profesionales"
+                value={search}
+                onChange={(e) => setSearch(e.currentTarget.value)}
               />
+              <span aria-hidden="true">
+                <IconSearch size={16} stroke={1.75} />
+              </span>
+            </div>
+            <SegmentedControl
+              value={status}
+              onChange={(v) => setStatus(v as typeof status)}
+              data={[
+                { label: `Activos · ${counts.active}`, value: "active" },
+                { label: `Inactivos · ${counts.inactive}`, value: "inactive" },
+                { label: "Todos", value: "all" },
+              ]}
+              size="xs"
+            />
+            <span style={{ flex: 1 }} />
+            {!isMobile && (
+              <Button leftSection={<IconPlus size={16} />} onClick={openNew}>
+                Nuevo profesional
+              </Button>
             )}
-          </Tabs.Panel>
-        </Tabs>
-      </Card>
+          </div>
 
-      {/* Modales */}
+          {loadError ? (
+            <div className="ag-alert ag-alert--danger" role="alert">
+              <IconAlertTriangle size={18} />
+              <div style={{ flex: 1 }}>No se pudo cargar el equipo. Revisa tu conexión e inténtalo de nuevo.</div>
+              <Button size="xs" variant="default" onClick={() => void loadAll()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : !initialLoaded ? (
+            <div className="ag-card" aria-busy="true">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+                  <span className="ag-skeleton" style={{ width: 40, height: 40, borderRadius: 999 }} />
+                  <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <span className="ag-skeleton" style={{ width: "35%" }} />
+                    <span className="ag-skeleton" style={{ width: "20%" }} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : employees.length === 0 ? (
+            <div className="ag-card">
+              <div className="ag-empty">
+                <div className="ag-empty__icon">
+                  <IconUsers size={22} />
+                </div>
+                <h3>Aún no tienes profesionales</h3>
+                <p>Agrega a tu equipo para asignar citas.</p>
+                <Button leftSection={<IconPlus size={16} />} onClick={openNew}>
+                  Nuevo profesional
+                </Button>
+              </div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="ag-card">
+              <div className="ag-empty">
+                <h3>No hay profesionales con estos filtros</h3>
+                <Button variant="default" onClick={() => { setSearch(""); setStatus("all"); }}>
+                  Limpiar filtros
+                </Button>
+              </div>
+            </div>
+          ) : isMobile ? (
+            <>
+              <div className="ag-card">
+                {filtered.map((e) => (
+                  <EmployeeRow key={e._id} employee={e} isMobile commission={commissionOf(e)} {...rowActions} />
+                ))}
+              </div>
+              <Button
+                size="lg"
+                radius="xl"
+                leftSection={<IconPlus size={18} />}
+                onClick={openNew}
+                style={{ position: "fixed", right: 16, bottom: "calc(var(--app-shell-footer-offset, 0px) + 16px)", zIndex: 150, boxShadow: "var(--shadow-lg)" }}
+              >
+                Nuevo profesional
+              </Button>
+            </>
+          ) : (
+            <div className="ag-card" style={{ overflowX: "auto" }}>
+              <table className="ag-table" style={{ minWidth: 760 }}>
+                <thead>
+                  <tr>
+                    <th>Profesional</th>
+                    <th>Estado</th>
+                    <th className="num">Servicios</th>
+                    <th>Reserva online</th>
+                    <th className="num">Comisión</th>
+                    <th aria-label="Acciones" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((e) => (
+                    <EmployeeRow key={e._id} employee={e} isMobile={false} commission={commissionOf(e)} {...rowActions} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
       <ModalCreateEdit
         isOpen={isModalOpen}
         onClose={() => {
@@ -440,6 +373,7 @@ const AdminEmployees: React.FC = () => {
         }}
         employee={editingEmployee}
         services={services}
+        employees={employees}
         onSave={handleSaveEmployee}
       />
 
@@ -447,20 +381,25 @@ const AdminEmployees: React.FC = () => {
         isOpen={showEmployeeDetails}
         onClose={() => setShowEmployeeDetails(false)}
         employee={selectedEmployee}
+        refreshKey={profileRefresh}
+        onAdvance={handleShowAdvanceModal}
+        onIncome={handleShowIncomeModal}
+        onEdit={(e) => {
+          setShowEmployeeDetails(false);
+          handleEditEmployee(e);
+        }}
       />
 
-      <AdvanceModal
-        isOpen={showAdvanceModal}
-        onClose={() => setShowAdvanceModal(false)}
-        employee={selectedEmployee}
-      />
+      <AdvanceModal isOpen={showAdvanceModal} onClose={() => {
+          setShowAdvanceModal(false);
+          setProfileRefresh((n) => n + 1);
+        }} employee={selectedEmployee} />
 
-      <IncomeModal
-        isOpen={showIncomeModal}
-        onClose={() => setShowIncomeModal(false)}
-        employee={selectedEmployee}
-      />
-    </Container>
+      <IncomeModal isOpen={showIncomeModal} onClose={() => {
+          setShowIncomeModal(false);
+          setProfileRefresh((n) => n + 1);
+        }} employee={selectedEmployee} />
+    </div>
   );
 };
 

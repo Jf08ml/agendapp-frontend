@@ -1,45 +1,20 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// pages/admin/MyMembership.tsx
+// Mi plan (rediseño, MembresiaPanel; antes «Mi membresía»): aviso del estado con
+// una sola acción, «Tu plan», uso con barras, qué incluye y cambiar de plan.
+// Periodo de gracia con fecha de corte y «Quedan 2 de 3 días».
 import { useEffect, useState } from "react";
-import {
-  Container,
-  Title,
-  Stack,
-  Paper,
-  Text,
-  Group,
-  Badge,
-  Button,
-  Alert,
-  Loader,
-  Progress,
-  SimpleGrid,
-  Collapse,
-  Anchor,
-  List,
-  ThemeIcon,
-} from "@mantine/core";
-import {
-  IconAlertCircle,
-  IconCheck,
-  IconX,
-  IconSparkles,
-} from "@tabler/icons-react";
-
+import { Box, Button, Collapse, Progress, Skeleton } from "@mantine/core";
+import { IconCheck, IconInfoCircle, IconSparkles, IconX } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
-import {
-  getCurrentMembership,
-  getMyPlanInfo,
-  Membership,
-  MyPlanInfo,
-} from "../../services/membershipService";
+import { getCurrentMembership, getMyPlanInfo, Membership, MyPlanInfo } from "../../services/membershipService";
 import { PaymentMethodsModal } from "../../components/PaymentMethodsModal";
 import { ActivatePlanModal } from "../../components/ActivatePlanModal";
 import { apiPlansPublic } from "../../services/axiosConfig";
 import { billingShort } from "../../utils/billingCycle";
 import WhatsappQuotaUsage from "../../components/WhatsappQuotaUsage";
+import { STATUS_LABELS, daysUntil, graceInfo, statusNotice } from "./membershipModel";
 
 interface PublicPlan {
   _id: string;
@@ -53,32 +28,22 @@ interface PublicPlan {
   paypalPlanId: string | null;
 }
 
-const STATUS: Record<string, { label: string; color: string }> = {
-  active: { label: "Activa", color: "green" },
-  trial: { label: "Prueba gratuita", color: "blue" },
-  pending: { label: "Pendiente", color: "yellow" },
-  past_due: { label: "Vencida", color: "orange" },
-  suspended: { label: "Suspendida", color: "red" },
-  cancelled: { label: "Cancelada", color: "gray" },
-  expired: { label: "Expirada", color: "red" },
-};
-
 const FEATURES: [string, string][] = [
   ["whatsappIntegration", "WhatsApp automático"],
   ["autoReminders", "Recordatorios automáticos"],
-  ["campaignsWhatsapp", "Campañas WhatsApp"],
-  ["loyaltyProgram", "Sistema de fidelización"],
+  ["campaignsWhatsapp", "Campañas de WhatsApp"],
+  ["loyaltyProgram", "Programa de fidelidad"],
   ["servicePackages", "Paquetes de sesiones"],
-  ["classesModule", "Módulo de clases"],
-  ["professionalLanding", "Landing profesional"],
-  ["customBranding", "Branding personalizado"],
+  ["classesModule", "Clases"],
+  ["professionalLanding", "Página de inicio profesional"],
+  ["customBranding", "Marca personalizada"],
   ["prioritySupport", "Soporte prioritario"],
 ];
 
-const DAY_MS = 1000 * 60 * 60 * 24;
-
-const formatDate = (d: string | Date) =>
-  new Date(d).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
+const formatDate = (d: string | Date | number) => new Date(d).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" });
+const money = (price: number, currency: string) => `$ ${price.toLocaleString("es-CO")} ${currency}`;
+const h1 = { margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" } as const;
+const toneClass = (tone: string) => (tone === "neutral" ? "ag-badge" : `ag-badge ag-badge--${tone}`);
 
 export default function MyMembership() {
   const [membership, setMembership] = useState<Membership | null>(null);
@@ -90,9 +55,7 @@ export default function MyMembership() {
   const [planInfo, setPlanInfo] = useState<MyPlanInfo | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
-  );
+  const organization = useSelector((state: RootState) => state.organization.organization);
 
   useEffect(() => {
     loadMembership();
@@ -102,10 +65,7 @@ export default function MyMembership() {
     if (!organization?._id) return;
     setLoading(true);
     try {
-      const [membershipData, planInfoData] = await Promise.all([
-        getCurrentMembership(organization._id),
-        getMyPlanInfo(),
-      ]);
+      const [membershipData, planInfoData] = await Promise.all([getCurrentMembership(organization._id), getMyPlanInfo()]);
       setMembership(membershipData);
       setPlanInfo(planInfoData);
     } catch (error) {
@@ -130,305 +90,244 @@ export default function MyMembership() {
     }
   };
 
-  const scrollToPlans = () =>
-    document.getElementById("planes")?.scrollIntoView({ behavior: "smooth", block: "start" });
-
+  const scrollToPlans = () => document.getElementById("planes")?.scrollIntoView({ behavior: "smooth", block: "start" });
   const paidPlans = publicPlans.filter((p) => p.slug !== "plan-demo" && p.price > 0);
 
   if (loading) {
     return (
-      <Container size="lg" py="xl">
-        <Stack align="center" gap="md" py="xl">
-          <Loader size="lg" />
-          <Text c="dimmed">Cargando información de membresía...</Text>
-        </Stack>
-      </Container>
+      <Box p={{ base: "sm", md: "lg" }} maw={1000}>
+        <Skeleton height={30} width={160} mb={16} />
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} height={140} radius="md" mb={12} />
+        ))}
+      </Box>
     );
   }
 
-  // ── Sin membresía: solo elegir plan ─────────────────────────────────────
+  // Sin membresía: solo elegir plan
   if (!membership) {
     return (
-      <Container size="lg" py="xl">
-        <Stack gap="xl">
+      <Box p={{ base: "sm", md: "lg" }} maw={1000}>
+        <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
           <div>
-            <Title order={2}>Mi membresía</Title>
-            <Text c="dimmed" size="sm">Elige un plan para comenzar a usar AgenditApp.</Text>
+            <h1 style={h1}>Mi plan</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>Elige un plan para empezar a usar AgenditApp.</div>
           </div>
-          <PlansGrid
-            plans={paidPlans}
-            error={plansError}
-            onRetry={loadPlans}
-            actionLabel="Elegir este plan"
-            onSelect={setActivatePlan}
-          />
-        </Stack>
-        <ActivatePlanModal
-          opened={!!activatePlan}
-          onClose={() => setActivatePlan(null)}
-          plan={activatePlan}
-          modalTitle="Activar mi plan"
-        />
-      </Container>
+          <PlansGrid plans={paidPlans} error={plansError} onRetry={loadPlans} actionLabel="Elegir este plan" onSelect={setActivatePlan} />
+        </div>
+        <ActivatePlanModal opened={!!activatePlan} onClose={() => setActivatePlan(null)} plan={activatePlan} modalTitle="Activar mi plan" />
+      </Box>
     );
   }
 
   const plan = membership.planId;
-  const isTrial = membership.status === "trial";
-  const isActive = membership.status === "active";
-  const status = STATUS[membership.status] ?? { label: membership.status, color: "gray" };
+  const status = membership.status;
+  const isTrial = status === "trial";
+  const isActive = status === "active";
+  const statusLabel = STATUS_LABELS[status] ?? { label: status, tone: "neutral" as const };
 
   const now = Date.now();
   const end = new Date(membership.currentPeriodEnd);
-  const daysLeft = Math.ceil((end.getTime() - now) / DAY_MS);
-  const trialTotalDays = Math.max(1, Math.ceil((end.getTime() - new Date(membership.startDate).getTime()) / DAY_MS));
-  const trialProgress = Math.min(100, ((trialTotalDays - Math.max(0, daysLeft)) / trialTotalDays) * 100);
-
-  // Plan pago que puede renovarse directamente (no aplica al trial)
+  const daysLeft = daysUntil(end.getTime(), now);
+  const trialTotalDays = Math.max(1, Math.ceil((end.getTime() - new Date(membership.startDate).getTime()) / 86_400_000));
   const canRenewCurrent = !isTrial && plan.price > 0;
-  const expiringSoon = isActive && daysLeft <= 7;
+  const notice = statusNotice(status, daysLeft, canRenewCurrent);
+  const grace = status === "past_due" ? graceInfo(end.getTime(), now, (membership as any).accessEndsAt ? new Date((membership as any).accessEndsAt).getTime() : null) : null;
 
-  // Mensaje de atención (solo cuando hay que hacer algo)
-  let attention: { color: string; text: string } | null = null;
-  if (membership.status === "past_due") {
-    attention = { color: "orange", text: "Tu plan venció. Solo puedes consultar datos; renueva para recuperar el acceso completo." };
-  } else if (membership.status === "suspended") {
-    attention = { color: "red", text: "Tu membresía está suspendida. Renueva para reactivarla." };
-  } else if (membership.status === "expired" || membership.status === "cancelled") {
-    attention = { color: "red", text: "Tu membresía no está activa. Elige un plan para recuperar el acceso." };
-  } else if (expiringSoon) {
-    attention = {
-      color: "yellow",
-      text: daysLeft > 0 ? `Tu membresía vence en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}.` : "Tu membresía vence hoy.",
-    };
-  }
+  const runAction = (action: string) => (action === "renew" ? setPaymentModalOpened(true) : scrollToPlans());
+  const actionLabel = (action: string) =>
+    action === "renew" ? (status === "active" ? "Renovar plan" : "Renovar") : isTrial ? "Activar mi plan" : "Elegir un plan";
 
-  // Para activas: otros planes (cambio). Para el resto: todos los planes pagos.
+  // Activas: otros planes (cambio). Resto: todos los planes de pago.
   const otherPlans = isActive ? paidPlans.filter((p) => p._id !== plan._id) : paidPlans;
 
-  const primaryAction = canRenewCurrent ? (
-    <Button
-      size="md"
-      variant={isActive && !expiringSoon ? "light" : "filled"}
-      onClick={() => setPaymentModalOpened(true)}
-    >
-      Renovar membresía
-    </Button>
-  ) : (
-    <Button size="md" leftSection={<IconSparkles size={18} />} onClick={scrollToPlans}>
-      Elegir un plan
-    </Button>
-  );
-
   const plansSection = otherPlans.length > 0 && (
-    <Stack gap="md" id="planes" style={{ scrollMarginTop: 80 }}>
+    <section className="ag-stack" style={{ gap: 12, scrollMarginTop: 80 }} id="planes">
       <div>
-        <Title order={3}>
-          {isTrial ? "Elige tu plan" : isActive ? "Cambiar de plan" : "Reactiva tu cuenta"}
-        </Title>
-        <Text size="sm" c="dimmed">
+        <h2 className="ag-h" style={{ margin: 0 }}>{isTrial ? "Elige tu plan" : isActive ? "Cambiar de plan" : "Reactiva tu cuenta"}</h2>
+        <div className="ag-muted" style={{ fontSize: 14 }}>
           {isTrial
             ? "Elige antes de que termine tu prueba para seguir sin interrupciones."
             : isActive
               ? "El nuevo plan se activa al completar el pago."
               : "Elige un plan para recuperar el acceso completo."}
-        </Text>
+        </div>
       </div>
       <PlansGrid
         plans={otherPlans}
         error={plansError}
         onRetry={loadPlans}
         actionLabel={isActive ? "Cambiar a este plan" : "Elegir este plan"}
-        actionVariant={isActive ? "light" : "filled"}
+        actionVariant={isActive ? "outline" : "filled"}
         onSelect={setActivatePlan}
       />
-    </Stack>
+    </section>
   );
 
   return (
-    <Container size="lg" py="xl">
-      <Stack gap="xl">
-        <Title order={2}>Mi membresía</Title>
+    <Box p={{ base: "sm", md: "lg" }} maw={1000}>
+      <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+        <h1 style={h1}>Mi plan</h1>
 
-        {/* ─── Resumen ──────────────────────────────────────────────── */}
-        <Paper withBorder radius="lg" p={{ base: "md", sm: "xl" }}>
-          <Stack gap="lg">
-            <Group justify="space-between" align="flex-start" wrap="nowrap">
-              <div>
-                <Text size="sm" c="dimmed">Tu plan</Text>
-                <Title order={3}>{isTrial ? "Prueba gratuita" : plan.displayName}</Title>
+        {/* Aviso del estado: una sola acción */}
+        {notice && (
+          <div className={`ag-alert ag-alert--${notice.tone}`} style={{ alignItems: "center", flexWrap: "wrap" }}>
+            <IconInfoCircle size={20} />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <b style={{ display: "block" }}>{notice.title}</b>
+              {notice.text}
+              {grace && (
+                <div style={{ marginTop: 8, maxWidth: 360 }}>
+                  <div className="ag-row" style={{ justifyContent: "space-between", fontSize: 13 }}>
+                    <span>
+                      Quedan {grace.left} de {grace.total} días
+                    </span>
+                    <span className="ag-subtle">Corte: {formatDate(grace.cutMs)}</span>
+                  </div>
+                  <Progress value={(grace.left / grace.total) * 100} color="orange" size="sm" mt={4} />
+                </div>
+              )}
+            </div>
+            {notice.action !== "none" && (
+              <Button onClick={() => runAction(notice.action)} leftSection={notice.action === "choose" ? <IconSparkles size={16} /> : undefined}>
+                {actionLabel(notice.action)}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Tu plan */}
+        <section className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="ag-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div>
+              <div className="ag-subtle">Tu plan</div>
+              <h2 className="ag-h" style={{ margin: 0 }}>{isTrial ? "Prueba gratuita" : plan.displayName}</h2>
+            </div>
+            <span className={toneClass(statusLabel.tone)}>{statusLabel.label}</span>
+          </div>
+
+          {isTrial ? (
+            <div className="ag-stack" style={{ gap: 8 }}>
+              <div className="ag-row" style={{ alignItems: "baseline", gap: 8 }}>
+                <span className="ag-num" style={{ font: "600 40px/44px var(--font-sans)" }}>{Math.max(0, daysLeft)}</span>
+                <span className="ag-muted">{daysLeft === 1 ? "día de prueba" : "días de prueba"} · termina el {formatDate(end)}</span>
               </div>
-              <Badge size="lg" variant="light" color={status.color} style={{ flexShrink: 0 }}>
-                {status.label}
-              </Badge>
-            </Group>
+              <Progress value={Math.min(100, ((trialTotalDays - Math.max(0, daysLeft)) / trialTotalDays) * 100)} color={daysLeft <= 2 ? "orange" : "dark"} size="sm" />
+              <div className="ag-subtle">Al terminar pasas al plan gratuito: 1 profesional, 5 servicios y sin WhatsApp.</div>
+              {!notice && (
+                <div>
+                  <Button onClick={scrollToPlans} leftSection={<IconSparkles size={16} />}>
+                    Activar mi plan
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <dl className="ag-kv" style={{ gridTemplateColumns: "140px 1fr" }}>
+              <dt>Precio</dt>
+              <dd className="ag-num">
+                {money(plan.price, plan.currency)} {plan.billingCycle !== "lifetime" ? `por ${billingShort(plan.billingCycle)}` : "· pago único"}
+              </dd>
+              <dt>{daysLeft > 0 ? "Vence el" : "Venció el"}</dt>
+              <dd>
+                {formatDate(end)}
+                {daysLeft > 0 && <span className="ag-subtle"> · faltan {daysLeft} {daysLeft === 1 ? "día" : "días"}</span>}
+              </dd>
+              {membership.lastPaymentDate && (
+                <>
+                  <dt>Último pago</dt>
+                  <dd>{formatDate(membership.lastPaymentDate)}</dd>
+                </>
+              )}
+              <dt>Renovación</dt>
+              <dd>{(membership as any).autoRenew ? "Automática con PayPal" : "Manual"}</dd>
+            </dl>
+          )}
 
-            {isTrial ? (
-              <Stack gap={6}>
-                <Group justify="space-between">
-                  <Text size="sm" fw={600}>
-                    {daysLeft > 0 ? `Te quedan ${daysLeft} día${daysLeft !== 1 ? "s" : ""}` : "Tu prueba termina hoy"}
-                  </Text>
-                  <Text size="sm" c="dimmed">Termina el {formatDate(end)}</Text>
-                </Group>
-                <Progress value={trialProgress} size="md" radius="xl" color={daysLeft <= 2 ? "red" : "blue"} />
-                <Text size="xs" c="dimmed">
-                  Al terminar pasarás al Plan Gratuito (1 profesional, 5 servicios, sin WhatsApp).
-                </Text>
-              </Stack>
-            ) : (
-              <SimpleGrid cols={{ base: 2, sm: 3 }} spacing="md">
-                <Stat label="Precio" value={`$${plan.price} ${plan.currency}`} hint={plan.billingCycle !== "lifetime" ? `por ${billingShort(plan.billingCycle)}` : "pago único"} />
-                <Stat
-                  label={daysLeft > 0 ? "Vence el" : "Venció el"}
-                  value={formatDate(end)}
-                  hint={daysLeft > 0 ? `${daysLeft} día${daysLeft !== 1 ? "s" : ""} restantes` : undefined}
-                  hintColor={daysLeft <= 3 ? "red" : daysLeft <= 7 ? "orange" : undefined}
-                />
-                {membership.lastPaymentDate && (
-                  <Stat label="Último pago" value={formatDate(membership.lastPaymentDate)} />
-                )}
-              </SimpleGrid>
-            )}
-
-            {attention && (
-              <Alert color={attention.color} variant="light" icon={<IconAlertCircle size={18} />}>
-                {attention.text}
-              </Alert>
-            )}
-
-            <Group>{primaryAction}</Group>
-          </Stack>
-        </Paper>
+          {isActive && !notice && canRenewCurrent && (
+            <div>
+              <Button variant="default" onClick={() => setPaymentModalOpened(true)}>
+                Renovar plan
+              </Button>
+            </div>
+          )}
+        </section>
 
         {/* En prueba o sin acceso, elegir plan es lo prioritario */}
         {!isActive && plansSection}
 
-        {/* ─── Uso e inclusiones ────────────────────────────────────── */}
         {!isTrial && (
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-            <Paper withBorder radius="lg" p={{ base: "md", sm: "lg" }}>
-              <Stack gap="md">
-                <Text fw={600}>Uso del plan</Text>
-                <UsageRow label="Profesionales" current={planInfo?.usage?.employees?.current} max={plan.limits?.maxEmployees} />
-                <UsageRow label="Servicios" current={planInfo?.usage?.services?.current} max={plan.limits?.maxServices} />
-                <WhatsappQuotaUsage usage={planInfo?.usage?.whatsappAppointmentsThisMonth} />
-                <Group gap="xl">
-                  <Stat
-                    label="Almacenamiento"
-                    value={plan.limits?.maxStorageGB != null ? `${plan.limits.maxStorageGB} GB` : "Ilimitado"}
-                    size="sm"
-                  />
-                  <Stat
-                    label="Recordatorios por cita"
-                    value={plan.limits?.maxRemindersPerAppointment > 0 ? String(plan.limits.maxRemindersPerAppointment) : "—"}
-                    size="sm"
-                  />
-                </Group>
-              </Stack>
-            </Paper>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, alignItems: "start" }}>
+            <section className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+              <h2 className="ag-h" style={{ margin: 0 }}>Uso del plan</h2>
+              <UsageRow label="Profesionales" current={planInfo?.usage?.employees?.current} max={plan.limits?.maxEmployees} />
+              <UsageRow label="Servicios" current={planInfo?.usage?.services?.current} max={plan.limits?.maxServices} />
+              <WhatsappQuotaUsage usage={planInfo?.usage?.whatsappAppointmentsThisMonth} />
+              <dl className="ag-kv" style={{ gridTemplateColumns: "1fr auto" }}>
+                <dt>Almacenamiento</dt>
+                <dd className="ag-num">{plan.limits?.maxStorageGB != null ? `${plan.limits.maxStorageGB} GB` : "Ilimitado"}</dd>
+                <dt>Recordatorios por cita</dt>
+                <dd className="ag-num">{plan.limits?.maxRemindersPerAppointment > 0 ? String(plan.limits.maxRemindersPerAppointment) : "—"}</dd>
+              </dl>
+            </section>
 
-            <Paper withBorder radius="lg" p={{ base: "md", sm: "lg" }}>
-              <Stack gap="md">
-                <Text fw={600}>Qué incluye</Text>
-                <SimpleGrid cols={{ base: 1, xs: 2 }} spacing={8}>
-                  {[...FEATURES]
-                    .sort(([a], [b]) => Number(!!(plan.limits as any)?.[b]) - Number(!!(plan.limits as any)?.[a]))
-                    .map(([key, label]) => {
-                      const included = !!(plan.limits as any)?.[key];
-                      return (
-                        <Group key={key} gap={8} wrap="nowrap">
-                          {included ? (
-                            <IconCheck size={16} color="var(--mantine-color-green-6)" style={{ flexShrink: 0 }} />
-                          ) : (
-                            <IconX size={16} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
-                          )}
-                          <Text size="sm" c={included ? undefined : "dimmed"} td={included ? undefined : "line-through"}>
-                            {label}
-                          </Text>
-                        </Group>
-                      );
-                    })}
-                </SimpleGrid>
-                {plan.characteristics?.length > 0 && (
-                  <>
-                    <Anchor component="button" size="sm" onClick={() => setShowDetails((v) => !v)} style={{ alignSelf: "flex-start" }}>
-                      {showDetails ? "Ocultar detalle" : "Ver detalle del plan"}
-                    </Anchor>
-                    <Collapse in={showDetails}>
-                      <List size="sm" spacing={4}>
-                        {plan.characteristics.map((c, i) => (
-                          <List.Item key={i}>{c}</List.Item>
-                        ))}
-                      </List>
-                    </Collapse>
-                  </>
-                )}
-              </Stack>
-            </Paper>
-          </SimpleGrid>
+            <section className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 className="ag-h" style={{ margin: 0 }}>Qué incluye</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
+                {[...FEATURES]
+                  .sort(([a], [b]) => Number(!!(plan.limits as any)?.[b]) - Number(!!(plan.limits as any)?.[a]))
+                  .map(([key, label]) => {
+                    const included = !!(plan.limits as any)?.[key];
+                    return (
+                      <div key={key} className="ag-row" style={{ gap: 8, flexWrap: "nowrap", fontSize: 14, color: included ? "var(--ink)" : "var(--ink-subtle)" }}>
+                        {included ? <IconCheck size={16} color="var(--success)" style={{ flex: "none" }} /> : <IconX size={16} style={{ flex: "none" }} />}
+                        <span style={{ textDecoration: included ? undefined : "line-through" }}>{label}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+              {plan.characteristics?.length > 0 && (
+                <>
+                  <button type="button" className="ag-link" style={{ alignSelf: "flex-start", background: "none", border: 0, padding: 0, fontSize: 13, cursor: "pointer" }} onClick={() => setShowDetails((v) => !v)}>
+                    {showDetails ? "Ocultar detalle" : "Ver detalle del plan"}
+                  </button>
+                  <Collapse in={showDetails}>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14, color: "var(--ink-muted)" }}>
+                      {plan.characteristics.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </Collapse>
+                </>
+              )}
+            </section>
+          </div>
         )}
 
         {isActive && plansSection}
-      </Stack>
+      </div>
 
-      {/* Modal de renovación del plan actual */}
-      <PaymentMethodsModal
-        opened={paymentModalOpened}
-        onClose={() => setPaymentModalOpened(false)}
-        membership={membership}
-      />
-
-      {/* Modal de activación / cambio de plan */}
-      <ActivatePlanModal
-        opened={!!activatePlan}
-        onClose={() => setActivatePlan(null)}
-        plan={activatePlan}
-        modalTitle={isActive ? "Cambiar de plan" : "Activar mi plan"}
-      />
-    </Container>
+      <PaymentMethodsModal opened={paymentModalOpened} onClose={() => setPaymentModalOpened(false)} membership={membership} />
+      <ActivatePlanModal opened={!!activatePlan} onClose={() => setActivatePlan(null)} plan={activatePlan} modalTitle={isActive ? "Cambiar de plan" : "Activar mi plan"} />
+    </Box>
   );
 }
 
 // ─── Sub-componentes ────────────────────────────────────────────────────────
 
-function Stat({
-  label,
-  value,
-  hint,
-  hintColor,
-  size = "md",
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  hintColor?: string;
-  size?: "sm" | "md";
-}) {
-  return (
-    <Stack gap={0}>
-      <Text size="xs" c="dimmed">{label}</Text>
-      <Text size={size === "md" ? "lg" : "md"} fw={700}>{value}</Text>
-      {hint && <Text size="xs" c={hintColor ?? "dimmed"} fw={hintColor ? 600 : undefined}>{hint}</Text>}
-    </Stack>
-  );
-}
-
 function UsageRow({ label, current, max }: { label: string; current?: number; max?: number | null }) {
   const used = current ?? 0;
   const pct = max ? Math.min(100, (used / max) * 100) : 0;
   return (
-    <Stack gap={4}>
-      <Group justify="space-between" wrap="nowrap">
-        <Text size="sm">{label}</Text>
-        <Text size="sm" fw={600}>
-          {current ?? "—"} / {max != null ? max : "Ilimitados"}
-        </Text>
-      </Group>
-      {max != null && (
-        <Progress value={pct} size="sm" radius="xl" color={used >= max ? "red" : pct >= 80 ? "orange" : "blue"} />
-      )}
-    </Stack>
+    <div>
+      <div className="ag-row" style={{ justifyContent: "space-between", fontSize: 14 }}>
+        <span>{label}</span>
+        <b className="ag-num">
+          {current ?? "—"} de {max != null ? max : "ilimitados"}
+        </b>
+      </div>
+      {max != null && <Progress value={pct} size="sm" mt={6} color={used >= max ? "red" : pct >= 80 ? "orange" : "dark"} />}
+    </div>
   );
 }
 
@@ -444,63 +343,54 @@ function PlansGrid({
   error: boolean;
   onRetry: () => void;
   actionLabel: string;
-  actionVariant?: "filled" | "light";
+  actionVariant?: "filled" | "outline";
   onSelect: (p: PublicPlan) => void;
 }) {
   if (error) {
     return (
-      <Alert icon={<IconAlertCircle size={18} />} title="No se pudieron cargar los planes" color="red">
-        <Button size="xs" variant="light" onClick={onRetry}>Reintentar</Button>
-      </Alert>
+      <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+        <IconInfoCircle size={20} />
+        <div style={{ flex: 1 }}>No pudimos cargar los planes.</div>
+        <Button size="xs" variant="outline" onClick={onRetry}>
+          Reintentar
+        </Button>
+      </div>
     );
   }
 
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
       {plans.map((p) => (
-        <Paper key={p._id} withBorder radius="lg" p="lg">
-          <Stack gap="md" h="100%">
-            <div>
-              <Group justify="space-between" wrap="nowrap" align="flex-start">
-                <Text size="lg" fw={700}>{p.displayName}</Text>
-                {p.domainType === "custom_domain" && (
-                  <Badge variant="light" color="grape" style={{ flexShrink: 0 }}>Dominio propio</Badge>
-                )}
-              </Group>
-              <Text size="xl" fw={800}>
-                ${p.price}{" "}
-                <Text span size="sm" c="dimmed" fw={500}>
-                  {p.currency}{p.billingCycle !== "lifetime" && ` / ${billingShort(p.billingCycle)}`}
-                </Text>
-              </Text>
+        <div key={p._id} className="ag-card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <div className="ag-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <b style={{ fontSize: 16 }}>{p.displayName}</b>
+              {p.domainType === "custom_domain" && <span className="ag-badge ag-badge--brand">Dominio propio</span>}
             </div>
-
-            {p.characteristics?.length > 0 && (
-              <List
-                size="sm"
-                spacing={6}
-                icon={
-                  <ThemeIcon color="green" variant="light" size={18} radius="xl">
-                    <IconCheck size={12} />
-                  </ThemeIcon>
-                }
-                style={{ flex: 1 }}
-              >
-                {p.characteristics.slice(0, 5).map((c, i) => (
-                  <List.Item key={i}>{c}</List.Item>
-                ))}
-                {p.characteristics.length > 5 && (
-                  <Text size="xs" c="dimmed" mt={4}>+{p.characteristics.length - 5} más</Text>
-                )}
-              </List>
-            )}
-
-            <Button fullWidth variant={actionVariant} onClick={() => onSelect(p)}>
-              {actionLabel}
-            </Button>
-          </Stack>
-        </Paper>
+            <div className="ag-num" style={{ marginTop: 4 }}>
+              <span style={{ font: "600 22px/28px var(--font-sans)" }}>$ {p.price.toLocaleString("es-CO")}</span>{" "}
+              <span className="ag-subtle">
+                {p.currency}
+                {p.billingCycle !== "lifetime" && ` / ${billingShort(p.billingCycle)}`}
+              </span>
+            </div>
+          </div>
+          {p.characteristics?.length > 0 && (
+            <ul style={{ margin: 0, padding: 0, listStyle: "none", flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+              {p.characteristics.slice(0, 5).map((c, i) => (
+                <li key={i} className="ag-row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start", fontSize: 14 }}>
+                  <IconCheck size={16} color="var(--success)" style={{ flex: "none", marginTop: 2 }} />
+                  {c}
+                </li>
+              ))}
+              {p.characteristics.length > 5 && <li className="ag-subtle">+{p.characteristics.length - 5} más</li>}
+            </ul>
+          )}
+          <Button fullWidth variant={actionVariant} onClick={() => onSelect(p)}>
+            {actionLabel}
+          </Button>
+        </div>
       ))}
-    </SimpleGrid>
+    </div>
   );
 }

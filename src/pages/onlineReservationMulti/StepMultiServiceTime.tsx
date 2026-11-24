@@ -3,11 +3,9 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Stack,
   Text,
-  Paper,
   Loader,
   Divider,
   SimpleGrid,
-  UnstyledButton,
   Anchor,
   Button,
   Switch,
@@ -16,7 +14,15 @@ import {
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
+import {
+  formatTimeFromISO as formatTimeFromISOBase,
+  formatTime as formatTimeBase,
+  toSpanishMeridiem,
+} from "../../utils/timeFormatUtils";
+
+// Web pública: «2:00 p. m.» (respeta 12 h / 24 h del negocio)
+const formatTimeFromISO = (iso: string, tf?: string) => toSpanishMeridiem(formatTimeFromISOBase(iso, tf));
+const formatTime = (d: Date | string | null | undefined, tf?: string) => toSpanishMeridiem(formatTimeBase(d, tf));
 import { Service } from "../../services/serviceService";
 import { Employee } from "../../services/employeeService";
 import {
@@ -29,7 +35,6 @@ import type { RecurrencePattern, SeriesPreview as SeriesPreviewType } from "../.
 import RecurrenceSelector from "../../components/customCalendar/components/RecurrenceSelector";
 import SeriesPreviewComponent from "../../components/customCalendar/components/SeriesPreview";
 import { previewRecurringReservations } from "../../services/reservationService";
-import StepHeading from "./StepHeading";
 
 const capitalize = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
@@ -84,7 +89,7 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
   const [showRecurrence, setShowRecurrence] = useState(false);
 
   // Cada franja (Mañana/Tarde/Noche) muestra 2 filas y el resto tras "Ver más"
-  const cols = useMatches({ base: 3, sm: 4, md: 5, lg: 6 });
+  const cols = useMatches({ base: 3, sm: 4, md: 5 });
   const visiblePerPeriod = cols * 2;
   const [expandedPeriods, setExpandedPeriods] = useState<Set<string>>(new Set());
   const togglePeriod = (period: string) =>
@@ -238,33 +243,11 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
     active: boolean;
     onClick: () => void;
   }) => {
+    // ag-slot: 48px, borde line-control; elegido en relleno de marca
     return (
-      <UnstyledButton
-        onClick={onClick}
-        aria-pressed={active}
-        style={{
-          width: "100%",
-          padding: 10,
-          minHeight: 46,
-          borderRadius: 10,
-          border: `1px solid ${
-            active
-              ? "var(--brand-text)"
-              : "var(--mantine-color-default-border)"
-          }`,
-          background: active
-            ? "var(--mantine-primary-color-filled)"
-            : "var(--mantine-color-body)",
-          color: active ? "var(--mantine-primary-color-contrast)" : undefined,
-          cursor: "pointer",
-          textAlign: "center",
-          userSelect: "none",
-        }}
-      >
-        <Text fw={700} size="sm" inherit style={{ lineHeight: 1.15 }}>
-          {label}
-        </Text>
-      </UnstyledButton>
+      <button type="button" className="ag-slot" onClick={onClick} aria-pressed={active} style={{ width: "100%" }}>
+        {label}
+      </button>
     );
   };
 
@@ -310,23 +293,20 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
   return (
     <Stack gap="sm">
-      <StepHeading
-        title="Elige la hora"
-        hint={[
+      <div className="ag-subtle">
+        {[
           capitalize(dayjs(dates[0].date).format("dddd D [de] MMMM")),
           `${totalMin} min`,
           who ? `con ${who}` : null,
         ]
           .filter(Boolean)
           .join(" · ")}
-      />
+      </div>
 
       {blockOptions.length === 0 ? (
-        <Paper withBorder radius="md" p="md" ta="center">
-          <Text size="sm" c="dimmed">
-            Este día ya no tiene horarios. Elige otro día en el calendario.
-          </Text>
-        </Paper>
+        <div className="ag-alert ag-alert--info">
+          Este día ya no tiene horarios. Elige otro día en el calendario.
+        </div>
       ) : (
         <Stack gap="sm">
           {groups.map(({ period, blocks }) => {
@@ -343,9 +323,9 @@ const StepMultiServiceTime: React.FC<StepMultiServiceTimeProps> = ({
 
             return (
             <Stack key={period} gap={6}>
-              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+              <div className="ag-slots__group" style={{ margin: "var(--space-2) 0 0" }}>
                 {period}
-              </Text>
+              </div>
               <SimpleGrid cols={cols} spacing="xs">
                 {shown.map((block) => {
                   const startStr = (block as any).startStr as string | undefined;

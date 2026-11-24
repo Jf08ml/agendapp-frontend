@@ -5,9 +5,7 @@ import {
   Flex,
   TextInput,
   Group,
-  Title,
   Button,
-  Badge,
   Tooltip,
   Skeleton,
   Modal,
@@ -23,9 +21,14 @@ import ClientFormModal from "./ClientFormModal";
 import BulkUploadModal from "./BulkUploadModal";
 import ClientList from "./ClientList";
 import FollowUpsTab from "./FollowUpsTab";
+import LoyaltySettingsPart from "./LoyaltySettingsPart";
+import { CLIENTS_TABS, resolveClientsTab } from "./clientsTabs";
+import { useSearchParams } from "react-router-dom";
+import { usePermissions } from "../../../hooks/usePermissions";
+import { computeNavPermissions } from "../../../layouts/adminNavigation";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
-import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical } from "@tabler/icons-react";
+import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical, IconInfoCircle } from "@tabler/icons-react";
 import {
   deleteClient,
   forceDeleteClient,
@@ -48,8 +51,31 @@ import { useDebouncedValue, useDisclosure, useMediaQuery } from "@mantine/hooks"
 const normalizeSearch = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 
+type LoyaltyFilter = "todos" | "premio" | "progreso";
+
+const hasReward = (c: Client) => !!(c.hasServiceDiscount || c.hasReferralBenefit);
+const inProgress = (c: Client) =>
+  !hasReward(c) && ((c.servicesTaken ?? 0) > 0 || (c.referralsMade ?? 0) > 0);
+
+// «Clientes y fidelidad» (decisión 6): una sola lista de clientes con sus
+// filtros de fidelidad, más Seguimientos, Programa de fidelidad y Tarjeta.
+// Las pestañas van en la URL (?tab=) para que los enlaces viejos de Ajustes
+// lleguen directo a Programa o Tarjeta.
 const ClientsDashboard = () => {
-  const [activeTab, setActiveTab] = useState<string>("clientes");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { hasPermission } = usePermissions();
+  const organization = useSelector((s: RootState) => s.organization.organization);
+  const can = computeNavPermissions(hasPermission, organization?.planLimits);
+  const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
+  const allowedTabs = CLIENTS_TABS.filter((t) => (t.key === "programa" || t.key === "tarjeta" ? can.businessInfo : true));
+  const activeTab = resolveClientsTab(searchParams.get("tab"), allowedTabs.map((t) => t.key));
+  const setActiveTab = (key: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (!key || key === "clientes") next.delete("tab");
+    else next.set("tab", key);
+    setSearchParams(next, { replace: true });
+  };
+  const [loyaltyFilter, setLoyaltyFilter] = useState<LoyaltyFilter>("todos");
   const [openModal, setOpenModal] = useState(false);
   const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -131,6 +157,21 @@ const ClientsDashboard = () => {
       );
     });
   }, [debounced, clients]);
+
+  // Filtros de fidelidad: premio listo = tiene un beneficio por servicios o por
+  // referidos sin canjear (los mismos campos que muestran «Premio listo» en la fila).
+  const loyaltyCounts = useMemo(
+    () => ({
+      todos: filteredClients.length,
+      premio: filteredClients.filter(hasReward).length,
+      progreso: filteredClients.filter(inProgress).length,
+    }),
+    [filteredClients]
+  );
+  const visibleClients = useMemo(() => {
+    if (!loyaltyEnabled || loyaltyFilter === "todos") return filteredClients;
+    return filteredClients.filter(loyaltyFilter === "premio" ? hasReward : inProgress);
+  }, [filteredClients, loyaltyEnabled, loyaltyFilter]);
 
   const handleRegisterService = async (clientId: string) => {
     try {
@@ -345,25 +386,67 @@ const ClientsDashboard = () => {
     }
   };
 
+  const loyaltyChips = loyaltyEnabled && (
+    <div className="ag-tabs" style={{ marginBottom: "var(--space-3)" }} role="tablist" aria-label="Filtrar clientes del programa">
+      {(
+        [
+          ["todos", "Todos"],
+          ["premio", "Premio listo"],
+          ["progreso", "En progreso"],
+        ] as [LoyaltyFilter, string][]
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          className="ag-chip"
+          aria-selected={loyaltyFilter === key}
+          onClick={() => setLoyaltyFilter(key)}
+          style={{ cursor: "pointer" }}
+        >
+          {label} <span className="count">{loyaltyCounts[key]}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <Box>
-      <Tabs value={activeTab} onChange={(value) => setActiveTab(value ?? "clientes")} keepMounted={false}>
+    <Box p={{ base: "sm", md: "lg" }}>
+      <h1 style={{ margin: "0 0 var(--space-3)", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>
+        Clientes y fidelidad
+      </h1>
+      <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="clientes">Clientes</Tabs.Tab>
-          <Tabs.Tab value="seguimientos">Seguimientos</Tabs.Tab>
+          {allowedTabs.map((t) => (
+            <Tabs.Tab key={t.key} value={t.key}>
+              {t.label}
+            </Tabs.Tab>
+          ))}
         </Tabs.List>
 
+        {!loyaltyEnabled && activeTab !== "programa" && activeTab !== "seguimientos" && (
+          <div className="ag-alert ag-alert--info" style={{ marginBottom: "var(--space-3)" }}>
+            <IconInfoCircle size={20} />
+            <div>
+              El programa de fidelidad está oculto para tus clientes.{" "}
+              {can.businessInfo && (
+                <a href="?tab=programa" className="ag-link" onClick={(e) => { e.preventDefault(); setActiveTab("programa"); }}>
+                  Actívalo en Programa de fidelidad
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         <Tabs.Panel value="clientes">
-          <Card
-            withBorder
-            radius="md"
-            p="md"
-            mb="md"
+          <Box
+            py="xs"
+            mb="sm"
             style={{
               position: "sticky",
               top: 0,
               zIndex: 5,
-              background: "var(--mantine-color-body)",
+              background: "var(--surface-muted)",
             }}
           >
             <Flex
@@ -373,12 +456,11 @@ const ClientsDashboard = () => {
               direction={isMobile ? "column" : "row"}
               wrap="wrap"
             >
-              <Group gap="sm">
-                <Title order={2}>Clientes</Title>
-                <Badge variant="light" size="sm">
-                  {filteredClients.length} de {clients.length}
-                </Badge>
-              </Group>
+              <Text size="sm" c="var(--ink-muted)">
+                {filteredClients.length === clients.length
+                  ? `${clients.length} ${clients.length === 1 ? "cliente" : "clientes"}`
+                  : `${filteredClients.length} de ${clients.length} clientes`}
+              </Text>
 
               <Group gap="sm" w={isMobile ? "100%" : "auto"}>
                 <TextInput
@@ -414,7 +496,6 @@ const ClientsDashboard = () => {
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<IconFileUpload size={16} />}
-                      color="blue"
                       onClick={() => setOpenBulkUploadModal(true)}
                     >
                       Carga masiva
@@ -423,7 +504,9 @@ const ClientsDashboard = () => {
                 </Menu>
               </Group>
             </Flex>
-          </Card>
+          </Box>
+
+          {loyaltyChips}
 
           {isLoading ? (
             <Card withBorder radius="md" p="md">
@@ -432,9 +515,8 @@ const ClientsDashboard = () => {
               <Skeleton height={36} />
             </Card>
           ) : (
-            <Card withBorder radius="md" p="md">
-              <ClientList
-                clients={filteredClients}
+            <ClientList
+                clients={visibleClients}
                 onDeleteClient={handleDeleteClient}
                 onForceDeleteClient={handleForceDeleteClient}
                 onMergeClient={handleOpenMerge}
@@ -445,13 +527,20 @@ const ClientsDashboard = () => {
                 onEditClient={handleOpenModal}
                 onClientUpdated={handleClientUpdated}
                 error={error}
-              />
-            </Card>
+            />
           )}
         </Tabs.Panel>
 
         <Tabs.Panel value="seguimientos">
           <FollowUpsTab />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="programa">
+          <LoyaltySettingsPart part="program" />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="tarjeta">
+          <LoyaltySettingsPart part="card" />
         </Tabs.Panel>
       </Tabs>
 

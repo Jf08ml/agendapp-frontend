@@ -1,27 +1,26 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// pages/superadmin/SuperadminManagement.tsx
-import { useEffect, useState } from "react";
+// Membresías de todos los negocios (rediseño, SuperadminMembresias; ruta
+// /superadmin): chips de estado con conteo (incluye «Vencen en 7 días o
+// menos», calculado en el navegador), tabla densa con una acción principal
+// por fila y «⋯», organizaciones sin membresía aparte y edición en panel.
+import { useEffect, useMemo, useState } from "react";
+import { ActionIcon, Button, Menu, Modal, NumberInput, Select, Skeleton, TextInput } from "@mantine/core";
+import { DateInput } from "@mantine/dates";
+import { notifications } from "@mantine/notifications";
+import dayjs from "dayjs";
 import {
-  Container,
-  Title,
-  Table,
-  Badge,
-  Group,
-  Button,
-  Text,
-  Select,
-  TextInput,
-  Paper,
-  Stack,
-  ActionIcon,
-  Tooltip,
-  Modal,
-  NumberInput,
-  Loader,
-  Alert,
-  CheckIcon,
-} from "@mantine/core";
+  IconAlertTriangle,
+  IconBan,
+  IconCircleCheck,
+  IconCircleX,
+  IconClock,
+  IconDots,
+  IconEdit,
+  IconInfoCircle,
+  IconMinus,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+} from "@tabler/icons-react";
 import {
   getAllMemberships,
   getAllPlans,
@@ -33,816 +32,424 @@ import {
   Membership,
   Plan,
 } from "../../services/membershipService";
-import {
-  getOrganizations,
-  Organization,
-} from "../../services/organizationService";
-import { notifications } from "@mantine/notifications";
-import { DateInput } from "@mantine/dates";
-import dayjs from "dayjs";
-import { BiRefresh, BiX, BiEdit, BiCreditCard, BiPlus } from "react-icons/bi";
-import SuperadminNav from "./SuperadminNav";
-import { IoAlertCircle } from "react-icons/io5";
+import { getOrganizations, Organization } from "../../services/organizationService";
+import { formatCurrency } from "../../utils/formatCurrency";
 import { EditMembershipModal } from "./EditMembershipModal";
+import { MEMBERSHIP_META, badgeClass, type Tone } from "./organizationsModel";
+import {
+  MEMBERSHIP_FILTERS,
+  PRIMARY_LABEL,
+  daysCell,
+  daysLeft,
+  filterCounts,
+  fmtDate,
+  matchesFilter,
+  primaryAction,
+  type MembershipFilter,
+} from "./membershipsModel";
+
+const TONE_ICON: Record<Tone, typeof IconCircleCheck> = {
+  success: IconCircleCheck,
+  info: IconClock,
+  warning: IconAlertTriangle,
+  danger: IconCircleX,
+  neutral: IconMinus,
+};
+
+type OrgRef = { _id?: string; name?: string; email?: string } | null;
+const orgOf = (m: Membership | null) => (m?.organizationId as unknown as OrgRef) ?? null;
+const orgIdOf = (m: Membership) => (typeof m.organizationId === "string" ? m.organizationId : orgOf(m)?._id);
+const errMsg = (e: unknown, fallback: string) => (e as { response?: { data?: { message?: string } } })?.response?.data?.message || fallback;
 
 export default function SuperadminManagement() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [orgsWithout, setOrgsWithout] = useState<Organization[]>([]);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
+  const [filter, setFilter] = useState<MembershipFilter>("all");
+  const [search, setSearch] = useState("");
 
-  // Modal de renovación
-  const [renewModalOpened, setRenewModalOpened] = useState(false);
-  const [selectedMembership, setSelectedMembership] =
-    useState<Membership | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<number>(0);
-
-  // Modal de edición
-  const [editModalOpened, setEditModalOpened] = useState(false);
-
-  // Modal de reactivación
-  const [reactivateModalOpened, setReactivateModalOpened] = useState(false);
+  const [selected, setSelected] = useState<Membership | null>(null);
+  const [dialog, setDialog] = useState<null | "renew" | "reactivate" | "activate" | "suspend" | "edit">(null);
+  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState<number>(0);
   const [newPeriodEnd, setNewPeriodEnd] = useState<string>("");
+  const [activatePlanId, setActivatePlanId] = useState("");
 
-  // Modal de activación de plan
-  const [activateModalOpened, setActivateModalOpened] = useState(false);
-  const [activatePlanId, setActivatePlanId] = useState<string>("");
-  const [activatePaymentAmount, setActivatePaymentAmount] = useState<number>(0);
-  const [activateLoading, setActivateLoading] = useState(false);
+  const [createOrg, setCreateOrg] = useState<Organization | null>(null);
+  const [createPlanId, setCreatePlanId] = useState("");
+  const [createTrialDays, setCreateTrialDays] = useState(0);
 
-  // Orgs sin membresía
-  const [orgsWithoutMembership, setOrgsWithoutMembership] = useState<Organization[]>([]);
-
-  // Modal de crear membresía
-  const [createModalOpened, setCreateModalOpened] = useState(false);
-  const [createOrgId, setCreateOrgId] = useState<string>("");
-  const [createPlanId, setCreatePlanId] = useState<string>("");
-  const [createTrialDays, setCreateTrialDays] = useState<number>(0);
-  const [createLoading, setCreateLoading] = useState(false);
+  const fetchData = async () => {
+    setStatus("loading");
+    try {
+      const [membershipsData, plansData, orgsData] = await Promise.all([getAllMemberships(), getAllPlans(), getOrganizations()]);
+      setMemberships(membershipsData);
+      setPlans(plansData);
+      const withMembership = new Set(membershipsData.map(orgIdOf));
+      setOrgsWithout((orgsData || []).filter((o) => !withMembership.has(o._id)));
+      setStatus("ok");
+    } catch {
+      setStatus("error");
+    }
+  };
 
   useEffect(() => {
     fetchData();
-  }, [filterStatus]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [membershipsData, plansData, orgsData] = await Promise.all([
-        getAllMemberships(filterStatus ? { status: filterStatus } : undefined),
-        getAllPlans(),
-        getOrganizations(),
-      ]);
-      setMemberships(membershipsData);
-      setPlans(plansData);
-
-      // Filtrar orgs que no tienen membresía
-      const orgIdsWithMembership = new Set(
-        membershipsData.map((m: Membership) =>
-          typeof m.organizationId === "string"
-            ? m.organizationId
-            : (m.organizationId as any)?._id
-        )
-      );
-      setOrgsWithoutMembership(
-        (orgsData || []).filter((org) => !orgIdsWithMembership.has(org._id))
-      );
-    } catch (error) {
-      console.error("Error al cargar datos:", error);
-      notifications.show({
-        title: "Error",
-        message: "No se pudieron cargar las membresías",
-        color: "red",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRenew = async () => {
-    const amount = Number(paymentAmount);
-    if (!selectedMembership || !Number.isFinite(amount) || amount <= 0) {
-      notifications.show({
-        title: "Monto inválido",
-        message: "Ingresa un monto mayor a 0",
-        color: "red",
-      });
-      return;
-    }
-
-    try {
-      await renewMembership(selectedMembership._id, amount);
-      notifications.show({
-        title: "Éxito",
-        message: "Membresía renovada correctamente",
-        color: "green",
-      });
-      setRenewModalOpened(false);
-      setSelectedMembership(null);
-      setPaymentAmount(0);
-      fetchData();
-    } catch (error) {
-      console.error("Error al renovar la membresía:", error);
-      notifications.show({
-        title: "Error",
-        message: "No se pudo renovar la membresía",
-        color: "red",
-      });
-    }
-  };
-
-  const handleSuspend = async (membership: Membership) => {
-    try {
-      await suspendMembership(
-        membership._id,
-        "Suspendida manualmente por administrador"
-      );
-      notifications.show({
-        title: "Éxito",
-        message: "Membresía suspendida",
-        color: "orange",
-      });
-      fetchData();
-    } catch (error) {
-      console.error("Error al suspender la membresía:", error);
-      notifications.show({
-        title: "Error",
-        message: "No se pudo suspender la membresía",
-        color: "red",
-      });
-    }
-  };
-
-  const handleReactivate = async () => {
-    if (!selectedMembership) return;
-
-    try {
-      await reactivateMembership(
-        selectedMembership._id,
-        newPeriodEnd || undefined
-      );
-      notifications.show({
-        title: "Éxito",
-        message: "Membresía reactivada correctamente",
-        color: "green",
-      });
-      setReactivateModalOpened(false);
-      setSelectedMembership(null);
-      setNewPeriodEnd("");
-      fetchData();
-    } catch (error) {
-      console.error("Error al reactivar la membresía:", error);
-      notifications.show({
-        title: "Error",
-        message: "No se pudo reactivar la membresía",
-        color: "red",
-      });
-    }
-  };
-
-  const handleActivatePlan = async () => {
-    if (!selectedMembership || !activatePlanId) {
-      notifications.show({
-        title: "Error",
-        message: "Selecciona un plan",
-        color: "red",
-      });
-      return;
-    }
-
-    setActivateLoading(true);
-    try {
-      await activatePlanSuperadmin(
-        selectedMembership._id,
-        activatePlanId,
-        activatePaymentAmount
-      );
-      notifications.show({
-        title: "Plan activado",
-        message: "La membresía fue activada exitosamente",
-        color: "green",
-      });
-      setActivateModalOpened(false);
-      setSelectedMembership(null);
-      setActivatePlanId("");
-      setActivatePaymentAmount(0);
-      fetchData();
-    } catch (error: any) {
-      notifications.show({
-        title: "Error",
-        message: error.response?.data?.message || "No se pudo activar el plan",
-        color: "red",
-      });
-    } finally {
-      setActivateLoading(false);
-    }
-  };
-
-  const handleCreateMembership = async () => {
-    if (!createOrgId || !createPlanId) {
-      notifications.show({
-        title: "Error",
-        message: "Selecciona una organización y un plan",
-        color: "red",
-      });
-      return;
-    }
-
-    setCreateLoading(true);
-    try {
-      await createMembership({
-        organizationId: createOrgId,
-        planId: createPlanId,
-        trialDays: createTrialDays > 0 ? createTrialDays : undefined,
-      });
-      notifications.show({
-        title: "Membresía creada",
-        message: "Se asignó la membresía correctamente",
-        color: "green",
-      });
-      setCreateModalOpened(false);
-      setCreateOrgId("");
-      setCreatePlanId("");
-      setCreateTrialDays(0);
-      fetchData();
-    } catch (error: any) {
-      notifications.show({
-        title: "Error",
-        message: error.response?.data?.message || "No se pudo crear la membresía",
-        color: "red",
-      });
-    } finally {
-      setCreateLoading(false);
-    }
-  };
+  }, []);
 
   const paidPlans = plans.filter((p) => p.slug !== "plan-demo" && p.price > 0);
+  const counts = useMemo(() => filterCounts(memberships), [memberships]);
+  const q = search.trim().toLowerCase();
+  const shown = memberships.filter(
+    (m) => matchesFilter(m, filter) && (!q || (orgOf(m)?.name ?? "").toLowerCase().includes(q) || (m.planId?.displayName ?? "").toLowerCase().includes(q))
+  );
+  const shownWithout = orgsWithout.filter((o) => !q || o.name?.toLowerCase().includes(q) || o.email?.toLowerCase().includes(q));
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { color: string; label: string }> = {
-      active: { color: "green", label: "Activa" },
-      trial: { color: "blue", label: "Prueba" },
-      past_due: { color: "orange", label: "Vencida" },
-      suspended: { color: "red", label: "Suspendida" },
-      pending: { color: "yellow", label: "Pendiente" },
-      cancelled: { color: "gray", label: "Cancelada" },
-      expired: { color: "red", label: "Expirada" },
-    };
-
-    const config = statusConfig[status] || { color: "gray", label: status };
-    return (
-      <Badge color={config.color} variant="filled">
-        {config.label}
-      </Badge>
-    );
+  const open = (m: Membership, d: NonNullable<typeof dialog>) => {
+    setSelected(m);
+    setDialog(d);
+    if (d === "renew") setAmount(m.planId?.price || 0);
+    if (d === "reactivate") setNewPeriodEnd("");
+    if (d === "activate") {
+      setActivatePlanId("");
+      setAmount(0);
+    }
+  };
+  const closeDialog = () => {
+    if (busy) return;
+    setDialog(null);
+    setSelected(null);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-CO", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const run = async (fn: () => Promise<unknown>, ok: string, fail: string) => {
+    setBusy(true);
+    try {
+      await fn();
+      notifications.show({ message: ok });
+      setDialog(null);
+      setSelected(null);
+      fetchData();
+    } catch (e) {
+      notifications.show({ message: errMsg(e, fail), color: "red" });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const getDaysUntilExpiration = (endDate: string) => {
-    const now = new Date();
-    const end = new Date(endDate);
-    const diff = end.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  const handleRenew = () => {
+    if (!selected || !(amount > 0)) {
+      notifications.show({ message: "Escribe un monto mayor a 0.", color: "red" });
+      return;
+    }
+    run(() => renewMembership(selected._id, amount), "Membresía renovada.", "No se pudo renovar la membresía.");
+  };
+  const handleReactivate = () =>
+    selected && run(() => reactivateMembership(selected._id, newPeriodEnd || undefined), "Membresía reactivada.", "No se pudo reactivar la membresía.");
+  const handleSuspend = () =>
+    selected && run(() => suspendMembership(selected._id, "Suspendida manualmente por administrador"), "Membresía suspendida.", "No se pudo suspender la membresía.");
+  const handleActivate = () =>
+    selected && activatePlanId && run(() => activatePlanSuperadmin(selected._id, activatePlanId, amount), "Plan activado.", "No se pudo activar el plan.");
+
+  const handleCreate = async () => {
+    if (!createOrg?._id || !createPlanId) return;
+    setBusy(true);
+    try {
+      await createMembership({ organizationId: createOrg._id, planId: createPlanId, trialDays: createTrialDays > 0 ? createTrialDays : undefined });
+      notifications.show({ message: `Membresía asignada a ${createOrg.name}.` });
+      setCreateOrg(null);
+      fetchData();
+    } catch (e) {
+      notifications.show({ message: errMsg(e, "No se pudo asignar la membresía."), color: "red" });
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const filteredMemberships = memberships.filter((m) => {
-    const orgName = (m.organizationId as any)?.name?.toLowerCase() || "";
-    const planName = m.planId?.displayName?.toLowerCase() || "";
-    const search = searchTerm.toLowerCase();
-    return orgName.includes(search) || planName.includes(search);
-  });
+  const planOption = (p: Plan) => ({ value: p._id, label: `${p.displayName} · $${p.price.toLocaleString()} ${p.currency ?? ""}`.trim() });
 
-  if (loading) {
-    return (
-      <Container size="xl" py="xl">
-        <Stack align="center" gap="md" py="xl">
-          <Loader size="lg" />
-          <Text c="dimmed">Cargando membresías...</Text>
-        </Stack>
-      </Container>
-    );
-  }
+  const dialogHead = (
+    <div className="ag-card" style={{ padding: "10px 12px", background: "var(--surface-muted)", fontSize: 14 }}>
+      <b>{orgOf(selected)?.name ?? "—"}</b>
+      <div className="ag-subtle">Plan actual: {selected?.planId?.displayName ?? "—"}</div>
+    </div>
+  );
+
+  const actions = (onCancel: () => void, label: string, onOk: () => void, disabled = false, color = "var(--platform)") => (
+    <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+      <Button variant="default" onClick={onCancel} disabled={busy}>
+        Cancelar
+      </Button>
+      <Button color={color} onClick={onOk} loading={busy} disabled={disabled}>
+        {label}
+      </Button>
+    </div>
+  );
 
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="lg">
-        {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
-
-        {/* Header */}
-        <Group justify="space-between">
+    <div style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 16px 48px" }}>
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div>
-            <Title order={2}>Gestión de Membresías</Title>
-            <Text c="dimmed" size="sm">
-              Administra todas las membresías del sistema
-            </Text>
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Membresías</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+              El plan, el estado y el vencimiento de cada negocio.
+            </div>
           </div>
-          <Button
-            leftSection={<BiRefresh size={16} />}
-            onClick={fetchData}
-            variant="light"
-          >
-            Actualizar
-          </Button>
-        </Group>
-
-        {/* Filtros */}
-        <Paper p="md" withBorder>
-          <Group>
+          <div className="ag-row" style={{ gap: 8 }}>
             <TextInput
-              placeholder="Buscar por organización o plan..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.currentTarget.value)}
-              style={{ flex: 1 }}
+              placeholder="Buscar por organización o plan"
+              aria-label="Buscar por organización o plan"
+              leftSection={<IconSearch size={16} />}
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              style={{ width: 280 }}
             />
-            <Select
-              placeholder="Filtrar por estado"
-              value={filterStatus}
-              onChange={(value) => setFilterStatus(value || "")}
-              data={[
-                { value: "", label: "Todos" },
-                { value: "active", label: "Activas" },
-                { value: "trial", label: "Prueba" },
-                { value: "past_due", label: "Vencidas" },
-                { value: "suspended", label: "Suspendidas" },
-              ]}
-              clearable
-              style={{ width: 200 }}
-            />
-          </Group>
-        </Paper>
+            <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={fetchData} loading={status === "loading"}>
+              Actualizar
+            </Button>
+          </div>
+        </div>
 
-        {/* Tabla */}
-        <Paper withBorder>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Organización</Table.Th>
-                <Table.Th>Plan</Table.Th>
-                <Table.Th>Estado</Table.Th>
-                <Table.Th>Vencimiento</Table.Th>
-                <Table.Th>Días Restantes</Table.Th>
-                <Table.Th>Último Pago</Table.Th>
-                <Table.Th>Acciones</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredMemberships.map((membership) => {
-                const org = membership.organizationId as any;
-                const daysLeft = getDaysUntilExpiration(
-                  membership.currentPeriodEnd
-                );
+        <div className="ag-row" style={{ gap: 6, flexWrap: "wrap" }} role="group" aria-label="Filtrar por estado">
+          {MEMBERSHIP_FILTERS.map((f) => (
+            <button key={f.value} type="button" className="ag-chip" style={{ cursor: "pointer" }} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>
+              {f.label} <span className="count">{status === "ok" ? counts[f.value] : "–"}</span>
+            </button>
+          ))}
+        </div>
 
-                return (
-                  <Table.Tr key={membership._id}>
-                    <Table.Td>
-                      <Stack gap={2}>
-                        <Text size="sm" fw={500}>
-                          {org?.name || membership._id}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {org?.email || ""}
-                        </Text>
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm">{membership.planId?.displayName}</Text>
-                    </Table.Td>
-                    <Table.Td>{getStatusBadge(membership.status)}</Table.Td>
-                    <Table.Td>
-                      <Text size="sm">
-                        {formatDate(membership.currentPeriodEnd)}
-                      </Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge
-                        color={
-                          daysLeft <= 3
-                            ? "red"
-                            : daysLeft <= 7
-                            ? "yellow"
-                            : "gray"
-                        }
-                        variant="light"
-                      >
-                        {daysLeft > 0 ? `${daysLeft} días` : `Vencida`}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      {membership.lastPaymentDate ? (
-                        <Stack gap={2}>
-                          <Text size="sm">
-                            {formatDate(membership.lastPaymentDate)}
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            $
-                            {membership.lastPaymentAmount?.toLocaleString() ||
-                              0}
-                          </Text>
-                        </Stack>
-                      ) : (
-                        <Text size="sm" c="dimmed">
-                          Sin pagos
-                        </Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        {["trial", "past_due", "expired"].includes(membership.status) && (
-                          <Tooltip label="Activar Plan">
-                            <ActionIcon
-                              color="grape"
-                              variant="light"
-                              onClick={() => {
-                                setSelectedMembership(membership);
-                                setActivatePlanId("");
-                                setActivatePaymentAmount(0);
-                                setActivateModalOpened(true);
-                              }}
-                            >
-                              <BiCreditCard size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        )}
-
-                        <Tooltip label="Editar">
-                          <ActionIcon
-                            color="blue"
-                            variant="light"
-                            onClick={() => {
-                              setSelectedMembership(membership);
-                              setEditModalOpened(true);
-                            }}
-                          >
-                            <BiEdit size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Renovar">
-                          <ActionIcon
-                            color="green"
-                            variant="light"
-                            onClick={() => {
-                              setSelectedMembership(membership);
-                              setPaymentAmount(membership.planId?.price || 0);
-                              setRenewModalOpened(true);
-                            }}
-                          >
-                            <CheckIcon size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        {membership.status === "suspended" ? (
-                          <Tooltip label="Reactivar">
-                            <ActionIcon
-                              color="cyan"
-                              variant="light"
-                              onClick={() => {
-                                setSelectedMembership(membership);
-                                setReactivateModalOpened(true);
-                              }}
-                            >
-                              <BiRefresh size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        ) : (
-                          <Tooltip label="Suspender">
-                            <ActionIcon
-                              color="red"
-                              variant="light"
-                              onClick={() => handleSuspend(membership)}
-                            >
-                              <BiX size={16} />
-                            </ActionIcon>
-                          </Tooltip>
-                        )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-
-          {filteredMemberships.length === 0 && (
-            <Stack align="center" py="xl">
-              <IoAlertCircle size={48} color="gray" />
-              <Text c="dimmed">No se encontraron membresías</Text>
-            </Stack>
-          )}
-        </Paper>
-
-        {/* Orgs sin membresía */}
-        {orgsWithoutMembership.length > 0 && !filterStatus && (
-          <Paper withBorder p="md">
-            <Title order={4} mb="md">
-              Organizaciones sin membresía ({orgsWithoutMembership.length})
-            </Title>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Organización</Table.Th>
-                  <Table.Th>Email</Table.Th>
-                  <Table.Th>Acciones</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {orgsWithoutMembership
-                  .filter((org) =>
-                    searchTerm
-                      ? org.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        org.email?.toLowerCase().includes(searchTerm.toLowerCase())
-                      : true
-                  )
-                  .map((org) => (
-                    <Table.Tr key={org._id}>
-                      <Table.Td>
-                        <Text size="sm" fw={500}>
-                          {org.name}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text size="sm" c="dimmed">
-                          {org.email}
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Button
-                          size="xs"
-                          variant="light"
-                          leftSection={<BiPlus size={14} />}
-                          onClick={() => {
-                            setCreateOrgId(org._id!);
-                            setCreatePlanId("");
-                            setCreateTrialDays(0);
-                            setCreateModalOpened(true);
-                          }}
-                        >
-                          Asignar Membresía
-                        </Button>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-              </Table.Tbody>
-            </Table>
-          </Paper>
+        {status === "error" ? (
+          <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+            <IconInfoCircle size={20} />
+            <div style={{ flex: 1 }}>No pudimos cargar las membresías.</div>
+            <Button size="xs" variant="default" onClick={fetchData}>
+              Reintentar
+            </Button>
+          </div>
+        ) : (
+          <div className="ag-card" style={{ overflowX: "auto" }}>
+            <table className="ag-table" style={{ minWidth: 960 }}>
+              <thead>
+                <tr>
+                  <th>Organización</th>
+                  <th>Plan</th>
+                  <th>Estado</th>
+                  <th>Vence</th>
+                  <th>Días</th>
+                  <th>Último pago</th>
+                  <th aria-label="Acciones" />
+                </tr>
+              </thead>
+              <tbody>
+                {status === "loading" ? (
+                  [0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i}>
+                      <td colSpan={7}>
+                        <Skeleton height={18} />
+                      </td>
+                    </tr>
+                  ))
+                ) : shown.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="ag-muted" style={{ textAlign: "center", padding: "32px 16px" }}>
+                      {q ? "Ninguna membresía coincide con la búsqueda." : "No hay membresías en este filtro."}
+                    </td>
+                  </tr>
+                ) : (
+                  shown.map((m) => {
+                    const org = orgOf(m);
+                    const meta = MEMBERSHIP_META[m.status] ?? { label: m.status, tone: "neutral" as Tone };
+                    const Icon = TONE_ICON[meta.tone];
+                    const days = daysCell(daysLeft(m.currentPeriodEnd));
+                    const action = primaryAction(m.status);
+                    const currency = m.planId?.currency || "USD";
+                    return (
+                      <tr key={m._id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{org?.name || m._id}</div>
+                          {org?.email && <div className="ag-subtle">{org.email}</div>}
+                        </td>
+                        <td>{m.planId?.displayName ?? "—"}</td>
+                        <td>
+                          <span className={badgeClass(meta.tone)} style={{ gap: 4 }}>
+                            <Icon size={13} stroke={2} />
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="ag-num">{fmtDate(m.currentPeriodEnd)}</td>
+                        <td className="ag-num" style={{ whiteSpace: "nowrap" }}>
+                          {days.tone === "neutral" ? <span className="ag-muted">{days.text}</span> : <span className={`ag-badge ag-badge--${days.tone}`}>{days.text}</span>}
+                        </td>
+                        <td>
+                          {m.lastPaymentDate ? (
+                            <>
+                              <div className="ag-num">{fmtDate(m.lastPaymentDate)}</div>
+                              <div className="ag-subtle ag-num">{formatCurrency(m.lastPaymentAmount || 0, currency)}</div>
+                            </>
+                          ) : (
+                            <span className="ag-muted">Sin pagos</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="ag-row" style={{ gap: 4, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                            <Button size="xs" variant="default" onClick={() => open(m, action)}>
+                              {PRIMARY_LABEL[action]}
+                            </Button>
+                            <Menu position="bottom-end" withinPortal width={200}>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" aria-label={`Más acciones para ${org?.name ?? "la membresía"}`}>
+                                  <IconDots size={18} />
+                                </ActionIcon>
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Item leftSection={<IconEdit size={16} />} onClick={() => open(m, "edit")}>
+                                  Editar
+                                </Menu.Item>
+                                {action !== "renew" && (
+                                  <Menu.Item leftSection={<IconRefresh size={16} />} onClick={() => open(m, "renew")}>
+                                    Renovar
+                                  </Menu.Item>
+                                )}
+                                {m.status !== "suspended" && (
+                                  <Menu.Item color="red" leftSection={<IconBan size={16} />} onClick={() => open(m, "suspend")}>
+                                    Suspender
+                                  </Menu.Item>
+                                )}
+                              </Menu.Dropdown>
+                            </Menu>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Stack>
 
-      {/* Modal de Crear Membresía */}
-      <Modal
-        opened={createModalOpened}
-        onClose={() => setCreateModalOpened(false)}
-        title="Asignar Membresía"
-        centered
-      >
-        <Stack gap="md">
-          <Alert icon={<IoAlertCircle size={18} />} color="blue">
-            <Text size="sm">
-              Organización:{" "}
-              <strong>
-                {orgsWithoutMembership.find((o) => o._id === createOrgId)?.name}
-              </strong>
-            </Text>
-          </Alert>
+        {status === "ok" && filter === "all" && shownWithout.length > 0 && (
+          <div className="ag-card" style={{ overflowX: "auto" }}>
+            <div style={{ padding: "14px 16px 4px" }}>
+              <h2 className="ag-h" style={{ margin: 0 }}>
+                Organizaciones sin membresía <span className="ag-muted ag-num" style={{ fontWeight: 400 }}>· {orgsWithout.length}</span>
+              </h2>
+            </div>
+            <table className="ag-table">
+              <tbody>
+                {shownWithout.map((o) => (
+                  <tr key={o._id}>
+                    <td style={{ fontWeight: 600 }}>{o.name}</td>
+                    <td className="ag-muted">{o.email}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <Button
+                        size="xs"
+                        variant="default"
+                        leftSection={<IconPlus size={14} />}
+                        onClick={() => {
+                          setCreateOrg(o);
+                          setCreatePlanId("");
+                          setCreateTrialDays(0);
+                        }}
+                      >
+                        Asignar membresía
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-          <Select
-            label="Plan"
-            placeholder="Selecciona un plan"
-            value={createPlanId}
-            onChange={(value) => setCreatePlanId(value || "")}
-            data={plans.map((p) => ({
-              value: p._id,
-              label: `${p.displayName} - $${p.price.toLocaleString()} ${p.currency}`,
-            }))}
-            required
-          />
-
+      {/* Renovar */}
+      <Modal opened={dialog === "renew"} onClose={closeDialog} title={<b>Renovar membresía</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          {dialogHead}
           <NumberInput
-            label="Días de prueba"
-            description="Dejar en 0 para activar inmediatamente"
-            value={createTrialDays}
-            onChange={(val) => setCreateTrialDays(Number(val) || 0)}
-            min={0}
-            max={90}
-          />
-
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="light"
-              onClick={() => setCreateModalOpened(false)}
-              disabled={createLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleCreateMembership}
-              loading={createLoading}
-              disabled={!createPlanId}
-            >
-              Crear Membresía
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-
-      {/* Modal de Renovación */}
-      <Modal
-        opened={renewModalOpened}
-        onClose={() => {
-          setRenewModalOpened(false);
-          setSelectedMembership(null);
-        }}
-        title="Renovar Membresía"
-        centered
-      >
-        <Stack gap="md">
-          <Alert icon={<IoAlertCircle size={18} />} color="blue">
-            <Text size="sm">
-              Organización:{" "}
-              <strong>
-                {(selectedMembership?.organizationId as any)?.name}
-              </strong>
-            </Text>
-            <Text size="sm">
-              Plan: <strong>{selectedMembership?.planId?.displayName}</strong>
-            </Text>
-          </Alert>
-
-          <NumberInput
-            label="Monto del Pago"
-            placeholder="Ingresa el monto"
-            value={paymentAmount}
-            onChange={(value) => {
-              const numValue = typeof value === "string" ? parseFloat(value) : value;
-              setPaymentAmount(Number.isFinite(numValue) ? numValue : 0);
-            }}
+            label="Monto del pago"
+            value={amount}
+            onChange={(v) => setAmount(Number(v) || 0)}
             prefix="$"
             thousandSeparator=","
             min={1}
             required
           />
-
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={() => setRenewModalOpened(false)}>
-              Cancelar
-            </Button>
-            <Button color="green" onClick={handleRenew}>
-              Renovar
-            </Button>
-          </Group>
-        </Stack>
+          {actions(closeDialog, "Renovar", handleRenew, !(amount > 0))}
+        </div>
       </Modal>
 
-      {/* Modal de Reactivación */}
-      <Modal
-        opened={reactivateModalOpened}
-        onClose={() => {
-          setReactivateModalOpened(false);
-          setSelectedMembership(null);
-        }}
-        title="Reactivar Membresía"
-        centered
-      >
-        <Stack gap="md">
-          <Alert icon={<IoAlertCircle size={18} />} color="blue">
-            <Text size="sm">
-              Organización:{" "}
-              <strong>
-                {(selectedMembership?.organizationId as any)?.name}
-              </strong>
-            </Text>
-          </Alert>
-
+      {/* Reactivar */}
+      <Modal opened={dialog === "reactivate"} onClose={closeDialog} title={<b>Reactivar membresía</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          {dialogHead}
           <DateInput
-            label="Nueva Fecha de Vencimiento (opcional)"
+            label="Nuevo vencimiento (opcional)"
+            description="Si lo dejas vacío, queda un mes desde hoy."
             placeholder="DD/MM/AAAA"
             value={newPeriodEnd ? dayjs(newPeriodEnd, "YYYY-MM-DD").toDate() : null}
             onChange={(d) => setNewPeriodEnd(d ? dayjs(d).format("YYYY-MM-DD") : "")}
             valueFormat="DD/MM/YYYY"
             clearable
-            description="Si no se especifica, se añadirá 1 mes desde hoy"
           />
-
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="light"
-              onClick={() => setReactivateModalOpened(false)}
-            >
-              Cancelar
-            </Button>
-            <Button color="blue" onClick={handleReactivate}>
-              Reactivar
-            </Button>
-          </Group>
-        </Stack>
+          {actions(closeDialog, "Reactivar", handleReactivate)}
+        </div>
       </Modal>
 
-      {/* Modal de Activación de Plan */}
-      <Modal
-        opened={activateModalOpened}
-        onClose={() => {
-          setActivateModalOpened(false);
-          setSelectedMembership(null);
-        }}
-        title="Activar Plan Pago"
-        centered
-      >
-        <Stack gap="md">
-          <Alert icon={<IoAlertCircle size={18} />} color="grape">
-            <Text size="sm">
-              Organización:{" "}
-              <strong>
-                {(selectedMembership?.organizationId as any)?.name}
-              </strong>
-            </Text>
-            <Text size="sm">
-              Plan actual:{" "}
-              <strong>{selectedMembership?.planId?.displayName}</strong>
-            </Text>
-            <Text size="sm">
-              Estado actual:{" "}
-              <Badge size="sm" color={selectedMembership?.status === "trial" ? "blue" : "orange"}>
-                {selectedMembership?.status === "trial" ? "Prueba" : selectedMembership?.status}
-              </Badge>
-            </Text>
-          </Alert>
-
+      {/* Activar plan pago */}
+      <Modal opened={dialog === "activate"} onClose={closeDialog} title={<b>Activar plan pago</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          {dialogHead}
           <Select
-            label="Nuevo Plan"
-            placeholder="Selecciona el plan a activar"
+            label="Plan de pago"
+            placeholder="Elige el plan"
             value={activatePlanId}
-            onChange={(value) => {
-              setActivatePlanId(value || "");
-              const selected = paidPlans.find((p) => p._id === value);
-              if (selected) setActivatePaymentAmount(selected.price);
+            onChange={(v) => {
+              setActivatePlanId(v || "");
+              const p = paidPlans.find((x) => x._id === v);
+              if (p) setAmount(p.price);
             }}
-            data={paidPlans.map((plan) => ({
-              value: plan._id,
-              label: `${plan.displayName} - $${plan.price.toLocaleString()} ${plan.currency}`,
-            }))}
+            data={paidPlans.map(planOption)}
             required
           />
-
-          <NumberInput
-            label="Monto del Pago Recibido"
-            description="Ingresa el monto que pagó el cliente"
-            placeholder="Ingresa el monto"
-            value={activatePaymentAmount}
-            onChange={(value) => {
-              const numValue = typeof value === "string" ? parseFloat(value) : value;
-              setActivatePaymentAmount(Number.isFinite(numValue) ? numValue : 0);
-            }}
-            prefix="$"
-            thousandSeparator=","
-            min={0}
-          />
-
-          <Alert color="blue" variant="light">
-            <Text size="sm">
-              Al activar, la membresía cambiará a estado <strong>Activa</strong>{" "}
-              con el plan seleccionado. El período se establece a 1 mes desde hoy.
-            </Text>
-          </Alert>
-
-          <Group justify="flex-end" mt="md">
-            <Button
-              variant="light"
-              onClick={() => setActivateModalOpened(false)}
-              disabled={activateLoading}
-            >
-              Cancelar
-            </Button>
-            <Button
-              color="grape"
-              onClick={handleActivatePlan}
-              loading={activateLoading}
-              disabled={!activatePlanId}
-            >
-              Activar Plan
-            </Button>
-          </Group>
-        </Stack>
+          <NumberInput label="Monto recibido" value={amount} onChange={(v) => setAmount(Number(v) || 0)} prefix="$" thousandSeparator="," min={0} />
+          <div className="ag-subtle">Queda Activa con este plan y el periodo dura un mes desde hoy.</div>
+          {actions(closeDialog, "Activar plan", handleActivate, !activatePlanId)}
+        </div>
       </Modal>
 
-      {/* Modal de Edición Completa */}
-      <EditMembershipModal
-        opened={editModalOpened}
-        onClose={() => {
-          setEditModalOpened(false);
-          setSelectedMembership(null);
-        }}
-        membership={selectedMembership}
-        plans={plans}
-        onSuccess={fetchData}
-      />
-    </Container>
+      {/* Suspender */}
+      <Modal opened={dialog === "suspend"} onClose={closeDialog} title={<b>Suspender membresía</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          {dialogHead}
+          <div className="ag-alert ag-alert--warning">
+            <IconAlertTriangle size={20} />
+            <div style={{ fontSize: 14 }}>El negocio pierde el acceso completo hasta que la reactives.</div>
+          </div>
+          {actions(closeDialog, "Suspender", handleSuspend, false, "red")}
+        </div>
+      </Modal>
+
+      {/* Asignar membresía */}
+      <Modal opened={!!createOrg} onClose={() => !busy && setCreateOrg(null)} title={<b>Asignar membresía a {createOrg?.name}</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          <Select label="Plan" placeholder="Elige el plan" value={createPlanId} onChange={(v) => setCreatePlanId(v || "")} data={plans.map(planOption)} required />
+          <NumberInput
+            label="Días de prueba"
+            description="Déjalo en 0 para activarla de una vez."
+            value={createTrialDays}
+            onChange={(v) => setCreateTrialDays(Number(v) || 0)}
+            min={0}
+            max={90}
+          />
+          {actions(() => setCreateOrg(null), "Asignar membresía", handleCreate, !createPlanId)}
+        </div>
+      </Modal>
+
+      {/* Editar (panel lateral) */}
+      <EditMembershipModal opened={dialog === "edit"} onClose={closeDialog} membership={selected} plans={plans} onSuccess={fetchData} />
+    </div>
   );
 }

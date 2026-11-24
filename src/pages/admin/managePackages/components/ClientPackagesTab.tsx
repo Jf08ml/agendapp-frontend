@@ -17,7 +17,6 @@ import {
   Collapse,
   ActionIcon,
   Tooltip,
-  ThemeIcon,
   Avatar,
   NumberInput,
   Select,
@@ -62,6 +61,8 @@ import {
 import { formatCurrency } from "../../../../utils/formatCurrency";
 
 interface ClientPackagesTabProps {
+  /** Acción del estado vacío («Asignar a cliente» o «Nuevo paquete», la decide la página) */
+  emptyAction?: { label: string; onClick: () => void };
   currency: string;
 }
 
@@ -312,7 +313,7 @@ function PackageCard({
               {remaining} de {total} disponibles
             </Text>
           </Group>
-          <Progress value={sessionPct} color={remaining > 0 ? "teal" : "red"} size="sm" radius="xl" />
+          <Progress value={sessionPct} color={remaining > 0 ? "gray.7" : "red"} size="sm" radius="xl" aria-label="Sesiones usadas" />
         </Box>
 
         {/* ── Financial stats ── */}
@@ -416,7 +417,7 @@ function PackageCard({
                           {svcRemaining}/{svcTotal} restantes
                         </Badge>
                       </Group>
-                      <Progress value={pct} color={svcRemaining > 0 ? "teal" : "red"} size="xs" radius="xl" />
+                      <Progress value={pct} color={svcRemaining > 0 ? "gray.7" : "red"} size="xs" radius="xl" />
                     </Box>
                   );
                 })}
@@ -449,7 +450,7 @@ function PackageCard({
                           {clsRemaining}/{clsTotal} restantes
                         </Badge>
                       </Group>
-                      <Progress value={pct} color={clsRemaining > 0 ? "grape" : "red"} size="xs" radius="xl" />
+                      <Progress value={pct} color={clsRemaining > 0 ? "gray.7" : "red"} size="xs" radius="xl" />
                     </Box>
                   );
                 })}
@@ -849,7 +850,7 @@ function EditPackageModal({
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
+const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency, emptyAction }) => {
   const organizationId = useSelector((state: RootState) => state.auth.organizationId);
 
   const [allPackages, setAllPackages] = useState<ClientPackage[]>([]);
@@ -1022,14 +1023,14 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
       {allPackages.length > 0 && (
         <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
           <Paper withBorder p="sm" radius="md">
-            <Text size="xs" c="dimmed">Pendiente por cobrar</Text>
-            <Text size="xl" fw={700} c={kpis.totalPending > 0 ? "red" : "dimmed"}>
+            <Text size="sm" c="var(--ink-muted)">Pendiente por cobrar</Text>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2}>
               {formatCurrency(kpis.totalPending, currency)}
             </Text>
           </Paper>
           <Paper withBorder p="sm" radius="md">
-            <Text size="xs" c="dimmed">Cobrado (histórico)</Text>
-            <Text size="xl" fw={700} c="teal">
+            <Text size="sm" c="var(--ink-muted)">Cobrado (histórico)</Text>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2}>
               {formatCurrency(kpis.totalCollected, currency)}
             </Text>
           </Paper>
@@ -1042,10 +1043,10 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
             style={{ cursor: "pointer", textAlign: "left", width: "100%" }}
           >
             <Group gap={6} wrap="nowrap">
-              <IconClockExclamation size={14} color="var(--mantine-color-orange-6)" />
-              <Text size="xs" c="dimmed">Vencen en 7 días</Text>
+              <IconClockExclamation size={14} color="var(--warning)" />
+              <Text size="sm" c="var(--ink-muted)">Vencen en 7 días</Text>
             </Group>
-            <Text size="xl" fw={700} c={kpis.expiringSoon > 0 ? "orange" : "dimmed"}>
+            <Text className="ag-num" fz={26} fw={600} lh={1.2} c={kpis.expiringSoon > 0 ? "var(--warning)" : undefined}>
               {kpis.expiringSoon}
             </Text>
           </Paper>
@@ -1078,17 +1079,22 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
         </Tooltip>
       </Group>
 
-      {/* Status filter */}
-      <SegmentedControl
-        fullWidth
-        size="xs"
-        value={statusFilter}
-        onChange={setStatusFilter}
-        data={STATUS_FILTER_OPTIONS.map((opt) => ({
-          value: opt.value,
-          label: `${opt.label}${countByStatus[opt.value] !== undefined ? ` (${countByStatus[opt.value]})` : ""}`,
-        }))}
-      />
+      {/* Filtro de estado: chips con conteo (como en Servicios) */}
+      <div className="ag-tabs" role="tablist" aria-label="Estado" style={{ scrollbarWidth: "none" }}>
+        {STATUS_FILTER_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            className="ag-chip"
+            aria-selected={statusFilter === opt.value}
+            onClick={() => setStatusFilter(opt.value)}
+          >
+            {opt.label}
+            {countByStatus[opt.value] !== undefined && <span className="count">{countByStatus[opt.value]}</span>}
+          </button>
+        ))}
+      </div>
 
       {/* Content */}
       {loading ? (
@@ -1096,17 +1102,16 @@ const ClientPackagesTab: React.FC<ClientPackagesTabProps> = ({ currency }) => {
           <Loader size="md" />
         </Center>
       ) : allPackages.length === 0 ? (
-        <Center mih={200}>
-          <Stack align="center" gap="xs">
-            <ThemeIcon size="xl" radius="xl" color="gray" variant="light">
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon">
               <IconPackage size={24} />
-            </ThemeIcon>
-            <Text c="dimmed" ta="center">No hay paquetes asignados aún.</Text>
-            <Text size="xs" c="dimmed" ta="center">
-              Asigna un paquete a un cliente desde la pestaña &quot;Plantillas de paquetes&quot;.
-            </Text>
-          </Stack>
-        </Center>
+            </div>
+            <h3>Aún no has vendido paquetes</h3>
+            <p>Cuando asignes un paquete a un cliente, lo verás aquí con sus sesiones y pagos.</p>
+            {emptyAction && <Button onClick={emptyAction.onClick}>{emptyAction.label}</Button>}
+          </div>
+        </div>
       ) : sortedFiltered.length === 0 ? (
         <Center mih={150}>
           <Stack align="center" gap="xs">

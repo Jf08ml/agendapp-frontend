@@ -430,7 +430,7 @@ export default function StepService({ onDone }: Props) {
           loading={saving}
           disabled={!canSave}
         >
-          Crear servicio y continuar →
+          Crear servicio y continuar
         </Button>
       </Group>
     </Stack>

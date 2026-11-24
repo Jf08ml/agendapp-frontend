@@ -20,6 +20,13 @@ export interface PaymentRecord {
   registeredBy?: string;
 }
 
+/** Cambio propuesto al arrastrar una cita en la agenda (se abre el modal con la cita original). */
+export interface AppointmentMove {
+  startDate: Date;
+  endDate: Date;
+  employee?: Employee;
+}
+
 export interface Appointment {
   _id: string;
   client: Client;

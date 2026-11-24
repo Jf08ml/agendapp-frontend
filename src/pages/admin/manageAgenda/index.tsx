@@ -21,12 +21,11 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import CustomCalendar from "../../../components/customCalendar/CustomCalendar";
 import {
   Appointment,
+  type AppointmentMove,
   cancelAppointment,
   createAppointmentsBatch,
   createMultiEmployeeBatch,
@@ -67,12 +66,11 @@ import type { WaCode } from "../../../utils/waRealtime";
 import { getMetaStatus } from "../../../services/organizationService";
 import WhatsAppStatusPill from "./components/WhatsAppStatusPill";
 import SchedulerQuickActionsMenu from "./components/SchedulerQuickActionsMenu";
-import SetupGuide from "./components/SetupGuide";
-import FirstAppointmentGuide from "./components/FirstAppointmentGuide";
-import ConnectWhatsappGuide from "./components/ConnectWhatsappGuide";
+import GettingStarted, { GettingStartedToggle, useGettingStartedPrefs } from "./components/GettingStarted";
+import { gettingStartedSteps, isGettingStartedRelevant } from "./components/gettingStartedModel";
 import ImpactSurveyModal from "./components/ImpactSurveyModal";
 import QuickPermissionsModal from "./components/QuickPermissionsModal";
-import { IconShieldCog, IconCalendarOff } from "@tabler/icons-react";
+import { IconShieldCog, IconCalendarOff, IconPlus } from "@tabler/icons-react";
 
 import type { EmployeeBlockData } from "./components/AppointmentModal";
 
@@ -125,6 +123,8 @@ const ScheduleView: React.FC = () => {
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
+  // Cambio propuesto al arrastrar (el modal lo aplica sobre la cita original)
+  const [pendingMove, setPendingMove] = useState<AppointmentMove | null>(null);
   const [editModalInitialTab, setEditModalInitialTab] = useState<
     string | undefined
   >(undefined);
@@ -267,6 +267,30 @@ const ScheduleView: React.FC = () => {
   }, [newAppointment.employee, employees]);
 
   const isWhatsAppReady = code === "ready";
+
+  // «Primeros pasos» (reemplaza las tres guías): solo para el administrador
+  const gsPrefs = useGettingStartedPrefs(organization?._id);
+  const gsSteps = useMemo(
+    () =>
+      gettingStartedSteps({
+        servicesCount: allServices.length,
+        employeesCount: employees.length,
+        employeesWithServices: employees.filter((e) => (e.services?.length ?? 0) > 0).length,
+        scheduleSaved:
+          !!organization?.weeklySchedule?.enabled ||
+          (!!organization?.openingHours?.start && (organization?.openingHours?.businessDays?.length ?? 0) > 0),
+        hasAppointments: !!organization?.onboardingMilestones?.firstAppointmentAt || appointments.length > 0,
+        whatsappConnected:
+          isWhatsAppReady || !!organization?.onboardingMilestones?.whatsappConnectedAt || organization?.waConnectionType === "meta",
+        linkShared: gsPrefs.linkShared,
+      }),
+    [allServices.length, employees, organization, appointments.length, isWhatsAppReady, gsPrefs.linkShared]
+  );
+  const showGettingStarted =
+    role === "admin" &&
+    !gsPrefs.hidden &&
+    isGettingStartedRelevant(gsSteps, organization?.onboardingMilestones?.setupCompletedAt, Date.now());
+  const gsExpanded = showGettingStarted && !gsPrefs.collapsed;
 
   // ---------- Envío de recordatorios (campaña bulk) ----------
   const handleSendDailyReminders = () => {
@@ -517,6 +541,7 @@ const ScheduleView: React.FC = () => {
     setNewAppointment({ services: [] });
     setModalOpenedAppointment(false);
     setSelectedAppointment(null);
+    setPendingMove(null);
     setFilteredServices([]);
     setEditModalInitialTab(undefined);
   }, []);
@@ -524,17 +549,22 @@ const ScheduleView: React.FC = () => {
   /**
    * EDITAR CITA
    */
+  // `move`: cambio propuesto al arrastrar la cita. La cita seleccionada sigue siendo la
+  // ORIGINAL y el cambio va precargado en el formulario: así el modal ve que es una
+  // reprogramación (aparece «Avisar al cliente por WhatsApp», marcada) y el guardado
+  // compara contra el horario original para enviar el aviso.
   const handleEditAppointment = useCallback(
-    (appointment: Appointment, initialTab?: string) => {
+    (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => {
       setSelectedAppointment(appointment);
+      setPendingMove(move ?? null);
       setNewAppointment({
         service: appointment.service,
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
-        employee: appointment.employee,
+        employee: move?.employee ?? appointment.employee,
         employeeRequestedByClient: appointment.employeeRequestedByClient,
-        startDate: new Date(appointment.startDate),
-        endDate: new Date(appointment.endDate),
+        startDate: new Date(move?.startDate ?? appointment.startDate),
+        endDate: new Date(move?.endDate ?? appointment.endDate),
         status: appointment.status,
         advancePayment: appointment.advancePayment,
         customFieldValues: appointment.customFieldValues,
@@ -1339,7 +1369,8 @@ const ScheduleView: React.FC = () => {
     <Box
       pos="relative"
       style={{
-        height: "calc(100dvh - 66px)", // 50px AppShell header + 16px AppShell.Main padding-top
+        // Alto del área del shell: header (60px) y, en móvil, la barra inferior (60px)
+        height: "calc(100dvh - var(--app-shell-header-offset, 0px) - var(--app-shell-footer-offset, 0px))",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -1362,49 +1393,18 @@ const ScheduleView: React.FC = () => {
           padding: isMobile ? "2px 2px 4px" : "2px 4px 6px",
         }}
       >
-        {/* Left: eyebrow (hidden on mobile) + Fraunces month title */}
-        <Box style={{ minWidth: 0 }}>
-          {!isMobile && (
-            <Text
-              style={{
-                fontSize: 10.5,
-                letterSpacing: 2,
-                color: "#8B92A6",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                lineHeight: 1,
-                marginBottom: 3,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                maxWidth: "clamp(160px, 30vw, 340px)",
-              }}
-            >
-              {organization?.name
-                ? `${organization.name} · Calendario`
-                : "Calendario"}
-            </Text>
-          )}
-          <Text
-            style={{
-              fontFamily: "'Fraunces', serif",
-              fontSize: isMobile ? 20 : 26,
-              fontWeight: 600,
-              letterSpacing: -1,
-              color: "#101526",
-              lineHeight: 1,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {format(currentDate, "MMMM", { locale: es }).charAt(0).toUpperCase() +
-              format(currentDate, "MMMM", { locale: es }).slice(1)}
-            {!isMobile && (
-              <span style={{ color: "#8B92A6", fontStyle: "italic", fontWeight: 400 }}>
-                {" "}{format(currentDate, "yyyy")}
-              </span>
-            )}
-          </Text>
-        </Box>
+        {/* Título de página (title-2): la fecha y la vista van en la barra del calendario */}
+        <h1
+          style={{
+            margin: 0,
+            font: `600 ${isMobile ? 20 : 24}px/30px var(--mantine-font-family)`,
+            letterSpacing: "-0.015em",
+            color: "var(--ink)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          Agenda
+        </h1>
 
         {/* Right: WA pill (compact on mobile) + create btn + actions menu */}
         <Group gap={isMobile ? 6 : 8} align="center" style={{ flexShrink: 0 }}>
@@ -1416,16 +1416,6 @@ const ScheduleView: React.FC = () => {
             blocked={organization?.planLimits?.whatsappIntegration === false}
             compact={isMobile}
           />
-
-          {!isMobile && hasPermission("appointments:create") && (
-            <Button
-              size="xs"
-              onClick={() => openModal(new Date(), new Date())}
-              style={{ borderRadius: 8 }}
-            >
-              Crear cita
-            </Button>
-          )}
 
           {(hasPermission("appointments:create") || hasPermission("appointments:manage_own_blocks")) && employees.length > 0 && (
             isMobile ? (
@@ -1443,11 +1433,9 @@ const ScheduleView: React.FC = () => {
             ) : (
               <Button
                 size="xs"
-                variant="light"
-                color="gray"
+                variant="default"
                 leftSection={<IconCalendarOff size={16} />}
                 onClick={() => setBlockModalOpened(true)}
-                style={{ borderRadius: 8 }}
               >
                 Bloquear
               </Button>
@@ -1505,39 +1493,57 @@ const ScheduleView: React.FC = () => {
             reminderDate={reminderDate}
             onChangeReminderDate={setReminderDate}
           />
+
+          {showGettingStarted && gsPrefs.collapsed && (
+            <GettingStartedToggle steps={gsSteps} onOpen={() => gsPrefs.setCollapsed(false)} />
+          )}
+
+          {/* Único botón principal de la página (en móvil va flotante, abajo) */}
+          {!isMobile && hasPermission("appointments:create") && (
+            <Button size="sm" leftSection={<IconPlus size={16} />} onClick={() => openModal(new Date(), new Date())}>
+              Nueva cita
+            </Button>
+          )}
         </Group>
       </Box>
 
-      {/* Guía de configuración inicial — se muestra solo si no hay profesionales */}
-      {employees.length === 0 && <SetupGuide employees={employees} />}
-
-      {/* Guía de activación — empuja a crear la primera cita cuando ya hay
-          profesionales pero ninguna cita creada todavía */}
-      {employees.length > 0 &&
-        !organization?.onboardingMilestones?.firstAppointmentAt &&
-        appointments.length === 0 && (
-          <FirstAppointmentGuide
-            seeded={!!organization?.onboardingMilestones?.seededDemoAt}
-            onCreateFirst={() => openModal(new Date(), new Date())}
-          />
-        )}
-
-      {/* Puente al aha de WhatsApp — ya hay citas pero WhatsApp no está conectado:
-          invita a conectarlo para notificar a los clientes (descartable) */}
-      {employees.length > 0 &&
-        appointments.length > 0 &&
-        !isWhatsAppReady && (
-          <ConnectWhatsappGuide
-            organizationId={organization?._id}
-            onConnect={() => navigate("/gestionar-whatsapp")}
-          />
-        )}
+      {/* Primeros pasos en móvil: arriba de la agenda, solo los pendientes */}
+      {gsExpanded && isMobile && (
+        <GettingStarted
+          steps={gsSteps}
+          prefs={gsPrefs}
+          isMobile
+          seeded={!!organization?.onboardingMilestones?.seededDemoAt}
+          onCreateAppointment={() => openModal(new Date(), new Date())}
+        />
+      )}
 
       {/* Reporte de impacto + encuesta (modal una sola vez, auto-gateado en backend) */}
       <ImpactSurveyModal organizationId={organization?._id} />
 
-      {/* Calendario principal — ocupa todo el alto restante */}
-      <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8 }}>
+      {/* Móvil: «Nueva cita» flotante sobre la barra inferior (ag-fab) */}
+      {isMobile && hasPermission("appointments:create") && (
+        <Button
+          size="lg"
+          radius="xl"
+          leftSection={<IconPlus size={18} />}
+          onClick={() => openModal(new Date(), new Date())}
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: "calc(var(--app-shell-footer-offset, 0px) + 16px)",
+            zIndex: 150,
+            boxShadow: "var(--shadow-lg)",
+          }}
+        >
+          Nueva cita
+        </Button>
+      )}
+
+      {/* Calendario principal — ocupa todo el alto restante; en escritorio, con
+          «Primeros pasos» a la derecha (340 px) */}
+      <Box style={{ flex: 1, overflow: "hidden", minHeight: 0, marginBottom: 8, display: "flex", gap: 12 }}>
+        <Box style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
         <CustomCalendar
           employees={employees}
           services={allServices}
@@ -1565,6 +1571,16 @@ const ScheduleView: React.FC = () => {
             setAvailabilityRefreshKey((k) => k + 1);
           }}
         />
+        </Box>
+        {gsExpanded && !isMobile && (
+          <GettingStarted
+            steps={gsSteps}
+            prefs={gsPrefs}
+            isMobile={false}
+            seeded={!!organization?.onboardingMilestones?.seededDemoAt}
+            onCreateAppointment={() => openModal(new Date(), new Date())}
+          />
+        )}
       </Box>
 
       {/* 🚀 Modales con Suspense para lazy loading */}
@@ -1574,6 +1590,7 @@ const ScheduleView: React.FC = () => {
             opened={modalOpenedAppointment}
             onClose={closeModal}
             appointment={selectedAppointment}
+            move={pendingMove}
             newAppointment={newAppointment}
             setNewAppointment={setNewAppointment}
             services={filteredServices}

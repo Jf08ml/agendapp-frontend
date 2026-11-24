@@ -1,22 +1,13 @@
 // src/App.tsx
-import {
-  AppShell,
-  Avatar,
-  Burger,
-  Flex,
-  UnstyledButton,
-  Text,
-  Anchor,
-  Drawer,
-} from "@mantine/core";
+import { Drawer } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import ChatPanel from "./chatbot/ChatPanel";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import "./App.css";
-import Header from "./layouts/Header";
-import Footer from "./layouts/Footer";
-import NavbarLinks from "./layouts/NavbarLinks";
+import AdminShell from "./layouts/AdminShell";
+import PublicShell from "./layouts/PublicShell";
+import { isAdminPath } from "./layouts/adminNavigation";
 import generalRoutes from "./routes/generalRoutes";
 import useAuthInitializer from "./hooks/useAuthInitializer";
 import { useSessionExpiry } from "./hooks/useSessionExpiry";
@@ -24,7 +15,6 @@ import { useServiceWorkerUpdate } from "./hooks/useServiceWorkerUpdate";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "./app/store";
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
-import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import { createSubscription } from "./services/subscriptionService";
 import { registerSessionEventListeners } from "./utils/sessionNotifications";
 import { extractTenantFromHost } from "./utils/domainUtils";
@@ -35,11 +25,13 @@ import {
   ORG_CONFIG_LOAD_FAILED,
   ORG_CONFIG_NOT_FOUND,
 } from "./features/organization/sliceOrganization";
+import { IconShieldCheck } from "@tabler/icons-react";
 import OrgLoadError from "./components/OrgLoadError";
+import OrgLoadingSkeleton from "./components/OrgLoadingSkeleton";
+import SuperadminShell from "./layouts/SuperadminShell";
+import { isSuperadminPanelPath } from "./layouts/superadminNavigation";
 
-import NotificationsMenu from "./layouts/NotificationsMenu";
-import WhatsNewModal from "./components/WhatsNewModal";
-import { ChristmasDecorations, SantaHat } from "./components/seasonal/ChristmasDecorations";
+import { ChristmasDecorations } from "./components/seasonal/ChristmasDecorations";
 import {
   CHRISTMAS_PREVIEW_KEY,
   resolveChristmasPreview,
@@ -90,7 +82,6 @@ function AppContent() {
   );
   const orgLoading = useSelector((state: RootState) => state.organization.loading);
   const orgError = useSelector((state: RootState) => state.organization.error);
-  const [opened, { toggle, close }] = useDisclosure(false);
   const [chatOpen, { open: openChat, toggle: toggleChat, close: closeChat }] = useDisclosure(false);
   // const isMobile = useMediaQuery("(max-width: 768px)");
   const [chatAutoStart, setChatAutoStart] = useState(false);
@@ -155,9 +146,6 @@ function AppContent() {
     navigate("/superadmin/orgs", { replace: true });
   }, [dispatch, navigate]);
 
-  // Branding dinámico
-  const color = organization?.branding?.primaryColor || "#1C3461";
-  const logoUrl = organization?.branding?.logoUrl || "/logo-default.png";
   // 🎄 Tema navideño: solo páginas de clientes, solo en temporada (1 dic – 6 ene)
   const christmasPreview = readChristmasPreview(location.search);
   const showChristmas = shouldShowChristmas({
@@ -268,195 +256,145 @@ function AppContent() {
         />
       );
     }
-    return <CustomLoaderHtml loadingText="Cargando organización..." />;
+    return <OrgLoadingSkeleton />;
   }
+
+  const routes = (
+    <Routes>
+      {generalRoutes.map((route, index) => (
+        <Route key={index} path={route.path} element={<route.component />} />
+      ))}
+    </Routes>
+  );
+
+  // Panel: con sesión (no superadmin) y en una ruta de administración. Todo lo
+  // demás (web del negocio, reserva, tienda…) usa el shell público, también si
+  // quien navega tiene sesión. Registro y superadmin: shell de plataforma.
+  const useAdminShell = isAuthenticated && !isSuperadmin && isAdminPath(location.pathname);
+  const isPlatformScreen = isSuperadmin || isSuperadminPath || (isSignupDomain && !organization);
+  // Superadmin con sesión: su propio shell con la navegación de plataforma.
+  const useSuperadminShell = isAuthenticated && isSuperadmin && isSuperadminPanelPath(location.pathname);
+
+  // Banners del panel: sesión de soporte y estado de la membresía
+  const banners = (
+    <>
+      {isImpersonating && (
+        // Modo soporte (rediseño): barra de plataforma, no del negocio.
+        <div
+          role="status"
+          style={{
+            background: "var(--platform)",
+            color: "#fff",
+            padding: "8px 16px",
+            fontSize: 14,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <IconShieldCheck size={18} />
+            Estás en modo soporte como admin de <strong>{organization?.name || "este negocio"}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={handleReturnToSuperadmin}
+            style={{
+              background: "#fff",
+              color: "var(--platform)",
+              border: "none",
+              borderRadius: 6,
+              padding: "4px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            Volver a la plataforma
+          </button>
+        </div>
+      )}
+      {!isImpersonating && organization?.membershipStatus === "trial" && (
+        <div
+          style={{
+            background: "var(--info-soft)",
+            borderBottom: "1px solid var(--line)",
+            padding: "8px 16px",
+            textAlign: "center",
+            fontSize: "14px",
+            color: "var(--ink)",
+            cursor: "pointer",
+          }}
+          onClick={() => navigate("/my-membership")}
+        >
+          Estás en período de prueba gratuita.{" "}
+          <strong style={{ color: "var(--info)" }}>Conoce nuestros planes</strong> para seguir usando la plataforma.
+        </div>
+      )}
+      {!isImpersonating && organization?.membershipStatus === "past_due" && (
+        <div
+          style={{
+            background: "var(--warning-soft)",
+            borderBottom: "1px solid var(--line)",
+            padding: "8px 16px",
+            textAlign: "center",
+            fontSize: "14px",
+            color: "var(--ink)",
+            cursor: "pointer",
+          }}
+          onClick={() => navigate("/my-membership")}
+        >
+          Tu plan ha vencido. Solo puedes consultar tus datos.{" "}
+          <strong style={{ color: "var(--warning)" }}>Renueva ahora</strong> para recuperar el acceso completo.
+        </div>
+      )}
+    </>
+  );
 
   return (
     <>
       <Analytics />
 
-      <AppShell
-        navbar={{
-          width: 300,
-          breakpoint: "sm",
-          collapsed: { desktop: !opened, mobile: !opened },
-        }}
-        header={{ height: 50 }}
-        footer={{ height: 30 }}
-        styles={{ footer: { borderTop: "none" } }}
-      >
-        <AppShell.Header bg={color}>
-          <Flex align="center" style={{ height: 50 }}>
-            <Burger
-              opened={opened}
-              onClick={toggle}
-              size="md"
-              color="white"
-              onMouseEnter={() => opened || toggle()}
-            />
-            {/* Logo + badge + menú de notificaciones */}
-            <NotificationsMenu
-              target={
-                <UnstyledButton
-                  aria-label="Abrir notificaciones"
-                  style={{ lineHeight: 0 }}
-                >
-                  <SantaHat show={showChristmas}>
-                    <Avatar
-                      src={logoUrl}
-                      alt={organization?.name}
-                      size={36}
-                      radius="xl"
-                      styles={{ image: { objectFit: "cover" } }}
-                    />
-                  </SantaHat>
-                </UnstyledButton>
-              }
-              showBadgeOnTarget
-              dropdownWidth={400}
-            />
-            {/* Nombre dinámico y contenido extra del Header */}
-            <Header organization={organization} />
-          </Flex>
-        </AppShell.Header>
 
-        <AppShell.Navbar
-          p="md"
-          bg={color}
-          onMouseLeave={() => opened && close()}
+      {useSuperadminShell ? (
+        <SuperadminShell>{routes}</SuperadminShell>
+      ) : useAdminShell ? (
+        <AdminShell banners={banners} chatOpen={chatOpen} onToggleChat={toggleChat}>
+          {routes}
+        </AdminShell>
+      ) : (
+        <PublicShell showChristmas={showChristmas} platform={isPlatformScreen}>
+          {/* El banner de soporte sigue visible si el admin abre su web pública */}
+          {isAuthenticated && isImpersonating && banners}
+          {routes}
+        </PublicShell>
+      )}
+
+      {/* Panel del asistente IA: fuera de los shells para no perder la
+          conversación al pasar del panel a la web pública. */}
+      {isAuthenticated && !isSuperadmin && (
+        <Drawer
+          opened={chatOpen}
+          onClose={closeChat}
+          position="right"
+          size="100%"
+          withCloseButton={false}
+          padding={0}
+          keepMounted
+          styles={{ body: { height: "100%", overflow: "hidden", padding: 0 } }}
         >
-          <NavbarLinks closeNavbar={close} />
-          <div style={{ marginTop: "auto", paddingTop: "1rem" }}>
-            <Text size="xs" ta="center" c="white" style={{ opacity: 0.8 }}>
-              Powered by{" "}
-              <Anchor
-                href="https://www.agenditapp.com?utm_source=app-dashboard&utm_medium=referral&utm_campaign=powered-by"
-                target="_blank"
-                rel="noopener noreferrer"
-                c="white"
-                fw={700}
-                style={{ textDecoration: "underline" }}
-              >
-                AgenditApp
-              </Anchor>
-            </Text>
-          </div>
-        </AppShell.Navbar>
-
-        {/* Panel del asistente IA — Drawer unificado para desktop y mobile */}
-        {isAuthenticated && !isSuperadmin && (
-          <Drawer
-            opened={chatOpen}
+          <ChatPanel
             onClose={closeChat}
-            position="right"
-            size="100%"
-            withCloseButton={false}
-            padding={0}
-            keepMounted
-            styles={{ body: { height: "100%", overflow: "hidden", padding: 0 } }}
-          >
-            <ChatPanel
-              onClose={closeChat}
-              onInvalidate={handleChatInvalidate}
-              autoStart={chatAutoStart}
-              onAutoStartDone={() => setChatAutoStart(false)}
-            />
-          </Drawer>
-        )}
-
-        <AppShell.Main style={{ height: "100vh", overflow: "auto" }}>
-          {/* Modal automático de novedades (solo admin/org, no superadmin) */}
-          {isAuthenticated && !isSuperadmin && <WhatsNewModal />}
-
-          {/* Banner de sesión de soporte (impersonación activa) */}
-          {isImpersonating && isAuthenticated && (
-            <div
-              style={{
-                background: "#1A1A2E",
-                borderBottom: "2px solid #E040FB",
-                padding: "8px 16px",
-                textAlign: "center",
-                fontSize: "14px",
-                color: "#E040FB",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "12px",
-              }}
-            >
-              <span>🛠️ Sesión de soporte técnico activa — estás operando como admin de <strong>{organization?.name || "esta organización"}</strong></span>
-              <button
-                onClick={handleReturnToSuperadmin}
-                style={{
-                  background: "#E040FB",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "4px 12px",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: "13px",
-                }}
-              >
-                Volver al panel de superadmin
-              </button>
-            </div>
-          )}
-          {isAuthenticated && !isImpersonating && organization?.membershipStatus === "trial" && (
-            <div
-              style={{
-                background: "#E3F2FD",
-                borderBottom: "1px solid #90CAF9",
-                padding: "8px 16px",
-                textAlign: "center",
-                fontSize: "14px",
-                color: "#1565C0",
-                cursor: "pointer",
-              }}
-              onClick={() => navigate("/my-membership")}
-            >
-              Estás en período de prueba gratuita.{" "}
-              <strong>Conoce nuestros planes</strong> para seguir usando la plataforma.
-            </div>
-          )}
-          {isAuthenticated && !isImpersonating && organization?.membershipStatus === "past_due" && (
-            <div
-              style={{
-                background: "#FFF3CD",
-                borderBottom: "1px solid #FFEEBA",
-                padding: "8px 16px",
-                textAlign: "center",
-                fontSize: "14px",
-                color: "#856404",
-                cursor: "pointer",
-              }}
-              onClick={() => navigate("/my-membership")}
-            >
-              Tu plan ha vencido. Solo puedes consultar tus datos.{" "}
-              <strong>Renueva ahora</strong> para recuperar el acceso completo.
-            </div>
-          )}
-          <Routes>
-            {generalRoutes.map((route, index) => (
-              <Route
-                key={index}
-                path={route.path}
-                element={<route.component />}
-              />
-            ))}
-          </Routes>
-        </AppShell.Main>
-
-        <AppShell.Footer>
-          <Footer
-            chatOpen={chatOpen}
-            onToggleChat={!isSuperadmin ? toggleChat : undefined}
+            onInvalidate={handleChatInvalidate}
+            autoStart={chatAutoStart}
+            onAutoStartDone={() => setChatAutoStart(false)}
           />
-        </AppShell.Footer>
-      </AppShell>
+        </Drawer>
+      )}
 
       {showChristmas && <ChristmasDecorations />}
-
     </>
   );
 }

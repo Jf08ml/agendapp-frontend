@@ -1,7 +1,11 @@
+// Fila de cliente (rediseño, ClientesPanel): en escritorio, fila de tabla
+// (Cliente con nombre y teléfono · Servicios · Referidos · Premio · «⋯»); en
+// móvil, fila compacta con los mismos datos en texto normal. Tocar la fila abre
+// la ficha lateral; las acciones van en el menú «⋯».
 import React from "react";
 import { useSelector } from "react-redux";
-import { Avatar, Badge, Box, Group, Paper, Text, Tooltip, ActionIcon } from "@mantine/core";
-import { IconChevronRight, IconGift, IconUserPlus, IconCirclePlus } from "@tabler/icons-react";
+import { ActionIcon, Menu } from "@mantine/core";
+import { IconCirclePlus, IconDots, IconEye, IconGift, IconPencil, IconUserPlus } from "@tabler/icons-react";
 import { RootState } from "../../../app/store";
 import { selectOrganization } from "../../../features/organization/sliceOrganization";
 import { Client } from "../../../services/clientService";
@@ -10,93 +14,129 @@ import { getCountryFlag } from "../../../utils/countryHelper";
 interface ClientListItemProps {
   client: Client;
   isMobile: boolean;
+  selected?: boolean;
   onOpenDetail: (clientId: string) => void;
   onRegisterService: (clientId: string) => void;
   onReferral: (clientId: string) => void;
+  onEditClient: (client: Client) => void;
 }
 
-const ClientListItem: React.FC<ClientListItemProps> = React.memo(
-  ({ client, isMobile, onOpenDetail, onRegisterService, onReferral }) => {
-    const organization = useSelector((state: RootState) => selectOrganization(state));
-    const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
-    const rewardReady = loyaltyEnabled && !!(client.hasServiceDiscount || client.hasReferralBenefit);
-    const iconSize = isMobile ? "lg" : "md";
+const initials = (name = "") =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 
+function ActionsMenu({
+  client,
+  onOpenDetail,
+  onRegisterService,
+  onReferral,
+  onEditClient,
+}: Omit<ClientListItemProps, "isMobile" | "selected">) {
+  return (
+    <Menu position="bottom-end" withinPortal shadow="lg">
+      <Menu.Target>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          aria-label={`Acciones de ${client.name}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <IconDots size={18} />
+        </ActionIcon>
+      </Menu.Target>
+      <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+        <Menu.Item leftSection={<IconEye size={16} />} onClick={() => onOpenDetail(client._id)}>
+          Ver ficha
+        </Menu.Item>
+        <Menu.Item leftSection={<IconCirclePlus size={16} />} onClick={() => onRegisterService(client._id)}>
+          Registrar servicio
+        </Menu.Item>
+        <Menu.Item leftSection={<IconUserPlus size={16} />} onClick={() => onReferral(client._id)}>
+          Registrar referido
+        </Menu.Item>
+        <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => onEditClient(client)}>
+          Editar cliente
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
+const ClientListItem: React.FC<ClientListItemProps> = React.memo((props) => {
+  const { client, isMobile, selected, onOpenDetail } = props;
+  const organization = useSelector((state: RootState) => selectOrganization(state));
+  const loyaltyEnabled = organization?.showLoyaltyProgram !== false;
+  const rewardReady = loyaltyEnabled && !!(client.hasServiceDiscount || client.hasReferralBenefit);
+  const phone = `${client.phone_country ? `${getCountryFlag(client.phone_country)} ` : ""}${client.phoneNumber ?? ""}`;
+
+  const who = (
+    <div className="ag-who" style={{ minWidth: 0 }}>
+      <span className="ag-avatar">{initials(client.name)}</span>
+      <div style={{ minWidth: 0 }}>
+        <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{client.name}</b>
+        <span className="ag-num" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {phone}
+        </span>
+      </div>
+    </div>
+  );
+
+  const reward = rewardReady && (
+    <span className="ag-badge ag-badge--success">
+      <IconGift size={14} stroke={2} /> Premio listo
+    </span>
+  );
+
+  if (isMobile) {
     return (
-      <Paper
-        withBorder
-        radius="md"
-        p="sm"
+      <div
+        className="ag-list-row"
+        role="button"
+        tabIndex={0}
+        aria-selected={selected}
         onClick={() => onOpenDetail(client._id)}
-        style={{
-          cursor: "pointer",
-          borderLeft: rewardReady ? "4px solid var(--mantine-color-yellow-5)" : undefined,
-        }}
+        onKeyDown={(e) => e.key === "Enter" && onOpenDetail(client._id)}
+        style={{ cursor: "pointer", padding: "var(--space-3) var(--space-3)", background: selected ? "var(--brand-soft)" : undefined }}
       >
-        <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
-          <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-            <Avatar radius="xl" color={rewardReady ? "yellow" : "blue"}>
-              {client.name.charAt(0).toUpperCase()}
-            </Avatar>
-            <Box style={{ minWidth: 0 }}>
-              <Group gap={4} wrap="nowrap">
-                <Text fw={600} size="sm" truncate>
-                  {client.name}
-                </Text>
-                {rewardReady && (
-                  <Tooltip label="Tiene un premio listo para canjear">
-                    <IconGift size={14} color="var(--mantine-color-yellow-7)" style={{ flexShrink: 0 }} />
-                  </Tooltip>
-                )}
-              </Group>
-              <Text size="xs" c="dimmed" truncate>
-                {client.phone_country && `${getCountryFlag(client.phone_country)} `}
-                {client.phoneNumber}
-              </Text>
-            </Box>
-          </Group>
-
-          {!isMobile && loyaltyEnabled && (
-            <Group gap={6} wrap="nowrap">
-              <Badge variant="light" color="dark" size="sm">
-                {client.servicesTaken} servicios
-              </Badge>
-              <Badge variant="light" color="dark" size="sm">
-                {client.referralsMade} referidos
-              </Badge>
-            </Group>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+          {who}
+          {(loyaltyEnabled || rewardReady) && (
+            <div className="ag-row" style={{ paddingLeft: 44, gap: 8 }}>
+              {loyaltyEnabled && (
+                <span className="ag-subtle">
+                  {client.servicesTaken} {client.servicesTaken === 1 ? "servicio" : "servicios"} · {client.referralsMade}{" "}
+                  {client.referralsMade === 1 ? "referido" : "referidos"}
+                </span>
+              )}
+              {reward}
+            </div>
           )}
-
-          <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
-            <Tooltip label="Registrar servicio">
-              <ActionIcon radius="xl" variant="light" color="green" size={iconSize} onClick={() => onRegisterService(client._id)}>
-                <IconCirclePlus size={isMobile ? 20 : 16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Registrar referido">
-              <ActionIcon radius="xl" variant="light" color="grape" size={iconSize} onClick={() => onReferral(client._id)}>
-                <IconUserPlus size={isMobile ? 20 : 16} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-
-          <IconChevronRight size={16} color="var(--mantine-color-gray-5)" style={{ flexShrink: 0 }} />
-        </Group>
-
-        {isMobile && loyaltyEnabled && (
-          <Group gap={6} mt="xs">
-            <Badge variant="light" color="dark" size="sm">
-              {client.servicesTaken} servicios
-            </Badge>
-            <Badge variant="light" color="dark" size="sm">
-              {client.referralsMade} referidos
-            </Badge>
-          </Group>
-        )}
-      </Paper>
+        </div>
+        <ActionsMenu {...props} />
+      </div>
     );
   }
-);
+
+  return (
+    <tr
+      aria-selected={selected}
+      onClick={() => onOpenDetail(client._id)}
+      style={{ cursor: "pointer" }}
+    >
+      <td>{who}</td>
+      {loyaltyEnabled && <td className="num">{client.servicesTaken}</td>}
+      {loyaltyEnabled && <td className="num">{client.referralsMade}</td>}
+      {loyaltyEnabled && <td>{reward || <span className="ag-subtle">—</span>}</td>}
+      <td style={{ width: 48, textAlign: "right" }}>
+        <ActionsMenu {...props} />
+      </td>
+    </tr>
+  );
+});
 
 ClientListItem.displayName = "ClientListItem";
 

@@ -1,12 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState } from "react";
-import {
-  Card, Stack, Stepper, Button, Group, Text, Paper, Divider,
-  Center, Title, LoadingOverlay, Switch,
-} from "@mantine/core";
+import { Stepper, Button, Switch } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { IconCheck } from "@tabler/icons-react";
+import { IconCheck, IconInfoCircle } from "@tabler/icons-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { DEFAULT_CLIENT_FORM_CONFIG } from "../../../services/organizationService";
@@ -53,6 +50,7 @@ export default function ClassBookingWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // 🔀 Paso previo opcional (configurable por organización): elegir entre
   // pagar una clase individual o usar un paquete ya comprado, antes de
@@ -185,9 +183,9 @@ export default function ClassBookingWizard() {
 
   if (!organization?._id) {
     return (
-      <Center h={300}>
-        <Text c="dimmed">No se encontró la organización.</Text>
-      </Center>
+      <div style={{ padding: 48, textAlign: "center" }} className="ag-muted">
+        No encontramos este negocio.
+      </div>
     );
   }
 
@@ -262,6 +260,7 @@ export default function ClassBookingWizard() {
   const handleSubmit = async () => {
     if (!organization?._id || selectedSessions.length === 0) return;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const attendeePayload = {
         name: attendee.name,
@@ -342,8 +341,14 @@ export default function ClassBookingWizard() {
       setCompleted(true);
       setCurrentStep(4); // paso "Completado"
     } catch (err) {
-      // Mostrar error al usuario (se puede mejorar con notifications)
-      alert(err instanceof Error ? err.message : "Error al reservar. Intenta nuevamente.");
+      const msg = err instanceof Error ? err.message : "";
+      // Si la sesión se llenó mientras tanto, volver a elegir sesión
+      if (/cupo|lleno|llena|full|capacidad/i.test(msg)) {
+        setSubmitError("Una de las sesiones se llenó mientras reservabas. Elige otra.");
+        setCurrentStep(1);
+      } else {
+        setSubmitError(msg || "No se pudo completar la inscripción. Intenta de nuevo.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -364,6 +369,8 @@ export default function ClassBookingWizard() {
   };
 
   // ── Contenido de cada paso ─────────────────────────
+  const currency = organization?.currency ?? "COP";
+  const timeFormat = (organization as any)?.timeFormat as string | undefined;
   const renderStep = (step: number) => {
     switch (step) {
       case 0:
@@ -372,7 +379,12 @@ export default function ClassBookingWizard() {
             classes={visibleClasses}
             loading={loadingClasses}
             selected={selectedClass}
-            onSelect={(c) => { setSelectedClass(c); setCurrentStep(1); }}
+            currency={currency}
+            packageOnly={bookingMode === "package" && packageClassIds.length > 0}
+            onSelect={(c) => {
+              setSelectedClass(c);
+              setCurrentStep(1);
+            }}
           />
         );
       case 1:
@@ -384,11 +396,9 @@ export default function ClassBookingWizard() {
             onChange={setSelectedSessions}
             selectedClass={selectedClass}
             timezone={tz}
-            maxSelectable={
-              bookingMode === "package" && selectedClass
-                ? packageCredits[selectedClass._id] ?? null
-                : null
-            }
+            timeFormat={timeFormat}
+            onChooseOtherClass={() => setCurrentStep(0)}
+            maxSelectable={bookingMode === "package" && selectedClass ? packageCredits[selectedClass._id] ?? null : null}
           />
         );
       case 2:
@@ -411,15 +421,10 @@ export default function ClassBookingWizard() {
             attendee={attendee}
             companion={companion}
             timezone={tz}
+            currency={currency}
+            timeFormat={timeFormat}
             usingPackage={usingPackage}
-            deposit={
-              classDepositNeeded
-                ? {
-                    percentage: organization?.classDepositPercentage ?? 0,
-                    currency: organization?.currency ?? "COP",
-                  }
-                : null
-            }
+            deposit={classDepositNeeded ? { percentage: organization?.classDepositPercentage ?? 0, currency } : null}
           />
         );
       default:
@@ -427,189 +432,175 @@ export default function ClassBookingWizard() {
     }
   };
 
-  const progressValue = Math.min((currentStep / STEPS.length) * 100, 100);
+  const page = { maxWidth: 760, margin: "0 auto", padding: isMobile ? "16px 16px 120px" : "24px 16px 48px" } as const;
+  const heading = (
+    <h1 style={{ margin: "0 0 16px", font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Reservar clase</h1>
+  );
 
-  // ── Fases previas al wizard (paso "clase paga vs. paquete") ──
-  if (phase === "mode") {
+  // ── Fases previas al wizard (clase paga vs. paquete) ──
+  if (phase === "mode" || phase === "lookup") {
     return (
-      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+      <div style={page}>
         <div ref={contentTopRef} />
-        <StepBookingMode onSelect={handleSelectBookingMode} />
-      </Card>
+        {heading}
+        <div className="ag-card" style={{ padding: isMobile ? 16 : 24 }}>
+          {phase === "mode" ? (
+            <StepBookingMode onSelect={handleSelectBookingMode} />
+          ) : (
+            <StepPackageLookup
+              identifierField={identifierField}
+              organizationCountry={(organization as any)?.default_country || "CO"}
+              organizationId={organization._id}
+              classes={classes}
+              loadingClasses={loadingClasses}
+              onBack={() => setPhase("mode")}
+              onFallbackSingle={handleFallbackToSingle}
+              onFound={handlePackageFound}
+            />
+          )}
+        </div>
+      </div>
     );
   }
 
-  if (phase === "lookup") {
+  // ── Listo ──
+  if (currentStep >= 4) {
     return (
-      <Card withBorder radius="md" p={isMobile ? "md" : "xl"}>
+      <div style={page}>
         <div ref={contentTopRef} />
-        <StepPackageLookup
-          identifierField={identifierField}
-          organizationCountry={(organization as any)?.default_country || "CO"}
-          organizationId={organization._id}
-          classes={classes}
-          loadingClasses={loadingClasses}
-          onBack={() => setPhase("mode")}
-          onFallbackSingle={handleFallbackToSingle}
-          onFound={handlePackageFound}
-        />
-      </Card>
+        <div className="ag-card" style={{ padding: 28, textAlign: "center", display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+          <span style={{ width: 56, height: 56, borderRadius: 999, display: "grid", placeItems: "center", background: "var(--success-soft)", color: "var(--success)" }}>
+            <IconCheck size={28} />
+          </span>
+          <h1 style={{ margin: 0, font: "600 22px/28px var(--mantine-font-family)" }}>Inscripción confirmada</h1>
+          <div className="ag-muted" style={{ fontSize: 14, maxWidth: 400 }}>
+            {finishName ? `${finishName.split(" ")[0]}, te` : "Te"} enviamos por WhatsApp la confirmación y los detalles de tu clase.
+          </div>
+          <div className="ag-row" style={{ gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 4 }}>
+            <Button onClick={() => navigate("/mis-reservas")}>Ver mis reservas</Button>
+            <Button variant="default" onClick={handleNewBooking}>
+              Hacer otra reserva
+            </Button>
+          </div>
+        </div>
+      </div>
     );
   }
+
+  // Barra inferior: resumen + el único botón del paso
+  const nextLabel = currentStep === 2 ? "Ver resumen" : currentStep === 3 ? (classDepositNeeded ? "Pagar y confirmar" : "Confirmar inscripción") : "Continuar";
+  const onNext = () => {
+    if (currentStep === 3) handleSubmit();
+    else setCurrentStep((s) => s + 1);
+  };
+  const missing =
+    currentStep === 0 && !canNext[0]
+      ? "Elige una clase para continuar."
+      : currentStep === 1 && !canNext[1]
+        ? "Elige al menos una sesión."
+        : currentStep === 2 && !canNext[2]
+          ? "Completa tu nombre y tu contacto."
+          : null;
+  const barSummary = [
+    selectedClass?.name,
+    selectedSessions.length ? (selectedSessions.length === 1 ? "1 sesión" : `${selectedSessions.length} sesiones`) : null,
+    companion ? "2 personas" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const actionBar = (
+    <div
+      style={
+        isMobile
+          ? {
+              position: "fixed",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 20,
+              background: "var(--surface-raised)",
+              borderTop: "1px solid var(--line)",
+              padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
+            }
+          : { borderTop: "1px solid var(--line)", paddingTop: 16, marginTop: 8 }
+      }
+    >
+      <div className="ag-row" style={{ gap: 12, alignItems: "center", flexWrap: "nowrap" }}>
+        {currentStep > 0 && (
+          <Button variant="subtle" color="gray" onClick={() => setCurrentStep((s) => s - 1)} disabled={submitting} px={isMobile ? 8 : undefined}>
+            Atrás
+          </Button>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {barSummary && <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{barSummary}</div>}
+          {missing && <div className="ag-subtle">{missing}</div>}
+        </div>
+        <Button onClick={onNext} disabled={currentStep < 3 && !canNext[currentStep]} loading={submitting}>
+          {nextLabel}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <Card
-      withBorder
-      radius="md"
-      p={isMobile ? "md" : "xl"}
-      style={{ position: "relative" }}
-    >
-      <LoadingOverlay visible={submitting} zIndex={1000} />
+    <div style={page}>
       <div ref={contentTopRef} />
-
-      <Stack gap={isMobile ? "md" : "xl"}>
-        {/* ── Header / Stepper ────────────────────────── */}
-        {!isMobile && currentStep < 4 ? (
+      {heading}
+      <div className="ag-card" style={{ padding: isMobile ? 16 : 24, display: "flex", flexDirection: "column", gap: 20 }}>
+        {isMobile ? (
+          <div>
+            <div className="ag-row" style={{ justifyContent: "space-between", fontSize: 13 }}>
+              <b>{STEPS[currentStep]?.label}</b>
+              <span className="ag-subtle">
+                Paso {currentStep + 1} de {STEPS.length}
+              </span>
+            </div>
+            <div style={{ height: 4, borderRadius: 999, background: "var(--surface-hover)", marginTop: 6, overflow: "hidden" }}>
+              <div style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%`, height: "100%", background: "var(--ink)", transition: "width 160ms ease" }} />
+            </div>
+          </div>
+        ) : (
           <Stepper
             active={currentStep}
-            onStepClick={(i) => { if (!completed && i < currentStep) setCurrentStep(i); }}
-            orientation="horizontal"
+            onStepClick={(i) => {
+              if (!completed && i < currentStep) setCurrentStep(i);
+            }}
             size="sm"
-            iconSize={26}
             allowNextStepsSelect={false}
           >
             {STEPS.map((s, i) => (
               <Stepper.Step key={i} label={s.label} />
             ))}
-            <Stepper.Completed>Completado</Stepper.Completed>
           </Stepper>
-        ) : currentStep < 4 ? (
-          <Paper
-            withBorder
-            p="sm"
-            radius="md"
-            style={{ position: "sticky", top: 0, zIndex: 9, background: "var(--mantine-color-body)" }}
-          >
-            <Group justify="space-between">
-              <Text size="sm" fw={600}>{STEPS[currentStep]?.label}</Text>
-              <Text size="xs" c="dimmed">Paso {currentStep + 1} de {STEPS.length}</Text>
-            </Group>
-            <Divider my={6} />
-            <div style={{ height: 6, borderRadius: 9999, overflow: "hidden", background: "var(--mantine-color-gray-2)" }}>
-              <div style={{ width: `${progressValue}%`, height: "100%", background: "var(--mantine-color-green-6)", transition: "width 160ms ease" }} />
-            </div>
-          </Paper>
-        ) : null}
-
-        {/* ── Contenido ────────────────────────────────── */}
-        {currentStep < 4 ? (
-          renderStep(currentStep)
-        ) : (
-          // Pantalla de éxito
-          <Stack align="center" gap="md" py="xl">
-            <Center
-              style={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: "var(--mantine-color-green-1)",
-              }}
-            >
-              <IconCheck size={32} color="var(--mantine-color-green-6)" />
-            </Center>
-            <Title order={3} ta="center">
-              ¡Reserva realizada, {finishName}!
-            </Title>
-            <Text ta="center" c="dimmed" maw={400}>
-              Recibirás un mensaje de WhatsApp con la confirmación y los detalles de tu inscripción.
-            </Text>
-            <Button onClick={handleNewBooking} variant="light" mt="md">
-              Hacer otra reserva
-            </Button>
-          </Stack>
         )}
 
-        {/* 📦 Opción de usar paquete (paso resumen) */}
+        {renderStep(currentStep)}
+
+        {/* Usar paquete (resumen) */}
         {currentStep === 3 && pkgId && (
-          <Paper withBorder p="sm" radius="md" style={{ borderColor: "var(--mantine-color-grape-4)" }}>
-            <Group justify="space-between" wrap="nowrap">
-              <div>
-                <Text size="sm" fw={600} c="grape">Tienes un paquete con créditos para esta clase</Text>
-                {pkgCoversAll ? (
-                  <Text size="xs" c="dimmed">
-                    Créditos disponibles: {pkgRemaining}. Si lo usas, tu lugar no tendrá costo
-                    (se descuenta 1 crédito por sesión). El acompañante usa su propio paquete si tiene.
-                  </Text>
-                ) : (
-                  <Text size="xs" c="orange.8">
-                    Te quedan {pkgRemaining} {pkgRemaining === 1 ? "crédito" : "créditos"} y elegiste{" "}
-                    {selectedSessions.length} sesiones. Para usar tu paquete vuelve al paso
-                    «Sesión» y deja como máximo {pkgRemaining}.
-                  </Text>
-                )}
+          <div className="ag-card" style={{ padding: 14, display: "flex", gap: 12, alignItems: "center" }}>
+            <div style={{ flex: 1 }}>
+              <b style={{ display: "block", fontSize: 14 }}>Tienes un paquete para esta clase</b>
+              <div className="ag-subtle">
+                {pkgCoversAll
+                  ? `Te ${pkgRemaining === 1 ? "queda 1 crédito" : `quedan ${pkgRemaining} créditos`}. Si lo usas se descuenta 1 por sesión y no pagas tu lugar.`
+                  : `Te ${pkgRemaining === 1 ? "queda 1 crédito" : `quedan ${pkgRemaining} créditos`} y elegiste ${selectedSessions.length} sesiones. Para usarlo, vuelve a «Sesión» y deja máximo ${pkgRemaining}.`}
               </div>
-              <Switch
-                disabled={!pkgCoversAll}
-                checked={usingPackage}
-                onChange={(e) => setUsePkg(e.currentTarget.checked)}
-                label={usePkg ? "Usar paquete" : "No usar"}
-              />
-            </Group>
-          </Paper>
+            </div>
+            <Switch disabled={!pkgCoversAll} checked={usingPackage} onChange={(e) => setUsePkg(e.currentTarget.checked)} aria-label="Usar paquete" />
+          </div>
         )}
 
-        {/* ── Botones de navegación ────────────────────── */}
-        {currentStep < 4 && !completed && (
-          <Group
-            justify={currentStep > 0 ? "space-between" : "flex-end"}
-            wrap="wrap"
-            gap="sm"
-          >
-            {currentStep > 0 && (
-              <Button variant="default" fullWidth={isMobile} onClick={() => setCurrentStep((s) => s - 1)}>
-                Atrás
-              </Button>
-            )}
-
-            {/* Pasos 0 y 1: auto-avanzan al seleccionar, pero también mostramos botón */}
-            {currentStep === 0 && (
-              <Button
-                fullWidth={isMobile}
-                disabled={!canNext[0]}
-                onClick={() => setCurrentStep(1)}
-              >
-                Siguiente
-              </Button>
-            )}
-            {currentStep === 1 && (
-              <Button
-                fullWidth={isMobile}
-                disabled={!canNext[1]}
-                onClick={() => setCurrentStep(2)}
-              >
-                Siguiente
-              </Button>
-            )}
-            {currentStep === 2 && (
-              <Button
-                fullWidth={isMobile}
-                disabled={!canNext[2]}
-                onClick={() => setCurrentStep(3)}
-              >
-                Ver resumen
-              </Button>
-            )}
-            {currentStep === 3 && (
-              <Button
-                fullWidth={isMobile}
-                loading={submitting}
-                color="green"
-                onClick={handleSubmit}
-              >
-                {classDepositNeeded ? "Pagar y confirmar" : "Confirmar inscripción"}
-              </Button>
-            )}
-          </Group>
+        {submitError && (
+          <div className="ag-alert ag-alert--danger">
+            <IconInfoCircle size={20} />
+            <div>{submitError}</div>
+          </div>
         )}
-      </Stack>
-    </Card>
+
+        {actionBar}
+      </div>
+    </div>
   );
 }

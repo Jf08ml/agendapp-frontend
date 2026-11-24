@@ -66,7 +66,7 @@ interface CancellationResponse {
   data?: {
     reservationId?: string;
     appointmentId?: string;
-    results?: any[];
+    results?: unknown[];
     successCount?: number;
     alreadyConfirmed?: number;
   };

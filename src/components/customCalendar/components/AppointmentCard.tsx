@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   Paper,
   Text,
-  Badge,
   Menu,
   ActionIcon,
   Flex,
@@ -28,8 +27,9 @@ import { FaWhatsapp } from "react-icons/fa";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { showNotification } from "@mantine/notifications";
-import { IoSettings } from "react-icons/io5";
-import { IconUserCheck, IconUserX, IconListDetails } from "@tabler/icons-react";
+import { IconUserCheck, IconUserX, IconListDetails, IconDots } from "@tabler/icons-react";
+import { appointmentStatus } from "../appointmentStatus";
+import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
 
 dayjs.extend(localizedFormat);
 dayjs.locale("es");
@@ -47,16 +47,6 @@ interface AppointmentCardProps {
   timezone?: string; // 🌍 Timezone de la organización
   timeFormat?: string;
 }
-
-// Función para calcular el contraste del color
-const getTextColor = (backgroundColor: string): string => {
-  const hex = backgroundColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? "#000000" : "#FFFFFF";
-};
 
 // const getStatusStyles = (status: string) => {
 //   switch (status) {
@@ -87,7 +77,6 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const { hasPermission } = usePermissions();
 
   const employeeColor = appointment.employee.color || "#ffffff";
-  const textColor = getTextColor(employeeColor);
 
   // 👇 esto debe seguir funcionando: citas pasadas cambian color
   const isPastAppointment = dayjs(appointment.endDate).isBefore(dayjs());
@@ -174,405 +163,290 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   };
   const reminderDelivery = reminderDeliveryStatus ? reminderDeliveryConfig[reminderDeliveryStatus] : null;
 
-  // 🕒 Hora de inicio/fin — se muestra en una esquina fija (position absolute) para
-  // no agregar una fila al flujo del contenido y evitar que desborde cards chicas.
+  // 🕒 Hora de inicio/fin (panel: «8:00 a. m.», respeta 24 h)
   const cardTimeFormat = timeFormat === "24h" ? "HH:mm" : "h:mm A";
-  const startTimeLabel = formatInTimezone(appointment.startDate, timezone, cardTimeFormat);
-  const endTimeLabel = formatInTimezone(appointment.endDate, timezone, cardTimeFormat);
+  const startTimeLabel = toSpanishMeridiem(formatInTimezone(appointment.startDate, timezone, cardTimeFormat));
+  const endTimeLabel = toSpanishMeridiem(formatInTimezone(appointment.endDate, timezone, cardTimeFormat));
+  // Bloques cortos (≤ 30 min): solo hora y cliente (AppointmentCard del design system)
+  const durationMin =
+    (new Date(appointment.endDate).getTime() - new Date(appointment.startDate).getTime()) / 60000;
+  const isShort = durationMin <= 30;
+  const status = appointmentStatus(appointment.status);
+  const StatusIcon = status.icon;
+  const muted = "var(--ink-muted)";
+  const smallBadge = { height: 20, padding: "0 7px", fontSize: 11 };
 
   return (
     <Paper
-        radius={10}
+        radius="md"
         style={{
-          backgroundColor: isCancelled
-            ? "#F0EBE0"
-            : isPastAppointment
-            ? "#FAF7F2"
-            : employeeColor,
-          color: isCancelled ? "#9CA3AF" : isPastAppointment ? "#8B92A6" : textColor,
+          // ag-appt: superficie elevada, borde line-strong y el color del profesional
+          // como franja a la izquierda (antes, todo el fondo en su color)
+          backgroundColor: isPastAppointment || isCancelled ? "var(--surface-muted)" : "var(--surface-raised)",
+          color: "var(--ink)",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
-          padding: "6px 8px",
+          gap: 1,
+          padding: "5px 8px 5px 10px",
           height: "100%",
           position: "relative",
+          overflow: "hidden",
           cursor: isCancelled ? "default" : "pointer",
-          fontSize: 10,
-          border: isCancelled
-            ? "1px dashed #C9C2B5"
-            : appointment.status === "attended"
-            ? "2px solid #12b886"
-            : appointment.status === "no_show"
-            ? "2px solid #e64980"
-            : isPastAppointment
-            ? "1px solid #E7E2D6"
-            : "1px solid rgba(0,0,0,0.12)",
-          boxShadow: isCancelled || isPastAppointment
-            ? "none"
-            : "0 1px 4px rgba(0,0,0,0.10)",
-          opacity: isCancelled ? 0.5 : appointment.status === "no_show" ? 0.65 : 1,
-          textDecoration: isCancelled ? "line-through" : "none",
+          border: isCancelled ? "1px dashed var(--line-control)" : "1px solid var(--line-strong)",
+          borderLeft: `3px solid ${employeeColor}`,
+          boxShadow: "none",
+          opacity: isCancelled ? 0.5 : appointment.status === "no_show" ? 0.75 : 1,
           pointerEvents: isCancelled ? "none" : "auto",
           transition: "opacity 0.12s",
         }}
         onClick={(e) => {
           // clave para que NO se propague al onClick de la columna
           e.stopPropagation();
-          const isIconClick = (e.target as HTMLElement).closest(
-            ".ignore-modal"
-          );
+          const isIconClick = (e.target as HTMLElement).closest(".ignore-modal");
           if (!isIconClick) {
             onEditAppointment(appointment);
           }
         }}
       >
-        {/* Hora de inicio-fin (esquina fija arriba-derecha, texto simple sin badge) */}
-        <Text
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 2,
-            fontSize: 8,
-            fontWeight: 700,
-            lineHeight: 1,
-            letterSpacing: -0.2,
-            whiteSpace: "nowrap",
-            color: isPastAppointment ? "#8B92A6" : textColor,
-            opacity: 0.85,
-          }}
-        >
-          {startTimeLabel}–{endTimeLabel}
-        </Text>
-
-        {/* Badge "solicitado" */}
-        {appointment.employeeRequestedByClient && (
-          <Badge
-            color="violet"
-            size="xxs"
-            radius="sm"
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 0,
-              fontSize: 7,
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
-              backgroundColor: "rgba(111, 66, 193, 0.9)",
-            }}
-          >
-            Solicitado
-          </Badge>
-        )}
-
-        {/* Badge "confirmado por cliente" */}
-        {appointment.clientConfirmed && !isCancelled && (
-          <Badge
-            color="green"
-            size="xxs"
-            radius="sm"
-            style={{
-              position: "absolute",
-              top: appointment.employeeRequestedByClient ? 45 : 10,
-              right: 0,
-              fontSize: 7,
-              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.18)",
-              backgroundColor: "rgba(37, 134, 87, 0.9)",
-            }}
-          >
-            ✓ Cliente
-          </Badge>
-        )}
-
-        {/* Menú opciones */}
-        <Menu position="top-start" withArrow>
-          <Menu.Target>
-            <Tooltip label="Opciones" withArrow>
-              <ActionIcon
-                className="ignore-modal"
-                variant="transparent"
-                color="dark"
-                size="xs"
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  left: -4,
-                  zIndex: 10,
-                  pointerEvents: "auto", // ✅ Menú siempre clickeable, incluso en citas canceladas
-                }}
-              >
-                <IoSettings size={10} />
-              </ActionIcon>
-            </Tooltip>
-          </Menu.Target>
-          <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
-            {handleToggleExpand && isExpanded && (
-              <Menu.Item
-                leftSection={
-                  isExpanded(appointment) ? (
-                    <BiCheck size={16} />
-                  ) : (
-                    <BiExpand size={16} />
-                  )
-                }
-                onClick={() => handleToggleExpand(appointment._id)}
-              >
-                {isExpanded(appointment) ? "Contraer detalle" : "Ver detalle"}
-              </Menu.Item>
-            )}
-            <Menu.Item
-              leftSection={<BiEdit size={16} />}
-              disabled={!hasPermission("appointments:update")}
-              onClick={() => onEditAppointment(appointment, "edicion")}
-            >
-              Editar cita
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<BiTrash size={16} />}
-              disabled={!hasPermission("appointments:cancel")}
-              onClick={() => onCancelAppointment(appointment._id)}
-              color="red"
-            >
-              Cancelar cita
-            </Menu.Item>
-            <Menu.Item
-              leftSection={<BiCheck size={16} />}
-              disabled={!hasPermission("appointments:confirm")}
-              onClick={() => onConfirmAppointment(appointment._id)}
-              color="green"
-            >
-              Confirmar realizada
-            </Menu.Item>
-            {isPastAppointment && !isCancelled && (
-              <>
-                <Menu.Divider />
-                <Menu.Label>Asistencia</Menu.Label>
-                <Menu.Item
-                  leftSection={<IconUserCheck size={16} />}
-                  disabled={!hasPermission("appointments:update")}
-                  onClick={() => onMarkAttendance(appointment._id, "attended")}
-                  color="teal"
-                >
-                  Asistió
-                </Menu.Item>
-                <Menu.Item
-                  leftSection={<IconUserX size={16} />}
-                  disabled={!hasPermission("appointments:update")}
-                  onClick={() => onMarkAttendance(appointment._id, "no_show")}
-                  color="pink"
-                >
-                  No asistió
-                </Menu.Item>
-              </>
-            )}
-          </Menu.Dropdown>
-        </Menu>
-
-        {/* Badge de cancelada */}
-        {isCancelled && (
-          <Badge
-            color="red"
-            size="xs"
-            radius="sm"
-            style={{
-              fontSize: 8,
-              marginTop: 4,
-              marginBottom: 2,
-            }}
-          >
-            ❌ CANCELADA
-          </Badge>
-        )}
-
-        {/* Badge de asistencia */}
-        {appointment.status === "attended" && (
-          <Badge
-            color="teal"
-            size="xs"
-            radius="sm"
-            style={{
-              fontSize: 8,
-              marginTop: 4,
-              marginBottom: 2,
-            }}
-          >
-            ✓ ASISTIÓ
-          </Badge>
-        )}
-        {appointment.status === "no_show" && (
-          <Badge
-            color="pink"
-            size="xs"
-            radius="sm"
-            style={{
-              fontSize: 8,
-              marginTop: 4,
-              marginBottom: 2,
-            }}
-          >
-            ✗ NO ASISTIÓ
-          </Badge>
-        )}
-
-        {/* Servicio (la hora ya se identifica por la columna de línea de tiempo) */}
-        <Text
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            marginTop: 6,
-            letterSpacing: -0.2,
-            lineHeight: 1.15,
-          }}
-        >
-          {appointment.service ? appointment.service.name : "Sin servicio"}
-          {appointment.packageSession &&
-            ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
-        </Text>
-
-        {/* Cliente */}
-        <Flex align="center" gap={3} wrap="nowrap">
+        {/* Hora + menú de opciones */}
+        <Flex align="center" gap={4} wrap="nowrap">
           <Text
-            style={{
-              color: isPastAppointment ? "#8B92A6" : textColor,
-              fontSize: 10,
-            }}
+            className="ag-num"
+            style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: "16px", fontWeight: 500, color: muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
           >
-            {isBirthday
-              ? `🎉 ${appointment.client.name} 🎉`
-              : appointment.client.name}
+            {startTimeLabel} – {endTimeLabel}
           </Text>
-          {appointment.customFieldValues &&
-            Object.keys(appointment.customFieldValues).length > 0 && (
-              <Tooltip
-                withArrow
-                multiline
-                w={220}
-                label={
-                  <>
-                    {Object.entries(appointment.customFieldValues).map(([key, value]) => {
-                      if (value === undefined || value === null || value === "") return null;
-                      const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
-                      const label = def?.label || key;
-                      return (
-                        <div key={key}>
-                          {label}: {String(value)}
-                        </div>
-                      );
-                    })}
-                  </>
-                }
-              >
-                <Box style={{ display: "inline-flex" }}>
-                  <IconListDetails
-                    size={10}
-                    color={isPastAppointment ? "#8B92A6" : textColor}
-                  />
-                </Box>
+          <Menu position="top-start" withArrow>
+            <Menu.Target>
+              <Tooltip label="Opciones" withArrow>
+                <ActionIcon
+                  className="ignore-modal"
+                  variant="subtle"
+                  color="gray"
+                  size="xs"
+                  aria-label="Opciones de la cita"
+                  style={{ pointerEvents: "auto", flex: "none" }}
+                >
+                  <IconDots size={14} />
+                </ActionIcon>
               </Tooltip>
-            )}
+            </Menu.Target>
+            <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
+              {handleToggleExpand && isExpanded && (
+                <Menu.Item
+                  leftSection={isExpanded(appointment) ? <BiCheck size={16} /> : <BiExpand size={16} />}
+                  onClick={() => handleToggleExpand(appointment._id)}
+                >
+                  {isExpanded(appointment) ? "Contraer detalle" : "Ver detalle"}
+                </Menu.Item>
+              )}
+              <Menu.Item
+                leftSection={<BiEdit size={16} />}
+                disabled={!hasPermission("appointments:update")}
+                onClick={() => onEditAppointment(appointment, "edicion")}
+              >
+                Editar cita
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<BiTrash size={16} />}
+                disabled={!hasPermission("appointments:cancel")}
+                onClick={() => onCancelAppointment(appointment._id)}
+                color="red"
+              >
+                Cancelar cita
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<BiCheck size={16} />}
+                disabled={!hasPermission("appointments:confirm")}
+                onClick={() => onConfirmAppointment(appointment._id)}
+                color="green"
+              >
+                Confirmar realizada
+              </Menu.Item>
+              {isPastAppointment && !isCancelled && (
+                <>
+                  <Menu.Divider />
+                  <Menu.Label>Asistencia</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconUserCheck size={16} />}
+                    disabled={!hasPermission("appointments:update")}
+                    onClick={() => onMarkAttendance(appointment._id, "attended")}
+                    color="teal"
+                  >
+                    Asistió
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconUserX size={16} />}
+                    disabled={!hasPermission("appointments:update")}
+                    onClick={() => onMarkAttendance(appointment._id, "no_show")}
+                    color="pink"
+                  >
+                    No asistió
+                  </Menu.Item>
+                </>
+              )}
+            </Menu.Dropdown>
+          </Menu>
         </Flex>
 
-        {/* Ícono de recordatorio (esquina fija, clickeable) */}
-        <Tooltip
-          label={
-            updatingReminder
-              ? "Actualizando..."
-              : appointment.reminderSent
-              ? reminderDelivery
-                ? `${reminderDelivery.label} — Click para marcar como pendiente`
-                : "Recordatorio enviado - Click para marcar como pendiente"
-              : "Recordatorio pendiente"
-          }
-          withArrow
-        >
-          <ActionIcon
-            className="ignore-modal"
-            size="xs"
-            variant="transparent"
-            loading={updatingReminder}
-            disabled={updatingReminder}
+        {/* Cliente (body-strong) */}
+        <Flex align="center" gap={4} wrap="nowrap">
+          <Text
             style={{
-              position: "absolute",
-              bottom: -2,
-              right: -2,
-              pointerEvents: "auto",
-              cursor: appointment.reminderSent && !updatingReminder ? "pointer" : "default",
+              fontSize: 14,
+              lineHeight: "18px",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              textDecoration: isCancelled ? "line-through" : "none",
             }}
-            onClick={
-              appointment.reminderSent && !updatingReminder
-                ? async (e) => {
-                    e.stopPropagation();
-                    setUpdatingReminder(true);
-                    try {
-                      const updatedAppointment = await updateAppointment(
-                        appointment._id,
-                        { reminderSent: false }
-                      );
-
-                      if (updatedAppointment) {
-                        showNotification({
-                          title: "Recordatorio actualizado",
-                          message: "El recordatorio se marcó como pendiente",
-                          color: "blue",
-                          autoClose: 3000,
-                          position: "top-right",
-                        });
-
-                        // Actualizar solo este appointment en el estado local
-                        setAppointments((prevAppointments) =>
-                          prevAppointments.map((appt) =>
-                            appt._id === appointment._id
-                              ? { ...appt, reminderSent: false }
-                              : appt
-                          )
-                        );
-                      }
-                    } catch (error) {
-                      console.error(error);
-                      showNotification({
-                        title: "Error",
-                        message: "No se pudo actualizar el recordatorio",
-                        color: "red",
-                        autoClose: 3000,
-                        position: "top-right",
-                      });
-                    } finally {
-                      setUpdatingReminder(false);
-                    }
-                  }
-                : undefined
-            }
           >
-            {appointment.reminderSent ? (
-              reminderDeliveryStatus === "failed" ? (
-                <BiXCircle size={12} color={reminderDelivery?.color} />
-              ) : (
-                <BiCheckCircle size={12} color={reminderDelivery?.color || "teal"} />
-              )
-            ) : (
-              <BiTimeFive size={12} color="gray" />
-            )}
-          </ActionIcon>
-        </Tooltip>
-
-        {/* Ícono de confirmación de WhatsApp (esquina fija, solo informativo) */}
-        {appointment.waConfirmationStatus && (
-          <Tooltip
-            label={waConfirmationTooltip}
-            withArrow
-            multiline
-            w={220}
-          >
-            <Box
-              style={{
-                position: "absolute",
-                bottom: -2,
-                left: -2,
-                display: "flex",
-                pointerEvents: "auto",
-              }}
+            {isBirthday ? `🎉 ${appointment.client.name}` : appointment.client.name}
+          </Text>
+          {appointment.customFieldValues && Object.keys(appointment.customFieldValues).length > 0 && (
+            <Tooltip
+              withArrow
+              multiline
+              w={220}
+              label={
+                <>
+                  {Object.entries(appointment.customFieldValues).map(([key, value]) => {
+                    if (value === undefined || value === null || value === "") return null;
+                    const def = organization?.clientFormConfig?.fields?.find((f) => f.key === key);
+                    const label = def?.label || key;
+                    return (
+                      <div key={key}>
+                        {label}: {String(value)}
+                      </div>
+                    );
+                  })}
+                </>
+              }
             >
-              <FaWhatsapp size={12} color={waConfirmationColor} />
-            </Box>
-          </Tooltip>
+              <Box className="ignore-modal" style={{ display: "inline-flex", flex: "none", color: muted }}>
+                <IconListDetails size={12} />
+              </Box>
+            </Tooltip>
+          )}
+        </Flex>
+
+        {/* Servicio (solo si el bloque es de más de 30 min) */}
+        {!isShort && (
+          <Text style={{ fontSize: 13, lineHeight: "17px", color: muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {appointment.service ? appointment.service.name : "Sin servicio"}
+            {appointment.packageSession &&
+              ` · Sesión ${appointment.packageSession.number}/${appointment.packageSession.total}`}
+          </Text>
+        )}
+
+        {/* Pie: estado en palabra + ícono, insignias y avisos de WhatsApp */}
+        {!isShort && (
+          <Flex align="center" gap={4} wrap="wrap" style={{ marginTop: "auto", paddingTop: 2 }}>
+            <span className={`ag-badge ag-badge--${status.tone}`} style={smallBadge}>
+              <StatusIcon size={12} stroke={2} />
+              {status.label}
+            </span>
+            {appointment.clientConfirmed && !isCancelled && (
+              <Tooltip label="El cliente confirmó su asistencia" withArrow>
+                <span className="ag-badge ag-badge--success" style={smallBadge}>
+                  <IconUserCheck size={12} stroke={2} />
+                  Cliente
+                </span>
+              </Tooltip>
+            )}
+            {appointment.employeeRequestedByClient && (
+              <Tooltip label="El cliente pidió a este profesional" withArrow>
+                <span className="ag-badge ag-badge--info" style={smallBadge}>
+                  Solicitado
+                </span>
+              </Tooltip>
+            )}
+
+            <Flex gap={2} align="center" style={{ marginLeft: "auto" }}>
+              {/* Confirmación de WhatsApp (solo informativo) */}
+              {appointment.waConfirmationStatus && (
+                <Tooltip label={waConfirmationTooltip} withArrow multiline w={220}>
+                  <Box className="ignore-modal" style={{ display: "flex", pointerEvents: "auto" }}>
+                    <FaWhatsapp size={13} color={waConfirmationColor} />
+                  </Box>
+                </Tooltip>
+              )}
+              {/* Recordatorio (clic para marcarlo como pendiente) */}
+              <Tooltip
+                label={
+                  updatingReminder
+                    ? "Actualizando..."
+                    : appointment.reminderSent
+                    ? reminderDelivery
+                      ? `${reminderDelivery.label} — Click para marcar como pendiente`
+                      : "Recordatorio enviado - Click para marcar como pendiente"
+                    : "Recordatorio pendiente"
+                }
+                withArrow
+              >
+                <ActionIcon
+                  className="ignore-modal"
+                  size="xs"
+                  variant="transparent"
+                  loading={updatingReminder}
+                  disabled={updatingReminder}
+                  aria-label="Recordatorio"
+                  style={{
+                    pointerEvents: "auto",
+                    cursor: appointment.reminderSent && !updatingReminder ? "pointer" : "default",
+                  }}
+                  onClick={
+                    appointment.reminderSent && !updatingReminder
+                      ? async (e) => {
+                          e.stopPropagation();
+                          setUpdatingReminder(true);
+                          try {
+                            const updatedAppointment = await updateAppointment(appointment._id, { reminderSent: false });
+                            if (updatedAppointment) {
+                              showNotification({
+                                title: "Recordatorio actualizado",
+                                message: "El recordatorio se marcó como pendiente",
+                                color: "blue",
+                                autoClose: 3000,
+                                position: "top-right",
+                              });
+                              // Actualizar solo este appointment en el estado local
+                              setAppointments((prevAppointments) =>
+                                prevAppointments.map((appt) =>
+                                  appt._id === appointment._id ? { ...appt, reminderSent: false } : appt
+                                )
+                              );
+                            }
+                          } catch (error) {
+                            console.error(error);
+                            showNotification({
+                              title: "Error",
+                              message: "No se pudo actualizar el recordatorio",
+                              color: "red",
+                              autoClose: 3000,
+                              position: "top-right",
+                            });
+                          } finally {
+                            setUpdatingReminder(false);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {appointment.reminderSent ? (
+                    reminderDeliveryStatus === "failed" ? (
+                      <BiXCircle size={13} color={reminderDelivery?.color} />
+                    ) : (
+                      <BiCheckCircle size={13} color={reminderDelivery?.color || "teal"} />
+                    )
+                  ) : (
+                    <BiTimeFive size={13} color="var(--ink-subtle)" />
+                  )}
+                </ActionIcon>
+              </Tooltip>
+            </Flex>
+          </Flex>
         )}
     </Paper>
   );

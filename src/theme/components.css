@@ -1,0 +1,47 @@
+/* Ajustes globales de Mantine para igualar las clases ag-* del design system
+ * (project/components/bundle.css). Se carga después de @mantine/core/styles.css.
+ * Lo que se puede expresar con defaultProps/vars está en theme/mantineTheme.ts. */
+
+/* Anillo de foco de teclado: 2px --focus con 2px de separación, independiente
+ * de la marca (con una marca amarilla o negra el anillo seguiría viéndose). */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible,
+.mantine-focus-auto:focus-visible,
+.mantine-focus-always:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Inputs, selects, textareas…: borde line-control (3:1) y foco en --focus.
+ * Misma especificidad que la regla de Mantine; el error (más específico) gana. */
+[data-mantine-color-scheme] .mantine-Input-wrapper[data-variant="default"] {
+  --input-bd: var(--line-control);
+  --input-bd-focus: var(--focus);
+}
+.mantine-Input-input[data-variant="default"] {
+  box-shadow: var(--shadow-xs);
+}
+.mantine-Input-input::placeholder {
+  color: var(--ink-subtle);
+}
+
+/* Etiquetas visibles encima del campo (ag-label) */
+.mantine-InputWrapper-label {
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.mantine-InputWrapper-description {
+  color: var(--ink-muted);
+}
+
+/* Tarjetas: borde line, sin sombra en reposo cuando no se pide (ag-card) */
+.mantine-Card-root,
+.mantine-Paper-root {
+  --paper-border-color: var(--line);
+}
+
+/* Switch apagado en line-control (ag-switch); encendido = color del prop (marca) */
+.mantine-Switch-input:not(:checked) + .mantine-Switch-track {
+  --switch-bg: var(--line-control);
+  --switch-bd: var(--line-control);
+}

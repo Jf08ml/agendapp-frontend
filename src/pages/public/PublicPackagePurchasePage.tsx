@@ -1,35 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  Container,
-  Title,
-  Text,
-  SimpleGrid,
-  Card,
-  Stack,
-  Group,
-  Badge,
-  Button,
-  List,
-  ThemeIcon,
-  Loader,
-  Center,
-  Alert,
-  Modal,
-  TextInput,
-  Textarea,
-  Divider,
-  SegmentedControl,
-  Image,
-} from "@mantine/core";
-import {
-  IconCheck,
-  IconPackage,
-  IconClock,
-  IconAlertCircle,
-  IconShoppingCart,
-  IconGift,
-} from "@tabler/icons-react";
+import { Button, Loader, Skeleton, TextInput, Textarea } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconBrandWhatsapp, IconCheck, IconInfoCircle, IconPackage, IconShoppingCart } from "@tabler/icons-react";
 import { DateInput } from "@mantine/dates";
 import dayjs from "dayjs";
 import { CountryCode } from "libphonenumber-js";
@@ -85,8 +58,9 @@ const hasTiers = (pkg: PublicPackageItem | null) => (pkg?.tiers?.length ?? 0) > 
 const minTierPrice = (pkg: PublicPackageItem) =>
   Math.min(...(pkg.tiers || []).map((t) => t.price));
 
-// Página pública para que un cliente compre un paquete y lo pague online (MP).
-// El ClientPackage se crea cuando el webhook confirma el pago.
+// Compra de paquetes (rediseño, PaquetesPublico): elegir paquete, nivel (si tiene)
+// y tus datos y pago, con barra inferior y un solo botón. El ClientPackage se crea
+// cuando se confirma el pago (Mercado Pago o comprobante).
 export default function PublicPackagePurchasePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -124,6 +98,8 @@ export default function PublicPackagePurchasePage() {
   const [foundName, setFoundName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
+  const isMobile = useMediaQuery("(max-width: 48em)");
 
   const setField = (field: keyof CustomerForm, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -159,10 +135,6 @@ export default function PublicPackagePurchasePage() {
     setFormError(null);
   };
 
-  const closeBuy = () => {
-    if (submitting) return;
-    setSelected(null);
-  };
 
   // Deep-link desde el catálogo de programas (?packageId=...): abre
   // directamente el modal de compra de ese paquete al cargar.
@@ -171,7 +143,10 @@ export default function PublicPackagePurchasePage() {
     const packageId = searchParams.get("packageId");
     if (!packageId) return;
     const pkg = packages.find((p) => p._id === packageId);
-    if (pkg) openBuy(pkg);
+    if (pkg) {
+      openBuy(pkg);
+      setStep(1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packages]);
 
@@ -301,342 +276,374 @@ export default function PublicPackagePurchasePage() {
 
   const LookupFeedback = () =>
     isLookingUp ? (
-      <Group gap="xs">
+      <div className="ag-row" style={{ gap: 6 }}>
         <Loader size="xs" />
-        <Text size="xs" c="dimmed">
-          Buscando por {IDENTIFIER_LABELS[identifierField]}...
-        </Text>
-      </Group>
+        <span className="ag-subtle">Buscando por {IDENTIFIER_LABELS[identifierField].toLowerCase()}…</span>
+      </div>
     ) : foundName ? (
-      <Group gap="xs">
-        <Text size="xs" c="dimmed">
-          Cliente encontrado:
-        </Text>
-        <Badge variant="light" size="sm">
-          {foundName}
-        </Badge>
-      </Group>
+      <div className="ag-alert ag-alert--success" style={{ padding: "6px 10px", fontSize: 13 }}>
+        <IconCheck size={16} />
+        <div>
+          Cliente encontrado: <b>{foundName}</b>
+        </div>
+      </div>
     ) : null;
+
+  const canPay = mpConnected || receiptMethods.length > 0;
+  const willUseMp = mpConnected && !(organization?.depositPreferredMethod === "receipt" && receiptMethods.length > 0);
+  const tiered = hasTiers(selected);
+  const steps = tiered ? ["Paquete", "Nivel", "Tus datos y pago"] : ["Paquete", "Tus datos y pago"];
+  const dataStep = tiered ? 2 : 1;
+  const whatsappUrl = organization?.whatsappUrl as string | undefined;
+
+  const shell = { maxWidth: 760, margin: "0 auto", padding: isMobile ? "20px 16px 120px" : "28px 16px 48px" } as const;
 
   if (loading) {
     return (
-      <Center mih="60vh">
-        <Loader />
-      </Center>
+      <div style={shell}>
+        <Skeleton height={28} width={240} mb={10} />
+        <Skeleton height={14} width="70%" mb={20} />
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} height={96} radius="md" mb={10} />
+        ))}
+      </div>
     );
   }
 
-  const canPay = mpConnected || receiptMethods.length > 0;
-  const willUseMp =
-    mpConnected &&
-    !(organization?.depositPreferredMethod === "receipt" && receiptMethods.length > 0);
+  if (packages.length === 0) {
+    return (
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: "40px 20px", textAlign: "center" }}>
+          <b style={{ display: "block", marginBottom: 6 }}>Este negocio no tiene paquetes a la venta</b>
+          <Button variant="default" onClick={() => navigate("/")} mt={6}>
+            Volver al inicio
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Precio por sesión de cada nivel y cuánto ahorra frente al más caro por sesión
+  const tierStats = (selected?.tiers || []).map((t) => {
+    const sessions = (t.sessionsIncluded || 0) + (t.courtesySessions || 0);
+    return { tier: t, sessions, perSession: sessions > 0 ? t.price / sessions : t.price };
+  });
+  const maxPerSession = Math.max(0, ...tierStats.map((s) => s.perSession));
+
+  const includes = (pkg: PublicPackageItem) => [
+    ...(pkg.services || []).map((s) => (hasTiers(pkg) ? s.serviceId?.name || "Servicio" : `${s.sessionsIncluded}× ${s.serviceId?.name || "Servicio"}`)),
+    ...(pkg.classes || []).map((c) => (hasTiers(pkg) ? c.classId?.name || "Clase" : `${c.sessionsIncluded}× ${c.classId?.name || "Clase"}`)),
+  ];
+
+  const next = () => {
+    setFormError(null);
+    if (step === 0) {
+      if (!selected) return setFormError("Elige un paquete.");
+      setStep(1);
+    } else if (tiered && step === 1) {
+      if (!tierId) return setFormError("Selecciona un nivel del paquete.");
+      setStep(2);
+    } else {
+      void handleBuy();
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const stepPackages = (
+    <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Paquete">
+      {packages.map((pkg) => {
+        const isSel = selected?._id === pkg._id;
+        const choose = () => canPay && openBuy(pkg);
+        return (
+          <div
+            key={pkg._id}
+            className="ag-pick"
+            role="radio"
+            tabIndex={canPay ? 0 : -1}
+            aria-checked={isSel}
+            aria-disabled={!canPay || undefined}
+            onClick={choose}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), choose())}
+            style={{ cursor: canPay ? "pointer" : "default", alignItems: "flex-start" }}
+          >
+            <div className="ag-pick__thumb" style={{ display: "grid", placeItems: "center", overflow: "hidden" }}>
+              {pkg.images?.[0] ? <img src={pkg.images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <IconPackage size={22} color="var(--ink-subtle)" />}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="ag-pick__name">{pkg.name}</div>
+              {pkg.description && (
+                <div className="ag-subtle" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {pkg.description}
+                </div>
+              )}
+              <div className="ag-row" style={{ gap: 10, marginTop: 4, flexWrap: "wrap", fontSize: 13 }}>
+                <b className="ag-num">{hasTiers(pkg) ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}` : formatCurrency(pkg.price ?? 0, currency)}</b>
+                <span className="ag-muted">Vigencia {pkg.validityDays} días</span>
+              </div>
+              <div className="ag-subtle" style={{ marginTop: 2 }}>{includes(pkg).join(" · ")}</div>
+            </div>
+            <span className="ag-pick__check">{isSel && <IconCheck size={14} />}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const stepTier = selected && (
+    <div className="ag-stack" style={{ gap: 12 }}>
+      <div className="ag-card" style={{ padding: 14, display: "flex", gap: 12 }}>
+        {selected.images?.[0] && <img src={selected.images[0]} alt="" style={{ width: 72, height: 72, borderRadius: "var(--radius-md)", objectFit: "cover", flex: "none" }} />}
+        <div>
+          <b>{selected.name}</b>
+          <div className="ag-subtle">Incluye: {includes(selected).join(", ")}</div>
+        </div>
+      </div>
+      <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Nivel">
+        {tierStats.map(({ tier, sessions, perSession }) => {
+          const saving = maxPerSession > 0 ? Math.round((1 - perSession / maxPerSession) * 100) : 0;
+          return (
+            <div
+              key={tier._id}
+              className="ag-opt"
+              role="radio"
+              tabIndex={0}
+              aria-checked={tierId === tier._id}
+              onClick={() => setTierId(tier._id)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setTierId(tier._id))}
+              style={{ cursor: "pointer", alignItems: "center" }}
+            >
+              <span className="ag-radio" />
+              <div style={{ flex: 1 }}>
+                <b>{tier.label}</b>
+                <span className="d">
+                  {tier.sessionsIncluded} sesiones
+                  {tier.courtesySessions ? ` + ${tier.courtesySessions} de cortesía` : ""}
+                  {sessions > 0 ? ` · ${formatCurrency(Math.round(perSession), currency)} por sesión` : ""}
+                </span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <b className="ag-num">{formatCurrency(tier.price, currency)}</b>
+                {saving >= 1 && <div className="ag-badge ag-badge--success" style={{ height: 20, fontSize: 11, marginTop: 2 }}>Ahorras {saving} %</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const stepData = selected && (
+    <div className="ag-stack" style={{ gap: 12 }}>
+      {identifierField === "phone" && (
+        <div className="ag-stack" style={{ gap: 6 }}>
+          <InternationalPhoneInput
+            label={phoneCfg.label || "Tu WhatsApp"}
+            value={form.phone_e164 || form.phone}
+            organizationDefaultCountry={orgCountry}
+            onChange={(e164, country, valid) => {
+              setField("phone_e164", e164 ?? "");
+              setField("phone", e164 ?? "");
+              setField("phone_country", country ?? "CO");
+              setPhoneValid(valid);
+              setPhoneError(null);
+            }}
+            onBlur={handlePhoneBlur}
+            error={phoneError}
+            required
+            compact
+          />
+          <LookupFeedback />
+        </div>
+      )}
+      {identifierField === "email" && (
+        <div className="ag-stack" style={{ gap: 6 }}>
+          <TextInput
+            label={emailCfg.label || IDENTIFIER_LABELS.email}
+            placeholder="tu@correo.com"
+            type="email"
+            value={form.email}
+            onChange={(e) => setField("email", e.currentTarget.value)}
+            onBlur={handleEmailBlur}
+            error={emailError}
+            required
+            disabled={isLookingUp}
+          />
+          <LookupFeedback />
+        </div>
+      )}
+      {identifierField === "documentId" && (
+        <div className="ag-stack" style={{ gap: 6 }}>
+          <TextInput
+            label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+            placeholder="Cédula, pasaporte…"
+            value={form.documentId}
+            onChange={(e) => setField("documentId", e.currentTarget.value)}
+            onBlur={handleDocumentIdBlur}
+            required
+            disabled={isLookingUp}
+          />
+          <LookupFeedback />
+        </div>
+      )}
+
+      <TextInput label="Nombre completo" placeholder="Tu nombre" required value={form.name} onChange={(e) => setField("name", e.currentTarget.value)} disabled={isLookingUp} />
+
+      {phoneCfg.enabled && identifierField !== "phone" && (
+        <InternationalPhoneInput
+          label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+          value={form.phone_e164 || form.phone}
+          organizationDefaultCountry={orgCountry}
+          onChange={(e164, country, valid) => {
+            setField("phone_e164", e164 ?? "");
+            setField("phone", e164 ?? "");
+            setField("phone_country", country ?? "CO");
+            setPhoneValid(valid);
+          }}
+          required={phoneCfg.required}
+          compact
+        />
+      )}
+      {emailCfg.enabled && identifierField !== "email" && (
+        <TextInput
+          label={emailCfg.label || IDENTIFIER_LABELS.email}
+          placeholder={emailCfg.required ? "tu@correo.com" : "Opcional"}
+          type="email"
+          value={form.email}
+          onChange={(e) => setField("email", e.currentTarget.value)}
+          onBlur={handleEmailBlur}
+          error={emailError}
+          required={emailCfg.required}
+        />
+      )}
+      {documentIdCfg.enabled && identifierField !== "documentId" && (
+        <TextInput
+          label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+          placeholder="Cédula, pasaporte…"
+          value={form.documentId}
+          onChange={(e) => setField("documentId", e.currentTarget.value)}
+          required={documentIdCfg.required}
+        />
+      )}
+      {birthDateCfg.enabled && (
+        <DateInput
+          label={birthDateCfg.label || "Fecha de nacimiento"}
+          value={form.birthDate ? dayjs(form.birthDate, "YYYY-MM-DD").toDate() : null}
+          onChange={(d) => setField("birthDate", d ? dayjs(d).format("YYYY-MM-DD") : "")}
+          valueFormat="DD/MM/YYYY"
+          placeholder="DD/MM/AAAA"
+          maxDate={new Date()}
+          required={birthDateCfg.required}
+          clearable
+          popoverProps={{ withinPortal: true, trapFocus: false }}
+        />
+      )}
+      {notesCfg.enabled && (
+        <Textarea
+          label={notesCfg.label || "Información adicional"}
+          placeholder="Algo que el negocio deba saber"
+          value={form.notes}
+          onChange={(e) => setField("notes", e.currentTarget.value)}
+          required={notesCfg.required}
+          minRows={2}
+          autosize
+        />
+      )}
+
+      <div className="ag-subtle">
+        {willUseMp ? "Pagas en Mercado Pago, de forma segura. Tu paquete se activa al confirmar el pago." : "Luego verás las cuentas para pagar y subir tu comprobante."}
+      </div>
+    </div>
+  );
+
+  const actionLabel = step === dataStep ? `Pagar ${formatCurrency(selectedPrice, currency)}` : "Continuar";
+  const summary = [selected?.name, tiered && selectedTier ? selectedTier.label : null].filter(Boolean).join(" · ");
 
   return (
-    <Container size="lg" py="xl">
-      <Stack gap="xs" mb="lg" align="center">
-        <ThemeIcon size={56} radius="xl" variant="light" color="violet">
-          <IconPackage size={32} />
-        </ThemeIcon>
-        <Title order={2} ta="center">
-          Paquetes disponibles
-        </Title>
-        <Text c="dimmed" ta="center" maw={520}>
-          Compra un paquete de sesiones y págalo en línea. Lo activamos
-          automáticamente al confirmar tu pago.
-        </Text>
-      </Stack>
+    <div style={shell}>
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div>
+          <h1 style={{ margin: 0, font: "600 26px/32px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Paquetes</h1>
+          <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+            Compra un paquete de sesiones y págalo en línea. Lo activamos automáticamente al confirmar tu pago.
+          </div>
+        </div>
 
-      {!canPay && (
-        <Alert
-          icon={<IconAlertCircle size={18} />}
-          color="yellow"
-          variant="light"
-          mb="md"
-        >
-          La compra en línea no está disponible en este momento. Comunícate con el
-          negocio para adquirir un paquete.
-        </Alert>
-      )}
-
-      {packages.length === 0 ? (
-        <Center mih="30vh">
-          <Text c="dimmed">No hay paquetes disponibles por ahora.</Text>
-        </Center>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-          {packages.map((pkg) => {
-            const tiered = hasTiers(pkg);
-            return (
-              <Card key={pkg._id} withBorder radius="md" padding="lg">
-                {pkg.images?.[0] && (
-                  <Card.Section mb="sm">
-                    <Image src={pkg.images[0]} h={180} alt={pkg.name} fit="cover" />
-                  </Card.Section>
-                )}
-                <Stack gap="sm" h="100%">
-                  <Stack gap={4}>
-                    <Text fw={600} size="lg">
-                      {pkg.name}
-                    </Text>
-                    {pkg.description && (
-                      <Text size="sm" c="dimmed" lineClamp={3}>
-                        {pkg.description}
-                      </Text>
-                    )}
-                  </Stack>
-
-                  <Group gap="xs">
-                    <Text fw={700} size="xl">
-                      {tiered
-                        ? `Desde ${formatCurrency(minTierPrice(pkg), currency)}`
-                        : formatCurrency(pkg.price ?? 0, currency)}
-                    </Text>
-                  </Group>
-
-                  {tiered && (
-                    <Group gap={6}>
-                      {pkg.tiers!.map((t) => (
-                        <Badge key={t._id} variant="outline" color="violet" size="sm">
-                          {t.label}
-                        </Badge>
-                      ))}
-                    </Group>
-                  )}
-
-                  <Badge
-                    variant="light"
-                    color="gray"
-                    leftSection={<IconClock size={12} />}
-                  >
-                    Vigencia {pkg.validityDays} días
-                  </Badge>
-
-                  <List
-                    spacing={4}
-                    size="sm"
-                    center
-                    icon={
-                      <ThemeIcon color="teal" size={16} radius="xl">
-                        <IconCheck size={11} />
-                      </ThemeIcon>
-                    }
-                  >
-                    {(pkg.services || []).map((s, i) => (
-                      <List.Item key={`s-${i}`}>
-                        {tiered
-                          ? s.serviceId?.name || "Servicio"
-                          : `${s.sessionsIncluded}× ${s.serviceId?.name || "Servicio"}`}
-                      </List.Item>
-                    ))}
-                    {(pkg.classes || []).map((c, i) => (
-                      <List.Item key={`c-${i}`}>
-                        {tiered
-                          ? c.classId?.name || "Clase"
-                          : `${c.sessionsIncluded}× ${c.classId?.name || "Clase"}`}
-                      </List.Item>
-                    ))}
-                  </List>
-
-                  <Button
-                    mt="auto"
-                    fullWidth
-                    leftSection={<IconShoppingCart size={16} />}
-                    disabled={!canPay}
-                    onClick={() => openBuy(pkg)}
-                  >
-                    Comprar
-                  </Button>
-                </Stack>
-              </Card>
-            );
-          })}
-        </SimpleGrid>
-      )}
-
-      <Modal opened={!!selected} onClose={closeBuy} title="Completar compra" centered>
-        {selected && (
-          <Stack gap="md">
-            <Group justify="space-between">
-              <Text fw={600}>{selected.name}</Text>
-              <Text fw={700}>{formatCurrency(selectedPrice, currency)}</Text>
-            </Group>
-
-            {hasTiers(selected) && (
-              <Stack gap="xs">
-                <Text size="sm" fw={500}>Paquete</Text>
-                <SegmentedControl
-                  fullWidth
-                  value={tierId || undefined}
-                  onChange={setTierId}
-                  data={(selected.tiers || []).map((t) => ({
-                    value: t._id,
-                    label: t.label,
-                  }))}
-                />
-                {selectedTier && (
-                  <Group gap={6} align="center">
-                    <Text size="xs" c="dimmed">
-                      {selectedTier.sessionsIncluded} sesiones
-                      {!!selectedTier.courtesySessions &&
-                        ` + ${selectedTier.courtesySessions} de cortesía`}
-                    </Text>
-                    {!!selectedTier.courtesySessions && (
-                      <IconGift size={14} color="var(--mantine-color-violet-6)" />
-                    )}
-                  </Group>
-                )}
-              </Stack>
+        {!canPay && (
+          <div className="ag-alert ag-alert--info" style={{ alignItems: "center", flexWrap: "wrap" }}>
+            <IconInfoCircle size={20} />
+            <div style={{ flex: 1, minWidth: 200 }}>La compra en línea no está disponible en este momento. Escríbele al negocio para comprar un paquete.</div>
+            {whatsappUrl && (
+              <Button component="a" href={whatsappUrl} target="_blank" rel="noopener noreferrer" size="xs" variant="default" leftSection={<IconBrandWhatsapp size={14} />}>
+                Escribir al negocio
+              </Button>
             )}
-
-            <Divider />
-
-            {/* Identificador configurado por la organización (siempre primero) */}
-            {identifierField === "phone" && (
-              <Stack gap={6}>
-                <InternationalPhoneInput
-                  label={phoneCfg.label || IDENTIFIER_LABELS.phone}
-                  value={form.phone_e164 || form.phone}
-                  organizationDefaultCountry={orgCountry}
-                  onChange={(e164, country, valid) => {
-                    setField("phone_e164", e164 ?? "");
-                    setField("phone", e164 ?? "");
-                    setField("phone_country", country ?? "CO");
-                    setPhoneValid(valid);
-                    setPhoneError(null);
-                  }}
-                  onBlur={handlePhoneBlur}
-                  error={phoneError}
-                  required
-                  compact
-                />
-                <LookupFeedback />
-              </Stack>
-            )}
-            {identifierField === "email" && (
-              <Stack gap={6}>
-                <TextInput
-                  label={emailCfg.label || IDENTIFIER_LABELS.email}
-                  placeholder="Ingresa tu correo"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setField("email", e.currentTarget.value)}
-                  onBlur={handleEmailBlur}
-                  error={emailError}
-                  required
-                  disabled={isLookingUp}
-                />
-                <LookupFeedback />
-              </Stack>
-            )}
-            {identifierField === "documentId" && (
-              <Stack gap={6}>
-                <TextInput
-                  label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
-                  placeholder="Cédula, pasaporte, etc."
-                  value={form.documentId}
-                  onChange={(e) => setField("documentId", e.currentTarget.value)}
-                  onBlur={handleDocumentIdBlur}
-                  required
-                  disabled={isLookingUp}
-                />
-                <LookupFeedback />
-              </Stack>
-            )}
-
-            {/* Nombre (siempre) */}
-            <TextInput
-              label="Nombre completo"
-              placeholder="Tu nombre"
-              required
-              value={form.name}
-              onChange={(e) => setField("name", e.currentTarget.value)}
-              disabled={isLookingUp}
-            />
-
-            {/* Campos secundarios habilitados (distintos al identificador) */}
-            {phoneCfg.enabled && identifierField !== "phone" && (
-              <InternationalPhoneInput
-                label={phoneCfg.label || IDENTIFIER_LABELS.phone}
-                value={form.phone_e164 || form.phone}
-                organizationDefaultCountry={orgCountry}
-                onChange={(e164, country, valid) => {
-                  setField("phone_e164", e164 ?? "");
-                  setField("phone", e164 ?? "");
-                  setField("phone_country", country ?? "CO");
-                  setPhoneValid(valid);
-                }}
-                required={phoneCfg.required}
-                compact
-              />
-            )}
-            {emailCfg.enabled && identifierField !== "email" && (
-              <TextInput
-                label={emailCfg.label || IDENTIFIER_LABELS.email}
-                placeholder="opcional"
-                type="email"
-                value={form.email}
-                onChange={(e) => setField("email", e.currentTarget.value)}
-                onBlur={handleEmailBlur}
-                error={emailError}
-                required={emailCfg.required}
-              />
-            )}
-            {documentIdCfg.enabled && identifierField !== "documentId" && (
-              <TextInput
-                label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
-                placeholder="Cédula, pasaporte, etc."
-                value={form.documentId}
-                onChange={(e) => setField("documentId", e.currentTarget.value)}
-                required={documentIdCfg.required}
-              />
-            )}
-            {birthDateCfg.enabled && (
-              <DateInput
-                label={birthDateCfg.label || "Fecha de nacimiento"}
-                value={form.birthDate ? dayjs(form.birthDate, "YYYY-MM-DD").toDate() : null}
-                onChange={(d) => setField("birthDate", d ? dayjs(d).format("YYYY-MM-DD") : "")}
-                valueFormat="DD/MM/YYYY"
-                placeholder="DD/MM/AAAA"
-                maxDate={new Date()}
-                required={birthDateCfg.required}
-                clearable
-                popoverProps={{ withinPortal: true, trapFocus: false }}
-              />
-            )}
-            {notesCfg.enabled && (
-              <Textarea
-                label={notesCfg.label || "Notas"}
-                placeholder="Información adicional..."
-                value={form.notes}
-                onChange={(e) => setField("notes", e.currentTarget.value)}
-                required={notesCfg.required}
-                minRows={2}
-                autosize
-              />
-            )}
-
-            {formError && (
-              <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
-                {formError}
-              </Alert>
-            )}
-
-            <Button
-              fullWidth
-              loading={submitting}
-              leftSection={<IconShoppingCart size={16} />}
-              onClick={handleBuy}
-            >
-              Pagar {formatCurrency(selectedPrice, currency)}
-            </Button>
-            <Text size="xs" c="dimmed" ta="center">
-              {willUseMp
-                ? "Serás redirigido a Mercado Pago para completar el pago de forma segura."
-                : "A continuación verás los datos para realizar tu pago y subir el comprobante."}
-            </Text>
-          </Stack>
+          </div>
         )}
-      </Modal>
-    </Container>
+
+        {canPay && (
+          <div className="ag-row" style={{ gap: 6, fontSize: 13, flexWrap: "wrap" }}>
+            {steps.map((label, i) => (
+              <span key={label} className="ag-row" style={{ gap: 6 }}>
+                {i > 0 && <span className="ag-subtle">›</span>}
+                <span style={{ fontWeight: i === step ? 600 : 400, color: i === step ? "var(--ink)" : i < step ? "var(--ink-muted)" : "var(--ink-subtle)" }}>
+                  {i + 1}. {label}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="ag-card" style={{ padding: isMobile ? 14 : 20 }}>
+          {step === 0 ? stepPackages : tiered && step === 1 ? stepTier : stepData}
+        </div>
+
+        {formError && (
+          <div className="ag-alert ag-alert--danger">
+            <IconInfoCircle size={20} />
+            <div>{formError}</div>
+          </div>
+        )}
+
+        {canPay && (
+          <div
+            style={
+              isMobile
+                ? {
+                    position: "fixed",
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 20,
+                    background: "var(--surface-raised)",
+                    borderTop: "1px solid var(--line)",
+                    padding: "10px 16px calc(10px + env(safe-area-inset-bottom))",
+                  }
+                : { borderTop: "1px solid var(--line)", paddingTop: 16 }
+            }
+          >
+            <div className="ag-row" style={{ gap: 12, flexWrap: "nowrap" }}>
+              {step > 0 && (
+                <Button variant="subtle" color="gray" onClick={() => setStep((s) => s - 1)} disabled={submitting} px={isMobile ? 8 : undefined}>
+                  Atrás
+                </Button>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {summary ? (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{summary}</div>
+                    {selectedPrice > 0 && <div className="ag-subtle ag-num">Total {formatCurrency(selectedPrice, currency)}</div>}
+                  </>
+                ) : (
+                  <div className="ag-subtle">Elige un paquete para continuar.</div>
+                )}
+              </div>
+              <Button onClick={next} loading={submitting} disabled={!selected} leftSection={step === dataStep ? <IconShoppingCart size={16} /> : undefined}>
+                {actionLabel}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

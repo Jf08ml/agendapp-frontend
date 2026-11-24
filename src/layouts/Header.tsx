@@ -1,50 +1,93 @@
+// src/layouts/Header.tsx
+// Header de la web pública (rediseño, LandingNegocio): neutro (--surface) con el
+// logo del negocio, los enlaces públicos y un único botón «Reservar». Los
+// enlaces son los que antes salían en la sección «Explora» del menú lateral,
+// con las mismas condiciones. Sin organización (app.agenditapp.com, superadmin)
+// muestra el nombre de la plataforma.
 import {
-  Text,
-  Box,
-  Group,
-  Menu,
-  SimpleGrid,
-  Anchor,
-  Skeleton,
-  rem,
-  Tooltip,
   ActionIcon,
+  Anchor,
+  Avatar,
+  Box,
+  Burger,
   Button,
+  Divider,
+  Drawer,
+  Group,
+  Skeleton,
+  Stack,
+  Text,
+  Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { FaFacebook, FaInstagram, FaTiktok, FaWhatsapp } from "react-icons/fa";
-import { IconCalendar } from "@tabler/icons-react";
+import { IconCalendarEvent, IconLayoutDashboard, IconLogin2 } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
-import { useMediaQuery } from "@mantine/hooks";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../features/auth/sliceAuth";
+import { usePwaActions } from "../hooks/usePwaActions";
 import { Organization } from "../services/organizationService";
-import { useSelector } from "react-redux";
-import { RootState } from "../app/store";
+import { AppDispatch, RootState } from "../app/store";
+import { SantaHat } from "../components/seasonal/ChristmasDecorations";
+import { orgInitials } from "./navIcons";
 
-type Props = { organization: Organization | null };
+type Props = {
+  organization: Organization | null;
+  /** Gorro navideño sobre el logo (solo páginas de clientes en temporada). */
+  showChristmas?: boolean;
+  /** Sin organización: pantallas de la plataforma (registro, superadmin). */
+  platform?: boolean;
+};
 
-export default function Header({ organization }: Props) {
-  const isXS = useMediaQuery("(max-width: 428px)");
+type PublicLink = { label: string; to: string; visible: boolean };
 
+function buildPublicLinks(organization: Organization | null): PublicLink[] {
+  const limits = organization?.planLimits;
+  const onlineBooking = organization?.enableOnlineBooking ?? true;
+  const classBooking = organization?.enableClassBooking ?? false;
+  return [
+    { label: "Servicios", to: "/servicios-precios", visible: true },
+    { label: "Clases", to: "/reservar-clase", visible: classBooking },
+    {
+      label: "Paquetes",
+      to: "/comprar-paquete",
+      visible:
+        limits?.servicePackages !== false &&
+        (!!organization?.mpCollect?.connected || (organization?.paymentMethods?.length ?? 0) > 0),
+    },
+    { label: "Tienda", to: "/tienda", visible: organization?.storeEnabled === true },
+    { label: "Mis reservas", to: "/mis-reservas", visible: onlineBooking || classBooking },
+    { label: "Plan de fidelidad", to: "/search-client", visible: organization?.showLoyaltyProgram ?? true },
+  ].filter((l) => l.visible);
+}
+
+export default function Header({ organization, showChristmas = false, platform = false }: Props) {
+  const location = useLocation();
+  const [menuOpened, { toggle: toggleMenu, close: closeMenu }] = useDisclosure(false);
   const { isAuthenticated, role } = useSelector((s: RootState) => s.auth);
   const isSuperadmin = role === "superadmin";
+  const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+  const { canInstall, install, updateAvailable, applyUpdate, clearing, clearCache } = usePwaActions();
 
-  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding, enableOnlineBooking } =
-    organization || {};
+  // Antes en el pie fijo: entrar como equipo o cerrar sesión.
+  const handleAuthAction = () => {
+    closeMenu();
+    if (isAuthenticated) {
+      dispatch(logout());
+      navigate("/");
+    } else {
+      navigate("/login-admin");
+    }
+  };
 
-  const textColor = branding?.footerTextColor || "white";
+  const { name, facebookUrl, instagramUrl, whatsappUrl, tiktokUrl, branding } = organization || {};
+  const enableOnlineBooking = organization?.enableOnlineBooking ?? true;
+  const logoUrl = branding?.logoUrl;
 
-  const navLinks = useMemo(
-    () => [
-      { label: "Nuestros Servicios", to: "/servicios-precios" },
-      ...(organization?.enableOnlineBooking !== false || organization?.enableClassBooking
-        ? [{ label: "Mis reservas", to: "/mis-reservas" }]
-        : []),
-      ...(organization?.showLoyaltyProgram !== false
-        ? [{ label: "Plan de fidelidad", to: "/search-client" }]
-        : []),
-    ],
-    [organization?.showLoyaltyProgram, organization?.enableOnlineBooking, organization?.enableClassBooking]
-  );
+  const links = useMemo(() => (platform ? [] : buildPublicLinks(organization)), [organization, platform]);
 
   const socials = useMemo(
     () =>
@@ -57,145 +100,198 @@ export default function Header({ organization }: Props) {
     [facebookUrl, instagramUrl, whatsappUrl, tiktokUrl]
   );
 
-  return (
-    <Box component="header" px="xs" w="100%" h="100%">
-      <Group justify="space-between" wrap="nowrap" gap="xs" h="100%" align="center">
-        {/* Izquierda: nombre de la organización */}
-        <Group gap="sm" wrap="nowrap" style={{ minWidth: 0, flex: "0 1 auto" }}>
-          <Anchor
-            component={Link}
-            to="/"
-            underline="never"
-            style={{ display: "inline-block", minWidth: 0 }}
-          >
-            {name ? (
-              <Text
-                fw={600}
-                fz="sm"
-                style={{
-                  color: textColor,
-                  textShadow: "0 1px 2px rgba(0,0,0,.35)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: rem(200),
-                }}
-              >
-                {name}
-              </Text>
-            ) : (
-              <Skeleton width={130} height={18} radius="sm" />
-            )}
-          </Anchor>
-        </Group>
+  const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+  // Plantilla Academia: el CTA del header es «Reservar clase».
+  const academy = organization?.homeLayout === "academy" && !!organization?.enableClassBooking;
+  const reserveTo = academy ? "/reservar-clase" : "/online-reservation";
+  const showReserve = !platform && (academy || enableOnlineBooking) && location.pathname !== reserveTo;
+  const showPanelLink = isAuthenticated && !isSuperadmin && !platform;
 
-        {/* Centro: nav links (solo desktop ≥ md) */}
-        <Group gap={4} visibleFrom="md" style={{ flex: "0 0 auto" }}>
-          {navLinks.map((l) => (
-            <Anchor
+  const initials = orgInitials(name);
+
+  const brandMark = platform ? (
+    <Text fw={600} fz={15} c="var(--platform)">
+      AgenditApp
+    </Text>
+  ) : (
+    <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
+      <SantaHat show={showChristmas}>
+        <Avatar
+          src={logoUrl || undefined}
+          alt={name}
+          size={32}
+          radius="xl"
+          styles={{
+            root: { background: logoUrl ? "transparent" : "var(--brand)", flexShrink: 0 },
+            placeholder: { color: "var(--on-brand)", fontSize: 12, fontWeight: 600 },
+            image: { objectFit: "cover" },
+          }}
+        >
+          {initials}
+        </Avatar>
+      </SantaHat>
+      {name ? (
+        <Text fw={600} fz={15} c="var(--ink)" truncate maw={220}>
+          {name}
+        </Text>
+      ) : (
+        <Skeleton width={130} height={18} radius="sm" />
+      )}
+    </Group>
+  );
+
+  return (
+    <Box
+      component="header"
+      h="100%"
+      px={{ base: "md", md: "xl" }}
+      style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)" }}
+    >
+      <Group justify="space-between" wrap="nowrap" gap="md" h="100%">
+        <Anchor component={Link} to="/" underline="never" style={{ minWidth: 0 }}>
+          {brandMark}
+        </Anchor>
+
+        <Group gap="lg" wrap="nowrap" style={{ flexShrink: 0 }}>
+          {/* Enlaces (escritorio ancho) */}
+          <Group gap="lg" visibleFrom="lg" wrap="nowrap">
+            {links.map((l) => (
+              <Anchor
+                key={l.to}
+                component={Link}
+                to={l.to}
+                underline="never"
+                fz="sm"
+                fw={isActive(l.to) ? 600 : 500}
+                c={isActive(l.to) ? "var(--ink)" : "var(--ink-muted)"}
+              >
+                {l.label}
+              </Anchor>
+            ))}
+          </Group>
+
+          <Group gap="xs" wrap="nowrap">
+            {showPanelLink && (
+              <Button
+                component={Link}
+                to="/gestionar-agenda"
+                variant="default"
+                leftSection={<IconLayoutDashboard size={16} />}
+                visibleFrom="sm"
+              >
+                Ir al panel
+              </Button>
+            )}
+            {showReserve && (
+              <Button
+                component={Link}
+                to={reserveTo}
+                leftSection={<IconCalendarEvent size={16} />}
+              >
+                {academy ? "Reservar clase" : "Reservar"}
+              </Button>
+            )}
+
+            {/* Menú (cuando los enlaces no caben): enlaces, redes, app y acceso del
+                equipo. Reemplaza el pie fijo que tenía la web pública. */}
+            <Box hiddenFrom="lg">
+              <Burger opened={menuOpened} onClick={toggleMenu} size="sm" aria-label="Abrir menú" />
+            </Box>
+            {/* Escritorio ancho: los enlaces se ven; queda solo un acceso discreto del equipo */}
+            {!platform && !isAuthenticated && (
+              <Tooltip label="Acceso para el equipo" withArrow>
+                <ActionIcon
+                  component={Link}
+                  to="/login-admin"
+                  variant="subtle"
+                  color="gray"
+                  size="lg"
+                  aria-label="Acceso para el equipo"
+                  visibleFrom="lg"
+                >
+                  <IconLogin2 size={18} stroke={1.75} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </Group>
+        </Group>
+      </Group>
+
+      <Drawer opened={menuOpened} onClose={closeMenu} position="right" size={300} title={name || "Menú"} hiddenFrom="lg">
+        <Stack gap={4}>
+          {showPanelLink && (
+            <UnstyledButton component={Link} to="/gestionar-agenda" onClick={closeMenu} py="xs" fw={600}>
+              Ir al panel
+            </UnstyledButton>
+          )}
+          {links.map((l) => (
+            <UnstyledButton
               key={l.to}
               component={Link}
               to={l.to}
-              underline="never"
-              fz="sm"
-              fw={500}
-              style={{
-                color: textColor,
-                opacity: 0.75,
-                padding: "6px 12px",
-                borderRadius: rem(6),
-                transition: "opacity 0.15s ease, background 0.15s ease",
-                textShadow: "0 1px 2px rgba(0,0,0,.25)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "1";
-                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "0.75";
-                e.currentTarget.style.background = "transparent";
-              }}
+              onClick={closeMenu}
+              py="xs"
+              fw={isActive(l.to) ? 600 : 500}
+              c={isActive(l.to) ? "var(--brand-text)" : "var(--ink)"}
             >
               {l.label}
-            </Anchor>
+            </UnstyledButton>
           ))}
-        </Group>
-
-        {/* Derecha: Reservar + redes */}
-        <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
-          {/* Botón Reservar — solo público y cuando enableOnlineBooking */}
-          {!isAuthenticated && !isSuperadmin && enableOnlineBooking && (
-            <Button
-              component={Link}
-              to="/online-reservation"
-              size="xs"
-              radius="md"
-              visibleFrom="sm"
-              leftSection={<IconCalendar size={12} />}
-              style={{
-                backgroundColor: textColor,
-                color: branding?.primaryColor || "#1C3461",
-                border: "none",
-                fontWeight: 600,
-                height: rem(30),
-                paddingInline: rem(12),
-                fontSize: rem(12),
-              }}
-            >
-              Reservar
-            </Button>
-          )}
-
-          {/* Redes — menú compacto en XS */}
-          {isXS && socials.length > 0 ? (
-            <Menu shadow="md" width={200} position="bottom-end" withArrow>
-              <Menu.Target>
-                <Box style={{ cursor: "pointer", display: "flex", alignItems: "center" }}>
-                  <SimpleGrid cols={2} spacing={3} style={{ width: 28, height: 28 }}>
-                    {socials.slice(0, 4).map(({ key, Icon }) => (
-                      <Icon key={key} size={13} color={textColor} />
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              </Menu.Target>
-              <Menu.Dropdown>
-                {socials.map(({ key, url, Icon, label }) => (
-                  <Menu.Item
-                    key={key}
-                    leftSection={<Icon size={16} />}
-                    component="a"
-                    href={url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {label}
-                  </Menu.Item>
-                ))}
-              </Menu.Dropdown>
-            </Menu>
-          ) : (
-            <Group gap={2} visibleFrom="sm" wrap="nowrap">
+          {socials.length > 0 && (
+            <Group gap="xs" mt="md">
               {socials.map(({ key, url, Icon, label }) => (
-                <Tooltip key={key} label={label} withArrow>
-                  <ActionIcon
-                    component="a"
-                    href={url!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    radius="xl"
-                    size="sm"
-                    variant="subtle"
-                    styles={{ root: { color: textColor, background: "transparent" } }}
-                    aria-label={label}
-                  >
-                    <Icon size={14} />
-                  </ActionIcon>
-                </Tooltip>
+                <ActionIcon
+                  key={key}
+                  component="a"
+                  href={url!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="default"
+                  size="lg"
+                  aria-label={label}
+                >
+                  <Icon size={16} />
+                </ActionIcon>
               ))}
             </Group>
           )}
-        </Group>
-      </Group>
+
+          <Divider my="md" color="var(--line)" />
+
+          {canInstall && (
+            <UnstyledButton onClick={() => { closeMenu(); void install(); }} py={6} fz="sm" c="var(--ink-muted)">
+              Instalar app
+            </UnstyledButton>
+          )}
+          {updateAvailable && (
+            <UnstyledButton onClick={applyUpdate} py={6} fz="sm" c="var(--ink-muted)">
+              Actualizar app
+            </UnstyledButton>
+          )}
+          <UnstyledButton onClick={clearCache} disabled={clearing} py={6} fz="sm" c="var(--ink-muted)">
+            Limpiar caché del sitio
+          </UnstyledButton>
+          <UnstyledButton onClick={handleAuthAction} py={6} fz="sm" c="var(--ink-muted)">
+            {isAuthenticated ? "Cerrar sesión" : "Acceso para el equipo"}
+          </UnstyledButton>
+
+          {organization?.planLimits?.brandingVisible === true && (
+            <Text fz="xs" c="var(--ink-subtle)" mt="md">
+              Impulsado por{" "}
+              <Anchor
+                href="https://www.agenditapp.com?utm_source=app-public&utm_medium=referral&utm_campaign=powered-by"
+                target="_blank"
+                rel="noopener noreferrer"
+                fz="xs"
+                c="var(--platform)"
+              >
+                AgenditApp
+              </Anchor>
+            </Text>
+          )}
+        </Stack>
+      </Drawer>
     </Box>
   );
 }
+            {/* Menú (móvil y escritorio angosto) */}

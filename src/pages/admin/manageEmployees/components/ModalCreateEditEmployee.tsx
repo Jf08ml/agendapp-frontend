@@ -1,46 +1,99 @@
-import React, { useState, useEffect } from "react";
+// Editor de profesional (rediseño, ProfesionalesPanel): panel lateral en
+// escritorio, pantalla completa en móvil. Secciones: foto y datos, color (las 8
+// muestras pro-*), reserva en línea (3 opciones excluyentes sobre los mismos
+// campos onlineBookingEnabled + onlineBookingBackup), servicios que atiende,
+// comisión, horario y bloqueos (solo al editar; se guardan aparte, como antes) y
+// permisos de agenda (solo al editar).
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Modal,
-  Stack,
-  TextInput,
-  Button,
-  Flex,
   ActionIcon,
-  Group,
-  Image,
-  Text,
+  Avatar,
+  Button,
+  ColorPicker,
+  Drawer,
   Loader,
-  Grid,
-  Checkbox,
-  ScrollArea,
-  Paper,
-  Box,
-  ColorInput,
-  LoadingOverlay,
-  SegmentedControl,
   NumberInput,
-  Divider,
-  Badge,
-  Tooltip,
-  Switch,
+  PasswordInput,
+  Popover,
+  SegmentedControl,
+  TextInput,
 } from "@mantine/core";
-import { AGENDA_PERMISSIONS } from "../../../../constants/agendaPermissions";
 import { Dropzone, IMAGE_MIME_TYPE } from "@mantine/dropzone";
 import { useMediaQuery } from "@mantine/hooks";
-import { IoEyeOff } from "react-icons/io5";
-import { FaEye } from "react-icons/fa";
-import { BiImageAdd, BiSolidXCircle } from "react-icons/bi";
-
+import { IconCheck, IconLock, IconPlus, IconTrash, IconUpload } from "@tabler/icons-react";
+import { AGENDA_PERMISSIONS } from "../../../../constants/agendaPermissions";
 import { uploadImage } from "../../../../services/imageService";
 import { Employee } from "../../../../services/employeeService";
 import { Service } from "../../../../services/serviceService";
+import {
+  PRO_COLORS,
+  findDuplicateContact,
+  initials,
+  onlineBookingFields,
+  onlineBookingMode,
+  sameColor,
+  type OnlineBookingMode,
+} from "../employeeView";
+import EmployeeScheduleSection from "./EmployeeScheduleSection";
 
 interface ModalCreateEditEmployeeProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
   services: Service[];
-  onSave: (employee: Employee) => void;
+  /** Resto del equipo, para avisar bajo el campo si el correo o teléfono se repite. */
+  employees?: Employee[];
+  onSave: (employee: Employee) => Promise<void> | void;
+}
+
+const EMPTY: Employee = {
+  _id: "",
+  names: "",
+  position: "",
+  phoneNumber: "",
+  services: [],
+  organizationId: "",
+  email: "",
+  password: "",
+  role: { name: "", permissions: [] },
+  customPermissions: [],
+  isActive: true,
+  onlineBookingEnabled: true,
+  onlineBookingBackup: false,
+  profileImage: "",
+  color: "",
+  commissionType: "percentage",
+  commissionValue: 0,
+};
+
+const ONLINE_OPTIONS: { value: OnlineBookingMode; title: string; desc: string }[] = [
+  {
+    value: "visible",
+    title: "Visible",
+    desc: "Los clientes pueden elegirlo al reservar en línea y los asistentes de reservas lo ofrecen.",
+  },
+  {
+    value: "backup",
+    title: "Solo como respaldo",
+    desc: "No aparece para elegirlo. Recibe reservas en línea solo en los horarios en que los demás profesionales de ese servicio están ocupados.",
+  },
+  {
+    value: "hidden",
+    title: "Oculta",
+    desc: "No aparece en la reserva en línea ni en los asistentes. Sigue en tu agenda y puedes asignarle citas.",
+  },
+];
+
+function Section({ title, help, children }: { title: string; help?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="ag-stack" style={{ gap: "var(--space-3)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--line)" }}>
+      <div>
+        <h3 style={{ margin: 0, font: "600 15px/22px var(--mantine-font-family)" }}>{title}</h3>
+        {help && <div className="ag-help" style={{ marginTop: 2 }}>{help}</div>}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
@@ -48,51 +101,24 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
   onClose,
   employee,
   services,
+  employees = [],
   onSave,
 }) => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
-  const [editingEmployee, setEditingEmployee] = useState<Employee>({
-    _id: "",
-    names: "",
-    position: "",
-    phoneNumber: "",
-    services: [],
-    organizationId: "",
-    email: "",
-    password: "",
-    role: {
-      name: "",
-      permissions: [],
-    },
-    customPermissions: [],
-    isActive: true,
-    onlineBookingEnabled: true,
-    onlineBookingBackup: false,
-    profileImage: "",
-    color: "",
-    commissionType: "percentage",
-    commissionValue: 0,
-  });
-
-  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState<Employee>(EMPTY);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [triedSave, setTriedSave] = useState(false);
 
   useEffect(() => {
+    setTriedSave(false);
     if (employee) {
-      setEditingEmployee({
-        _id: employee._id || "",
-        names: employee.names || "",
-        position: employee.position || "",
-        phoneNumber: employee.phoneNumber || "",
+      setForm({
+        ...EMPTY,
+        ...employee,
         services: employee.services || [],
-        email: employee.email || "",
-        organizationId: employee.organizationId || "",
         password: employee.password || "",
-        role: {
-          name: employee.role?.name || "",
-          permissions: employee.role?.permissions || [],
-        },
+        role: { name: employee.role?.name || "", permissions: employee.role?.permissions || [] },
         customPermissions: employee.customPermissions || [],
         isActive: employee.isActive ?? true,
         onlineBookingEnabled: employee.onlineBookingEnabled !== false,
@@ -103,19 +129,35 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
         commissionValue: employee.commissionValue ?? 0,
       });
     } else {
-      resetForm();
+      setForm(EMPTY);
     }
-  }, [employee]);
+  }, [employee, isOpen]);
+
+  const set = (patch: Partial<Employee>) => setForm((f) => ({ ...f, ...patch }));
+
+  const dup = useMemo(() => findDuplicateContact(form, employees), [form, employees]);
+  const selectedIds = useMemo(() => new Set((form.services || []).map((s) => s._id)), [form.services]);
+  const allSelected = services.length > 0 && services.every((s) => selectedIds.has(s._id));
+  const noServices = selectedIds.size === 0;
+
+  const canSave =
+    form.names.trim().length > 1 &&
+    form.position.trim().length > 0 &&
+    form.phoneNumber.trim().length > 5 &&
+    form.email.trim().length > 3 &&
+    !dup.email &&
+    !dup.phone &&
+    !noServices;
 
   const handleSave = async () => {
-    if (isUploading || isSaving) return;
+    setTriedSave(true);
+    if (isUploading || isSaving || !canSave) return;
     setIsSaving(true);
     try {
-      await onSave(editingEmployee);
-      // Only close on success
-      handleClose();
+      await onSave(form);
+      onClose();
     } catch (error) {
-      // Keep modal open on error
+      // El panel sigue abierto; el error ya se mostró
       console.error("Error saving employee:", error);
     } finally {
       setIsSaving(false);
@@ -126,10 +168,7 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     setIsUploading(true);
     try {
       const imageUrl = await uploadImage(files[0]);
-      setEditingEmployee({
-        ...editingEmployee,
-        profileImage: imageUrl as string,
-      });
+      set({ profileImage: imageUrl as string });
     } catch (error) {
       console.error("Error al cargar la imagen:", error);
     } finally {
@@ -137,453 +176,381 @@ const ModalCreateEditEmployee: React.FC<ModalCreateEditEmployeeProps> = ({
     }
   };
 
-  const handleRemoveImage = () => {
-    setEditingEmployee({ ...editingEmployee, profileImage: "" });
-  };
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  const resetForm = () => {
-    setEditingEmployee({
-      _id: "",
-      names: "",
-      position: "",
-      phoneNumber: "",
-      services: [],
-      email: "",
-      organizationId: "",
-      password: "",
-      role: {
-        name: "",
-        permissions: [],
-      },
-      customPermissions: [],
-      isActive: true,
-      onlineBookingEnabled: true,
-      onlineBookingBackup: false,
-      profileImage: "",
-      color: "",
-      commissionType: "percentage",
-      commissionValue: 0,
+  const toggleService = (service: Service) => {
+    const list = form.services || [];
+    set({
+      services: selectedIds.has(service._id) ? list.filter((s) => s._id !== service._id) : [...list, service],
     });
   };
 
-  const canSave =
-    editingEmployee.names.trim().length > 1 &&
-    editingEmployee.position.trim().length > 0 &&
-    editingEmployee.phoneNumber.trim().length > 5 &&
-    editingEmployee.email.trim().length > 3;
-
-  const handleServiceToggle = (serviceId: string) => {
-    const isSelected = editingEmployee.services?.some(
-      (srv) => srv._id === serviceId
-    );
-
-    if (isSelected) {
-      setEditingEmployee({
-        ...editingEmployee,
-        services: editingEmployee.services?.filter(
-          (srv) => srv._id !== serviceId
-        ) || [],
-      });
-    } else {
-      const service = services.find((srv) => srv._id === serviceId);
-      if (service) {
-        setEditingEmployee({
-          ...editingEmployee,
-          services: [...(editingEmployee.services || []), service],
-        });
-      }
-    }
-  };
+  const mode = onlineBookingMode(form);
+  const customColor = !!form.color && !PRO_COLORS.some((c) => sameColor(c.hex, form.color));
+  const ring = form.color || "var(--line-strong)";
 
   return (
-    <Modal
+    <Drawer
       opened={isOpen}
-      onClose={handleClose}
-      title={employee ? "Editar Profesional" : "Agregar Profesional"}
-      size="xl"
-      centered
+      onClose={onClose}
+      position="right"
+      size={isMobile ? "100%" : 520}
+      title={employee ? "Editar profesional" : "Nuevo profesional"}
+      styles={{ body: { paddingBottom: 0 } }}
     >
-      <Box pos="relative">
-        <LoadingOverlay
-          visible={isSaving}
-          overlayProps={{ blur: 2 }}
-          loaderProps={{
-            children: (
-              <Stack align="center" gap="xs">
-                <Loader size="lg" />
-                <Text size="sm" c="dimmed">
-                  Guardando profesional...
-                </Text>
-              </Stack>
-            ),
-          }}
+      <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+        {/* Foto */}
+        <div className="ag-row" style={{ gap: "var(--space-4)", alignItems: "center", flexWrap: "nowrap" }}>
+          <span style={{ padding: 3, borderRadius: 999, background: ring, display: "inline-flex", flex: "none" }}>
+            <Avatar
+              src={form.profileImage || null}
+              size={64}
+              radius="xl"
+              styles={{ root: { background: "var(--surface-hover)" }, placeholder: { color: "var(--ink-muted)", fontWeight: 600 } }}
+            >
+              {initials(form.names) || "?"}
+            </Avatar>
+          </span>
+          <div className="ag-row" style={{ gap: 8 }}>
+            <Dropzone
+              onDrop={handleDrop}
+              accept={IMAGE_MIME_TYPE}
+              multiple={false}
+              disabled={isUploading}
+              p={0}
+              style={{ border: 0, background: "transparent" }}
+            >
+              <Button
+                component="span"
+                variant="default"
+                size="xs"
+                leftSection={isUploading ? <Loader size={14} /> : <IconUpload size={14} />}
+              >
+                {isUploading ? "Subiendo…" : form.profileImage ? "Cambiar foto" : "Subir foto"}
+              </Button>
+            </Dropzone>
+            {form.profileImage && !isUploading && (
+              <Button variant="subtle" color="gray" size="xs" leftSection={<IconTrash size={14} />} onClick={() => set({ profileImage: "" })}>
+                Quitar
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Datos */}
+        <TextInput
+          label="Nombre completo"
+          withAsterisk
+          placeholder="Ej: Nataly Gómez"
+          value={form.names}
+          onChange={(e) => set({ names: e.currentTarget.value })}
+          error={triedSave && form.names.trim().length <= 1 ? "Escribe el nombre" : undefined}
+        />
+        <TextInput
+          label="Cargo"
+          withAsterisk
+          placeholder="Ej: Estilista"
+          value={form.position}
+          onChange={(e) => set({ position: e.currentTarget.value })}
+          error={triedSave && !form.position.trim() ? "Escribe el cargo" : undefined}
+        />
+        <TextInput
+          label="Teléfono"
+          withAsterisk
+          inputMode="tel"
+          placeholder="Ej: 3001234567"
+          value={form.phoneNumber}
+          onChange={(e) => set({ phoneNumber: e.currentTarget.value })}
+          error={
+            dup.phone
+              ? "Ya hay un profesional con ese teléfono"
+              : triedSave && form.phoneNumber.trim().length <= 5
+                ? "Escribe el teléfono"
+                : undefined
+          }
+        />
+        <TextInput
+          label="Correo"
+          withAsterisk
+          type="email"
+          placeholder="correo@ejemplo.com"
+          value={form.email}
+          onChange={(e) => set({ email: e.currentTarget.value })}
+          error={
+            dup.email
+              ? "Ya hay un profesional con ese correo"
+              : triedSave && form.email.trim().length <= 3
+                ? "Escribe el correo"
+                : undefined
+          }
+        />
+        <PasswordInput
+          label="Contraseña"
+          description={employee ? "Déjala igual para no cambiarla." : "Con ella entra a su agenda."}
+          placeholder="••••••••"
+          value={form.password}
+          onChange={(e) => set({ password: e.currentTarget.value })}
         />
 
-        <Grid>
-          {/* Columna izquierda - Información básica */}
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="md">
-              <TextInput
-                label="Nombre completo"
-                withAsterisk
-                placeholder="Ej: Juan Pérez"
-                value={editingEmployee.names}
-                onChange={(e) =>
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    names: e.currentTarget.value,
-                  })
-                }
-              />
-
-              <TextInput
-                label="Posición"
-                withAsterisk
-                placeholder="Ej: Barbero"
-                value={editingEmployee.position}
-                onChange={(e) =>
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    position: e.currentTarget.value,
-                  })
-                }
-              />
-
-              <TextInput
-                label="Número de teléfono"
-                withAsterisk
-                placeholder="Ej: +56912345678"
-                value={editingEmployee.phoneNumber}
-                onChange={(e) =>
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    phoneNumber: e.currentTarget.value,
-                  })
-                }
-              />
-
-              <TextInput
-                label="Correo electrónico"
-                withAsterisk
-                type="email"
-                placeholder="correo@ejemplo.com"
-                value={editingEmployee.email}
-                onChange={(e) =>
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    email: e.currentTarget.value,
-                  })
-                }
-              />
-
-              <TextInput
-                label="Contraseña"
-                withAsterisk
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••"
-                value={editingEmployee.password}
-                onChange={(e) =>
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    password: e.currentTarget.value,
-                  })
-                }
-                rightSection={
-                  <ActionIcon
-                    variant="transparent"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                  >
-                    {showPassword ? (
-                      <IoEyeOff size={16} />
-                    ) : (
-                      <FaEye size={16} />
-                    )}
-                  </ActionIcon>
-                }
-              />
-
-              <ColorInput
-                label="Color identificador"
-                placeholder="Selecciona un color"
-                value={editingEmployee.color || ""}
-                onChange={(newColor) => {
-                  setEditingEmployee({
-                    ...editingEmployee,
-                    color: newColor,
-                  });
-                }}
-                format="hex"
-                withPicker
-                swatches={[
-                  "#FFB6C1",
-                  "#FFD700",
-                  "#98FB98",
-                  "#AFEEEE",
-                  "#7B68EE",
-                  "#FF69B4",
-                  "#FFA07A",
-                  "#E6E6FA",
-                  "#FFFACD",
-                  "#C0C0C0",
-                ]}
-                swatchesPerRow={5}
-              />
-
-              <Box>
-                <Text size="sm" fw={500} mb={4}>
-                  Tipo de comisión
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  value={editingEmployee.commissionType ?? "percentage"}
-                  onChange={(value) =>
-                    setEditingEmployee({
-                      ...editingEmployee,
-                      commissionType: value as "percentage" | "fixed",
-                      commissionValue: 0,
-                    })
-                  }
-                  data={[
-                    { label: "Porcentaje (%)", value: "percentage" },
-                    { label: "Valor fijo", value: "fixed" },
-                  ]}
-                />
-                <NumberInput
-                  mt="xs"
-                  placeholder={
-                    editingEmployee.commissionType === "percentage"
-                      ? "Ej: 30"
-                      : "Ej: 15000"
-                  }
-                  description={
-                    editingEmployee.commissionType === "percentage"
-                      ? "Porcentaje sobre el valor de cada cita (0-100)"
-                      : "Monto fijo por cada cita confirmada"
-                  }
-                  min={0}
-                  max={editingEmployee.commissionType === "percentage" ? 100 : undefined}
-                  value={editingEmployee.commissionValue ?? 0}
-                  onChange={(val) =>
-                    setEditingEmployee({
-                      ...editingEmployee,
-                      commissionValue: typeof val === "number" ? val : 0,
-                    })
-                  }
-                  rightSection={
-                    <Text size="xs" c="dimmed" pr={4}>
-                      {editingEmployee.commissionType === "percentage" ? "%" : "$"}
-                    </Text>
-                  }
-                />
-              </Box>
-            </Stack>
-          </Grid.Col>
-
-          {/* Columna derecha - Servicios e imagen */}
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="md">
-              {/* Servicios */}
-              <Box>
-                <Text size="sm" fw={500} mb="xs">
-                  Servicios <span style={{ color: "red" }}>*</span>
-                </Text>
-                <Paper withBorder p="md">
-                  {services.length === 0 ? (
-                    <Text size="sm" c="dimmed" ta="center">
-                      No hay servicios disponibles
-                    </Text>
-                  ) : (
-                    <ScrollArea.Autosize mah={isMobile ? 200 : 300}>
-                      <Stack gap="xs">
-                        {services.map((service) => (
-                          <Checkbox
-                            key={service._id}
-                            label={service.name}
-                            checked={editingEmployee.services?.some(
-                              (srv) => srv._id === service._id
-                            ) ?? false}
-                            onChange={() => handleServiceToggle(service._id)}
-                          />
-                        ))}
-                      </Stack>
-                    </ScrollArea.Autosize>
-                  )}
-                </Paper>
-              </Box>
-
-              {/* Reserva en línea */}
-              <Paper withBorder p="md">
-                <Switch
-                  label="Disponible para reserva en línea"
-                  description={
-                    editingEmployee.onlineBookingEnabled !== false
-                      ? "Los clientes pueden elegirlo al reservar en línea y los asistentes de reservas lo ofrecen."
-                      : "Oculto en la reserva en línea y en los asistentes de reservas. Sigue en tu agenda y puedes asignarle citas."
-                  }
-                  checked={editingEmployee.onlineBookingEnabled !== false}
-                  onChange={(e) =>
-                    setEditingEmployee({
-                      ...editingEmployee,
-                      onlineBookingEnabled: e.currentTarget.checked,
-                    })
-                  }
-                />
-                {editingEmployee.onlineBookingEnabled !== false && (
-                  <Switch
-                    mt="md"
-                    label="Solo como respaldo"
-                    description="No aparece para que el cliente lo elija. Se le asignan reservas en línea solo en los horarios en que los demás profesionales de ese servicio están ocupados."
-                    checked={editingEmployee.onlineBookingBackup === true}
-                    onChange={(e) =>
-                      setEditingEmployee({
-                        ...editingEmployee,
-                        onlineBookingBackup: e.currentTarget.checked,
-                      })
-                    }
-                  />
-                )}
-              </Paper>
-
-              {/* Imagen de perfil */}
-              <Box>
-                <Text size="sm" fw={500} mb="xs">
-                  Imagen de perfil
-                </Text>
-                <Dropzone
-                  onDrop={handleDrop}
-                  accept={IMAGE_MIME_TYPE}
-                  multiple={false}
-                  loading={isUploading}
+        {/* Color */}
+        <Section title="Color en la agenda" help="Identifica sus citas en la agenda.">
+          <div className="ag-row" style={{ gap: 8 }} role="radiogroup" aria-label="Color">
+            {PRO_COLORS.map((c) => {
+              const on = sameColor(c.hex, form.color);
+              return (
+                <button
+                  key={c.token}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={`Color ${c.token.replace("pro-", "")}`}
+                  onClick={() => set({ color: c.hex })}
                   style={{
-                    border: "2px dashed #ced4da",
-                    borderRadius: "8px",
-                    cursor: isUploading ? "not-allowed" : "pointer",
-                    minHeight: editingEmployee.profileImage ? "auto" : "120px",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 999,
+                    border: on ? "2px solid var(--ink)" : "2px solid transparent",
+                    boxShadow: "inset 0 0 0 2px var(--surface-raised)",
+                    background: `var(--${c.token})`,
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#fff",
+                    cursor: "pointer",
+                    padding: 0,
                   }}
                 >
-                  <Group justify="center" p="md">
-                    {isUploading ? (
-                      <Stack align="center" gap="xs">
-                        <Loader size="md" />
-                        <Text size="sm" c="dimmed">
-                          Subiendo imagen...
-                        </Text>
-                      </Stack>
-                    ) : editingEmployee.profileImage ? (
-                      <Box pos="relative">
-                        <Image
-                          src={editingEmployee.profileImage}
-                          alt="Imagen de perfil"
-                          width={100}
-                          height={100}
-                          radius="md"
-                        />
-                        <ActionIcon
-                          style={{
-                            position: "absolute",
-                            top: -8,
-                            right: -8,
-                          }}
-                          variant="filled"
-                          radius="xl"
-                          size="sm"
-                          color="red"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveImage();
-                          }}
-                        >
-                          <BiSolidXCircle />
-                        </ActionIcon>
-                      </Box>
-                    ) : (
-                      <Stack align="center" gap="xs">
-                        <BiImageAdd size={40} color="#228be6" />
-                        <Text size="sm" ta="center">
-                          Arrastra una imagen o haz clic
-                        </Text>
-                      </Stack>
-                    )}
-                  </Group>
-                </Dropzone>
-              </Box>
-            </Stack>
-          </Grid.Col>
-        </Grid>
+                  {on && <IconCheck size={16} stroke={2.5} />}
+                </button>
+              );
+            })}
+            {customColor && (
+              <span
+                role="radio"
+                aria-checked
+                aria-label="Color actual"
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 999,
+                  border: "2px solid var(--ink)",
+                  boxShadow: "inset 0 0 0 2px var(--surface-raised)",
+                  background: form.color,
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#fff",
+                }}
+              >
+                <IconCheck size={16} stroke={2.5} />
+              </span>
+            )}
+            <Popover position="bottom-start" withinPortal shadow="lg">
+              <Popover.Target>
+                <ActionIcon variant="default" radius="xl" size={32} aria-label="Otro color">
+                  <IconPlus size={16} />
+                </ActionIcon>
+              </Popover.Target>
+              <Popover.Dropdown>
+                <ColorPicker format="hex" value={form.color || "#1c7ed6"} onChange={(color) => set({ color })} />
+              </Popover.Dropdown>
+            </Popover>
+          </div>
+        </Section>
+
+        {/* Reserva en línea */}
+        <Section title="Reserva en línea">
+          <div className="ag-stack" style={{ gap: 8 }} role="radiogroup" aria-label="Reserva en línea">
+            {ONLINE_OPTIONS.map((o) => (
+              <div
+                key={o.value}
+                className="ag-opt"
+                role="radio"
+                tabIndex={0}
+                aria-checked={mode === o.value}
+                onClick={() => set(onlineBookingFields(o.value))}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), set(onlineBookingFields(o.value)))}
+                style={{ cursor: "pointer" }}
+              >
+                <span className="ag-radio" />
+                <div>
+                  <b>{o.title}</b>
+                  <span className="d">{o.desc}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        {/* Servicios */}
+        <Section title="Servicios que atiende">
+          {services.length === 0 ? (
+            <span className="ag-muted">Aún no tienes servicios creados.</span>
+          ) : (
+            <div className="ag-card" style={{ overflow: "hidden" }}>
+              <div
+                className="ag-list-row"
+                role="checkbox"
+                tabIndex={0}
+                aria-checked={allSelected}
+                onClick={() => set({ services: allSelected ? [] : [...services] })}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), set({ services: allSelected ? [] : [...services] }))}
+                style={{ padding: "10px 12px", cursor: "pointer", background: "var(--surface-muted)" }}
+              >
+                <span className="ag-check" aria-checked={allSelected}>
+                  {allSelected && <IconCheck size={14} stroke={2.5} />}
+                </span>
+                <b style={{ flex: 1, fontSize: 14 }}>Seleccionar todos</b>
+                <span className="ag-subtle ag-num">
+                  {selectedIds.size} de {services.length}
+                </span>
+              </div>
+              <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                {services.map((s) => {
+                  const on = selectedIds.has(s._id);
+                  return (
+                    <div
+                      key={s._id}
+                      className="ag-list-row"
+                      role="checkbox"
+                      tabIndex={0}
+                      aria-checked={on}
+                      onClick={() => toggleService(s)}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleService(s))}
+                      style={{ padding: "10px 12px", cursor: "pointer" }}
+                    >
+                      <span className="ag-check" aria-checked={on}>
+                        {on && <IconCheck size={14} stroke={2.5} />}
+                      </span>
+                      <span style={{ flex: 1, fontSize: 14 }}>{s.name}</span>
+                      {s.type && <span className="ag-subtle">{s.type}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {triedSave && noServices && (
+            <span className="ag-help" style={{ color: "var(--danger)" }}>
+              Elige al menos un servicio.
+            </span>
+          )}
+        </Section>
+
+        {/* Comisión */}
+        <Section title="Comisión" help="Se usa para calcular su pago en el perfil.">
+          <SegmentedControl
+            size="xs"
+            value={form.commissionType ?? "percentage"}
+            onChange={(value) => set({ commissionType: value as "percentage" | "fixed", commissionValue: 0 })}
+            data={[
+              { label: "Porcentaje", value: "percentage" },
+              { label: "Valor fijo por cita", value: "fixed" },
+            ]}
+            style={{ alignSelf: "flex-start" }}
+          />
+          <NumberInput
+            aria-label="Valor de la comisión"
+            placeholder={form.commissionType === "percentage" ? "Ej: 30" : "Ej: 15000"}
+            description={
+              form.commissionType === "percentage"
+                ? "Porcentaje sobre el valor de cada cita atendida (0 a 100)."
+                : "Monto fijo por cada cita atendida."
+            }
+            min={0}
+            max={form.commissionType === "percentage" ? 100 : undefined}
+            thousandSeparator={form.commissionType === "fixed" ? "." : undefined}
+            decimalSeparator={form.commissionType === "fixed" ? "," : undefined}
+            value={form.commissionValue ?? 0}
+            onChange={(val) => set({ commissionValue: typeof val === "number" ? val : 0 })}
+            rightSection={<span className="ag-subtle" style={{ paddingRight: 4 }}>{form.commissionType === "percentage" ? "%" : "$"}</span>}
+            w={220}
+          />
+        </Section>
+
+        {/* Horario y bloqueos: se guardan aparte, con su propio botón */}
+        {employee?._id && (
+          <Section title="Horario y bloqueos" help="Se guardan con sus propios botones, aparte del resto del formulario.">
+            <EmployeeScheduleSection employeeId={employee._id} employeeName={employee.names} />
+          </Section>
+        )}
 
         {/* Permisos de agenda */}
         {employee && (
-          <>
-            <Divider
-              my="md"
-              label={<Text size="sm" fw={600}>Permisos de agenda</Text>}
-              labelPosition="left"
-            />
-            <Paper withBorder p="md">
-              <Stack gap="sm">
-                {AGENDA_PERMISSIONS.map((perm) => {
-                  const fromRole = (editingEmployee.role?.permissions ?? []).includes(perm.key);
-                  const fromCustom = (editingEmployee.customPermissions ?? []).includes(perm.key);
-                  return (
-                    <Tooltip
-                      key={perm.key}
-                      label="Otorgado por el rol — edita el rol para quitarlo"
-                      disabled={!fromRole}
-                      withArrow
-                      position="right"
-                    >
-                      <Checkbox
-                        label={
-                          <Group gap={6} wrap="nowrap">
-                            <Text size="sm">{perm.label}</Text>
-                            {fromRole && (
-                              <Badge size="xs" variant="light" color="gray">
-                                Rol
-                              </Badge>
-                            )}
-                          </Group>
-                        }
-                        description={perm.description}
-                        checked={fromRole || fromCustom}
-                        disabled={fromRole}
-                        onChange={() => {
-                          const current = editingEmployee.customPermissions ?? [];
-                          setEditingEmployee({
-                            ...editingEmployee,
-                            customPermissions: fromCustom
-                              ? current.filter((p) => p !== perm.key)
-                              : [...current, perm.key],
-                          });
-                        }}
-                      />
-                    </Tooltip>
-                  );
-                })}
-              </Stack>
-            </Paper>
-          </>
+          <Section title="Permisos de agenda" help="Lo que puede hacer en la agenda además de ver sus propias citas.">
+            <div className="ag-card" style={{ overflow: "hidden" }}>
+              {AGENDA_PERMISSIONS.map((perm) => {
+                const fromRole = (form.role?.permissions ?? []).includes(perm.key);
+                const fromCustom = (form.customPermissions ?? []).includes(perm.key);
+                const on = fromRole || fromCustom;
+                const toggle = () => {
+                  if (fromRole) return;
+                  const current = form.customPermissions ?? [];
+                  set({ customPermissions: fromCustom ? current.filter((p) => p !== perm.key) : [...current, perm.key] });
+                };
+                return (
+                  <div
+                    key={perm.key}
+                    className="ag-list-row"
+                    role="checkbox"
+                    tabIndex={fromRole ? -1 : 0}
+                    aria-checked={on}
+                    aria-disabled={fromRole}
+                    onClick={toggle}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle())}
+                    style={{ padding: "10px 12px", cursor: fromRole ? "default" : "pointer", alignItems: "flex-start" }}
+                  >
+                    <span className="ag-check" aria-checked={on} style={{ marginTop: 1, opacity: fromRole ? 0.55 : 1 }}>
+                      {on && <IconCheck size={14} stroke={2.5} />}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="ag-row" style={{ gap: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>{perm.label}</span>
+                        {fromRole && (
+                          <span className="ag-badge" style={{ height: 20, padding: "0 8px", fontSize: 11 }}>
+                            <IconLock size={12} stroke={2} /> Por su rol
+                          </span>
+                        )}
+                      </div>
+                      {(perm.description || fromRole) && (
+                        <span className="ag-help" style={{ display: "block" }}>
+                          {fromRole ? "Viene con su rol; para quitarlo hay que cambiar el rol." : perm.description}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
         )}
 
-        {/* Footer con botones */}
-        <Flex justify="end" gap="sm" mt="xl">
-          <Button variant="subtle" onClick={handleClose} disabled={isSaving}>
+        {/* Pie fijo */}
+        <div
+          style={{
+            position: "sticky",
+            bottom: 0,
+            zIndex: 2,
+            display: "flex",
+            gap: 8,
+            justifyContent: "flex-end",
+            alignItems: "center",
+            margin: "0 calc(-1 * var(--mantine-spacing-md))",
+            padding: "12px var(--mantine-spacing-md)",
+            borderTop: "1px solid var(--line)",
+            background: "var(--surface-raised)",
+          }}
+        >
+          {triedSave && !canSave && (
+            <span className="ag-help" style={{ marginRight: "auto", color: "var(--danger)" }}>
+              Revisa los campos marcados.
+            </span>
+          )}
+          <Button variant="default" onClick={onClose} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isUploading || !canSave || isSaving}
-            loading={isSaving}
-          >
-            {employee ? "Guardar Cambios" : "Agregar Profesional"}
+          <Button onClick={handleSave} disabled={isUploading} loading={isSaving}>
+            {employee ? "Guardar cambios" : "Agregar profesional"}
           </Button>
-        </Flex>
-      </Box>
-    </Modal>
+        </div>
+      </div>
+    </Drawer>
   );
 };
 

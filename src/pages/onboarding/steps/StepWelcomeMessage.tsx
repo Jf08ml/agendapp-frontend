@@ -160,7 +160,7 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
   const theme = useMantineTheme();
   const primary = theme.colors[theme.primaryColor][6];
   const selectedLayout = (form.values.homeLayout as LayoutId | undefined) ?? "modern";
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseLanding = planLimits?.professionalLanding !== false;
 
   const title = form.values.welcomeTitle ?? "";
@@ -256,8 +256,8 @@ export default function StepWelcomeMessage({ form, onNext, onBack, saving }: Pro
 
       <Divider />
       <Group justify="space-between">
-        <Button variant="default" onClick={onBack} size="md">← Anterior</Button>
-        <Button size="md" onClick={onNext} loading={saving}>Guardar y continuar →</Button>
+        <Button variant="default" onClick={onBack} size="md">Anterior</Button>
+        <Button size="md" onClick={onNext} loading={saving}>Guardar y continuar</Button>
       </Group>
     </Stack>
   );

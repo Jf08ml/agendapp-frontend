@@ -1,5 +1,9 @@
-import { Button, Container, Paper, Stack, Text, Title } from "@mantine/core";
+import { Button } from "@mantine/core";
+import { IconBrandWhatsapp, IconWifiOff } from "@tabler/icons-react";
 import { AGENDITAPP_SUPPORT_WA_URL } from "../utils/panelAccess";
+import AuthCard from "./auth/AuthCard";
+import { StatusIcon } from "./auth/AccessStatus";
+import NotFoundOrg from "../pages/public/NotFoundOrg";
 
 interface Props {
   notFound: boolean;
@@ -7,40 +11,31 @@ interface Props {
 }
 
 /**
- * Pantalla cuando no se pudo cargar el negocio del dominio actual. Antes la app
- * se quedaba en "Cargando organización..." para siempre (y en el registro el
- * código de acceso vencía mientras tanto).
+ * Pantalla cuando no se pudo cargar el negocio del dominio actual (rediseño,
+ * ErroresYAcceso). Si el negocio no existe, «No encontramos este negocio»; si
+ * falló la carga, «No pudimos cargar la página» con «Reintentar».
  */
 export default function OrgLoadError({ notFound, onRetry }: Props) {
+  if (notFound) return <NotFoundOrg />;
   return (
-    <Container size={420} my={80}>
-      <Paper withBorder shadow="md" p={30} radius="md">
-        <Stack gap="md">
-          <Title order={3}>
-            {notFound ? "No encontramos este negocio" : "No pudimos cargar la página"}
-          </Title>
-          <Text size="sm" c="dimmed">
-            {notFound
-              ? "Revisa que el enlace esté bien escrito. Si es el enlace de tu negocio y no funciona, escríbenos."
-              : "Puede ser la conexión a internet. Inténtalo de nuevo en un momento."}
-          </Text>
-          {!notFound && (
-            <Button fullWidth onClick={onRetry}>
-              Reintentar
-            </Button>
-          )}
-          <Button
-            variant={notFound ? "filled" : "subtle"}
-            fullWidth
-            component="a"
-            href={AGENDITAPP_SUPPORT_WA_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Escribir a soporte por WhatsApp
-          </Button>
-        </Stack>
-      </Paper>
-    </Container>
+    <AuthCard platform>
+      <StatusIcon tone="warning">
+        <IconWifiOff size={26} />
+      </StatusIcon>
+      <div>
+        <h1>No pudimos cargar la página</h1>
+        <p className="ag-muted" style={{ margin: "4px 0 0" }}>
+          Puede ser la conexión a internet. Inténtalo de nuevo en un momento.
+        </p>
+      </div>
+      <div className="ag-stack" style={{ gap: 8 }}>
+        <Button fullWidth color="var(--platform)" onClick={onRetry}>
+          Reintentar
+        </Button>
+        <Button fullWidth variant="default" component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" leftSection={<IconBrandWhatsapp size={16} />}>
+          Escribir a soporte
+        </Button>
+      </div>
+    </AuthCard>
   );
 }

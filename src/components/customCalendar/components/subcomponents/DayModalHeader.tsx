@@ -1,8 +1,8 @@
 import { FC } from "react";
-import { Box, Text, ActionIcon, Tooltip } from "@mantine/core";
+import { Avatar, Box, Text, ActionIcon, Tooltip } from "@mantine/core";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 import { Employee } from "../../../../services/employeeService";
-import { CARD_WIDTH } from "../DayModal";
-import { IoEye, IoEyeOff } from "react-icons/io5";
+import { CARD_WIDTH } from "../dayGrid";
 
 interface HeaderProps {
   employees: Employee[];
@@ -11,17 +11,16 @@ interface HeaderProps {
   columnWidthMap?: Map<string, number>;
 }
 
-// Contraste de texto con color de fondo
-const getTextColor = (backgroundColor: string): string => {
-  const hex = backgroundColor.replace("#", "");
-  if (hex.length < 6) return "#000000";
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? "#000000" : "#FFFFFF";
-};
+const initials = (name = "") =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 
+// Encabezado de columnas de la vista Día (AgendaEscritorio): neutro
+// (surface-muted), con el avatar del profesional y un anillo de su color.
 const DayModalHeader: FC<HeaderProps> = ({
   employees,
   hiddenEmployeeIds,
@@ -32,12 +31,12 @@ const DayModalHeader: FC<HeaderProps> = ({
     <Box
       style={{
         display: "flex",
-        borderBottom: "1px solid #F0EBE0",
-        backgroundColor: "#FAF7F2",
+        borderBottom: "1px solid var(--line-strong)",
+        backgroundColor: "var(--surface-muted)",
       }}
     >
-      {/* Espacio reservado para la columna de horas — sticky left para que
-          la esquina superior-izquierda no desaparezca al scrollear horizontalmente */}
+      {/* Espacio de la columna de horas — sticky left para que la esquina
+          superior-izquierda no desaparezca al hacer scroll horizontal */}
       <Box
         style={{
           width: "80px",
@@ -45,16 +44,13 @@ const DayModalHeader: FC<HeaderProps> = ({
           position: "sticky",
           left: 0,
           zIndex: 5,
-          backgroundColor: "#FAF7F2",
+          backgroundColor: "var(--surface-muted)",
         }}
       />
 
-      {/* Encabezados de cada profesional */}
       {employees.map((employee) => {
-        const color = employee.color || "#dee2e6";
-        const textColor = getTextColor(color);
+        const color = employee.color || "var(--pro-8)";
         const isHidden = hiddenEmployeeIds.includes(employee._id);
-
         const width = columnWidthMap?.get(employee._id) ?? CARD_WIDTH;
         return (
           <Box
@@ -63,64 +59,54 @@ const DayModalHeader: FC<HeaderProps> = ({
               width: `${width}px`,
               minWidth: `${width}px`,
               display: "flex",
-              flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-              textAlign: "center",
-              marginLeft: "2px",
-              padding: "6px 4px",
-              backgroundColor: isHidden ? "#F0EBE0" : color,
-              borderRadius: 8,
-              border: isHidden
-                ? "1px dashed #C9C2B5"
-                : "1px solid rgba(0,0,0,0.08)",
-              boxShadow: isHidden
-                ? "none"
-                : "0 1px 4px rgba(0,0,0,0.10)",
-              opacity: isHidden ? 0.6 : 1,
-              transition: "all 120ms ease",
+              gap: 8,
+              padding: "8px 8px 8px 10px",
+              borderLeft: "1px solid var(--line)",
+              opacity: isHidden ? 0.55 : 1,
+              minHeight: 52,
             }}
           >
-            {/* Nombre completo del profesional */}
+            <Avatar
+              src={employee.profileImage || undefined}
+              size={32}
+              radius="xl"
+              styles={{
+                root: { boxShadow: `inset 0 0 0 2px ${color}`, background: "var(--surface-hover)", flex: "none" },
+                placeholder: { color: "var(--ink-muted)", fontSize: 12, fontWeight: 600, background: "transparent" },
+                image: { border: `2px solid ${color}`, borderRadius: "50%" },
+              }}
+            >
+              {initials(employee.names)}
+            </Avatar>
             <Text
-              size="xs"
               fw={600}
               style={{
-                color: isHidden ? "#495057" : textColor,
-                lineHeight: 1.2,
-                textAlign: "center",
-                wordBreak: "break-word",
-                whiteSpace: "normal",
+                flex: 1,
+                minWidth: 0,
+                fontSize: 14,
+                lineHeight: "18px",
+                color: "var(--ink)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
+              title={employee.names}
             >
               {employee.names}
             </Text>
-
-            {/* Ícono de visibilidad */}
-            <Box style={{ position: "absolute", top: -4, right: 0 }}>
-              <Tooltip
-                label={isHidden ? "Mostrar profesional" : "Ocultar profesional"}
-                withArrow
+            <Tooltip label={isHidden ? "Mostrar profesional" : "Ocultar profesional"} withArrow>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                aria-label={isHidden ? `Mostrar a ${employee.names}` : `Ocultar a ${employee.names}`}
+                onClick={() => onToggleEmployeeHidden(employee._id)}
+                style={{ flex: "none" }}
               >
-                <ActionIcon
-                  size="xxxs"
-                  radius="xl"
-                  variant="white"
-                  onClick={() => onToggleEmployeeHidden(employee._id)}
-                  style={{
-                    backgroundColor: "rgba(255,255,255,0.8)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
-                  }}
-                >
-                  {isHidden ? (
-                    <IoEyeOff size={14} color="#212529" />
-                  ) : (
-                    <IoEye size={14} color="#212529" />
-                  )}
-                </ActionIcon>
-              </Tooltip>
-            </Box>
+                {isHidden ? <IconEyeOff size={14} /> : <IconEye size={14} />}
+              </ActionIcon>
+            </Tooltip>
           </Box>
         );
       })}

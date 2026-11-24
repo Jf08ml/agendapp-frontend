@@ -1,43 +1,30 @@
+// Tienda e inventario › Productos (rediseño, InventarioPanel). Encabezado con
+// una sola acción filled («Nuevo producto»), ajustes de la tienda pública en
+// panel lateral, tabla con foto, marca y SKU, stock con badge «Bajo», comisión
+// en texto claro y publicación en palabras. En móvil, lista y «Registrar venta»
+// flotante.
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Box,
-  Title,
-  Card,
-  Group,
-  Button,
-  Text,
-  ActionIcon,
-  TextInput,
-  Avatar,
-  Badge,
-  Tooltip,
-  Switch,
-  Checkbox,
-  Table,
-  Skeleton,
-  Center,
-  Stack,
-} from "@mantine/core";
+import { ActionIcon, Avatar, Button, Menu, Switch, Text } from "@mantine/core";
 import { useClipboard, useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import {
-  IconPlus,
-  IconPencil,
   IconAdjustments,
-  IconCircleX,
-  IconCircleCheck,
-  IconSearch,
-  IconShoppingCart,
   IconAlertTriangle,
   IconCheck,
+  IconDots,
   IconLink,
   IconPackage,
+  IconPencil,
+  IconPlayerPause,
+  IconPlayerPlay,
+  IconPlus,
+  IconSearch,
+  IconSettings,
+  IconShoppingCart,
 } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
 import { modals } from "@mantine/modals";
 import { useSelector } from "react-redux";
-import { RootState, useAppDispatch } from "../../../app/store";
-import { fetchOrganizationConfig } from "../../../features/organization/sliceOrganization";
-import { updateOrganization } from "../../../services/organizationService";
+import { RootState } from "../../../app/store";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { formatCurrency } from "../../../utils/formatCurrency";
 import {
@@ -51,29 +38,24 @@ import {
 import ProductModal, { ProductFormData } from "./components/ProductModal";
 import StockAdjustModal from "./components/StockAdjustModal";
 import SaleModal from "./components/SaleModal";
-
-const isLowStock = (p: Product) =>
-  p.trackStock && p.lowStockThreshold > 0 && p.stockQuantity <= p.lowStockThreshold;
-
-const commissionLabel = (p: Product, currency: string): string => {
-  if (!p.commissionType) return "Del profesional";
-  if (p.commissionType === "percentage") return `${p.commissionValue ?? 0}%`;
-  return `${formatCurrency(p.commissionValue ?? 0, currency)} c/u`;
-};
+import StoreSettingsDrawer from "./components/StoreSettingsDrawer";
+import StoreTabs from "../../../components/store/StoreTabs";
+import { isLowStock, productCommissionText, publicationState } from "./storeView";
+import StateBadge from "./components/StoreStateBadge";
 
 const InventoryPage: React.FC = () => {
   const isMobile = useMediaQuery("(max-width: 48rem)");
   const { hasPermission } = usePermissions();
-  const organization = useSelector(
-    (state: RootState) => state.organization.organization
-  );
+  const organization = useSelector((state: RootState) => state.organization.organization);
   const currency = organization?.currency || "COP";
+  const money = (n: number) => formatCurrency(n, currency);
 
   const canManage = hasPermission("inventory:manage");
   const canSell = hasPermission("inventory:sell") || canManage;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchTerm, 250);
   const [showInactive, setShowInactive] = useState(false);
@@ -82,71 +64,23 @@ const InventoryPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [storeSettingsOpen, setStoreSettingsOpen] = useState(false);
 
-  // ── Tienda pública: flags de la organización ──────────────────────────────
-  const dispatch = useAppDispatch();
   const clipboard = useClipboard({ timeout: 1500 });
-  const [savingStoreConfig, setSavingStoreConfig] = useState(false);
   const storeEnabled = !!organization?.storeEnabled;
-  const storeCodEnabled = organization?.storeCodEnabled !== false;
-  const storePickupEnabled = organization?.storePickupEnabled !== false;
-  const storeDeliveryEnabled = organization?.storeDeliveryEnabled !== false;
-  const mpConnected = !!organization?.mpCollect?.connected;
-  const hasTransferAccounts = (organization?.paymentMethods?.length ?? 0) > 0;
-  const storeMpOn = mpConnected && organization?.storeMpEnabled !== false;
-  const storeTransferOn = hasTransferAccounts && organization?.storeTransferEnabled !== false;
-  // Vías de pago que el cliente vería hoy (para no dejar la tienda sin ninguna)
-  const activePayCount = [storeMpOn, storeTransferOn, storeCodEnabled].filter(Boolean).length;
-
-  const handleStoreConfigChange = async (patch: {
-    storeEnabled?: boolean;
-    storeCodEnabled?: boolean;
-    storePickupEnabled?: boolean;
-    storeDeliveryEnabled?: boolean;
-    storeMpEnabled?: boolean;
-    storeTransferEnabled?: boolean;
-  }) => {
-    if (!organization?._id) return;
-    setSavingStoreConfig(true);
-    try {
-      const updated = await updateOrganization(organization._id, patch);
-      if (!updated) {
-        throw new Error("No se pudo actualizar la configuración de la tienda");
-      }
-      // Refresco del slice de org en segundo plano — NO provoca loader global
-      // (App.tsx solo muestra el loader cuando !organization).
-      await dispatch(fetchOrganizationConfig());
-      showNotification({
-        title: "Tienda actualizada",
-        message: "La configuración se guardó correctamente",
-        color: "green",
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Error al actualizar la configuración de la tienda";
-      showNotification({ title: "Error", message, color: "red" });
-    } finally {
-      setSavingStoreConfig(false);
-    }
-  };
 
   useEffect(() => {
     loadProducts();
   }, []);
 
   const loadProducts = async () => {
+    setLoadError(false);
     try {
       const data = await getProducts({ includeInactive: true });
       setProducts(data);
     } catch (error) {
       console.error(error);
-      showNotification({
-        title: "Error",
-        message: "Error al cargar los productos",
-        color: "red",
-      });
+      setLoadError(true);
     } finally {
       setInitialLoaded(true);
     }
@@ -280,333 +214,257 @@ const InventoryPage: React.FC = () => {
     });
   };
 
-  const rows = filtered.map((product) => {
-    const low = isLowStock(product);
-    return (
-      <Table.Tr key={product._id} style={{ opacity: product.active ? 1 : 0.6 }}>
-        <Table.Td>
-          <Group gap="sm" wrap="nowrap">
-            <Avatar
-              src={product.imageUrl || undefined}
-              alt={product.name}
-              size={38}
-              radius="sm"
-              color="gray"
-            >
-              <IconPackage size={20} />
-            </Avatar>
-            <div>
-              <Group gap={6} wrap="nowrap">
-                <Text fw={600} size="sm">
-                  {product.name}
-                </Text>
-                {!product.active && (
-                  <Badge color="gray" size="xs" variant="light">
-                    Inactivo
-                  </Badge>
-                )}
-              </Group>
-              {product.brand && (
-                <Text size="xs" c="dimmed">
-                  {product.brand}
-                </Text>
-              )}
-            </div>
-          </Group>
-        </Table.Td>
-        <Table.Td>
-          <Text size="sm">{product.category || "—"}</Text>
-        </Table.Td>
-        <Table.Td>
-          <Text size="sm" fw={600}>
-            {formatCurrency(product.salePrice, currency)}
-          </Text>
-        </Table.Td>
-        <Table.Td>
-          {product.trackStock ? (
-            <Badge
-              color={low ? "red" : "teal"}
-              variant={low ? "filled" : "light"}
-              leftSection={low ? <IconAlertTriangle size={12} /> : undefined}
-            >
-              {product.stockQuantity}
-            </Badge>
-          ) : (
-            <Text size="sm" c="dimmed">
-              Sin control
-            </Text>
-          )}
-        </Table.Td>
-        <Table.Td>
-          <Text size="sm">{commissionLabel(product, currency)}</Text>
-        </Table.Td>
-        {canManage && (
-          <Table.Td>
-            <Group gap={6} wrap="nowrap">
-              <Tooltip label="Editar" withArrow>
-                <ActionIcon
-                  variant="light"
-                  color="blue"
-                  onClick={() => {
-                    setEditingProduct(product);
-                    setIsProductModalOpen(true);
-                  }}
-                >
-                  <IconPencil size={16} />
-                </ActionIcon>
-              </Tooltip>
-              {product.trackStock && (
-                <Tooltip label="Ajustar stock" withArrow>
-                  <ActionIcon
-                    variant="light"
-                    color="grape"
-                    onClick={() => setAdjustingProduct(product)}
-                  >
-                    <IconAdjustments size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              )}
-              <Tooltip
-                label={product.active ? "Desactivar" : "Activar"}
-                withArrow
-              >
-                <ActionIcon
-                  variant="light"
-                  color={product.active ? "orange" : "green"}
-                  onClick={() => confirmDeactivate(product)}
-                >
-                  {product.active ? (
-                    <IconCircleX size={16} />
-                  ) : (
-                    <IconCircleCheck size={16} />
-                  )}
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Table.Td>
+  const openNew = () => {
+    setEditingProduct(null);
+    setIsProductModalOpen(true);
+  };
+  const openEdit = (p: Product) => {
+    setEditingProduct(p);
+    setIsProductModalOpen(true);
+  };
+
+  const thumb = (p: Product, size = 40) => (
+    <Avatar
+      src={p.imageUrl || null}
+      alt=""
+      size={size}
+      radius="md"
+      styles={{ root: { background: "var(--surface-hover)", flex: "none" }, placeholder: { color: "var(--ink-subtle)" } }}
+    >
+      <IconPackage size={18} stroke={1.75} />
+    </Avatar>
+  );
+
+  const stockCell = (p: Product) =>
+    p.trackStock ? (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+        <span className="ag-num" style={{ fontWeight: 600 }}>{p.stockQuantity}</span>
+        {isLowStock(p) && (
+          <span className="ag-badge ag-badge--warning" style={{ height: 20, fontSize: 11, padding: "0 8px" }}>
+            <IconAlertTriangle size={12} stroke={2} /> Bajo
+          </span>
         )}
-      </Table.Tr>
+      </span>
+    ) : (
+      <span className="ag-subtle">Sin control</span>
     );
-  });
+
+  const Actions = ({ p }: { p: Product }) =>
+    canManage ? (
+      <Menu shadow="lg" withinPortal position="bottom-end">
+        <Menu.Target>
+          <ActionIcon variant="subtle" color="gray" aria-label={`Acciones de ${p.name}`} onClick={(e) => e.stopPropagation()}>
+            <IconDots size={18} />
+          </ActionIcon>
+        </Menu.Target>
+        <Menu.Dropdown onClick={(e) => e.stopPropagation()}>
+          <Menu.Item leftSection={<IconPencil size={16} />} onClick={() => openEdit(p)}>
+            Editar
+          </Menu.Item>
+          {p.trackStock && (
+            <Menu.Item leftSection={<IconAdjustments size={16} />} onClick={() => setAdjustingProduct(p)}>
+              Ajustar stock
+            </Menu.Item>
+          )}
+          <Menu.Divider />
+          <Menu.Item
+            leftSection={p.active ? <IconPlayerPause size={16} /> : <IconPlayerPlay size={16} />}
+            onClick={() => confirmDeactivate(p)}
+          >
+            {p.active ? "Desactivar" : "Activar"}
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+    ) : null;
+
+  const headerActions = (
+    <>
+      {storeEnabled && !isMobile && (
+        <Button
+          variant="subtle"
+          color="gray"
+          leftSection={clipboard.copied ? <IconCheck size={16} /> : <IconLink size={16} />}
+          onClick={() => clipboard.copy(`${window.location.origin}/tienda`)}
+        >
+          {clipboard.copied ? "Link copiado" : "Copiar link de la tienda"}
+        </Button>
+      )}
+      {canSell && !isMobile && (
+        <Button variant="default" leftSection={<IconShoppingCart size={16} />} onClick={() => setIsSaleModalOpen(true)}>
+          Registrar venta
+        </Button>
+      )}
+      {canManage && (
+        <Button leftSection={<IconPlus size={16} />} onClick={openNew} size={isMobile ? "xs" : "sm"}>
+          Nuevo producto
+        </Button>
+      )}
+    </>
+  );
 
   return (
-    <Box>
-      <Card withBorder radius="md" p="md" mb="md" shadow="sm">
-        <Stack gap="md">
-          <Group justify="space-between" align="center" wrap="nowrap">
-            <Title order={isMobile ? 3 : 2}>Inventario</Title>
-            <Group gap="xs">
-              {canSell && (
-                <Button
-                  leftSection={<IconShoppingCart size={18} />}
-                  variant="light"
-                  color="teal"
-                  onClick={() => setIsSaleModalOpen(true)}
-                  size={isMobile ? "sm" : "md"}
-                >
-                  {isMobile ? "Venta" : "Registrar venta"}
-                </Button>
-              )}
-              {canManage && (
-                <Button
-                  leftSection={<IconPlus size={18} />}
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setIsProductModalOpen(true);
-                  }}
-                  size={isMobile ? "sm" : "md"}
-                >
-                  {isMobile ? "Nuevo" : "Nuevo producto"}
-                </Button>
-              )}
-            </Group>
-          </Group>
+    <div className="ag-stack" style={{ gap: "var(--space-4)", padding: isMobile ? "var(--space-3)" : "var(--space-5) var(--space-6)" }}>
+      <StoreTabs actions={headerActions} />
 
-          <Group wrap="wrap" gap="sm" align="center">
-            <TextInput
-              leftSection={<IconSearch size={16} />}
-              placeholder="Buscar por nombre, categoría, marca o SKU…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.currentTarget.value)}
-              style={{
-                flex: isMobile ? "1 1 100%" : "1 1 280px",
-                minWidth: isMobile ? "100%" : 240,
-              }}
-            />
-            <Switch
-              label="Ver inactivos"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.currentTarget.checked)}
-            />
-          </Group>
+      {/* Filtros y estado de la tienda */}
+      <div className="ag-row" style={{ gap: 12 }}>
+        <div className="ag-search" style={{ flex: isMobile ? "1 1 100%" : "0 1 320px" }}>
+          <input
+            className="ag-input"
+            type="search"
+            placeholder="Buscar por nombre, categoría, marca o SKU"
+            aria-label="Buscar productos"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.currentTarget.value)}
+          />
+          <span aria-hidden="true">
+            <IconSearch size={16} stroke={1.75} />
+          </span>
+        </div>
+        <Switch label="Ver inactivos" checked={showInactive} onChange={(e) => setShowInactive(e.currentTarget.checked)} />
+        <span style={{ flex: 1 }} />
+        {canManage && (
+          <button
+            type="button"
+            className="ag-chip"
+            onClick={() => setStoreSettingsOpen(true)}
+            aria-label="Ajustes de la tienda pública"
+          >
+            <IconSettings size={14} />
+            Tienda pública:
+            <b style={{ color: storeEnabled ? "var(--success)" : "var(--ink-muted)" }}>{storeEnabled ? "Activa" : "Apagada"}</b>
+          </button>
+        )}
+      </div>
 
-          {canManage && (
-            <Group wrap="wrap" gap="md" align="center">
-              <Switch
-                label="Tienda pública"
-                checked={storeEnabled}
-                disabled={savingStoreConfig}
-                onChange={(e) =>
-                  handleStoreConfigChange({
-                    storeEnabled: e.currentTarget.checked,
-                  })
-                }
-              />
-              {storeEnabled && (
-                <Button
-                  variant="light"
-                  size="xs"
-                  color={clipboard.copied ? "teal" : undefined}
-                  leftSection={
-                    clipboard.copied ? (
-                      <IconCheck size={14} />
-                    ) : (
-                      <IconLink size={14} />
-                    )
-                  }
-                  onClick={() =>
-                    clipboard.copy(`${window.location.origin}/tienda`)
-                  }
-                >
-                  {clipboard.copied ? "Link copiado" : "Copiar link de la tienda"}
-                </Button>
-              )}
-            </Group>
-          )}
-
-          {canManage && storeEnabled && (
-            <Group wrap="wrap" gap="xl" align="flex-start">
-              <Stack gap={6}>
-                <Text size="sm" fw={600}>
-                  Entrega
-                </Text>
-                <Tooltip
-                  label="Debe quedar al menos una modalidad de entrega"
-                  disabled={!(storePickupEnabled && !storeDeliveryEnabled)}
-                >
-                  <div>
-                    <Checkbox
-                      label="Retiro en el local"
-                      checked={storePickupEnabled}
-                      disabled={savingStoreConfig || (storePickupEnabled && !storeDeliveryEnabled)}
-                      onChange={(e) =>
-                        handleStoreConfigChange({ storePickupEnabled: e.currentTarget.checked })
-                      }
-                    />
-                  </div>
-                </Tooltip>
-                <Tooltip
-                  label="Debe quedar al menos una modalidad de entrega"
-                  disabled={!(storeDeliveryEnabled && !storePickupEnabled)}
-                >
-                  <div>
-                    <Checkbox
-                      label="Domicilio"
-                      checked={storeDeliveryEnabled}
-                      disabled={savingStoreConfig || (storeDeliveryEnabled && !storePickupEnabled)}
-                      onChange={(e) =>
-                        handleStoreConfigChange({ storeDeliveryEnabled: e.currentTarget.checked })
-                      }
-                    />
-                  </div>
-                </Tooltip>
-              </Stack>
-
-              <Stack gap={6}>
-                <Text size="sm" fw={600}>
-                  Pago
-                </Text>
-                {mpConnected && (
-                  <Checkbox
-                    label="Mercado Pago"
-                    checked={storeMpOn}
-                    disabled={savingStoreConfig || (storeMpOn && activePayCount === 1)}
-                    onChange={(e) =>
-                      handleStoreConfigChange({ storeMpEnabled: e.currentTarget.checked })
-                    }
-                  />
-                )}
-                <Checkbox
-                  label="Transferencia (con comprobante)"
-                  description={
-                    hasTransferAccounts
-                      ? undefined
-                      : "Agrega tus cuentas en Información del negocio → Pagos"
-                  }
-                  checked={storeTransferOn}
-                  disabled={
-                    savingStoreConfig ||
-                    !hasTransferAccounts ||
-                    (storeTransferOn && activePayCount === 1)
-                  }
-                  onChange={(e) =>
-                    handleStoreConfigChange({ storeTransferEnabled: e.currentTarget.checked })
-                  }
-                />
-                <Checkbox
-                  label="Contraentrega"
-                  checked={storeCodEnabled}
-                  disabled={savingStoreConfig || (storeCodEnabled && activePayCount === 1)}
-                  onChange={(e) =>
-                    handleStoreConfigChange({ storeCodEnabled: e.currentTarget.checked })
-                  }
-                />
-                {activePayCount === 1 && (
-                  <Text size="xs" c="dimmed">
-                    Debe quedar al menos una forma de pago activa.
-                  </Text>
-                )}
-              </Stack>
-            </Group>
-          )}
-        </Stack>
-      </Card>
-
-      {!initialLoaded ? (
-        <Card withBorder radius="md" p="md">
+      {loadError ? (
+        <div className="ag-alert ag-alert--danger" role="alert">
+          <IconAlertTriangle size={18} />
+          <div style={{ flex: 1 }}>No se pudieron cargar los productos. Revisa tu conexión e inténtalo de nuevo.</div>
+          <Button size="xs" variant="default" onClick={() => void loadProducts()}>
+            Reintentar
+          </Button>
+        </div>
+      ) : !initialLoaded ? (
+        <div className="ag-card" aria-busy="true">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} height={36} mb="sm" />
+            <div key={i} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
+              <span className="ag-skeleton" style={{ width: 40, height: 40, borderRadius: "var(--radius-md)" }} />
+              <span style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <span className="ag-skeleton" style={{ width: "35%" }} />
+                <span className="ag-skeleton" style={{ width: "20%" }} />
+              </span>
+            </div>
           ))}
-        </Card>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon"><IconPackage size={22} /></div>
+            <h3>Aún no tienes productos</h3>
+            <p>Crea el primero para empezar a vender.</p>
+            {canManage && <Button leftSection={<IconPlus size={16} />} onClick={openNew}>Nuevo producto</Button>}
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
-        <Center mih={200}>
-          <Stack align="center" gap="xs">
-            <Text c="dimmed">
-              {products.length === 0
-                ? "Aún no tienes productos. Crea el primero para empezar a vender."
-                : "No hay productos para los filtros aplicados."}
-            </Text>
-            {canManage && products.length === 0 && (
-              <Button
-                leftSection={<IconPlus size={16} />}
-                onClick={() => {
-                  setEditingProduct(null);
-                  setIsProductModalOpen(true);
-                }}
-              >
-                Nuevo producto
-              </Button>
-            )}
-          </Stack>
-        </Center>
+        <div className="ag-card">
+          <div className="ag-empty">
+            <h3>No hay productos con estos filtros</h3>
+            <Button variant="default" onClick={() => { setSearchTerm(""); setShowInactive(true); }}>
+              Limpiar filtros
+            </Button>
+          </div>
+        </div>
+      ) : isMobile ? (
+        <div className="ag-card">
+          {filtered.map((p) => (
+            <div
+              key={p._id}
+              className="ag-list-row"
+              role={canManage ? "button" : undefined}
+              tabIndex={canManage ? 0 : undefined}
+              onClick={() => canManage && openEdit(p)}
+              style={{ padding: "var(--space-3)", cursor: canManage ? "pointer" : undefined, opacity: p.active ? 1 : 0.65 }}
+            >
+              {thumb(p, 44)}
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                <b style={{ fontSize: 15 }}>{p.name}</b>
+                <span className="ag-subtle ag-num">
+                  {money(p.salePrice)} · {p.trackStock ? `${p.stockQuantity} en stock` : "Sin control de stock"}
+                </span>
+                <div className="ag-row" style={{ gap: 4 }}>
+                  {isLowStock(p) && (
+                    <span className="ag-badge ag-badge--warning" style={{ height: 20, fontSize: 11, padding: "0 8px" }}>
+                      <IconAlertTriangle size={12} stroke={2} /> Stock bajo
+                    </span>
+                  )}
+                  <StateBadge info={publicationState(p)} small />
+                </div>
+              </div>
+              <Actions p={p} />
+            </div>
+          ))}
+        </div>
       ) : (
-        <Card withBorder radius="md" p={0}>
-          <Table.ScrollContainer minWidth={720}>
-            <Table striped highlightOnHover verticalSpacing="sm">
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Producto</Table.Th>
-                  <Table.Th>Categoría</Table.Th>
-                  <Table.Th>Precio venta</Table.Th>
-                  <Table.Th>Stock</Table.Th>
-                  <Table.Th>Comisión</Table.Th>
-                  {canManage && <Table.Th>Acciones</Table.Th>}
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>{rows}</Table.Tbody>
-            </Table>
-          </Table.ScrollContainer>
-        </Card>
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table" style={{ minWidth: 880 }}>
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th className="num">Precio</th>
+                <th className="num">Stock</th>
+                <th>Comisión</th>
+                <th>Publicación</th>
+                {canManage && <th aria-label="Acciones" />}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr
+                  key={p._id}
+                  onClick={() => canManage && openEdit(p)}
+                  style={{ cursor: canManage ? "pointer" : undefined, opacity: p.active ? 1 : 0.65 }}
+                >
+                  <td>
+                    <div className="ag-who" style={{ minWidth: 0 }}>
+                      {thumb(p)}
+                      <div style={{ minWidth: 0 }}>
+                        <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</b>
+                        <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {[p.brand, p.sku && `SKU ${p.sku}`].filter(Boolean).join(" · ") || "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{p.category || <span className="ag-subtle">—</span>}</td>
+                  <td className="num"><b>{money(p.salePrice)}</b></td>
+                  <td className="num">{stockCell(p)}</td>
+                  <td>{productCommissionText(p.commissionType, p.commissionValue, money)}</td>
+                  <td><StateBadge info={publicationState(p)} /></td>
+                  {canManage && (
+                    <td style={{ width: 48, textAlign: "right" }}>
+                      <Actions p={p} />
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Móvil: «Registrar venta» flotante sobre la barra inferior */}
+      {isMobile && canSell && (
+        <Button
+          size="lg"
+          radius="xl"
+          leftSection={<IconShoppingCart size={18} />}
+          onClick={() => setIsSaleModalOpen(true)}
+          style={{ position: "fixed", right: 16, bottom: "calc(var(--app-shell-footer-offset, 0px) + 16px)", zIndex: 150, boxShadow: "var(--shadow-lg)" }}
+        >
+          Registrar venta
+        </Button>
       )}
 
       <ProductModal
@@ -626,13 +484,10 @@ const InventoryPage: React.FC = () => {
         onAdjust={handleAdjustStock}
       />
 
-      <SaleModal
-        isOpen={isSaleModalOpen}
-        onClose={() => setIsSaleModalOpen(false)}
-        onSaleCreated={loadProducts}
-        products={products}
-      />
-    </Box>
+      <SaleModal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} onSaleCreated={loadProducts} products={products} />
+
+      <StoreSettingsDrawer opened={storeSettingsOpen} onClose={() => setStoreSettingsOpen(false)} />
+    </div>
   );
 };
 

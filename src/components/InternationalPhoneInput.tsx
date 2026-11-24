@@ -233,10 +233,13 @@ const InternationalPhoneInput: React.FC<InternationalPhoneInputProps> = ({
           placeholder={placeholder || "300 000 0000"}
           style={{ flex: 1 }}
           disabled={disabled}
+          // En compacto el selector ya muestra el indicativo: no repetirlo en el campo
           leftSection={
-            <Text size="sm" c="dimmed">
-              {callingCode}
-            </Text>
+            compact ? undefined : (
+              <Text size="sm" c="dimmed">
+                {callingCode}
+              </Text>
+            )
           }
         />
       </Group>

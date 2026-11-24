@@ -1,9 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { FC, useMemo, useEffect, useState } from "react";
+import React, { FC, useMemo, useEffect, useRef, useState } from "react";
 import { Box, Text } from "@mantine/core";
 import { format, startOfWeek, addDays, isSameDay, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { useMediaQuery } from "@mantine/hooks";
+import { useElementSize, useMediaQuery } from "@mantine/hooks";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { Appointment } from "../../../services/appointmentService";
@@ -15,13 +15,14 @@ import {
 } from "../utils/scheduleUtils";
 import { useExpandAppointment } from "../hooks/useExpandAppointment";
 import { usePermissions } from "../../../hooks/usePermissions";
-import { HOUR_HEIGHT, CARD_WIDTH } from "./DayModal";
+import { HOUR_HEIGHT, CARD_WIDTH } from "./dayGrid";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezonePlugin from "dayjs/plugin/timezone";
 import DayModalTimeColumn from "./subcomponents/DayModalTimeColumn";
 import DayModalEmployeeColumn from "./subcomponents/DayModalEmployeeColumn";
 import CustomLoader from "../../../components/customLoader/CustomLoader";
+import WeekDayColumn from "./WeekDayColumn";
 
 dayjs.extend(utc);
 dayjs.extend(timezonePlugin);
@@ -77,6 +78,9 @@ const WeekView: FC<WeekViewProps> = ({
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [currentDate]);
+
+  // Contenedor con scroll: su ancho reparte las 7 columnas y su scroll ubica la hora de apertura
+  const { ref: scrollRef, width: scrollWidth } = useElementSize();
 
   // Appointments for the entire week
   const weekAppointments = useMemo(
@@ -134,6 +138,36 @@ const WeekView: FC<WeekViewProps> = ({
     [startHour, endHour, weekDays]
   );
 
+  // Al abrir (o cambiar de semana) la grilla se ubica en la hora de apertura del
+  // negocio, o en la primera cita de la semana si es más temprana: antes quedaba
+  // en el inicio de la grilla y se veía la madrugada vacía.
+  const openHour = useMemo(() => {
+    const ws = organization?.weeklySchedule;
+    if (ws?.enabled && ws.schedule?.length) {
+      const starts = ws.schedule
+        .filter((d) => d.isOpen && d.start)
+        .map((d) => parseInt(d.start.split(":")[0], 10))
+        .filter((h) => Number.isFinite(h));
+      if (starts.length) return Math.min(...starts);
+    }
+    return orgStartHour;
+  }, [organization?.weeklySchedule, orgStartHour]);
+  const scrollToHour = useMemo(() => {
+    const active = weekAppointments.filter((a) => !a.status.includes("cancelled"));
+    const earliest = active.length ? Math.min(...active.map((a) => dayjs.tz(a.startDate, tz).hour())) : openHour;
+    return Math.min(openHour, earliest);
+  }, [weekAppointments, openHour, tz]);
+  const weekKey = format(weekDays[0], "yyyy-MM-dd");
+  const scrolledWeekRef = useRef<string | null>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    // Se recoloca al cambiar de semana o cuando llegan las citas (cambia el rango)
+    const key = `${weekKey}|${startHour}|${scrollToHour}`;
+    if (!el || scrolledWeekRef.current === key) return;
+    scrolledWeekRef.current = key;
+    el.scrollTop = Math.max(0, (scrollToHour - startHour) * HOUR_HEIGHT);
+  }, [weekKey, scrollToHour, startHour, scrollRef]);
+
   // Per-day appointmentsByEmployee map (for DayModalEmployeeColumn)
   const appointmentsByEmployeeByDay = useMemo(() => {
     const result = new Map<string, Record<string, Appointment[]>>();
@@ -166,8 +200,14 @@ const WeekView: FC<WeekViewProps> = ({
     return result;
   }, [weekDays, appointmentsByEmployeeByDay, employees, isMobile]);
 
+  // Con 2 o más profesionales (filtro «Todos»): 7 columnas, una por día, con
+  // citas compactas (AgendaSemana). Con uno solo, la columna por profesional.
+  const compact = employees.length > 1;
+  const compactDayWidth = Math.max(110, Math.floor((scrollWidth - 80 - 18) / 7));
+
   // Width of each day group (sum of employee columns for that day)
   const dayGroupWidths = useMemo(() => {
+    if (compact) return weekDays.map(() => compactDayWidth);
     return weekDays.map((day) => {
       const map = columnWidthMapByDay.get(getDayKey(day));
       return employees.reduce(
@@ -175,7 +215,7 @@ const WeekView: FC<WeekViewProps> = ({
         0
       );
     });
-  }, [weekDays, columnWidthMapByDay, employees, isMobile]);
+  }, [weekDays, columnWidthMapByDay, employees, isMobile, compact, compactDayWidth]);
 
   // Current time line
   const [currentLineTop, setCurrentLineTop] = useState<number | null>(null);
@@ -208,14 +248,15 @@ const WeekView: FC<WeekViewProps> = ({
   const EMP_ROW_H = 32;  // employee name chips
 
   const WEEK_BRAND = {
-    deep: "#1E3A8A",
-    cream: "#FAF7F2",
-    surface: "#FFFFFF",
-    line: "#E7E2D6",
-    lineSoft: "#F0EBE0",
-    muted: "#8B92A6",
-    body: "#404760",
-    ink: "#101526",
+    deep: "var(--brand)",
+    deepText: "var(--brand-text)",
+    cream: "var(--surface-muted)",
+    surface: "var(--surface-raised)",
+    line: "var(--line)",
+    lineSoft: "var(--line)",
+    muted: "var(--ink-subtle)",
+    body: "var(--ink-muted)",
+    ink: "var(--ink)",
   };
 
   return (
@@ -242,6 +283,7 @@ const WeekView: FC<WeekViewProps> = ({
        * Scrolling vertically keeps headers pinned.
        */}
       <Box
+        ref={scrollRef}
         style={{
           overflowX: "auto",
           overflowY: "auto",
@@ -293,10 +335,10 @@ const WeekView: FC<WeekViewProps> = ({
                   padding: "6px 4px 4px",
                   borderRight: `1px solid ${WEEK_BRAND.line}`,
                   backgroundColor: isCurrentDay
-                    ? "rgba(30,58,138,0.06)"
+                    ? "var(--brand-soft)"
                     : "transparent",
                   borderBottom: isCurrentDay
-                    ? `2px solid ${WEEK_BRAND.deep}`
+                    ? `2px solid ${WEEK_BRAND.deepText}`
                     : "2px solid transparent",
                 }}
               >
@@ -306,7 +348,7 @@ const WeekView: FC<WeekViewProps> = ({
                     fontWeight: 700,
                     letterSpacing: 1.5,
                     textTransform: "uppercase",
-                    color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                    color: isCurrentDay ? WEEK_BRAND.deepText : WEEK_BRAND.muted,
                   }}
                 >
                   {format(day, isMobile ? "EEE" : "EEEE", { locale: es })}
@@ -327,7 +369,7 @@ const WeekView: FC<WeekViewProps> = ({
                     style={{
                       fontSize: 14,
                       fontWeight: isCurrentDay ? 700 : 500,
-                      color: isCurrentDay ? "#fff" : WEEK_BRAND.ink,
+                      color: isCurrentDay ? "var(--on-brand)" : WEEK_BRAND.ink,
                       lineHeight: 1,
                     }}
                   >
@@ -341,7 +383,7 @@ const WeekView: FC<WeekViewProps> = ({
                       fontWeight: 500,
                       lineHeight: 1,
                       marginTop: 2,
-                      color: isCurrentDay ? WEEK_BRAND.deep : WEEK_BRAND.muted,
+                      color: isCurrentDay ? WEEK_BRAND.deepText : WEEK_BRAND.muted,
                     }}
                   >
                     {dayApts.length} {dayApts.length === 1 ? "cita" : "citas"}
@@ -356,7 +398,8 @@ const WeekView: FC<WeekViewProps> = ({
           })}
         </Box>
 
-        {/* ── ROW 2: Employee name headers ── sticky top:DAY_ROW_H */}
+        {/* ── ROW 2: Employee name headers ── sticky top:DAY_ROW_H (solo por profesional) */}
+        {!compact && (
         <Box
           style={{
             position: "sticky",
@@ -438,6 +481,7 @@ const WeekView: FC<WeekViewProps> = ({
             );
           })}
         </Box>
+        )}
 
         {/* ── BODY: time column + employee columns per day ── */}
         <Box
@@ -481,7 +525,7 @@ const WeekView: FC<WeekViewProps> = ({
                   minWidth: `${dayGroupWidths[dayIdx]}px`,
                   borderRight: `1px solid ${WEEK_BRAND.line}`,
                   backgroundColor: isCurrentDay
-                    ? "rgba(30,58,138,0.03)"
+                    ? "color-mix(in srgb, var(--brand-soft) 45%, transparent)"
                     : "transparent",
                 }}
               >
@@ -494,7 +538,7 @@ const WeekView: FC<WeekViewProps> = ({
                       left: 0,
                       right: 0,
                       height: 2,
-                      backgroundColor: WEEK_BRAND.deep,
+                      backgroundColor: "var(--danger)",
                       zIndex: 20,
                       pointerEvents: "none",
                     }}
@@ -507,14 +551,30 @@ const WeekView: FC<WeekViewProps> = ({
                         width: 10,
                         height: 10,
                         borderRadius: "50%",
-                        backgroundColor: WEEK_BRAND.deep,
+                        backgroundColor: "var(--danger)",
                       }}
                     />
                   </Box>
                 )}
 
-                {/* One DayModalEmployeeColumn per employee */}
-                {employees.map((emp) => (
+                {compact ? (
+                  <Box style={{ width: "100%" }}>
+                    <WeekDayColumn
+                      day={day}
+                      appointments={(getDayAppointments(day) || []).filter((a) => !a.status.includes("cancelled"))}
+                      weekAppointments={weekAppointments}
+                      startHour={startHour}
+                      endHour={endHour}
+                      timezone={tz}
+                      timeFormat={timeFormat}
+                      canCreate={hasPermission("appointments:create")}
+                      onEditAppointment={onEditAppointment}
+                      onOpenModal={onOpenModal}
+                    />
+                  </Box>
+                ) : (
+                /* One DayModalEmployeeColumn per employee */
+                employees.map((emp) => (
                   <DayModalEmployeeColumn
                     key={emp._id}
                     employee={emp}
@@ -537,7 +597,7 @@ const WeekView: FC<WeekViewProps> = ({
                     timeFormat={timeFormat}
                     onExceptionDeleted={onExceptionDeleted}
                   />
-                ))}
+                )))}
               </Box>
             );
           })}
@@ -551,7 +611,7 @@ const WeekView: FC<WeekViewProps> = ({
             position: "absolute",
             inset: 0,
             zIndex: 200,
-            background: "rgba(250,247,242,0.78)",
+            background: "color-mix(in srgb, var(--surface) 78%, transparent)",
             backdropFilter: "blur(2px)",
             display: "flex",
             alignItems: "center",

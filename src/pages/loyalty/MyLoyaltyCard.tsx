@@ -8,21 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Center,
-  Group,
-  Loader,
-  Paper,
-  SegmentedControl,
-  SimpleGrid,
-  Stack,
-  Text,
-  Title,
-} from "@mantine/core";
+import { Button, Drawer, Skeleton } from "@mantine/core";
 import { showNotification } from "@mantine/notifications";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -62,6 +48,7 @@ export default function MyLoyaltyCard() {
   const [adminClient, setAdminClient] = useState<Client | null>(null);
   const [registering, setRegistering] = useState<Kind | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installHelp, setInstallHelp] = useState(false);
 
   const load = useCallback(async () => {
     const data = await getPublicLoyaltyCard(token);
@@ -135,31 +122,32 @@ export default function MyLoyaltyCard() {
         color: "green",
       });
     } catch (e) {
-      showNotification({ title: "Error", message: (e as Error).message, color: "red" });
+      showNotification({ color: "red", message: `No se pudo registrar: ${(e as Error).message}. Intenta de nuevo.` });
     } finally {
       setRegistering(null);
     }
   };
 
+  const shell = { maxWidth: 480, margin: "0 auto", padding: "24px 16px 48px" } as const;
+
   if (loading) {
     return (
-      <Center mih={360}>
-        <Loader />
-      </Center>
+      <div style={shell}>
+        <Skeleton radius={20} style={{ aspectRatio: "1.586", height: "auto" }} mb={16} />
+        <Skeleton height={200} radius="md" />
+      </div>
     );
   }
 
   if (!card || !org) {
     return (
-      <Center mih={360} px="md">
-        <Stack align="center" gap="xs" maw={360}>
-          <Title order={4} ta="center">Tarjeta no encontrada</Title>
-          <Text c="dimmed" ta="center" size="sm">
-            El enlace no es válido o el programa de fidelidad no está activo. Pide al negocio que te
-            envíe tu tarjeta de nuevo.
-          </Text>
-        </Stack>
-      </Center>
+      <div style={shell}>
+        <div className="ag-card" style={{ padding: 24, textAlign: "center" }}>
+          <h1 style={{ margin: "0 0 6px", font: "600 20px/26px var(--mantine-font-family)" }}>No pudimos abrir tu tarjeta</h1>
+          <div className="ag-muted" style={{ fontSize: 14, marginBottom: 14 }}>El enlace no es válido o el programa de fidelidad no está activo.</div>
+          <Button onClick={() => navigate("/search-client")}>Consultar con mi número</Button>
+        </div>
+      </div>
     );
   }
 
@@ -170,19 +158,22 @@ export default function MyLoyaltyCard() {
   const tiers = activeKind === "service" ? serviceTiers : referralTiers;
 
   return (
-    <Box maw={480} mx="auto" px="md" py="lg">
-      <Stack gap="md">
+    <div style={shell}>
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div>
+          <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Mi tarjeta</h1>
+          <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>Tu programa de fidelidad en {org.name}.</div>
+        </div>
+
         {hasService && hasReferral && (
-          <SegmentedControl
-            fullWidth
-            radius="xl"
-            value={activeKind}
-            onChange={(v) => setKind(v as Kind)}
-            data={[
-              { value: "service", label: "Servicios" },
-              { value: "referral", label: "Referidos" },
-            ]}
-          />
+          <div className="ag-segment" role="group" aria-label="Tarjeta" style={{ alignSelf: "flex-start" }}>
+            <button type="button" aria-pressed={activeKind === "service"} onClick={() => setKind("service")}>
+              Servicios
+            </button>
+            <button type="button" aria-pressed={activeKind === "referral"} onClick={() => setKind("referral")}>
+              Referidos
+            </button>
+          </div>
         )}
 
         {hasService || hasReferral ? (
@@ -197,127 +188,99 @@ export default function MyLoyaltyCard() {
             tiers={tiers}
           />
         ) : (
-          <Alert color="gray">Este negocio aún no configuró los niveles de su programa.</Alert>
+          <div className="ag-card" style={{ padding: 16, textAlign: "center" }}>
+            <div className="ag-muted" style={{ fontSize: 14 }}>Este plan aún no tiene niveles configurados.</div>
+          </div>
         )}
 
-        {design.message && (
-          <Text size="sm" c="dimmed" ta="center">{design.message}</Text>
-        )}
+        {design.message && <div className="ag-muted" style={{ fontSize: 14, textAlign: "center" }}>{design.message}</div>}
 
         {/* Panel del negocio (sesión iniciada en esta organización) */}
         {adminClient && (
-          <Paper withBorder radius="md" p="md" style={{ borderLeft: "3px solid var(--mantine-color-green-6)" }}>
-            <Group gap={6} mb="xs">
-              <IconShieldCheck size={16} color="var(--mantine-color-green-7)" />
-              <Text size="sm" fw={700}>Vista del negocio · {adminClient.name}</Text>
-            </Group>
-            <SimpleGrid cols={2} spacing="sm">
-              <Button
-                variant="light"
-                color="green"
-                leftSection={<IconCirclePlus size={16} />}
-                loading={registering === "service"}
-                disabled={!!registering}
-                onClick={() => handleRegister("service")}
-              >
+          <div className="ag-card" style={{ padding: 16 }}>
+            <div className="ag-row" style={{ gap: 6, marginBottom: 10 }}>
+              <IconShieldCheck size={16} />
+              <b style={{ fontSize: 14 }}>Vista del negocio · {adminClient.name}</b>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <Button variant="default" leftSection={<IconCirclePlus size={16} />} loading={registering === "service"} disabled={!!registering} onClick={() => handleRegister("service")}>
                 Registrar servicio
               </Button>
-              <Button
-                variant="light"
-                color="grape"
-                leftSection={<IconUserPlus size={16} />}
-                loading={registering === "referral"}
-                disabled={!!registering}
-                onClick={() => handleRegister("referral")}
-              >
+              <Button variant="default" leftSection={<IconUserPlus size={16} />} loading={registering === "referral"} disabled={!!registering} onClick={() => handleRegister("referral")}>
                 Registrar referido
               </Button>
-            </SimpleGrid>
-          </Paper>
+            </div>
+          </div>
         )}
 
-        {/* Premios por reclamar */}
         {pendingRewards.length > 0 && (
-          <Paper withBorder radius="md" p="md">
-            <Group gap={6} mb="xs">
+          <div className="ag-card" style={{ padding: 16 }}>
+            <div className="ag-row" style={{ gap: 6, marginBottom: 8 }}>
               <IconGift size={16} />
-              <Text size="sm" fw={700}>Premios por reclamar</Text>
-            </Group>
-            <Stack gap={6}>
-              {pendingRewards.map((r) => (
-                <Group key={r._id} justify="space-between" wrap="nowrap">
-                  <Text size="sm" truncate="end">🏅 {r.reward}</Text>
-                  <Badge size="sm" variant="light" color={r.type === "service" ? "blue" : "grape"}>
-                    {r.type === "service" ? "Servicios" : "Referidos"}
-                  </Badge>
-                </Group>
-              ))}
-            </Stack>
-            <Text size="xs" c="dimmed" mt="xs">Muestra esta tarjeta en tu próxima visita para reclamarlos.</Text>
-          </Paper>
+              <b style={{ fontSize: 14 }}>Premios por reclamar</b>
+            </div>
+            {pendingRewards.map((r) => (
+              <div key={r._id} className="ag-row" style={{ justifyContent: "space-between", gap: 8, flexWrap: "nowrap", padding: "4px 0" }}>
+                <span style={{ fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.reward}</span>
+                <span className="ag-badge">{r.type === "service" ? "Servicios" : "Referidos"}</span>
+              </div>
+            ))}
+            <div className="ag-subtle" style={{ marginTop: 6 }}>Muestra esta tarjeta en tu próxima visita para reclamarlos.</div>
+          </div>
         )}
 
-        {/* QR para que el negocio abra la tarjeta */}
-        <Paper withBorder radius="md" p="md">
-          <Stack align="center" gap={6}>
-            <Box p={8} style={{ background: "#fff", borderRadius: 12 }}>
-              <QRCodeSVG value={cardUrl} size={168} level="M" />
-            </Box>
-            <Text size="sm" fw={600} ta="center">Muestra este código al llegar</Text>
-            <Text size="xs" c="dimmed" ta="center" maw={320}>
-              El negocio lo escanea para registrar tu servicio o tus referidos.
-            </Text>
-          </Stack>
-        </Paper>
+        <div className="ag-card" style={{ padding: 16, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ padding: 8, background: "#fff", borderRadius: 12 }}>
+            <QRCodeSVG value={cardUrl} size={168} level="M" />
+          </div>
+          <b style={{ fontSize: 14 }}>Muéstralo en tu cita</b>
+          <div className="ag-subtle" style={{ maxWidth: 320 }}>El negocio lo escanea para registrar tu servicio o tus referidos.</div>
+        </div>
 
-        {/* Guardar en el teléfono */}
         {!adminClient && (
-          <Paper withBorder radius="md" p="md">
-            <Group gap={6} mb={4}>
-              <IconDeviceMobile size={16} />
-              <Text size="sm" fw={700}>Tenla siempre a la mano</Text>
-            </Group>
-            {installPrompt ? (
-              <Button
-                fullWidth
-                variant="light"
-                mt="xs"
-                onClick={async () => {
+          <div className="ag-stack" style={{ gap: 6 }}>
+            <Button
+              variant="default"
+              fullWidth
+              leftSection={<IconDeviceMobile size={16} />}
+              onClick={async () => {
+                if (installPrompt) {
                   installPrompt.prompt();
                   await installPrompt.userChoice;
                   setInstallPrompt(null);
-                }}
-              >
-                Agregar a la pantalla de inicio
-              </Button>
-            ) : (
-              <Text size="xs" c="dimmed">
-                {isIos()
-                  ? "En Safari toca Compartir y luego «Agregar a inicio». También puedes guardar este enlace en tus favoritos."
-                  : "Abre el menú del navegador (⋮) y elige «Agregar a la pantalla de inicio», o guarda este enlace en tus favoritos."}
-              </Text>
-            )}
-          </Paper>
+                } else {
+                  setInstallHelp(true);
+                }
+              }}
+            >
+              Agregar a la pantalla de inicio
+            </Button>
+            <Button
+              variant="subtle"
+              color="gray"
+              size="xs"
+              onClick={() => {
+                try {
+                  localStorage.removeItem(savedCardKey(org._id));
+                } catch {
+                  /* almacenamiento no disponible */
+                }
+                navigate("/search-client");
+              }}
+            >
+              ¿No es tu tarjeta? Consultar con otro número
+            </Button>
+          </div>
         )}
+      </div>
 
-        {!adminClient && (
-          <Button
-            variant="subtle"
-            color="gray"
-            size="xs"
-            onClick={() => {
-              try {
-                localStorage.removeItem(savedCardKey(org._id));
-              } catch {
-                /* almacenamiento no disponible */
-              }
-              navigate("/search-client");
-            }}
-          >
-            ¿No es tu tarjeta? Consultar con otro número
-          </Button>
-        )}
-      </Stack>
-    </Box>
+      <Drawer opened={installHelp} onClose={() => setInstallHelp(false)} position="bottom" size="auto" radius="lg" title={<b>Tenla siempre a la mano</b>}>
+        <div className="ag-muted" style={{ fontSize: 14, paddingBottom: 12 }}>
+          {isIos()
+            ? "En Safari toca Compartir y luego «Agregar a inicio». También puedes guardar este enlace en tus favoritos."
+            : "Abre el menú del navegador (⋮) y elige «Agregar a la pantalla de inicio», o guarda este enlace en tus favoritos."}
+        </div>
+      </Drawer>
+    </div>
   );
 }

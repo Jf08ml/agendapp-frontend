@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Stack, Card, Text, Badge, Group, Center, Loader,
-  Progress, ThemeIcon, Alert, Paper, Divider, Button, CloseButton,
-} from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
-import { DatePicker } from "@mantine/dates";
-import {
-  IconCalendar, IconAlertCircle, IconClock, IconCheck, IconRepeat,
-} from "@tabler/icons-react";
+import { Button, CloseButton, Skeleton } from "@mantine/core";
+import { IconCheck, IconInfoCircle, IconRepeat } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import utc from "dayjs/plugin/utc";
@@ -31,26 +24,15 @@ interface Props {
   timezone?: string;
   /** Créditos del paquete con que se reserva: tope de sesiones a marcar. */
   maxSelectable?: number | null;
+  /** Formato de hora del negocio ("12h" | "24h"). */
+  timeFormat?: string;
+  /** Volver al paso de clase cuando esta no tiene sesiones. */
+  onChooseOtherClass?: () => void;
 }
-
-const STATUS_COLOR: Record<string, string> = {
-  open: "green",
-  full: "red",
-  cancelled: "gray",
-  completed: "gray",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "Disponible",
-  full: "Sin cupos",
-  cancelled: "Cancelada",
-  completed: "Finalizada",
-};
 
 // Un día del calendario es una etiqueta pura (YYYY-MM-DD), no un instante:
 // se construye/lee con getters locales para que coincida siempre con las
 // celdas del propio DatePicker, sin pasar por conversión de timezone.
-const dateToKey = (date: Date) => dayjs(date).format("YYYY-MM-DD");
 const dayKeyToDate = (key: string) => {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -61,9 +43,8 @@ const byStart = (a: ClassSession, b: ClassSession) =>
 
 export default function StepSelectSession({
   sessions, loading, selected, onChange, selectedClass, timezone: tz = "America/Bogota",
-  maxSelectable = null,
+  maxSelectable = null, timeFormat, onChooseOtherClass,
 }: Props) {
-  const isMobile = useMediaQuery("(max-width: 48rem)");
 
   const limit = Math.min(maxSelectable ?? MAX_SESSIONS_PER_BOOKING, MAX_SESSIONS_PER_BOOKING);
   const selectedIds = useMemo(() => new Set(selected.map((s) => s._id)), [selected]);
@@ -111,30 +92,48 @@ export default function StepSelectSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableDays.join(","), tz]);
 
+  const fmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
+  const amPm = (s: string) => s.replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
+
   if (loading) {
-    return <Center h={200}><Loader /></Center>;
+    return (
+      <div className="ag-stack" style={{ gap: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} height={60} width={56} radius="md" />
+          ))}
+        </div>
+        {[0, 1].map((i) => (
+          <Skeleton key={i} height={84} radius="md" />
+        ))}
+      </div>
+    );
   }
 
   if (!selectedClass) {
-    return (
-      <Alert icon={<IconAlertCircle size={16} />} color="gray">
-        Selecciona una clase primero.
-      </Alert>
-    );
+    return <div className="ag-muted" style={{ fontSize: 14 }}>Elige una clase primero.</div>;
   }
 
   if (availableSessions.length === 0) {
     return (
-      <Center h={200}>
-        <Stack align="center" gap="xs">
-          <IconCalendar size={40} color="gray" />
-          <Text c="dimmed">No hay sesiones disponibles para esta clase por el momento.</Text>
-        </Stack>
-      </Center>
+      <div className="ag-card" style={{ padding: "32px 16px", textAlign: "center" }}>
+        <b style={{ display: "block", marginBottom: 4 }}>No hay sesiones próximas</b>
+        <div className="ag-muted" style={{ fontSize: 14, marginBottom: onChooseOtherClass ? 12 : 0 }}>Esta clase no tiene sesiones con cupo por ahora.</div>
+        {onChooseOtherClass && (
+          <Button size="xs" variant="default" onClick={onChooseOtherClass}>
+            Elegir otra clase
+          </Button>
+        )}
+      </div>
     );
   }
 
-  const sessionsOfSelectedDay = selectedDayKey ? sessionsByDay[selectedDayKey] ?? [] : [];
+  // Sesiones del día elegido: las abiertas y también las llenas (deshabilitadas)
+  const sessionsOfSelectedDay = selectedDayKey
+    ? sessions
+        .filter((s) => (s.status === "open" || s.status === "full") && dayjs(s.startDate).isAfter(dayjs()) && dayjs(s.startDate).tz(tz).format("YYYY-MM-DD") === selectedDayKey)
+        .sort(byStart)
+    : [];
 
   const toggle = (s: ClassSession) => {
     if (selectedIds.has(s._id)) {
@@ -156,165 +155,119 @@ export default function StepSelectSession({
 
   const repeatBase = repeatBaseId ? selected.find((s) => s._id === repeatBaseId) ?? null : null;
 
-  const getDayProps = (date: Date) => {
-    const key = dateToKey(date);
-    if (!sessionsByDay[key]) {
-      return { disabled: true };
-    }
-    if (key === selectedDayKey) {
-      return {
-        style: {
-          backgroundColor: "var(--mantine-color-blue-6)",
-          color: "#fff",
-          fontWeight: 700,
-        },
-      };
-    }
-    if (selectedDays.has(key)) {
-      return {
-        style: {
-          backgroundColor: "var(--mantine-color-blue-1)",
-          color: "var(--mantine-color-blue-8)",
-          fontWeight: 700,
-          boxShadow: "inset 0 0 0 2px var(--mantine-color-blue-5)",
-        },
-      };
-    }
-    return {
-      style: {
-        backgroundColor: "var(--mantine-color-green-1)",
-        color: "var(--mantine-color-green-8)",
-        fontWeight: 700,
-      },
-    };
-  };
-
   return (
-    <Stack gap="md">
-      <Text fw={600} size="lg">Elige tus sesiones</Text>
-      <Text size="sm" c="dimmed">{selectedClass.name} · {selectedClass.duration} min</Text>
-      <Text size="xs" c="dimmed">
-        Puedes marcar una o varias sesiones, o repetir una cada semana. Los días en{" "}
-        <Text span c="green" fw={600}>verde</Text> tienen sesiones disponibles y los
-        marcados en <Text span c="blue" fw={600}>azul</Text> ya tienen sesiones elegidas.
-      </Text>
+    <div className="ag-stack" style={{ gap: 14 }}>
+      <div>
+        <h2 className="ag-h" style={{ margin: 0 }}>Elige la sesión</h2>
+        <div className="ag-subtle">
+          {selectedClass.name} · {selectedClass.duration} min. Puedes elegir varias o repetir una cada semana.
+        </div>
+      </div>
 
       {maxSelectable != null && (
-        <Alert color="grape" variant="light" p="xs">
-          <Text size="xs">
+        <div className="ag-alert ag-alert--info" style={{ padding: "8px 12px" }}>
+          <IconInfoCircle size={18} />
+          <div style={{ fontSize: 13 }}>
             Tu paquete cubre hasta {maxSelectable} {maxSelectable === 1 ? "sesión" : "sesiones"} de esta clase.
-          </Text>
-        </Alert>
+          </div>
+        </div>
       )}
 
-      <Paper withBorder radius="md" p={isMobile ? "sm" : "md"}>
-        <DatePicker
-          value={selectedDayKey ? dayKeyToDate(selectedDayKey) : null}
-          onChange={(d) => d && setSelectedDayKey(dateToKey(d))}
-          defaultDate={
-            selectedDayKey ? dayKeyToDate(selectedDayKey)
-            : availableDays[0] ? dayKeyToDate(availableDays[0]) : undefined
-          }
-          minDate={new Date()}
-          maxDate={dayKeyToDate(availableDays[availableDays.length - 1])}
-          excludeDate={(d) => dayjs(d).isBefore(dayjs(), "day")}
-          getDayProps={getDayProps}
-          locale="es"
-          size={isMobile ? "sm" : "md"}
-          style={{ width: "100%" }}
-        />
-      </Paper>
+      {/* Tira de días con sesiones */}
+      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "thin" }} role="tablist" aria-label="Días con sesiones">
+        {availableDays.map((key) => {
+          const d = dayKeyToDate(key);
+          const active = key === selectedDayKey;
+          const hasPicked = selectedDays.has(key);
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setSelectedDayKey(key)}
+              style={{
+                flex: "none",
+                width: 58,
+                padding: "8px 0",
+                borderRadius: "var(--radius-md)",
+                border: active ? "2px solid var(--ink)" : "1px solid var(--line-control)",
+                background: active ? "var(--ink)" : "var(--surface-raised)",
+                color: active ? "var(--ink-inverse)" : "var(--ink)",
+                cursor: "pointer",
+                position: "relative",
+                font: "inherit",
+              }}
+            >
+              <div style={{ fontSize: 11, textTransform: "capitalize", opacity: 0.8 }}>{dayjs(d).format("ddd").replace(".", "")}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, lineHeight: "22px" }}>{dayjs(d).format("D")}</div>
+              <div style={{ fontSize: 10, textTransform: "capitalize", opacity: 0.7 }}>{dayjs(d).format("MMM").replace(".", "")}</div>
+              {hasPicked && <span style={{ position: "absolute", top: 4, right: 6, width: 6, height: 6, borderRadius: 999, background: active ? "var(--ink-inverse)" : "var(--brand)" }} />}
+            </button>
+          );
+        })}
+      </div>
 
-      {selectedDayKey && sessionsOfSelectedDay.length > 0 && (
-        <Stack gap="xs">
-          <Divider
-            label={dayjs(dayKeyToDate(selectedDayKey)).format("dddd D [de] MMMM")}
-            labelPosition="left"
-          />
+      {selectedDayKey && (
+        <div className="ag-stack" style={{ gap: 8 }}>
+          <b style={{ fontSize: 14, textTransform: "capitalize" }}>{dayjs(dayKeyToDate(selectedDayKey)).format("dddd D [de] MMMM")}</b>
           {sessionsOfSelectedDay.map((s) => {
             const isSelected = selectedIds.has(s._id);
-            const disabled = !isSelected && atLimit;
+            const full = s.status === "full" || s.capacity - s.enrolledCount <= 0;
+            const disabled = full || (!isSelected && atLimit);
             const start = dayjs(s.startDate).tz(tz);
             const end = dayjs(s.endDate).tz(tz);
-            const remaining = s.capacity - s.enrolledCount;
+            const remaining = Math.max(0, s.capacity - s.enrolledCount);
             const pct = s.capacity > 0 ? Math.round((s.enrolledCount / s.capacity) * 100) : 0;
             const employee = typeof s.employeeId === "object" ? s.employeeId : null;
             const room = typeof s.roomId === "object" ? s.roomId : null;
-
             return (
-              <Card
+              <div
                 key={s._id}
-                withBorder
-                radius="md"
-                p="sm"
-                onClick={() => toggle(s)}
-                style={{
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  opacity: disabled ? 0.55 : 1,
-                  borderColor: isSelected ? "var(--mantine-color-blue-5)" : undefined,
-                  borderWidth: isSelected ? 2 : 1,
-                  boxShadow: isSelected ? "0 0 0 2px var(--mantine-color-blue-2)" : undefined,
-                  transition: "all 0.15s ease",
-                }}
+                className="ag-pick"
+                role="checkbox"
+                tabIndex={disabled ? -1 : 0}
+                aria-checked={isSelected}
+                aria-disabled={disabled || undefined}
+                onClick={() => !disabled && toggle(s)}
+                onKeyDown={(e) => !disabled && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggle(s))}
+                style={{ gridTemplateColumns: "1fr auto", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled && !isSelected ? 0.55 : 1 }}
               >
-                <Group justify="space-between" wrap="nowrap">
-                  <Group gap="sm" style={{ flex: 1, minWidth: 0 }}>
-                    <ThemeIcon
-                      size="md"
-                      variant={isSelected ? "filled" : "light"}
-                      color={isSelected ? "blue" : "gray"}
-                      radius="xl"
+                <div style={{ minWidth: 0 }}>
+                  <div className="ag-pick__name ag-num">
+                    {amPm(start.format(fmt))} – {amPm(end.format(fmt))}
+                  </div>
+                  <div className="ag-subtle">
+                    {[employee?.names, room?.name].filter(Boolean).join(" · ") || " "}
+                  </div>
+                  <div className="ag-row" style={{ gap: 8, marginTop: 6, flexWrap: "nowrap" }}>
+                    <div style={{ flex: 1, maxWidth: 160, height: 4, borderRadius: 999, background: "var(--surface-hover)", overflow: "hidden" }}>
+                      <div style={{ width: `${pct}%`, height: "100%", background: full ? "var(--danger)" : "var(--ink)" }} />
+                    </div>
+                    <span className="ag-subtle" style={{ color: full ? "var(--danger)" : undefined, fontWeight: full ? 600 : undefined, whiteSpace: "nowrap" }}>
+                      {full ? "Sin cupos" : `${remaining} ${remaining === 1 ? "cupo" : "cupos"} de ${s.capacity}`}
+                    </span>
+                  </div>
+                  {isSelected && !atLimit && repeatBaseId !== s._id && (
+                    <Button
+                      mt={8}
+                      size="compact-xs"
+                      variant="subtle"
+                      leftSection={<IconRepeat size={14} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRepeatBaseId(s._id);
+                      }}
                     >
-                      {isSelected ? <IconCheck size={16} /> : <IconClock size={16} />}
-                    </ThemeIcon>
-                    <Stack gap={2} style={{ minWidth: 0 }}>
-                      <Text fw={600} size="sm">
-                        {start.format("HH:mm")} – {end.format("HH:mm")}
-                      </Text>
-                      <Group gap="xs">
-                        {employee && (
-                          <Text size="xs" c="dimmed">{employee.names}</Text>
-                        )}
-                        {room && (
-                          <Text size="xs" c="dimmed">· {room.name}</Text>
-                        )}
-                      </Group>
-
-                      {/* Barra de ocupación */}
-                      <Group gap="xs" mt={4} style={{ minWidth: 120 }}>
-                        <Progress
-                          value={pct}
-                          size="xs"
-                          color={pct >= 90 ? "red" : pct >= 70 ? "orange" : "blue"}
-                          style={{ flex: 1 }}
-                        />
-                        <Text size="xs" c={remaining <= 3 ? "red" : "dimmed"} fw={remaining <= 3 ? 600 : 400}>
-                          {remaining} {remaining === 1 ? "cupo" : "cupos"}
-                        </Text>
-                      </Group>
-                    </Stack>
-                  </Group>
-                  <Badge size="sm" color={isSelected ? "blue" : STATUS_COLOR[s.status] ?? "gray"} variant="light">
-                    {isSelected ? "Elegida" : STATUS_LABEL[s.status] ?? s.status}
-                  </Badge>
-                </Group>
-
-                {/* Repetir: mismo horario otros días/semanas (como las citas recurrentes) */}
-                {isSelected && !atLimit && repeatBaseId !== s._id && (
-                  <Button
-                    mt="sm"
-                    size="xs"
-                    variant="light"
-                    leftSection={<IconRepeat size={14} />}
-                    onClick={(e) => { e.stopPropagation(); setRepeatBaseId(s._id); }}
-                  >
-                    Repetir esta clase…
-                  </Button>
-                )}
-              </Card>
+                      Repetir cada semana
+                    </Button>
+                  )}
+                </div>
+                <span className="ag-pick__check">{isSelected && <IconCheck size={14} />}</span>
+              </div>
             );
           })}
-        </Stack>
+        </div>
       )}
 
       {repeatBase && (
@@ -331,40 +284,35 @@ export default function StepSelectSession({
         />
       )}
 
-      {/* Sesiones elegidas */}
       {selected.length > 0 && (
-        <Paper withBorder radius="md" p="sm">
-          <Group justify="space-between" mb={6}>
-            <Text size="sm" fw={600}>
+        <div className="ag-card" style={{ padding: 12 }}>
+          <div className="ag-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+            <b style={{ fontSize: 14 }}>
               {selected.length} {selected.length === 1 ? "sesión elegida" : "sesiones elegidas"}
               {maxSelectable != null && ` de ${maxSelectable}`}
-            </Text>
+            </b>
             <Button size="compact-xs" variant="subtle" color="gray" onClick={() => onChange([])}>
               Quitar todas
             </Button>
-          </Group>
-          <Stack gap={4}>
-            {selected.map((s) => {
-              const start = dayjs(s.startDate).tz(tz);
-              return (
-                <Group key={s._id} justify="space-between" wrap="nowrap" gap="xs">
-                  <Text size="xs">
-                    {start.format("ddd D [de] MMM")} · {start.format("HH:mm")}
-                  </Text>
-                  <CloseButton size="sm" aria-label="Quitar sesión" onClick={() => toggle(s)} />
-                </Group>
-              );
-            })}
-          </Stack>
+          </div>
+          {selected.map((s) => {
+            const start = dayjs(s.startDate).tz(tz);
+            return (
+              <div key={s._id} className="ag-row" style={{ justifyContent: "space-between", flexWrap: "nowrap", fontSize: 13 }}>
+                <span style={{ textTransform: "capitalize" }}>
+                  {start.format("ddd D [de] MMM")} · {amPm(start.format(fmt))}
+                </span>
+                <CloseButton size="sm" aria-label="Quitar sesión" onClick={() => toggle(s)} />
+              </div>
+            );
+          })}
           {atLimit && (
-            <Text size="xs" c="dimmed" mt={6}>
-              {maxSelectable != null
-                ? "Llegaste al máximo de sesiones de tu paquete."
-                : `Puedes reservar hasta ${MAX_SESSIONS_PER_BOOKING} sesiones a la vez.`}
-            </Text>
+            <div className="ag-subtle" style={{ marginTop: 6 }}>
+              {maxSelectable != null ? "Llegaste al máximo de sesiones de tu paquete." : `Puedes reservar hasta ${MAX_SESSIONS_PER_BOOKING} sesiones a la vez.`}
+            </div>
           )}
-        </Paper>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 }

@@ -141,11 +141,14 @@ function TierEditor({
 export default function FidelityTab({
   form,
   isEditing,
+  part,
 }: {
   form: UseFormReturnType<FormValues>;
   isEditing: boolean;
+  /** "program": programa y niveles (Clientes › Fidelidad); "card": solo el diseño de la tarjeta (Marca y web). */
+  part?: "program" | "card";
 }) {
-  const planLimits = useSelector((s: RootState) => (s.organization.organization as any)?.planLimits);
+  const planLimits = useSelector((s: RootState) => s.organization.organization?.planLimits);
   const canUseLoyalty = planLimits?.loyaltyProgram !== false;
   const programEnabled = form.values.showLoyaltyProgram;
   const serviceTiers: Tier[] = form.values.serviceTiers ?? [];
@@ -153,6 +156,17 @@ export default function FidelityTab({
 
   const sortedService = [...serviceTiers].sort((a, b) => a.threshold - b.threshold);
   const sortedReferral = [...referralTiers].sort((a, b) => a.threshold - b.threshold);
+
+  if (part === "card") {
+    return (
+      <SectionCard
+        title="Tarjeta de fidelidad"
+        description="El diseño de la tarjeta virtual que recibe cada cliente. Los niveles y premios se configuran en la pestaña Programa de fidelidad."
+      >
+        <LoyaltyCardDesigner form={form} disabled={!isEditing} />
+      </SectionCard>
+    );
+  }
 
   return (
     <SectionCard
@@ -255,6 +269,7 @@ export default function FidelityTab({
               )}
             </Stack>
 
+            {part !== "program" && (<>
             <Divider />
 
             {/* Diseño de la tarjeta virtual */}
@@ -272,6 +287,7 @@ export default function FidelityTab({
               </Text>
               <LoyaltyCardDesigner form={form} disabled={!isEditing} />
             </Stack>
+            </>)}
           </>
         )}
       </Stack>

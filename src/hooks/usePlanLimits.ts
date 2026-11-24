@@ -35,7 +35,7 @@ export function usePlanLimits() {
 
   // planLimits ya viene en el objeto de organización desde fetchOrganizationConfig
   const planLimits = useSelector(
-    (s: RootState) => (s.organization.organization as any)?.planLimits
+    (s: RootState) => s.organization.organization?.planLimits
   );
   const isAuthenticated = useSelector((s: RootState) => s.auth.isAuthenticated);
 
@@ -55,7 +55,7 @@ export function usePlanLimits() {
 
   const canUse = (feature: PlanFeature): boolean => {
     if (!limits) return true; // si no hay info, no bloqueamos
-    return (limits as any)[feature] !== false;
+    return (limits as Record<string, unknown>)[feature] !== false;
   };
 
   const isAtLimit = (resource: "employees" | "services" | "appointmentsThisMonth"): boolean => {

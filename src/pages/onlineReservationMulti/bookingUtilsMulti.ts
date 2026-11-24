@@ -114,3 +114,13 @@ export async function generateAvailableTimes(): Promise<string[]> {
   console.warn("generateAvailableTimes está deprecado. Usar scheduleService.getAvailableSlotsBatch()");
   return [];
 }
+
+/** ¿Falta elegir profesional en algún servicio que lo exige (agendamiento automático)? */
+export function missingRequiredEmployee(
+  value: { serviceId: string; employeeId: string | null }[],
+  employees: Employee[],
+  employeeRequired: boolean
+): boolean {
+  if (!employeeRequired) return false;
+  return value.some((s) => !s.employeeId && !serviceHasBackupEmployee(employees, s.serviceId));
+}

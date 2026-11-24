@@ -1,13 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  Switch,
-  Text,
-  Flex,
-  Loader,
-  Notification as Alert,
-  List,
-  Button,
-} from "@mantine/core";
+import { Switch, Text, Flex, Loader, List, Button } from "@mantine/core";
+import { pushState, type PushState } from "./notificationsModel";
 import { IconInfoCircle } from "@tabler/icons-react";
 import {
   createSubscription,
@@ -190,55 +183,74 @@ const NotificationToggle = ({
 
   const hasNotificationAPI =
     typeof window !== "undefined" && "Notification" in window;
+  const permission = (hasNotificationAPI ? window.Notification.permission : "unsupported") as
+    | "granted"
+    | "denied"
+    | "default"
+    | "unsupported";
+  const { isIOS } = getBrowserInfo();
+  const standalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true);
+  const state = pushState({
+    subscribed: isEnabled,
+    permission,
+    isIOS,
+    standalone,
+    hasPushManager: typeof window !== "undefined" && "PushManager" in window,
+  });
+  const [showHelp, setShowHelp] = useState(false);
 
-  const permission = hasNotificationAPI
-    ? window.Notification.permission
-    : "unsupported";
+  const stateText: Record<PushState, string> = {
+    on: "Te avisamos aunque no tengas el panel abierto.",
+    off: "Actívalos para enterarte de reservas y pagos al instante.",
+    blocked: "Tu navegador los bloqueó. Desbloquéalos para poder activarlos.",
+    ios_install: "En iPhone, primero instala el panel como app desde Safari.",
+    unsupported: "Este navegador no permite avisos.",
+  };
 
   return (
-    <Flex direction="column" gap="xs">
-      <Flex align="center" gap="md">
+    <div className="ag-stack" style={{ gap: 8 }}>
+      <div className="ag-row" style={{ gap: 12, alignItems: "center" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b style={{ display: "block", fontSize: 14 }}>Avisos en este dispositivo</b>
+          <span className="ag-subtle">{stateText[state]}</span>
+        </div>
+        {isLoading && <Loader size="xs" />}
         <Switch
+          aria-label="Avisos en este dispositivo"
           checked={isEnabled}
           onChange={handleToggle}
-          disabled={isLoading}
-          size="xs"
+          disabled={isLoading || state === "blocked" || state === "ios_install" || state === "unsupported"}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         />
-        <Text size="xs">
-          {isEnabled ? "Noti. activadas" : "Noti. desactivadas"}
-        </Text>
-        {isLoading && <Loader size="sm" />}
-      </Flex>
+      </div>
 
-      {/* Mostrar error si ocurre */}
-      {error && (
-        <Alert
-          color="red"
-          title="Error"
-          onClose={() => setError(null)}
-          withCloseButton
-          mt="xs"
-        >
-          {error}
-          {permission === "denied" && (
-            <Button
-              size="xs"
-              variant="light"
-              mt="xs"
-              onClick={() => setShowInstructions(true)}
-              leftSection={<IconInfoCircle size={16} />}
-            >
-              Ver instrucciones
-            </Button>
+      {(state === "blocked" || state === "ios_install") && (
+        <div>
+          <Button size="xs" variant="subtle" px={0} leftSection={<IconInfoCircle size={14} />} onClick={() => setShowHelp((v) => !v)}>
+            {showHelp ? "Ocultar instrucciones" : state === "ios_install" ? "Cómo instalarlo" : "Cómo desbloquearlos"}
+          </Button>
+          {showHelp && (
+            <div className="ag-card" style={{ padding: 12, marginTop: 6 }}>
+              <InstructionsContent />
+            </div>
           )}
-        </Alert>
+        </div>
       )}
 
-      {/* Modal con instrucciones específicas según el navegador */}
-      {/* Este Modal está renderizado en NotificationsMenu para evitar conflictos con el portal del Menu */}
-    </Flex>
+      {error && (
+        <div className="ag-alert ag-alert--danger" style={{ padding: "8px 12px" }}>
+          <IconInfoCircle size={18} />
+          <div style={{ flex: 1, fontSize: 13 }}>{error}</div>
+          <Button size="compact-xs" variant="subtle" color="gray" onClick={() => setError(null)}>
+            Cerrar
+          </Button>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -299,7 +311,7 @@ export const InstructionsContent = () => {
         </Text>
         <List size="sm" spacing="xs">
           <List.Item>
-            Haz clic en el ícono de candado 🔒 o información (i) en la barra de
+            Haz clic en el ícono de candado o de información (i) en la barra de
             direcciones
           </List.Item>
           <List.Item>Busca "Notificaciones"</List.Item>
@@ -322,7 +334,7 @@ export const InstructionsContent = () => {
         </Text>
         <List size="sm" spacing="xs">
           <List.Item>
-            Haz clic en el ícono de candado 🔒 en la barra de direcciones
+            Haz clic en el ícono de candado en la barra de direcciones
           </List.Item>
           <List.Item>
             Haz clic en la flecha {">"} junto a "Bloqueado temporalmente"

@@ -1,11 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { Alert, Button, Container, Loader, Paper, Stack, Text, Title } from "@mantine/core";
-import { IconAlertCircle } from "@tabler/icons-react";
-import { AGENDITAPP_SUPPORT_WA_URL, ingresarTarget } from "../../utils/panelAccess";
+import { Button } from "@mantine/core";
+import { IconBrandWhatsapp, IconLinkOff } from "@tabler/icons-react";
+import AuthCard from "../../components/auth/AuthCard";
+import { IndeterminateBar, StatusIcon } from "../../components/auth/AccessStatus";
+import { AGENDITAPP_SUPPORT_WA_URL, RECOVER_ACCESS_PATH, ingresarTarget } from "../../utils/panelAccess";
 
 /**
- * /ingresar/:slug — puente al login del panel de un negocio.
+ * /ingresar/:slug — puente al login del panel de un negocio (rediseño,
+ * ErroresYAcceso).
  *
  * Meta solo deja URLs dinámicas con la parte variable al final de un dominio
  * fijo, así que el botón "Ir a mi panel" del WhatsApp de bienvenida
@@ -22,29 +25,32 @@ export default function IngresarPage() {
 
   if (target) {
     return (
-      <Container size={400} my={80}>
-        <Stack align="center" gap="md">
-          <Loader size="lg" />
-          <Text c="dimmed" size="sm">Abriendo tu panel…</Text>
-        </Stack>
-      </Container>
+      <AuthCard platform title="Entrando a tu panel…" subtitle="Un momento, te llevamos a la página de ingreso de tu negocio.">
+        <IndeterminateBar />
+      </AuthCard>
     );
   }
 
   return (
-    <Container size={420} my={80}>
-      <Paper withBorder shadow="md" p={30} radius="md">
-        <Stack gap="md">
-          <Title order={3}>No encontramos ese enlace</Title>
-          <Alert icon={<IconAlertCircle size={16} />} color="yellow">
-            El enlace para entrar a tu panel parece incompleto. Busca el correo o el WhatsApp de
-            bienvenida de AgenditApp, o escríbenos y te ayudamos a entrar.
-          </Alert>
-          <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth>
-            Escribir a soporte por WhatsApp
-          </Button>
-        </Stack>
-      </Paper>
-    </Container>
+    <AuthCard platform>
+      <StatusIcon tone="warning">
+        <IconLinkOff size={26} />
+      </StatusIcon>
+      <div>
+        <h1>El enlace está incompleto</h1>
+        <p className="ag-muted" style={{ margin: "4px 0 0" }}>
+          Busca el correo o el WhatsApp de bienvenida de AgenditApp y ábrelo desde ahí. Si no lo encuentras, recupera tu acceso con tu correo o tu
+          celular.
+        </p>
+      </div>
+      <div className="ag-stack" style={{ gap: 8 }}>
+        <Button component="a" href={RECOVER_ACCESS_PATH} fullWidth color="var(--platform)">
+          Recuperar acceso
+        </Button>
+        <Button component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" fullWidth variant="default" leftSection={<IconBrandWhatsapp size={16} />}>
+          Escribir a soporte
+        </Button>
+      </div>
+    </AuthCard>
   );
 }

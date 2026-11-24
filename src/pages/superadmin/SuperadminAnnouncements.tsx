@@ -1,38 +1,10 @@
+// Anuncios del sistema (rediseño, SuperadminAnuncios): tabla con conteo de
+// cambios por tipo, vistas que muestran qué organizaciones lo vieron,
+// Publicar u Ocultar con texto y edición en panel lateral.
 import { useEffect, useState } from "react";
-import {
-  Container,
-  Title,
-  Table,
-  Badge,
-  Group,
-  Button,
-  Text,
-  Stack,
-  ActionIcon,
-  Tooltip,
-  Modal,
-  TextInput,
-  Textarea,
-  Select,
-  Switch,
-  Divider,
-  Paper,
-  Loader,
-  HoverCard,
-  ScrollArea,
-} from "@mantine/core";
+import { ActionIcon, Button, Drawer, Modal, Popover, ScrollArea, Select, Skeleton, Switch, TextInput, Textarea } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import {
-  IconPlus,
-  IconEdit,
-  IconTrash,
-  IconRefresh,
-  IconCheck,
-  IconX,
-  IconEye,
-  IconEyeOff,
-} from "@tabler/icons-react";
-import SuperadminNav from "./SuperadminNav";
+import { IconEdit, IconPlus, IconRefresh, IconTrash, IconX } from "@tabler/icons-react";
 import {
   adminGetAnnouncements,
   adminCreateAnnouncement,
@@ -72,12 +44,6 @@ const TYPE_OPTIONS = [
   { value: "improvement", label: "Mejora" },
   { value: "fix", label: "Corrección" },
 ];
-
-const TYPE_COLOR: Record<UpdateType, string> = {
-  new: "teal",
-  improvement: "blue",
-  fix: "orange",
-};
 
 export default function SuperadminAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -142,7 +108,7 @@ export default function SuperadminAnnouncements() {
   // ── Guardar ─────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!form.version.trim() || !form.isoDate.trim() || !form.date.trim()) {
-      notifications.show({ title: "Campos requeridos", message: "Versión, fecha ISO y fecha display son obligatorias", color: "orange" });
+      notifications.show({ title: "Campos requeridos", message: "La versión, la fecha visible y la fecha para ordenar son obligatorias.", color: "orange" });
       return;
     }
     setSaving(true);
@@ -194,269 +160,220 @@ export default function SuperadminAnnouncements() {
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const rows = announcements.map((a) => (
-    <Table.Tr key={a._id}>
-      <Table.Td>
-        <Text fw={600} size="sm">v{a.version}</Text>
-      </Table.Td>
-      <Table.Td>
-        <Stack gap={2}>
-          <Text size="sm">{a.date}</Text>
-          <Text size="xs" c="dimmed" ff="monospace">{a.isoDate}</Text>
-        </Stack>
-      </Table.Td>
-      <Table.Td>
-        <Text size="xs" c="dimmed">{a.items.length} item{a.items.length !== 1 ? "s" : ""}</Text>
-        <Group gap={4} mt={4}>
-          {a.items.slice(0, 3).map((item, i) => (
-            <Badge key={i} size="xs" color={TYPE_COLOR[item.type]} variant="light">
-              {item.type}
-            </Badge>
-          ))}
-          {a.items.length > 3 && <Text size="xs" c="dimmed">+{a.items.length - 3}</Text>}
-        </Group>
-      </Table.Td>
-      <Table.Td>
-        {a.viewCount && a.viewCount > 0 && a.viewers?.length ? (
-          <HoverCard width={280} shadow="md" position="left" withArrow openDelay={150}>
-            <HoverCard.Target>
-              <Text
-                size="sm"
-                fw={500}
-                style={{ cursor: "pointer", textDecoration: "underline dotted" }}
-              >
-                {a.viewCount}
-              </Text>
-            </HoverCard.Target>
-            <HoverCard.Dropdown>
-              <Text size="xs" fw={700} mb={6}>
-                Organizaciones que lo vieron
-              </Text>
-              <ScrollArea.Autosize mah={220}>
-                <Stack gap={2} pr="xs">
-                  {a.viewers.map((v) => (
-                    <Text key={v._id} size="xs">
-                      {v.name}
-                    </Text>
-                  ))}
-                </Stack>
-              </ScrollArea.Autosize>
-            </HoverCard.Dropdown>
-          </HoverCard>
-        ) : (
-          <Text size="sm" fw={500}>{a.viewCount ?? 0}</Text>
-        )}
-        <Text size="xs" c="dimmed">organizaciones</Text>
-      </Table.Td>
-      <Table.Td>
-        <Badge color={a.published ? "green" : "gray"} variant="dot" size="sm">
-          {a.published ? "Publicado" : "Borrador"}
-        </Badge>
-      </Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <Tooltip label={a.published ? "Ocultar" : "Publicar"}>
-            <ActionIcon
-              variant="light"
-              color={a.published ? "gray" : "green"}
-              onClick={() => handleTogglePublish(a)}
-            >
-              {a.published ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Editar">
-            <ActionIcon variant="light" color="blue" onClick={() => openEdit(a)}>
-              <IconEdit size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Eliminar">
-            <ActionIcon variant="light" color="red" onClick={() => setDeleteTarget(a)}>
-              <IconTrash size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ));
+  const mono = { fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)" } as const;
+  const changeSummary = (a: Announcement) => {
+    const n = (t: UpdateType) => a.items.filter((i) => i.type === t).length;
+    const parts = [
+      [n("new"), "nuevo", "nuevos"],
+      [n("improvement"), "mejora", "mejoras"],
+      [n("fix"), "corrección", "correcciones"],
+    ]
+      .filter(([c]) => (c as number) > 0)
+      .map(([c, one, many]) => `${c} ${c === 1 ? one : many}`);
+    return parts.length ? parts.join(" · ") : "Sin cambios";
+  };
 
   return (
-    <Container size="xl" py="xl">
-      <Stack gap="lg">
-        {/* Navegación superadmin (compartida) */}
-        <SuperadminNav />
-
-        {/* Header */}
-        <Group justify="space-between">
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px 48px" }}>
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div className="ag-row" style={{ justifyContent: "space-between", gap: 12, alignItems: "flex-end" }}>
           <div>
-            <Title order={2}>Anuncios del sistema</Title>
-            <Text c="dimmed" size="sm">
-              Crea y publica novedades visibles para todos los administradores de la plataforma
-            </Text>
+            <h1 style={{ margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" }}>Anuncios</h1>
+            <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
+              Las novedades que ven los administradores de todos los negocios.
+            </div>
           </div>
-          <Group gap="xs">
-            <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={fetchAll}>
+          <div className="ag-row" style={{ gap: 8 }}>
+            <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={fetchAll} loading={loading}>
               Actualizar
             </Button>
-            <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+            <Button color="var(--platform)" leftSection={<IconPlus size={16} />} onClick={openCreate}>
               Nuevo anuncio
             </Button>
-          </Group>
-        </Group>
+          </div>
+        </div>
 
-        {/* Tabla */}
-        {loading ? (
-          <Stack align="center" py="xl">
-            <Loader />
-            <Text c="dimmed">Cargando anuncios...</Text>
-          </Stack>
-        ) : (
-          <Paper withBorder radius="md">
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Versión</Table.Th>
-                  <Table.Th>Fecha</Table.Th>
-                  <Table.Th>Items</Table.Th>
-                  <Table.Th>Vistas</Table.Th>
-                  <Table.Th>Estado</Table.Th>
-                  <Table.Th>Acciones</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {rows.length > 0 ? rows : (
-                  <Table.Tr>
-                    <Table.Td colSpan={5}>
-                      <Text ta="center" c="dimmed" py="lg">
-                        No hay anuncios. Crea el primero.
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-        )}
-      </Stack>
+        <div className="ag-card" style={{ overflowX: "auto" }}>
+          <table className="ag-table" style={{ minWidth: 820 }}>
+            <thead>
+              <tr>
+                <th>Versión</th>
+                <th>Fecha visible</th>
+                <th>Cambios</th>
+                <th style={{ textAlign: "right" }}>Vistas</th>
+                <th>Estado</th>
+                <th aria-label="Acciones" />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && announcements.length === 0 ? (
+                [0, 1, 2].map((i) => (
+                  <tr key={i}>
+                    <td colSpan={6}>
+                      <Skeleton height={18} />
+                    </td>
+                  </tr>
+                ))
+              ) : announcements.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="ag-muted" style={{ textAlign: "center", padding: "32px 16px" }}>
+                    Aún no hay anuncios. Crea el primero con «Nuevo anuncio».
+                  </td>
+                </tr>
+              ) : (
+                announcements.map((a) => (
+                  <tr key={a._id}>
+                    <td style={{ fontWeight: 600 }}>v{a.version}</td>
+                    <td>
+                      <div>{a.date}</div>
+                      <div className="ag-subtle" style={mono}>{a.isoDate}</div>
+                    </td>
+                    <td className="ag-muted">{changeSummary(a)}</td>
+                    <td className="ag-num" style={{ textAlign: "right" }}>
+                      {a.viewers?.length ? (
+                        <Popover width={280} position="bottom-end" withinPortal shadow="md">
+                          <Popover.Target>
+                            <button type="button" className="ag-link ag-num" style={{ border: 0, background: "none", padding: 0, cursor: "pointer", fontSize: 14 }} aria-label={`Ver las ${a.viewCount ?? 0} organizaciones que vieron v${a.version}`}>
+                              {a.viewCount ?? a.viewers.length}
+                            </button>
+                          </Popover.Target>
+                          <Popover.Dropdown>
+                            <b style={{ fontSize: 13, display: "block", marginBottom: 6 }}>Organizaciones que lo vieron</b>
+                            <ScrollArea.Autosize mah={240}>
+                              <div className="ag-stack" style={{ gap: 2, paddingRight: 8 }}>
+                                {a.viewers.map((v) => (
+                                  <span key={v._id} style={{ fontSize: 13 }}>
+                                    {v.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </ScrollArea.Autosize>
+                          </Popover.Dropdown>
+                        </Popover>
+                      ) : (
+                        <span className="ag-muted">{a.viewCount ?? 0}</span>
+                      )}
+                    </td>
+                    <td>{a.published ? <span className="ag-badge ag-badge--success">Publicado</span> : <span className="ag-badge">Borrador</span>}</td>
+                    <td>
+                      <div className="ag-row" style={{ gap: 4, justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                        <Button size="xs" variant="default" onClick={() => handleTogglePublish(a)}>
+                          {a.published ? "Ocultar" : "Publicar"}
+                        </Button>
+                        <ActionIcon variant="subtle" color="gray" onClick={() => openEdit(a)} aria-label={`Editar v${a.version}`}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="subtle" color="gray" onClick={() => setDeleteTarget(a)} aria-label={`Eliminar v${a.version}`}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* ── Modal crear / editar ──────────────────────────────────────────── */}
-      <Modal
+      {/* ── Panel crear / editar ─────────────────────────────────────────── */}
+      <Drawer
         opened={modalOpened}
-        onClose={() => setModalOpened(false)}
-        title={<Text fw={700} size="lg">{editing ? `Editar v${editing.version}` : "Nuevo anuncio"}</Text>}
-        size="lg"
-        centered
+        onClose={() => !saving && setModalOpened(false)}
+        position="right"
+        size={560}
+        title={<b style={{ fontSize: 16 }}>{editing ? `Editar v${editing.version}` : "Nuevo anuncio"}</b>}
       >
-        <Stack gap="md">
-          <Group grow>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <TextInput label="Versión" placeholder="2.6" required value={form.version} onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))} />
             <TextInput
-              label="Versión"
-              placeholder="2.6"
-              required
-              value={form.version}
-              onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))}
-            />
-            <Switch
-              label="Publicado"
-              description="Visible para todos los admins"
-              checked={form.published}
-              onChange={(e) => {
-                // Capturar antes del updater diferido: React resetea currentTarget a null.
-                const checked = e.currentTarget.checked;
-                setForm((f) => ({ ...f, published: checked }));
-              }}
-              mt="lg"
-            />
-          </Group>
-
-          <Group grow>
-            <TextInput
-              label="Fecha display"
-              placeholder="5 Jun 2026"
-              description="Texto que verá el usuario"
+              label="Fecha visible"
+              placeholder="5 jun 2026"
+              description="El texto que ve el administrador."
               required
               value={form.date}
               onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
             />
-            <TextInput
-              label="Fecha ISO"
-              placeholder="2026-06-05"
-              description="Formato AAAA-MM-DD (para ordenar)"
-              required
-              value={form.isoDate}
-              onChange={(e) => setForm((f) => ({ ...f, isoDate: e.target.value }))}
-              ff="monospace"
-            />
-          </Group>
+          </div>
+          <TextInput
+            label="Fecha para ordenar"
+            placeholder="2026-06-05"
+            description="Formato AAAA-MM-DD."
+            required
+            value={form.isoDate}
+            onChange={(e) => setForm((f) => ({ ...f, isoDate: e.target.value }))}
+            styles={{ input: mono }}
+          />
+          <Switch
+            label="Publicado"
+            description="Lo ven todos los administradores."
+            checked={form.published}
+            onChange={(e) => {
+              // Capturar antes del updater diferido: React resetea currentTarget a null.
+              const checked = e.currentTarget.checked;
+              setForm((f) => ({ ...f, published: checked }));
+            }}
+          />
 
-          <Divider label="Items del anuncio" />
-
-          <Stack gap="xs">
-            {form.items.map((item, idx) => (
-              <Paper key={idx} withBorder p="sm" radius="sm">
-                <Group gap="xs" align="flex-start" mb="xs">
-                  <Select
-                    data={TYPE_OPTIONS}
-                    value={item.type}
-                    onChange={(v) => updateItem(idx, "type", v ?? "new")}
-                    style={{ width: 130, flexShrink: 0 }}
-                  />
-                  <TextInput
-                    style={{ flex: 1 }}
-                    placeholder="Título del cambio (visible siempre)"
-                    value={item.text}
-                    onChange={(e) => updateItem(idx, "text", e.target.value)}
-                  />
-                  <ActionIcon color="red" variant="light" mt={4} onClick={() => removeItem(idx)}>
-                    <IconX size={16} />
-                  </ActionIcon>
-                </Group>
-                <Textarea
-                  placeholder="Detalle opcional: explica qué se hizo y cómo funciona ahora (aparece al expandir)"
-                  value={item.detail}
-                  onChange={(e) => updateItem(idx, "detail", e.target.value)}
-                  rows={2}
-                  autosize
-                  minRows={2}
-                  maxRows={6}
-                  styles={{ input: { fontSize: 13 } }}
+          <h3 className="ag-h" style={{ margin: "6px 0 0" }}>Cambios</h3>
+          {form.items.length === 0 && <div className="ag-subtle">Agrega al menos un cambio.</div>}
+          {form.items.map((item, idx) => (
+            <div key={idx} className="ag-card" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="ag-row" style={{ gap: 8, flexWrap: "nowrap", alignItems: "flex-start" }}>
+                <Select
+                  aria-label="Tipo de cambio"
+                  data={TYPE_OPTIONS}
+                  value={item.type}
+                  onChange={(v) => updateItem(idx, "type", v ?? "new")}
+                  allowDeselect={false}
+                  style={{ width: 140, flex: "none" }}
                 />
-              </Paper>
-            ))}
-            <Button variant="light" size="xs" leftSection={<IconPlus size={14} />} onClick={addItem}>
-              Agregar item
-            </Button>
-          </Stack>
+                <TextInput style={{ flex: 1 }} aria-label="Título del cambio" placeholder="Título del cambio" value={item.text} onChange={(e) => updateItem(idx, "text", e.target.value)} />
+                <ActionIcon variant="subtle" color="gray" mt={4} onClick={() => removeItem(idx)} aria-label="Quitar este cambio">
+                  <IconX size={16} />
+                </ActionIcon>
+              </div>
+              <Textarea
+                aria-label="Detalle del cambio"
+                placeholder="Detalle opcional: qué se hizo y cómo funciona ahora (se ve al expandir)"
+                value={item.detail}
+                onChange={(e) => updateItem(idx, "detail", e.target.value)}
+                autosize
+                minRows={2}
+                maxRows={6}
+              />
+            </div>
+          ))}
+          <Button variant="default" leftSection={<IconPlus size={14} />} onClick={addItem} style={{ alignSelf: "flex-start" }}>
+            Agregar cambio
+          </Button>
 
-          <Divider />
-          <Group justify="flex-end">
-            <Button variant="light" color="gray" onClick={() => setModalOpened(false)}>
+          <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+            <Button variant="default" onClick={() => setModalOpened(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button leftSection={<IconCheck size={16} />} loading={saving} onClick={handleSave}>
-              {editing ? "Guardar cambios" : "Crear anuncio"}
+            <Button color="var(--platform)" loading={saving} onClick={handleSave}>
+              {editing ? "Guardar anuncio" : "Crear anuncio"}
             </Button>
-          </Group>
-        </Stack>
-      </Modal>
+          </div>
+        </div>
+      </Drawer>
 
-      {/* ── Modal eliminar ────────────────────────────────────────────────── */}
-      <Modal
-        opened={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title={<Text fw={700} c="red">Eliminar anuncio</Text>}
-        size="sm"
-        centered
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            ¿Eliminar el anuncio <strong>v{deleteTarget?.version}</strong>? Esta acción no se puede deshacer.
-          </Text>
-          <Group justify="flex-end">
-            <Button variant="light" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button color="red" loading={deleting} onClick={handleDelete}>Sí, eliminar</Button>
-          </Group>
-        </Stack>
+      {/* ── Eliminar ─────────────────────────────────────────────────────── */}
+      <Modal opened={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title={<b>Eliminar v{deleteTarget?.version}</b>} centered>
+        <div className="ag-stack" style={{ gap: 14 }}>
+          <div className="ag-muted" style={{ fontSize: 14 }}>No se puede deshacer. Los administradores dejan de verlo en Novedades.</div>
+          <div className="ag-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+            <Button variant="default" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button color="red" loading={deleting} onClick={handleDelete}>
+              Sí, eliminar
+            </Button>
+          </div>
+        </div>
       </Modal>
-    </Container>
+    </div>
   );
 }

@@ -1,0 +1,132 @@
+/* AgenditApp — tokens de plataforma (design system: project/tokens.json).
+ * Capa 1: no cambian por negocio. La marca (--brand, --on-brand, --brand-text,
+ * --brand-soft, --brand-accent) la escribe AppWithBranding por
+ * cssVariablesResolver; aquí solo queda el respaldo azul AgenditApp.
+ * Mantine pone data-mantine-color-scheme en <html>. */
+
+:root {
+  /* Superficies y texto */
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #f8f9fa;
+  --surface-hover: #f1f3f5;
+  --line: #e9ecef;
+  --line-strong: #dee2e6;
+  --line-control: #868e96;
+  --ink: #1a1b1e;
+  --ink-muted: #5c5f66;
+  --ink-subtle: #6b7178;
+  --ink-inverse: #ffffff;
+
+  /* Marca (respaldo; la reemplaza el negocio) y plataforma */
+  --brand: #1c3461;
+  --on-brand: #ffffff;
+  --brand-text: #1c3461;
+  --brand-soft: #e8ecf3;
+  --brand-accent: #1c3461;
+  --platform: #1c3461;
+
+  /* Estados */
+  --success: #237032;
+  --success-soft: #ebfbee;
+  --warning: #9c5a00;
+  --warning-soft: #fff4e6;
+  --danger: #c92a2a;
+  --danger-soft: #fff5f5;
+  --info: #1864ab;
+  --info-soft: #e7f5ff;
+
+  /* Profesionales */
+  --pro-1: #1c7ed6;
+  --pro-2: #d6336c;
+  --pro-3: #0c8599;
+  --pro-4: #e8590c;
+  --pro-5: #7048e8;
+  --pro-6: #5c940d;
+  --pro-7: #ae3ec9;
+  --pro-8: #868e96;
+
+  --focus: #1971c2;
+  --scrim: rgba(12, 13, 16, 0.48);
+
+  /* Tipografía (la familia la fija el negocio en el tema de Mantine) */
+  --font-sans: var(--mantine-font-family, "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Espacios */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* Radios */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 32px;
+  --radius-full: 999px;
+
+  /* Sombras */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.04);
+
+  /* Tamaños */
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+  --header-h: 60px;
+  --sidebar-w: 264px;
+  --tabbar-h: 60px;
+  --content-max: 1240px;
+  --form-max: 560px;
+}
+
+:root[data-mantine-color-scheme="dark"] {
+  --surface: #0c0d10;
+  --surface-raised: #14161a;
+  --surface-muted: #101216;
+  --surface-hover: #1b1e23;
+  --line: #25282e;
+  --line-strong: #2d3036;
+  --line-control: #6b7079;
+  --ink: #f1f3f5;
+  --ink-muted: #adb5bd;
+  --ink-subtle: #868e96;
+  --ink-inverse: #0c0d10;
+
+  --brand: #9db4e0;
+  --on-brand: #0c0d10;
+  --brand-text: #9db4e0;
+  --brand-soft: #1e2635;
+  --brand-accent: #9db4e0;
+  --platform: #9db4e0;
+
+  --success: #69db7c;
+  --success-soft: #14261a;
+  --warning: #ffc078;
+  --warning-soft: #2b2114;
+  --danger: #ff8787;
+  --danger-soft: #2e1719;
+  --info: #74c0fc;
+  --info-soft: #13212e;
+
+  --pro-1: #4dabf7;
+  --pro-2: #f783ac;
+  --pro-3: #3bc9db;
+  --pro-4: #ff922b;
+  --pro-5: #9775fa;
+  --pro-6: #94d82d;
+  --pro-7: #da77f2;
+  --pro-8: #adb5bd;
+
+  --focus: #74c0fc;
+  --scrim: rgba(0, 0, 0, 0.64);
+}

@@ -79,6 +79,7 @@ import SeriesPreview from "../../../../components/customCalendar/components/Seri
 import CustomDatesSelector from "../../../../components/customCalendar/components/CustomDatesSelector";
 import {
   RecurrencePattern,
+  type AppointmentMove,
   SeriesPreview as SeriesPreviewType,
   createAppointmentSeries,
 } from "../../../../services/appointmentService";
@@ -262,6 +263,8 @@ interface AppointmentModalProps {
   opened: boolean;
   onClose: () => void;
   appointment: Appointment | null;
+  /** Cambio propuesto al arrastrar la cita: se precarga sobre la cita original. */
+  move?: AppointmentMove | null;
   newAppointment: Partial<CreateAppointmentPayload>;
   setNewAppointment: React.Dispatch<
     React.SetStateAction<Partial<CreateAppointmentPayload>>
@@ -287,6 +290,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   opened,
   onClose,
   appointment,
+  move,
   newAppointment,
   setNewAppointment,
   services,
@@ -752,8 +756,10 @@ ${clientServices}`;
     if (appointment) {
       // Parse dates in organization timezone and create local Date with same hour values
       // This prevents TimeSelector from showing wrong time due to browser timezone conversion
-      const startParsed = dayjs.tz(appointment.startDate, timezone);
-      const endParsed = dayjs.tz(appointment.endDate, timezone);
+      // Si viene de arrastrar, el formulario arranca con la hora y el profesional donde se soltó
+      // (antes este efecto lo pisaba con la hora original y el modal no mostraba el cambio).
+      const startParsed = dayjs.tz(move?.startDate ?? appointment.startDate, timezone);
+      const endParsed = dayjs.tz(move?.endDate ?? appointment.endDate, timezone);
 
       const startDate = new Date(
         startParsed.year(),
@@ -775,7 +781,7 @@ ${clientServices}`;
         ...appointment,
         startDate,
         endDate,
-        employee: appointment?.employee || newAppointment.employee,
+        employee: move?.employee ?? appointment?.employee ?? newAppointment.employee,
         services: appointment.service ? [appointment.service] : [],
         client: appointment.client,
       });
@@ -788,7 +794,7 @@ ${clientServices}`;
         setSearchedClients((prev) => [appointment.client, ...prev]);
       }
     }
-  }, [appointment, setNewAppointment]);
+  }, [appointment, move, setNewAppointment]);
 
   useEffect(() => {
     // MODO CREACIÓN: recalcular endDate basado en duración de servicios
@@ -2186,6 +2192,26 @@ ${clientServices}`;
 
   const actionButtons = (
     <>
+          {isRescheduling && appointment && newAppointment.startDate && (() => {
+            // Resumen del cambio: «Martes 20 nov, de 10:00 a. m. a 11:00 a. m.» y el profesional nuevo
+            const fmt = timeFormat === "24h" ? "HH:mm" : "h:mm A";
+            const label = (d: Date | string) => {
+              const t = formatInTimezone(d, timezone, `ddd D MMM, ${fmt}`);
+              return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\s?AM\b/, " a. m.").replace(/\s?PM\b/, " p. m.");
+            };
+            const newEmp = newAppointment.employee as Employee | undefined;
+            const oldEmpId = String((appointment.employee as Employee | undefined)?._id ?? appointment.employee);
+            const empChanged = !!newEmp && String(newEmp._id) !== oldEmpId;
+            return (
+              <div className="ag-alert ag-alert--info" style={{ marginTop: 16 }}>
+                <div>
+                  <b style={{ display: "block" }}>Cambio de horario</b>
+                  De {label(appointment.startDate)} a {label(newAppointment.startDate)}
+                  {empChanged && <>{" · "}con {newEmp?.names}</>}
+                </div>
+              </div>
+            );
+          })()}
           {isRescheduling && (
             <Checkbox
               mt="md"

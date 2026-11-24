@@ -27,6 +27,7 @@ import {
 import { openConfirmModal } from "@mantine/modals";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   IconPencil,
@@ -385,7 +386,7 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
         size={isMobile ? "100%" : "md"}
         title={
           <Group gap="sm" wrap="nowrap">
-            <Avatar radius="xl" color="blue">{client.name.charAt(0).toUpperCase()}</Avatar>
+            <Avatar radius="xl" color="gray">{client.name.charAt(0).toUpperCase()}</Avatar>
             <Box style={{ minWidth: 0 }}>
               <Text fw={700} size="sm" truncate>{client.name}</Text>
               <Text size="xs" c="dimmed" truncate>
@@ -472,7 +473,10 @@ const ClientDetailDrawer: React.FC<ClientDetailDrawerProps> = ({
             <Stack gap="md">
               {organization?.showLoyaltyProgram !== false && (
                 <Paper withBorder radius="md" p="md">
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed" mb="sm">Fidelidad</Text>
+                  <Group justify="space-between" mb="sm">
+                    <Text size="xs" fw={700} tt="uppercase" c="dimmed">Fidelidad</Text>
+                    <Link to="/gestionar-clientes?tab=programa" className="ag-link">Ver programa</Link>
+                  </Group>
                   <Stack gap="md">
                     <CompactLoyaltyCard
                       label="Servicios tomados"

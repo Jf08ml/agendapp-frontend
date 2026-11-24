@@ -364,6 +364,7 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
             required
             compact
           />
+          <span className="ag-help">Te enviaremos la confirmación y el recordatorio por WhatsApp.</span>
           <LookupFeedback />
         </Stack>
       )}
@@ -430,6 +431,9 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
             required={phoneCfg.required}
             compact
           />
+        )}
+        {phoneCfg.enabled && identifierField !== "phone" && (
+          <span className="ag-help">Te enviaremos la confirmación y el recordatorio por WhatsApp.</span>
         )}
 
         {/* Correo — solo si está habilitado Y no es el identificador */}

@@ -10,11 +10,18 @@ import {
 } from "../../types/multiBooking";
 import { formatCurrency } from "../../utils/formatCurrency";
 import type { RecurrencePattern, SeriesPreview } from "../../services/appointmentService";
-import { IconCalendarEvent, IconRepeat, IconPackage, IconPhone } from "@tabler/icons-react";
-import { formatPhoneInternational } from "../../utils/phoneUtils";
+import { IconCalendarEvent, IconRepeat, IconPackage } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import { formatTimeFromISO, formatTime } from "../../utils/timeFormatUtils";
+import {
+  formatTimeFromISO as formatTimeFromISOBase,
+  formatTime as formatTimeBase,
+  toSpanishMeridiem,
+} from "../../utils/timeFormatUtils";
+
+// Web pública: «2:00 p. m.» (respeta 12 h / 24 h del negocio)
+const formatTimeFromISO = (iso: string, tf?: string) => toSpanishMeridiem(formatTimeFromISOBase(iso, tf));
+const formatTime = (d: Date | string | null | undefined, tf?: string) => toSpanishMeridiem(formatTimeBase(d, tf));
 
 dayjs.locale("es");
 
@@ -185,18 +192,3 @@ export default function StepMultiServiceSummary({
 }
 
 /** Línea que resalta el teléfono de confirmación para detectar un dígito mal escrito */
-export function ConfirmationPhoneNote({ phone }: { phone?: string }) {
-  if (!phone) return null;
-  return (
-    <Group gap="xs" wrap="nowrap" align="flex-start">
-      <IconPhone size={18} style={{ flexShrink: 0, marginTop: 2 }} />
-      <Text size="sm">
-        Te enviaremos la confirmación al{" "}
-        <Text span fw={800} inherit style={{ whiteSpace: "nowrap" }}>
-          {formatPhoneInternational(phone)}
-        </Text>
-        . Revisa que esté bien escrito.
-      </Text>
-    </Group>
-  );
-}

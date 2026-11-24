@@ -1,11 +1,17 @@
+// /exchange — ingreso automático con un código de un solo uso (tras el
+// registro, la recuperación de acceso o la suplantación del superadmin).
+// Rediseño, ErroresYAcceso: «Entrando a tu panel…» y, si el enlace ya se usó
+// o venció, «Iniciar sesión» y soporte.
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Container, Paper, Title, Text, Loader, Alert, Button, Stack } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { Button } from "@mantine/core";
+import { IconBrandWhatsapp, IconClock } from "@tabler/icons-react";
 import { useDispatch } from "react-redux";
 import { exchangeCodeForToken } from "../../services/registrationService";
 import { loginSuccess } from "../../features/auth/sliceAuth";
 import { AGENDITAPP_SUPPORT_WA_URL } from "../../utils/panelAccess";
+import AuthCard from "../../components/auth/AuthCard";
+import { IndeterminateBar, StatusIcon } from "../../components/auth/AccessStatus";
 
 export default function ExchangePage() {
   const [searchParams] = useSearchParams();
@@ -49,8 +55,7 @@ export default function ExchangePage() {
 
         // En dev, preservar ?slug= para que el axios interceptor envíe X-Dev-Tenant-Slug
         const slug = searchParams.get("slug");
-        const isDev =
-          window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const isDev = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
         if (isDev && slug) {
           navigate(`/gestionar-agenda?slug=${slug}`, { replace: true });
@@ -73,51 +78,35 @@ export default function ExchangePage() {
 
   if (isLoading) {
     return (
-      <Container size={400} my={80}>
-        <Paper withBorder shadow="md" p={30} radius="md">
-          <Stack align="center" gap="md">
-            <Loader size="lg" />
-            <Title order={3}>Configurando tu cuenta...</Title>
-            <Text c="dimmed" size="sm">
-              Por favor espera un momento
-            </Text>
-          </Stack>
-        </Paper>
-      </Container>
+      <AuthCard platform title="Entrando a tu panel…" subtitle="Estamos preparando tu sesión. Un momento.">
+        <IndeterminateBar />
+      </AuthCard>
     );
   }
 
   return (
-    <Container size={420} my={80}>
-      <Paper withBorder shadow="md" p={30} radius="md">
-        <Stack gap="md">
-          <Title order={3}>Inicia sesión para entrar a tu panel</Title>
-          <Alert icon={<IconInfoCircle size={16} />} color="blue">
-            Tu cuenta ya está creada. Este enlace de acceso automático ya se usó o venció, así que
-            entra con el <strong>correo y la contraseña</strong> con los que te registraste.
-          </Alert>
-          <Text size="sm" c="dimmed">
-            El enlace de tu panel es{" "}
-            <Text span fw={700} c="dark" style={{ wordBreak: "break-all" }}>
-              {`${window.location.origin}/login-admin`}
-            </Text>
-            . También te lo enviamos a tu correo y a tu WhatsApp.
-          </Text>
-          <Button fullWidth onClick={() => navigate("/login-admin", { replace: true })}>
-            Iniciar sesión
-          </Button>
-          <Button
-            variant="subtle"
-            fullWidth
-            component="a"
-            href={AGENDITAPP_SUPPORT_WA_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            ¿No puedes entrar? Escríbenos por WhatsApp
-          </Button>
-        </Stack>
-      </Paper>
-    </Container>
+    <AuthCard platform maxWidth={420}>
+      <StatusIcon tone="info">
+        <IconClock size={26} />
+      </StatusIcon>
+      <div>
+        <h1>Este enlace ya se usó o venció</h1>
+        <p className="ag-muted" style={{ margin: "4px 0 0" }}>
+          Tu cuenta ya está creada. Entra con el correo y la contraseña con los que te registraste.
+        </p>
+      </div>
+      <div className="ag-card" style={{ padding: "10px 12px", background: "var(--surface-muted)", fontSize: 14 }}>
+        <div className="ag-subtle">El enlace de tu panel</div>
+        <b style={{ wordBreak: "break-all" }}>{`${window.location.origin}/login-admin`}</b>
+      </div>
+      <div className="ag-stack" style={{ gap: 8 }}>
+        <Button fullWidth color="var(--platform)" onClick={() => navigate("/login-admin", { replace: true })}>
+          Iniciar sesión
+        </Button>
+        <Button fullWidth variant="default" component="a" href={AGENDITAPP_SUPPORT_WA_URL} target="_blank" rel="noopener noreferrer" leftSection={<IconBrandWhatsapp size={16} />}>
+          ¿No puedes entrar? Escríbenos
+        </Button>
+      </div>
+    </AuthCard>
   );
 }

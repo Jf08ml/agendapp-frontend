@@ -50,7 +50,9 @@ const QUICK_ACTIONS = [
 
 export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStartDone }: ChatPanelProps) {
   const org = useSelector((s: RootState) => s.organization.organization);
-  const color = org?.branding?.primaryColor || "#1C3461";
+  // Marca del negocio por tokens (AppWithBranding); texto encima: --on-brand.
+  const color = "var(--brand)";
+  const onColor = "var(--on-brand)";
   const agentName = org?.aiAssistantName || "Roxi";
 
   const { messages, loading, error, send, reset, sessionId } = useChatbot({ onInvalidate, autoStart, onAutoStartDone, agentName });
@@ -123,19 +125,19 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
           <Flex align="center" gap="sm">
             <ThemeIcon
               size={40} radius="xl"
-              style={{ background: "rgba(255,255,255,0.18)", flexShrink: 0 }}
+              style={{ background: "color-mix(in srgb, var(--on-brand) 18%, transparent)", flexShrink: 0 }}
             >
-              <IconRobot size={22} color="white" />
+              <IconRobot size={22} color={onColor} />
             </ThemeIcon>
             <Box>
               <Flex align="center" gap={6}>
-                <Text fw={700} c="white" size="md" lh={1.2}>{agentName}</Text>
+                <Text fw={700} c={onColor} size="md" lh={1.2}>{agentName}</Text>
                 <Badge size="xs" color="yellow" variant="light"
                   style={{ textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   Beta
                 </Badge>
               </Flex>
-              <Text c="white" size="xs" style={{ opacity: 0.7, lineHeight: 1.3 }}>
+              <Text c={onColor} size="xs" style={{ opacity: 0.7, lineHeight: 1.3 }}>
                 Asistente de administración
               </Text>
             </Box>
@@ -144,7 +146,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
           <Flex gap={4} align="center">
             <Tooltip label="Nueva conversación" withArrow position="bottom">
               <ActionIcon
-                variant="subtle" color="white"
+                variant="subtle" color="white" c={onColor}
                 onClick={reset}
                 disabled={messages.length <= 1 || loading}
                 aria-label="Nueva conversación"
@@ -153,7 +155,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
               </ActionIcon>
             </Tooltip>
             <ActionIcon
-              variant="subtle" color="white"
+              variant="subtle" color="white" c={onColor}
               onClick={onClose}
               aria-label="Cerrar"
             >
@@ -289,7 +291,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                       wordBreak: "break-word",
                     }}
                   >
-                    <Text size="sm" c="white" style={{ whiteSpace: "pre-wrap" }}>
+                    <Text size="sm" c={onColor} style={{ whiteSpace: "pre-wrap" }}>
                       {msg.content}
                     </Text>
                   </Paper>
@@ -307,7 +309,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                     size={34} radius="xl"
                     style={{ background: color, flexShrink: 0, marginTop: 2 }}
                   >
-                    <IconRobot size={18} color="white" />
+                    <IconRobot size={18} color={onColor} />
                   </ThemeIcon>
                   <Paper
                     px="md" py="sm"
@@ -346,7 +348,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                   key={messages.length}
                   suggestions={lastMessage.widget.suggestions}
                   currency={lastMessage.widget.currency}
-                  color={color}
+                  color="brand"
                   disabled={loading}
                   onSubmit={send}
                 />
@@ -360,7 +362,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                   size={34} radius="xl"
                   style={{ background: color, flexShrink: 0, marginTop: 2 }}
                 >
-                  <IconRobot size={18} color="white" />
+                  <IconRobot size={18} color={onColor} />
                 </ThemeIcon>
                 <Paper
                   px="md" py="sm" shadow="xs"
@@ -459,7 +461,7 @@ export default function ChatPanel({ onClose, onInvalidate, autoStart, onAutoStar
                   flexShrink: 0,
                 }}
               >
-                <IconSend size={16} color={input.trim() && !loading ? "white" : "var(--mantine-color-gray-5)"} />
+                <IconSend size={16} color={input.trim() && !loading ? onColor : "var(--mantine-color-gray-5)"} />
               </ActionIcon>
             </Flex>
           </Paper>

@@ -1,11 +1,11 @@
-import { Card, Divider, Group, Text, ThemeIcon, Title } from "@mantine/core";
+// Sección de una página de Ajustes (rediseño, SettingsLayout): tarjeta ag-card
+// con título, ayuda y contenido. `icon` / `iconColor` se aceptan por
+// compatibilidad, pero el título va sin ícono de color (diseño neutro).
 import React from "react";
 
 export default function SectionCard({
   title,
   description,
-  icon,
-  iconColor = "blue",
   children,
 }: {
   title: string;
@@ -15,24 +15,16 @@ export default function SectionCard({
   children?: React.ReactNode;
 }) {
   return (
-    <Card withBorder radius="lg" p="lg">
-      <Group gap="sm" mb="xs" align="flex-start">
-        {icon && (
-          <ThemeIcon size="lg" radius="md" color={iconColor} variant="light">
-            {icon}
-          </ThemeIcon>
+    <section className="ag-card" style={{ padding: "var(--space-5)" }}>
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <h2 style={{ margin: 0, font: "600 17px/24px var(--mantine-font-family)" }}>{title}</h2>
+        {description && (
+          <div className="ag-muted" style={{ fontSize: 14, lineHeight: "20px", marginTop: 2 }}>
+            {description}
+          </div>
         )}
-        <div style={{ flex: 1 }}>
-          <Title order={4}>{title}</Title>
-          {description && (
-            <Text c="dimmed" size="sm" mt={2}>
-              {description}
-            </Text>
-          )}
-        </div>
-      </Group>
-      <Divider mb="md" />
+      </div>
       {children}
-    </Card>
+    </section>
   );
 }

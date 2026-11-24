@@ -1,22 +1,8 @@
+// Mis solicitudes (rediseño, NovedadesHistorial): ideas de mejora del negocio con
+// su estado. «Retirar solicitud» va en el menú «⋯».
 import { useEffect, useState } from "react";
-import {
-  Box,
-  Text,
-  Stack,
-  Paper,
-  Badge,
-  Group,
-  Textarea,
-  Button,
-  Loader,
-  Alert,
-  Center,
-  ActionIcon,
-  Tooltip,
-  UnstyledButton,
-  Collapse,
-} from "@mantine/core";
-import { IconAlertCircle, IconSend, IconX, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { ActionIcon, Button, Collapse, Menu, Skeleton, Text, Textarea, UnstyledButton } from "@mantine/core";
+import { IconChevronDown, IconChevronUp, IconDots, IconInfoCircle, IconSend, IconX } from "@tabler/icons-react";
 import { showNotification } from "@mantine/notifications";
 import { openConfirmModal } from "@mantine/modals";
 import {
@@ -27,73 +13,56 @@ import {
   type FeatureRequestStatus,
 } from "../../../services/featureRequestService";
 
-const STATUS_CONFIG: Record<FeatureRequestStatus, { label: string; color: string }> = {
-  pending: { label: "Pendiente", color: "gray" },
-  under_review: { label: "En revisión", color: "blue" },
-  planned: { label: "Planeada", color: "violet" },
-  done: { label: "Implementada", color: "teal" },
-  declined: { label: "No planeada", color: "red" },
+const STATUS_CONFIG: Record<FeatureRequestStatus, { label: string; tone: string }> = {
+  pending: { label: "Pendiente", tone: "" },
+  under_review: { label: "En revisión", tone: "ag-badge--info" },
+  planned: { label: "Planeada", tone: "ag-badge--brand" },
+  done: { label: "Implementada", tone: "ag-badge--success" },
+  declined: { label: "No planeada", tone: "ag-badge--danger" },
 };
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" });
+const formatDate = (iso: string) => new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
 
-function RequestCard({
-  request,
-  onClose,
-  closing,
-}: {
-  request: FeatureRequest;
-  onClose?: (id: string) => void;
-  closing: boolean;
-}) {
+function RequestCard({ request, onClose, closing }: { request: FeatureRequest; onClose?: (id: string) => void; closing: boolean }) {
   const cfg = STATUS_CONFIG[request.status];
   return (
-    <Paper withBorder radius="md" p="sm" opacity={request.closedByOrg ? 0.6 : 1}>
-      <Group justify="space-between" align="flex-start" wrap="nowrap">
-        <Box style={{ flex: 1, minWidth: 0 }}>
-          <Text size="sm" td={request.closedByOrg ? "line-through" : undefined}>
-            {request.text}
-          </Text>
-          <Text size="xs" c="dimmed" mt={4}>
+    <div className="ag-card" style={{ padding: "14px 16px", opacity: request.closedByOrg ? 0.6 : 1 }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, lineHeight: "20px", textDecoration: request.closedByOrg ? "line-through" : undefined }}>{request.text}</div>
+          <div className="ag-subtle" style={{ marginTop: 4 }}>
             {formatDate(request.createdAt)}
-          </Text>
+            {request.closedByOrg ? " · Retirada" : ""}
+          </div>
           {request.adminReply && (
-            <Box
-              mt="xs"
-              p="sm"
-              style={{
-                borderLeft: "2px solid var(--mantine-color-violet-3)",
-                borderRadius: "0 4px 4px 0",
-                backgroundColor: "var(--mantine-color-violet-0)",
-              }}
+            <div
+              className="ag-muted"
+              style={{ marginTop: 10, padding: "10px 12px", borderLeft: "2px solid var(--line-strong)", background: "var(--surface-muted)", fontSize: 13 }}
             >
-              <Text size="sm" c="dimmed">
-                {request.adminReply}
-              </Text>
-            </Box>
+              <b style={{ display: "block", color: "var(--ink)", marginBottom: 2 }}>Respuesta de AgenditApp</b>
+              {request.adminReply}
+            </div>
           )}
-        </Box>
-        <Group gap={4} wrap="nowrap">
-          <Badge size="xs" color={cfg.color} variant="filled">
-            {cfg.label}
-          </Badge>
-          {onClose && (
-            <Tooltip label="Retirar solicitud">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                loading={closing}
-                onClick={() => onClose(request._id)}
-              >
-                <IconX size={14} />
+        </div>
+        <span className={`ag-badge ${cfg.tone}`} style={{ flex: "none" }}>
+          {cfg.label}
+        </span>
+        {onClose && (
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray" size="sm" loading={closing} aria-label="Más opciones">
+                <IconDots size={16} />
               </ActionIcon>
-            </Tooltip>
-          )}
-        </Group>
-      </Group>
-    </Paper>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconX size={14} />} onClick={() => onClose(request._id)}>
+                Retirar solicitud
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -108,6 +77,7 @@ export default function FeatureRequests() {
 
   const loadRequests = () => {
     setLoading(true);
+    setError(false);
     getMyFeatureRequests()
       .then(setRequests)
       .catch(() => setError(true))
@@ -124,22 +94,10 @@ export default function FeatureRequests() {
     try {
       await createFeatureRequest(text.trim());
       setText("");
-      showNotification({
-        title: "Solicitud enviada",
-        message: "Gracias por tu idea, la vamos a revisar.",
-        color: "green",
-        autoClose: 3000,
-        position: "top-right",
-      });
+      showNotification({ title: "Solicitud enviada", message: "Gracias por tu idea, la vamos a revisar.", color: "green", autoClose: 3000 });
       loadRequests();
     } catch (err) {
-      showNotification({
-        title: "Error",
-        message: (err as Error).message || "No se pudo enviar la solicitud.",
-        color: "red",
-        autoClose: 4000,
-        position: "top-right",
-      });
+      showNotification({ message: (err as Error).message || "No pudimos enviar tu solicitud. Inténtalo de nuevo.", color: "red", autoClose: 4000 });
     } finally {
       setSending(false);
     }
@@ -149,22 +107,10 @@ export default function FeatureRequests() {
     setClosingId(id);
     try {
       await closeFeatureRequest(id);
-      showNotification({
-        title: "Solicitud retirada",
-        message: "La quitamos de tu lista activa.",
-        color: "gray",
-        autoClose: 2500,
-        position: "top-right",
-      });
+      showNotification({ title: "Solicitud retirada", message: "La quitamos de tu lista activa.", color: "gray", autoClose: 2500 });
       loadRequests();
     } catch (err) {
-      showNotification({
-        title: "Error",
-        message: (err as Error).message || "No se pudo retirar la solicitud.",
-        color: "red",
-        autoClose: 4000,
-        position: "top-right",
-      });
+      showNotification({ message: (err as Error).message || "No pudimos retirar la solicitud. Inténtalo de nuevo.", color: "red", autoClose: 4000 });
     } finally {
       setClosingId(null);
     }
@@ -173,9 +119,8 @@ export default function FeatureRequests() {
   const confirmClose = (id: string) => {
     openConfirmModal({
       title: "Retirar solicitud",
-      children: <Text size="sm">¿Ya no necesitas esta solicitud? Se retira de tu lista activa (no se borra).</Text>,
-      labels: { confirm: "Sí, retirar", cancel: "Cancelar" },
-      confirmProps: { color: "gray" },
+      children: <Text size="sm">¿Ya no la necesitas? Sale de tu lista activa, pero no se borra.</Text>,
+      labels: { confirm: "Sí, retirar", cancel: "Volver" },
       onConfirm: () => handleClose(id),
       centered: true,
     });
@@ -185,78 +130,74 @@ export default function FeatureRequests() {
   const closedRequests = requests.filter((r) => r.closedByOrg);
 
   return (
-    <Box p="md" maw={720} mx="auto">
-      <Text size="sm" c="dimmed" mb="md">
-        ¿Te falta algo en AgenditApp o se te ocurre una mejora? Contánoslo — lo revisamos y acá vas a ver el estado
-        de tu solicitud.
-      </Text>
-
-      <Paper withBorder radius="md" p="md" mb="xl">
+    <div className="ag-stack" style={{ gap: "var(--space-4)" }}>
+      <div className="ag-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <b style={{ display: "block", fontSize: 14 }}>¿Te falta algo o se te ocurre una mejora?</b>
+          <span className="ag-muted" style={{ fontSize: 14 }}>Cuéntanos: lo revisamos y aquí verás en qué va tu solicitud.</span>
+        </div>
         <Textarea
-          placeholder='Ej: "Quiero poder compartir el detalle de mis servicios con un link"'
+          placeholder="Ej: quiero compartir el detalle de mis servicios con un enlace"
           value={text}
           onChange={(e) => setText(e.currentTarget.value)}
           minRows={3}
           autosize
           maxRows={8}
+          aria-label="Tu solicitud"
         />
-        <Group justify="flex-end" mt="sm">
-          <Button
-            leftSection={<IconSend size={16} />}
-            onClick={handleSubmit}
-            loading={sending}
-            disabled={!text.trim()}
-          >
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button leftSection={<IconSend size={16} />} onClick={handleSubmit} loading={sending} disabled={!text.trim()}>
             Enviar solicitud
           </Button>
-        </Group>
-      </Paper>
+        </div>
+      </div>
 
       {loading && (
-        <Center py="xl">
-          <Loader size="sm" />
-        </Center>
+        <div className="ag-stack" style={{ gap: 8 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} height={64} radius="md" />
+          ))}
+        </div>
       )}
 
       {error && (
-        <Alert icon={<IconAlertCircle size={16} />} color="red" variant="light">
-          No se pudieron cargar tus solicitudes. Intenta de nuevo más tarde.
-        </Alert>
+        <div className="ag-alert ag-alert--danger" style={{ alignItems: "center" }}>
+          <IconInfoCircle size={20} />
+          <div style={{ flex: 1 }}>No pudimos cargar tus solicitudes.</div>
+          <Button size="xs" variant="outline" onClick={loadRequests}>
+            Reintentar
+          </Button>
+        </div>
       )}
 
       {!loading && !error && requests.length === 0 && (
-        <Text c="dimmed" ta="center" py="xl">
-          Todavía no has enviado ninguna solicitud.
-        </Text>
+        <div className="ag-card" style={{ padding: "32px 20px", textAlign: "center" }}>
+          <b>Todavía no has enviado ninguna solicitud</b>
+        </div>
       )}
 
       {!loading && !error && activeRequests.length > 0 && (
-        <Stack gap="sm">
+        <div className="ag-stack" style={{ gap: 8 }}>
           {activeRequests.map((r) => (
             <RequestCard key={r._id} request={r} onClose={confirmClose} closing={closingId === r._id} />
           ))}
-        </Stack>
+        </div>
       )}
 
       {!loading && !error && closedRequests.length > 0 && (
-        <Box mt="lg">
-          <UnstyledButton onClick={() => setShowClosed((v) => !v)}>
-            <Group gap={4} c="dimmed">
-              <Text size="xs" fw={500}>
-                {showClosed ? "Ocultar" : "Ver"} retiradas ({closedRequests.length})
-              </Text>
-              {showClosed ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
-            </Group>
+        <div>
+          <UnstyledButton onClick={() => setShowClosed((v) => !v)} className="ag-link" style={{ fontSize: 13 }}>
+            {showClosed ? "Ocultar" : "Ver"} retiradas ({closedRequests.length}) {showClosed ? <IconChevronUp size={12} /> : <IconChevronDown size={12} />}
           </UnstyledButton>
           <Collapse in={showClosed}>
-            <Stack gap="sm" mt="sm">
+            <div className="ag-stack" style={{ gap: 8, marginTop: 8 }}>
               {closedRequests.map((r) => (
                 <RequestCard key={r._id} request={r} closing={false} />
               ))}
-            </Stack>
+            </div>
           </Collapse>
-        </Box>
+        </div>
       )}
-    </Box>
+    </div>
   );
 }

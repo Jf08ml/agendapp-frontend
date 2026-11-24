@@ -16,14 +16,16 @@ import CustomLoader from "../../customLoader/CustomLoader";
 import { useHolidays, type HolidayConfig } from "../../../hooks/useHolidays";
 
 const BRAND = {
-  deep: "#1E3A8A",
-  cream: "#FAF7F2",
-  surface: "#FFFFFF",
-  ink: "#101526",
-  body: "#404760",
-  muted: "#8B92A6",
-  line: "#E7E2D6",
-  lineSoft: "#F0EBE0",
+  deep: "var(--brand)",
+  deepText: "var(--brand-text)",
+  onDeep: "var(--on-brand)",
+  cream: "var(--surface-muted)",
+  surface: "var(--surface-raised)",
+  ink: "var(--ink)",
+  body: "var(--ink-muted)",
+  muted: "var(--ink-subtle)",
+  line: "var(--line)",
+  lineSoft: "var(--line)",
   accent: "#D97A4A",
   accentSoft: "#FDF1E8",
 };
@@ -139,7 +141,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                 fontWeight: 700,
                 letterSpacing: 1.5,
                 textTransform: "uppercase",
-                color: i === 0 || i === 6 ? BRAND.deep : BRAND.muted,
+                color: i === 0 || i === 6 ? BRAND.deepText : BRAND.muted,
               }}
             >
               {label}
@@ -183,10 +185,10 @@ const MonthView: React.FC<MonthViewProps> = ({
 
           // Day number color
           let numColor = BRAND.ink;
-          if (outside) numColor = "#C9C2B5";
-          else if (selected) numColor = "#fff";
+          if (outside) numColor = "var(--line-strong)";
+          else if (selected) numColor = BRAND.onDeep;
           else if (holiday) numColor = BRAND.accent;
-          else if (today) numColor = BRAND.deep;
+          else if (today) numColor = BRAND.deepText;
           else if (weekend) numColor = BRAND.body;
 
           const numWeight = today && !selected ? 700 : 500;
@@ -221,7 +223,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     ? BRAND.deep
                     : holiday
                     ? "#FBEADC"
-                    : "#F5F1EC";
+                    : "var(--surface-hover)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = cellBg;
@@ -253,7 +255,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         fontSize: 7.5,
                         fontWeight: 800,
                         letterSpacing: 1,
-                        color: BRAND.deep,
+                        color: BRAND.deepText,
                         textTransform: "uppercase",
                       }}
                     >
@@ -282,7 +284,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         width: 9,
                         height: 9,
                         borderRadius: "50%",
-                        background: hasSpace ? "#2F9E44" : "#CED4DA",
+                        background: hasSpace ? "var(--success)" : "var(--line-strong)",
                         border: selected ? "1px solid rgba(255,255,255,0.7)" : "none",
                         flexShrink: 0,
                       }}
@@ -314,7 +316,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        border: `1.5px solid ${selected ? BRAND.deep : "#fff"}`,
+                        border: `1.5px solid `,
                         marginLeft: i === 0 ? 0 : -4,
                         flexShrink: 0,
                         zIndex: 3 - i,
@@ -328,7 +330,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     style={{
                       fontSize: 10,
                       fontWeight: 600,
-                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      color: selected ? "color-mix(in srgb, var(--on-brand) 85%, transparent)" : BRAND.muted,
                       marginLeft: 5,
                       whiteSpace: "nowrap",
                     }}
@@ -345,7 +347,7 @@ const MonthView: React.FC<MonthViewProps> = ({
                     style={{
                       fontSize: 9,
                       fontWeight: 600,
-                      color: selected ? "rgba(255,255,255,0.85)" : BRAND.muted,
+                      color: selected ? "color-mix(in srgb, var(--on-brand) 85%, transparent)" : BRAND.muted,
                       whiteSpace: "nowrap",
                     }}
                   >

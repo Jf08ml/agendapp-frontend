@@ -1,7 +1,7 @@
 import { FC } from "react";
 import { Box } from "@mantine/core";
 import { addMinutes } from "date-fns";
-import { HOUR_HEIGHT } from "../DayModal";
+import { HOUR_HEIGHT } from "../dayGrid";
 
 interface TimeGridProps {
   timeIntervals: Date[];
@@ -61,8 +61,8 @@ const DayModalTimeGrid: FC<TimeGridProps> = ({
               <Box
                 style={{
                   borderTop: isMainHour
-                    ? "1px solid #E7E2D6"
-                    : "1px dashed #DDD8CE",
+                    ? "1px solid var(--line)"
+                    : "1px dashed var(--line)",
                   height: 0,
                 }}
               />

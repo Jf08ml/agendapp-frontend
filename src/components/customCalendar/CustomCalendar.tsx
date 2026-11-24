@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { Appointment } from "../../services/appointmentService";
+import { Appointment, type AppointmentMove } from "../../services/appointmentService";
 import MonthView from "./components/MonthView";
-import DayModal from "./components/DayModal";
+import DayView from "./components/DayView";
 import WeekView from "./components/WeekView";
 import DayDetailPanel from "./components/DayDetailPanel";
 import {
+  addDays,
   addMonths,
   subMonths,
   addWeeks,
@@ -28,28 +29,37 @@ import {
   SegmentedControl,
   Group,
   ActionIcon,
+  Button,
   Text,
   Box,
   Tooltip,
   Select,
 } from "@mantine/core";
 import {
-  BiCalendar,
-  BiChevronLeft,
-  BiChevronRight,
-  BiCalendarWeek,
-} from "react-icons/bi";
-import { MdToday } from "react-icons/md";
-import { IconMaximize, IconMinimize, IconPin, IconPinnedFilled } from "@tabler/icons-react";
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconMaximize,
+  IconMinimize,
+  IconPin,
+  IconPinnedFilled,
+} from "@tabler/icons-react";
 
 const STORAGE_KEY = "agenda_default_view";
 
-const BRAND = {
-  deep: "#1E3A8A",
-  surface: "#FFFFFF",
-  body: "#404760",
-  line: "#E7E2D6",
-};
+type CalendarView = "day" | "week" | "month";
+
+// Vista inicial: la fijada por la persona; si no hay, Día (AgendaEscritorio/AgendaMovil:
+// el mes ya no es la vista por defecto).
+function readDefaultView(): CalendarView {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "day" || saved === "week" || saved === "month") return saved;
+  } catch {
+    /* sin almacenamiento */
+  }
+  return "day";
+}
 
 interface CustomCalendarProps {
   employees: Employee[];
@@ -60,7 +70,7 @@ interface CustomCalendarProps {
   currentDate: Date;
   setCurrentDate: React.Dispatch<React.SetStateAction<Date>>;
   onOpenModal: (selectedDay: Date | null, interval: Date) => void;
-  onEditAppointment: (appointment: Appointment) => void;
+  onEditAppointment: (appointment: Appointment, initialTab?: string, move?: AppointmentMove) => void;
   onCancelAppointment: (appointmentId: string) => void;
   onConfirmAppointment: (appointmentId: string) => void;
   onMarkAttendance: (appointmentId: string, status: "attended" | "no_show") => void;
@@ -94,16 +104,23 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
   timezone = "America/Bogota",
   onExceptionDeleted,
 }) => {
-  const savedDefault = (localStorage.getItem(STORAGE_KEY) ?? "month") as "month" | "week";
-  const [viewMode, setViewMode] = useState<"month" | "week">(savedDefault);
-  const [defaultView, setDefaultView] = useState<"month" | "week">(savedDefault);
-  const [modalOpened, setModalOpened] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<CalendarView>(readDefaultView);
+  const [defaultView, setDefaultView] = useState<CalendarView>(readDefaultView);
   const [panelDay, setPanelDay] = useState<Date>(new Date());
   const [isMaximized, setIsMaximized] = useState(false);
+  // Filtro de la vista Semana: «Todos» (7 columnas, citas compactas) o un profesional
+  const [weekEmployeeId, setWeekEmployeeId] = useState<string | null>(null);
+  const weekEmployees = useMemo(
+    () => (weekEmployeeId ? employees.filter((e) => e._id === weekEmployeeId) : employees),
+    [employees, weekEmployeeId]
+  );
 
   const handleSetDefault = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, viewMode);
+    try {
+      localStorage.setItem(STORAGE_KEY, viewMode);
+    } catch {
+      /* sin almacenamiento */
+    }
     setDefaultView(viewMode);
   }, [viewMode]);
 
@@ -172,26 +189,23 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, availServiceId, availEmployeeId, monthKey, organization?._id, appointments, availabilityRefreshKey]);
 
-  const handleMonthNavigation = useCallback(
+  // Anterior / siguiente según la vista (día, semana o mes). Si se sale del mes
+  // cargado, se piden las citas del mes nuevo (igual que antes en semana y mes).
+  const handleNavigate = useCallback(
     (direction: "prev" | "next") => {
-      const adjustDate = direction === "prev" ? subMonths : addMonths;
-      const newDate = adjustDate(currentDate, 1);
+      const step = direction === "prev" ? -1 : 1;
+      const newDate =
+        viewMode === "day"
+          ? addDays(currentDate, step)
+          : viewMode === "week"
+            ? (step < 0 ? subWeeks : addWeeks)(currentDate, 1)
+            : (step < 0 ? subMonths : addMonths)(currentDate, 1);
       setCurrentDate(newDate);
-      fetchAppointmentsForMonth(newDate);
-    },
-    [currentDate, setCurrentDate, fetchAppointmentsForMonth]
-  );
-
-  const handleWeekNavigation = useCallback(
-    (direction: "prev" | "next") => {
-      const adjustDate = direction === "prev" ? subWeeks : addWeeks;
-      const newDate = adjustDate(currentDate, 1);
-      setCurrentDate(newDate);
-      if (!isSameMonth(newDate, currentDate)) {
+      if (viewMode === "month" || !isSameMonth(newDate, currentDate)) {
         fetchAppointmentsForMonth(newDate);
       }
     },
-    [currentDate, setCurrentDate, fetchAppointmentsForMonth]
+    [viewMode, currentDate, setCurrentDate, fetchAppointmentsForMonth]
   );
 
   const goToToday = useCallback(() => {
@@ -203,19 +217,15 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
     }
   }, [currentDate, setCurrentDate, fetchAppointmentsForMonth]);
 
-  const handleDayClick = useCallback((day: Date) => {
-    setPanelDay(day);
-    setSelectedDay(day);
-    setModalOpened(true);
-  }, []);
-
-  const onPrevMonth = useCallback(
-    () => handleMonthNavigation("prev"),
-    [handleMonthNavigation]
-  );
-  const onNextMonth = useCallback(
-    () => handleMonthNavigation("next"),
-    [handleMonthNavigation]
+  // Tocar un día del mes abre la vista Día de ese día (antes, un modal)
+  const handleDayClick = useCallback(
+    (day: Date) => {
+      setPanelDay(day);
+      setCurrentDate(day);
+      if (!isSameMonth(day, currentDate)) fetchAppointmentsForMonth(day);
+      setViewMode("day");
+    },
+    [currentDate, setCurrentDate, fetchAppointmentsForMonth]
   );
 
   const getAppointmentsForDay = useCallback(
@@ -244,13 +254,19 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
     [appointments]
   );
 
-  const weekRangeLabel = (() => {
+  // Fecha de la barra: día en largo, rango de la semana o mes
+  const rangeLabel = (() => {
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    if (viewMode === "day") {
+      return cap(format(currentDate, isMobile ? "EEE d MMM" : "EEEE d 'de' MMMM", { locale: es }));
+    }
+    if (viewMode === "month") return cap(format(currentDate, "MMMM yyyy", { locale: es }));
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
     if (isSameMonth(weekStart, weekEnd)) {
-      return `${format(weekStart, "d")} – ${format(weekEnd, "d 'de' MMMM yyyy", { locale: es })}`;
+      return `${format(weekStart, "d")} – ${format(weekEnd, "d 'de' MMMM", { locale: es })}`;
     }
-    return `${format(weekStart, "d MMM", { locale: es })} – ${format(weekEnd, "d MMM yyyy", { locale: es })}`;
+    return `${format(weekStart, "d MMM", { locale: es })} – ${format(weekEnd, "d MMM", { locale: es })}`;
   })();
 
   // Show panel on desktop only (≥ 1100px) in month view
@@ -258,32 +274,54 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Top toolbar: view toggle + week/month nav */}
-      <Group justify="space-between" align="center" mb="xs" gap="xs" style={{ flexShrink: 0 }}>
-        <Group gap={6} align="center">
+      {/* Barra del calendario (ag-pagehead): Hoy, anterior/siguiente, fecha y vista */}
+      <Group justify="space-between" align="center" mb="xs" gap="xs" style={{ flexShrink: 0 }} wrap="wrap">
+        <Group gap={6} align="center" wrap="nowrap" style={{ minWidth: 0 }}>
+          <Button variant="default" size="compact-sm" onClick={goToToday}>
+            Hoy
+          </Button>
+          <ActionIcon variant="subtle" color="gray" size="md" onClick={() => handleNavigate("prev")} aria-label={`${viewMode === "day" ? "Día" : viewMode === "week" ? "Semana" : "Mes"} anterior`}>
+            <IconChevronLeft size={18} />
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="gray" size="md" onClick={() => handleNavigate("next")} aria-label={`${viewMode === "day" ? "Día" : viewMode === "week" ? "Semana" : "Mes"} siguiente`}>
+            <IconChevronRight size={18} />
+          </ActionIcon>
+          <Text fw={600} fz={isMobile ? 14 : 15} style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {rangeLabel}
+          </Text>
+        </Group>
+
+        <Group gap={6} align="center" wrap="nowrap">
+          {viewMode === "week" && employees.length > 1 && (
+            <Select
+              size="xs"
+              aria-label="Profesional"
+              data={[
+                { value: "all", label: "Todos" },
+                ...employees.map((e) => ({ value: e._id, label: e.names.trim() })),
+              ]}
+              value={weekEmployeeId ?? "all"}
+              onChange={(v) => setWeekEmployeeId(!v || v === "all" ? null : v)}
+              allowDeselect={false}
+              w={160}
+              comboboxProps={{ zIndex: 350 }}
+            />
+          )}
+          {viewMode === "week" && (
+            <Tooltip label={isMaximized ? "Restaurar vista" : "Pantalla completa"} withArrow>
+              <ActionIcon variant="subtle" color="gray" size="md" onClick={() => setIsMaximized((v) => !v)} aria-label={isMaximized ? "Restaurar vista" : "Pantalla completa"}>
+                {isMaximized ? <IconMinimize size={16} /> : <IconMaximize size={16} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
           <SegmentedControl
             size="xs"
             value={viewMode}
-            onChange={(v) => setViewMode(v as "month" | "week")}
+            onChange={(v) => setViewMode(v as CalendarView)}
             data={[
-              {
-                value: "month",
-                label: (
-                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <BiCalendar size={14} />
-                    <span>Mes</span>
-                  </Box>
-                ),
-              },
-              {
-                value: "week",
-                label: (
-                  <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <BiCalendarWeek size={14} />
-                    <span>Semana</span>
-                  </Box>
-                ),
-              },
+              { value: "day", label: "Día" },
+              { value: "week", label: "Semana" },
+              { value: "month", label: "Mes" },
             ]}
           />
           <Tooltip
@@ -291,118 +329,30 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
             withArrow
           >
             <ActionIcon
-              size="sm"
-              variant={defaultView === viewMode ? "filled" : "subtle"}
-              color={defaultView === viewMode ? "blue" : "gray"}
+              size="md"
+              variant="subtle"
+              color={defaultView === viewMode ? "dark" : "gray"}
               onClick={handleSetDefault}
               aria-label="Fijar vista predeterminada"
+              aria-pressed={defaultView === viewMode}
             >
-              {defaultView === viewMode ? <IconPinnedFilled size={14} /> : <IconPin size={14} />}
+              {defaultView === viewMode ? <IconPinnedFilled size={16} /> : <IconPin size={16} />}
             </ActionIcon>
           </Tooltip>
         </Group>
-
-        {/* Month toolbar: prev/Hoy/next + employee legend */}
-        {viewMode === "month" && (
-          <Group gap={0} align="center" style={{ flexWrap: "nowrap" }}>
-            {/* Navigation */}
-            <Group gap={isMobile ? 4 : 4} align="center" mr={isMobile ? 0 : 16}>
-              <ActionIcon
-                variant="default"
-                radius="xl"
-                size={isMobile ? 28 : 32}
-                onClick={onPrevMonth}
-                style={{ border: `1px solid ${BRAND.line}`, color: BRAND.body }}
-              >
-                <BiChevronLeft size={16} />
-              </ActionIcon>
-              <Box
-                onClick={goToToday}
-                style={{
-                  padding: isMobile ? "4px 10px" : "5px 13px",
-                  borderRadius: 999,
-                  background: BRAND.surface,
-                  border: `1px solid ${BRAND.line}`,
-                  fontSize: isMobile ? 11 : 12,
-                  fontWeight: 600,
-                  color: BRAND.body,
-                  cursor: "pointer",
-                  userSelect: "none",
-                  transition: "background 0.12s",
-                  whiteSpace: "nowrap",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F1EC")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = BRAND.surface)}
-              >
-                Hoy
-              </Box>
-              <ActionIcon
-                variant="default"
-                radius="xl"
-                size={isMobile ? 28 : 32}
-                onClick={onNextMonth}
-                style={{ border: `1px solid ${BRAND.line}`, color: BRAND.body }}
-              >
-                <BiChevronRight size={16} />
-              </ActionIcon>
-            </Group>
-
-            {/* Employee legend — solo en desktop */}
-            {!isMobile && !isTablet && employees.length > 0 && (
-              <Group gap={10} align="center">
-                {employees.slice(0, 5).map((emp) => (
-                  <Group key={emp._id} gap={5} align="center" style={{ cursor: "default" }}>
-                    <Box
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: emp.color || "#3B5BDB",
-                        flexShrink: 0,
-                      }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 11.5,
-                        color: BRAND.body,
-                        fontWeight: 500,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {emp.names.trim().split(/\s+/)[0]}
-                    </Text>
-                  </Group>
-                ))}
-              </Group>
-            )}
-          </Group>
-        )}
-
-        {/* Week navigation */}
-        {viewMode === "week" && (
-          <Group gap={4} align="center">
-            <ActionIcon variant="subtle" size="sm" onClick={() => handleWeekNavigation("prev")}>
-              <BiChevronLeft size={18} />
-            </ActionIcon>
-            <Text size="sm" fw={500} style={{ minWidth: isMobile ? 120 : 200, textAlign: "center" }}>
-              {weekRangeLabel}
-            </Text>
-            <ActionIcon variant="subtle" size="sm" onClick={() => handleWeekNavigation("next")}>
-              <BiChevronRight size={18} />
-            </ActionIcon>
-            <Tooltip label="Ir a hoy" withArrow>
-              <ActionIcon variant="light" size="sm" onClick={goToToday}>
-                <MdToday size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label={isMaximized ? "Restaurar vista" : "Pantalla completa"} withArrow>
-              <ActionIcon variant="light" size="sm" onClick={() => setIsMaximized((v) => !v)}>
-                {isMaximized ? <IconMinimize size={16} /> : <IconMaximize size={16} />}
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        )}
       </Group>
+
+      {/* Leyenda de profesionales (Mes y Semana, escritorio) */}
+      {viewMode !== "day" && !isMobile && !isTablet && employees.length > 0 && (
+        <Group gap={14} align="center" mb="xs" style={{ flexShrink: 0 }}>
+          {employees.slice(0, 8).map((emp) => (
+            <span key={emp._id} className="ag-appt__pro">
+              <i style={{ background: emp.color || "var(--pro-8)" }} />
+              {emp.names.trim().split(/\s+/)[0]}
+            </span>
+          ))}
+        </Group>
+      )}
 
       {/* Barra de disponibilidad (solo vista mensual) */}
       {viewMode === "month" && services.length > 0 && employees.length > 0 && (
@@ -421,7 +371,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
             onChange={setAvailServiceId}
             clearable
             searchable
-            leftSection={<BiCalendar size={14} />}
+            leftSection={<IconCalendar size={14} />}
             style={{ flex: isMobile ? "1 1 100%" : "0 0 240px", minWidth: 0 }}
             comboboxProps={{ zIndex: 350 }}
           />
@@ -448,11 +398,11 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
               ) : (
                 <>
                   <Group gap={4} align="center" wrap="nowrap">
-                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "#2F9E44" }} />
+                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--success)" }} />
                     <Text size="xs" c="dimmed">{isMobile ? "Libre" : "Con espacio"}</Text>
                   </Group>
                   <Group gap={4} align="center" wrap="nowrap">
-                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "#CED4DA" }} />
+                    <Box style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--line-strong)" }} />
                     <Text size="xs" c="dimmed">{isMobile ? "Ocupado" : "Sin espacio"}</Text>
                   </Group>
                 </>
@@ -470,7 +420,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
                 position: "fixed",
                 inset: 0,
                 zIndex: 300,
-                background: "#fff",
+                background: "var(--surface)",
                 display: "flex",
                 flexDirection: "column",
                 padding: 12,
@@ -489,7 +439,24 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           </Group>
         )}
 
-        {viewMode === "month" ? (
+        {viewMode === "day" ? (
+          <DayView
+            day={currentDate}
+            onOpenModal={onOpenModal}
+            employees={employees}
+            getAppointmentsForDay={getAllAppointmentsForDay}
+            onEditAppointment={onEditAppointment}
+            onCancelAppointment={onCancelAppointment}
+            onConfirmAppointment={onConfirmAppointment}
+            onMarkAttendance={onMarkAttendance}
+            onDeleteAppointment={onDeleteAppointment}
+            setAppointments={setAppointments}
+            fetchAppointmentsForDay={fetchAppointmentsForDay}
+            loadedMonthDate={currentDate}
+            timezone={timezone}
+            onExceptionDeleted={onExceptionDeleted}
+          />
+        ) : viewMode === "month" ? (
           <Box
             style={{
               display: "grid",
@@ -532,7 +499,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
           <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
             <WeekView
               appointments={appointments}
-              employees={employees}
+              employees={weekEmployees}
               currentDate={currentDate}
               onOpenModal={onOpenModal}
               onEditAppointment={onEditAppointment}
@@ -549,7 +516,7 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         ) : (
           <WeekView
             appointments={appointments}
-            employees={employees}
+            employees={weekEmployees}
             currentDate={currentDate}
             onOpenModal={onOpenModal}
             onEditAppointment={onEditAppointment}
@@ -565,28 +532,6 @@ const CustomCalendar: React.FC<CustomCalendarProps> = ({
         )}
       </div>
 
-      {/* DayModal: only used from month view */}
-      {viewMode === "month" && (
-        <DayModal
-          key={selectedDay?.toISOString()}
-          opened={modalOpened}
-          selectedDay={selectedDay}
-          onClose={() => setModalOpened(false)}
-          onOpenModal={onOpenModal}
-          employees={employees}
-          getAppointmentsForDay={getAllAppointmentsForDay}
-          onEditAppointment={onEditAppointment}
-          onCancelAppointment={onCancelAppointment}
-          onConfirmAppointment={onConfirmAppointment}
-          onMarkAttendance={onMarkAttendance}
-          onDeleteAppointment={onDeleteAppointment}
-          setAppointments={setAppointments}
-          fetchAppointmentsForDay={fetchAppointmentsForDay}
-          loadedMonthDate={currentDate}
-          timezone={timezone}
-          onExceptionDeleted={onExceptionDeleted}
-        />
-      )}
     </div>
   );
 };

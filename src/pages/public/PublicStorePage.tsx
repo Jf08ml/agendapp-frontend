@@ -1,51 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Container,
-  Title,
-  Text,
-  SimpleGrid,
-  Card,
-  Stack,
-  Group,
-  Badge,
-  Button,
-  ThemeIcon,
-  Loader,
-  Center,
-  Alert,
-  Modal,
-  TextInput,
-  Textarea,
-  Divider,
-  ActionIcon,
-  Radio,
-  Image,
-  AspectRatio,
-  Drawer,
-  Affix,
-  Skeleton,
-  Paper,
-  Box,
-  Collapse,
-} from "@mantine/core";
+// Tienda pública (rediseño, TiendaPublica): catálogo con búsqueda y categorías,
+// pedido en un drawer (hoja inferior en móvil) y "Hacer pedido" con Mercado
+// Pago, transferencia (comprobante) o pago contra entrega.
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Button, Collapse, Drawer, Loader, Modal, Skeleton, TextInput, Textarea } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { notifications } from "@mantine/notifications";
 import {
-  IconAlertCircle,
-  IconBuildingStore,
-  IconCash,
   IconCircleCheck,
-  IconCreditCard,
-  IconMinus,
-  IconPlus,
-  IconReceipt2,
-  IconSearch,
-  IconSearchOff,
-  IconShoppingCart,
-  IconTrash,
-  IconTruckDelivery,
+  IconInfoCircle,
   IconMapPin,
+  IconMinus,
+  IconPhoto,
+  IconPlus,
+  IconSearch,
+  IconShoppingBag,
+  IconTrash,
+  IconX,
 } from "@tabler/icons-react";
 import { CountryCode } from "libphonenumber-js";
 import { useSelector } from "react-redux";
@@ -120,83 +90,44 @@ const normalizeText = (s: string) =>
 // Valor centinela del chip "Todas" (evita colisión con una categoría real).
 const ALL_CATEGORIES = "__all__";
 
-// Estilos de presentación: hover de tarjetas de producto y estado activo de las
-// tarjetas de opción del checkout. Solo CSS, sin listeners de JS.
+// Estilos propios de la tienda (grilla, tarjeta de producto, barra del pedido).
 const STORE_STYLES = `
-  .store-product-card {
-    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-  }
-  .store-product-img {
-    transition: transform 300ms ease;
-  }
-  @media (hover: hover) {
-    .store-product-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--mantine-shadow-md);
-      border-color: var(--mantine-primary-color-filled);
-    }
-    .store-product-card:hover .store-product-img {
-      transform: scale(1.04);
-    }
-  }
-  .store-option-card {
-    transition: border-color 120ms ease, background-color 120ms ease;
-  }
-  .store-option-card[data-checked] {
-    border-color: var(--mantine-primary-color-filled);
-    background-color: var(--mantine-primary-color-light);
-  }
-  .store-category-scroll {
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    scroll-behavior: smooth;
-  }
-  .store-category-scroll::-webkit-scrollbar {
-    display: none;
-  }
-  .store-tabs-bar {
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid var(--mantine-color-gray-3);
-  }
-  .store-tab {
-    position: relative;
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font: inherit;
-    padding: 10px 14px;
-    font-size: var(--mantine-font-size-sm);
-    font-weight: 500;
-    color: var(--mantine-color-dimmed);
-    transition: color 150ms ease;
-  }
-  .store-tab:hover {
-    color: var(--mantine-color-text);
-  }
-  .store-tab[data-active="true"] {
-    color: var(--mantine-color-text);
-    font-weight: 700;
-  }
-  .store-tab[data-active="true"]::after {
-    content: "";
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: -1px;
-    height: 2px;
-    border-radius: 2px 2px 0 0;
-    background: var(--mantine-primary-color-filled);
-  }
+  .store-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  @media (min-width: 48em) { .store-grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; } }
+  .store-filters { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 50px; z-index: 20; background: var(--mantine-color-body); padding: 6px 0; }
+  @media (min-width: 48em) { .store-filters { flex-direction: row; align-items: center; gap: 12px; } }
+  .store-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+  .store-chips::-webkit-scrollbar { display: none; }
+  .store-chips .ag-chip { cursor: pointer; }
+  .store-card { display: flex; flex-direction: column; overflow: hidden; cursor: pointer; transition: border-color 120ms ease, box-shadow 120ms ease; }
+  @media (hover: hover) { .store-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sm); } }
+  .store-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .store-card__img { position: relative; aspect-ratio: 1; }
+  .store-card__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .store-card[data-soldout] .store-card__img > img, .store-card[data-soldout] .store-card__img > svg { opacity: .5; filter: grayscale(1); }
+  .store-card[data-soldout] .store-card__body { opacity: .65; }
+  .store-card__badges { position: absolute; top: 8px; left: 8px; display: flex; gap: 4px; }
+  .store-card__badges .ag-badge:not(.ag-badge--danger) { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-sm); }
+  .store-card__body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .store-card__brand { font: 600 11px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .store-card__name { font: 600 14px/20px var(--font-sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .store-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 8px; }
+  .store-add { flex: none; width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--line-control); background: var(--surface-raised); color: var(--ink); display: grid; place-items: center; cursor: pointer; font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+  .store-add[data-count] { background: var(--ink); border-color: var(--ink); color: var(--ink-inverse); }
+  .store-stepper { display: inline-flex; align-items: center; border: 1px solid var(--line-control); border-radius: 999px; height: 30px; }
+  .store-stepper button { width: 30px; height: 28px; border: 0; background: none; color: var(--ink); display: grid; place-items: center; cursor: pointer; border-radius: 999px; }
+  .store-stepper button:hover { background: var(--surface-hover); }
+  .store-stepper span { min-width: 22px; text-align: center; font-size: 14px; font-weight: 600; }
+  .store-icon-btn { border: 0; background: none; color: var(--ink-subtle); padding: 4px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+  .store-icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+  .store-bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; display: flex; align-items: center; gap: 12px; background: var(--surface-raised); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .store-fab { position: fixed; right: 24px; bottom: 24px; z-index: 150; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 8px 0 16px; border-radius: 999px; border: 0; background: var(--ink); color: var(--ink-inverse); font: 600 14px/1 var(--font-sans); box-shadow: var(--shadow-lg); cursor: pointer; }
+  .store-fab__count { min-width: 28px; height: 28px; padding: 0 8px; border-radius: 999px; background: var(--ink-inverse); color: var(--ink); display: grid; place-items: center; font-size: 13px; }
 `;
 
-// Tienda pública de productos: catálogo + carrito local + checkout con
-// Mercado Pago, transferencia (comprobante) o pago contra entrega.
 export default function PublicStorePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const organization = useSelector((s: RootState) => s.organization.organization);
   const orgCountry = (organization?.default_country || "CO") as CountryCode;
   const storeEnabled = !!organization?.storeEnabled;
@@ -217,7 +148,8 @@ export default function PublicStorePage() {
   // ── Carrito (persistido en localStorage por organización — ver useStoreCart,
   // necesario para que sobreviva la navegación a /tienda/producto/:id) ───────
   const [cart, setCart] = useStoreCart(organization?._id);
-  const [cartOpen, setCartOpen] = useState(false);
+  // El detalle de producto vuelve con { openCart: true } para abrir el pedido.
+  const [cartOpen, setCartOpen] = useState(() => !!(location.state as { openCart?: boolean } | null)?.openCart);
 
   // ── Config del formulario de tienda (independiente del de reservas/citas) ──
   const rawConfig = organization?.storeFormConfig;
@@ -315,15 +247,7 @@ export default function PublicStorePage() {
     cart.find((i) => i.product._id === productId)?.quantity ?? 0;
 
   const addToCart = (product: StoreProduct) => {
-    // Feedback al agregar el primer ítem: guía hacia el botón flotante.
-    if (cart.length === 0) {
-      notifications.show({
-        message: "Producto agregado. Revisa tu pedido en el botón del carrito.",
-        icon: <IconShoppingCart size={16} />,
-        autoClose: 2500,
-        withBorder: true,
-      });
-    }
+    // Sin aviso: la tarjeta muestra la cantidad y aparece la barra del pedido.
     setCart((prev) => {
       const existing = prev.find((i) => i.product._id === product._id);
       if (existing) {
@@ -542,647 +466,490 @@ export default function PublicStorePage() {
 
   const LookupFeedback = () =>
     isLookingUp ? (
-      <Group gap="xs">
-        <Loader size="xs" />
-        <Text size="xs" c="dimmed">
-          Buscando por {IDENTIFIER_LABELS[identifierField]}...
-        </Text>
-      </Group>
+      <div className="ag-row ag-subtle" style={{ gap: 6 }}>
+        <Loader size={12} /> Buscando por {IDENTIFIER_LABELS[identifierField].toLowerCase()}…
+      </div>
     ) : foundName ? (
-      <Group gap="xs">
-        <Text size="xs" c="dimmed">
-          Cliente encontrado:
-        </Text>
-        <Badge variant="light" size="sm">
-          {foundName}
-        </Badge>
-      </Group>
+      <div className="ag-alert ag-alert--success" style={{ padding: "8px 12px" }}>
+        <IconCircleCheck size={18} />
+        <div style={{ fontSize: 13 }}>
+          Cliente encontrado: <b>{foundName}</b>. Completamos tus datos.
+        </div>
+      </div>
     ) : null;
 
-  // Vías de pago disponibles (nota informativa del carrito).
-  const payHints: { Icon: typeof IconCreditCard; label: string }[] = [];
-  if (hasMp) payHints.push({ Icon: IconCreditCard, label: "Mercado Pago" });
-  if (hasReceipt) payHints.push({ Icon: IconReceipt2, label: "Transferencia" });
-  if (hasCod) payHints.push({ Icon: IconCash, label: "Contraentrega" });
+  // Vías de pago disponibles (nota del carrito).
+  const payHints = [hasMp && "Mercado Pago", hasReceipt && "transferencia", hasCod && "contra entrega"].filter(Boolean) as string[];
 
-  // Encabezado de la tienda (se reutiliza en el estado de carga). Sin logo ni
-  // nombre del negocio: ya aparecen en el header/footer del sitio.
+  const countLabel = (n: number) => (n === 1 ? "1 producto" : `${n} productos`);
+  const page = { maxWidth: 1120, margin: "0 auto", padding: isMobile ? "16px 16px 112px" : "24px 24px 64px" } as const;
+  const h1 = { margin: 0, font: "600 24px/30px var(--mantine-font-family)", letterSpacing: "-0.015em" } as const;
+
   const headerBlock = (
-    <Stack gap={6} align="center">
-      <Title order={1} size="h2" ta="center">
-        Tienda
-      </Title>
-      <Text c="dimmed" ta="center" maw={520}>
+    <div>
+      <h1 style={h1}>Tienda</h1>
+      <div className="ag-muted" style={{ fontSize: 14, marginTop: 4 }}>
         Elige tus productos, arma tu pedido y págalo en línea o al recibirlo.
-      </Text>
-    </Stack>
+      </div>
+    </div>
+  );
+
+  const emptyState = (title: string, text: string, action?: ReactNode) => (
+    <div className="ag-card" style={{ padding: "40px 16px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+      <b style={{ fontSize: 15 }}>{title}</b>
+      <div className="ag-muted" style={{ fontSize: 14, maxWidth: 360 }}>{text}</div>
+      {action && <div style={{ marginTop: 8 }}>{action}</div>}
+    </div>
+  );
+
+  const thumb = (p: StoreProduct, size: number) => (
+    <span className="ag-photo" style={{ width: size, height: size, borderRadius: 8, overflow: "hidden", flex: "none" }}>
+      {p.imageUrl ? (
+        <img src={storeImageSrc(p.imageUrl)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      ) : (
+        <IconPhoto size={size / 2.4} />
+      )}
+    </span>
+  );
+
+  const stepper = (productId: string, qty: number, name: string) => (
+    <div className="store-stepper" role="group" aria-label={`Cantidad de ${name}`}>
+      <button type="button" aria-label="Quitar uno" onClick={() => changeQty(productId, -1)}>
+        <IconMinus size={14} />
+      </button>
+      <span className="ag-num">{qty}</span>
+      <button type="button" aria-label="Agregar uno" onClick={() => changeQty(productId, 1)}>
+        <IconPlus size={14} />
+      </button>
+    </div>
   );
 
   // ── Tienda deshabilitada ─────────────────────────────────────────────────
   if (organization && !storeEnabled) {
     return (
-      <Container size="sm" py="xl">
-        <Stack align="center" gap="md" mt={60}>
-          <ThemeIcon size={72} radius="xl" variant="light" color="gray">
-            <IconBuildingStore size={44} />
-          </ThemeIcon>
-          <Title order={3} ta="center">
-            La tienda no está disponible
-          </Title>
-          <Text c="dimmed" ta="center">
-            Este negocio no tiene la tienda en línea activa por el momento.
-          </Text>
-          <Button variant="light" onClick={() => navigate("/")}>
-            Volver al inicio
-          </Button>
-        </Stack>
-      </Container>
+      <div style={{ ...page, maxWidth: 480, paddingTop: 48 }}>
+        {emptyState(
+          "La tienda no está disponible",
+          "Este negocio no tiene la tienda en línea activa por el momento.",
+          <Button variant="default" onClick={() => navigate("/")}>Volver al inicio</Button>
+        )}
+      </div>
     );
   }
 
-  // ── Cargando: skeletons de tarjetas ──────────────────────────────────────
+  // ── Cargando ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <Container size="xl" py="xl">
-        <Stack gap="xl">
+      <div style={page}>
+        <style>{STORE_STYLES}</style>
+        <div className="ag-stack" style={{ gap: 16 }}>
           {headerBlock}
-          <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing={{ base: "sm", sm: "lg" }}>
+          <div className="store-grid">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} withBorder radius="lg" padding={isMobile ? "sm" : "lg"}>
-                <Card.Section>
-                  <AspectRatio ratio={1}>
-                    <Skeleton radius={0} />
-                  </AspectRatio>
-                </Card.Section>
-                <Stack gap="xs" mt="md">
-                  <Skeleton height={14} width="75%" radius="sm" />
-                  <Skeleton height={10} width="95%" radius="sm" />
-                  <Skeleton height={22} width="55%" radius="sm" />
-                  <Skeleton height={34} radius="md" />
-                </Stack>
-              </Card>
+              <div key={i} className="ag-card" style={{ overflow: "hidden" }}>
+                <Skeleton radius={0} style={{ aspectRatio: "1", height: "auto" }} />
+                <div style={{ padding: 12 }}>
+                  <Skeleton height={12} width="70%" mb={8} />
+                  <Skeleton height={16} width="45%" />
+                </div>
+              </div>
             ))}
-          </SimpleGrid>
-        </Stack>
-      </Container>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  // ── Pedido contraentrega confirmado ──────────────────────────────────────
+  // ── Pedido contra entrega confirmado ─────────────────────────────────────
   if (codConfirmation) {
+    const n = codConfirmation.items.reduce((s, i) => s + i.quantity, 0);
     return (
-      <Container size="sm" py="xl">
-        <Stack align="center" gap="lg" mt={40}>
-          <ThemeIcon size={96} radius="xl" color="teal" variant="light">
-            <IconCircleCheck size={60} />
-          </ThemeIcon>
-          <Stack align="center" gap="xs">
-            <Title order={2} ta="center">
-              ¡Pedido recibido!
-            </Title>
-            <Text c="dimmed" ta="center" maw={440}>
-              El negocio te contactará para coordinar la entrega. Pagas al
-              recibir tu pedido.
-            </Text>
-          </Stack>
+      <div style={{ ...page, maxWidth: 520 }}>
+        <div className="ag-card" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 56, height: 56, borderRadius: 999, display: "grid", placeItems: "center", background: "var(--success-soft)", color: "var(--success)" }}>
+              <IconCircleCheck size={28} />
+            </span>
+            <h1 style={{ ...h1, fontSize: 22, lineHeight: "28px" }}>Recibimos tu pedido</h1>
+            <div className="ag-muted" style={{ fontSize: 14, maxWidth: 380 }}>
+              El negocio te contactará para coordinar la entrega. Pagas al {codConfirmation.deliveryMode === "delivery" ? "recibirlo" : "recogerlo"}.
+            </div>
+          </div>
 
-          <Paper withBorder radius="lg" p="lg" w="100%">
-            <Text fw={700} mb="sm">
-              Resumen del pedido
-            </Text>
-            <Stack gap={6}>
-              {codConfirmation.items.map((i) => (
-                <Group key={i.product._id} justify="space-between" wrap="nowrap">
-                  <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
-                    {i.quantity}× {i.product.name}
-                  </Text>
-                  <Text size="sm" fw={500}>
-                    {formatCurrency(i.product.salePrice * i.quantity, currency)}
-                  </Text>
-                </Group>
-              ))}
-              <Divider my={4} />
-              <Group justify="space-between">
-                <Text fw={700}>Total</Text>
-                <Text fw={800} size="lg">
-                  {formatCurrency(codConfirmation.total, currency)}
-                </Text>
-              </Group>
-              <Group gap="xs" mt={4}>
-                <Badge
-                  variant="light"
-                  leftSection={
-                    codConfirmation.deliveryMode === "delivery" ? (
-                      <IconTruckDelivery size={12} />
-                    ) : (
-                      <IconBuildingStore size={12} />
-                    )
-                  }
-                >
-                  {codConfirmation.deliveryMode === "delivery"
-                    ? "Envío a domicilio"
-                    : "Recoger en el local"}
-                </Badge>
-                <Badge variant="light" color="orange">
-                  Pago contra entrega
-                </Badge>
-              </Group>
-              {codConfirmation.address && (
-                <Text size="sm" c="dimmed">
-                  Dirección: {codConfirmation.address}
-                </Text>
-              )}
-            </Stack>
-          </Paper>
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <div className="ag-subtle" style={{ marginBottom: 6 }}>{countLabel(n)}</div>
+            {codConfirmation.items.map((i) => (
+              <div key={i.product._id} className="ag-row" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 8, fontSize: 14, padding: "3px 0" }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {i.quantity} × {i.product.name}
+                </span>
+                <span className="ag-num">{formatCurrency(i.product.salePrice * i.quantity, currency)}</span>
+              </div>
+            ))}
+            <div className="ag-row" style={{ justifyContent: "space-between", borderTop: "1px solid var(--line)", marginTop: 8, paddingTop: 8 }}>
+              <b>Total</b>
+              <span className="ag-price">{formatCurrency(codConfirmation.total, currency)}</span>
+            </div>
+          </div>
 
-          <Button
-            variant="light"
-            size="md"
-            leftSection={<IconBuildingStore size={18} />}
-            onClick={() => setCodConfirmation(null)}
-          >
+          <dl className="ag-kv" style={{ margin: 0 }}>
+            <dt>Entrega</dt>
+            <dd>{codConfirmation.deliveryMode === "delivery" ? "Domicilio" : "Recoger en el local"}</dd>
+            {codConfirmation.address && (
+              <>
+                <dt>Dirección</dt>
+                <dd>{codConfirmation.address}</dd>
+              </>
+            )}
+            <dt>Pago</dt>
+            <dd>Contra entrega</dd>
+          </dl>
+
+          <Button variant="default" onClick={() => setCodConfirmation(null)}>
             Seguir comprando
           </Button>
-        </Stack>
-      </Container>
+        </div>
+      </div>
     );
   }
 
-  // En móvil, la barra de carrito es fija al fondo: reserva espacio para que
-  // no tape la última fila de productos.
-  const mobileCartBarSpace = isMobile && cart.length > 0 ? 88 : 0;
+  // ── Contenido del carrito (drawer en desktop, hoja inferior en móvil) ────
+  const cartContent =
+    cart.length === 0 ? (
+      <div style={{ textAlign: "center", padding: "32px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        <b style={{ fontSize: 15 }}>Tu pedido está vacío</b>
+        <div className="ag-muted" style={{ fontSize: 14 }}>Agrega productos del catálogo para armarlo.</div>
+        <Button variant="default" mt={8} onClick={() => setCartOpen(false)}>Ver productos</Button>
+      </div>
+    ) : (
+      <div className="ag-stack" style={{ gap: 16 }}>
+        <div>
+          {cart.map((i) => (
+            <div key={i.product._id} className="ag-row" style={{ gap: 12, flexWrap: "nowrap", alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+              {thumb(i.product, 48)}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i.product.name}</div>
+                <div className="ag-subtle ag-num">{formatCurrency(i.product.salePrice, currency)} c/u</div>
+                <div style={{ marginTop: 6 }}>{stepper(i.product._id, i.quantity, i.product.name)}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                <span className="ag-num" style={{ fontSize: 14, fontWeight: 600 }}>{formatCurrency(i.product.salePrice * i.quantity, currency)}</span>
+                <button type="button" className="store-icon-btn" aria-label={`Quitar ${i.product.name}`} onClick={() => removeFromCart(i.product._id)}>
+                  <IconTrash size={15} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="ag-stack" style={{ gap: 6, fontSize: 14 }}>
+          <div className="ag-row" style={{ justifyContent: "space-between" }}>
+            <span className="ag-muted">Subtotal</span>
+            <span className="ag-num">{formatCurrency(total, currency)}</span>
+          </div>
+          <div className="ag-row" style={{ justifyContent: "space-between" }}>
+            <span className="ag-muted">Envío</span>
+            <span className="ag-muted">Lo coordina el negocio</span>
+          </div>
+          <div className="ag-row" style={{ justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 2 }}>
+            <b>Total</b>
+            <span className="ag-price">{formatCurrency(total, currency)}</span>
+          </div>
+        </div>
+
+        <div className="ag-stack" style={{ gap: 6 }}>
+          <Button
+            fullWidth
+            size="md"
+            disabled={!canPay}
+            onClick={() => {
+              setCartOpen(false);
+              openCheckout();
+            }}
+          >
+            Hacer pedido
+          </Button>
+          <Button fullWidth variant="subtle" color="gray" onClick={() => setCartOpen(false)}>
+            Seguir comprando
+          </Button>
+          {payHints.length > 0 && (
+            <div className="ag-subtle" style={{ textAlign: "center" }}>
+              Pagas con {payHints.length > 1 ? `${payHints.slice(0, -1).join(", ")} o ${payHints[payHints.length - 1]}` : payHints[0]}.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+  // ── Opciones del checkout ────────────────────────────────────────────────
+  const option = (checked: boolean, onSelect: () => void, title: string, desc: string, key: string) => (
+    <div
+      key={key}
+      className="ag-opt"
+      role="radio"
+      tabIndex={0}
+      aria-checked={checked}
+      onClick={onSelect}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onSelect())}
+      style={{ cursor: "pointer", flex: 1 }}
+    >
+      <span className="ag-radio" />
+      <div>
+        <b>{title}</b>
+        <div className="d">{desc}</div>
+      </div>
+    </div>
+  );
+
+  const submitLabel =
+    payMethod === "cod" ? "Confirmar pedido" : payMethod === "receipt" ? "Continuar al pago" : `Pagar ${formatCurrency(total, currency)}`;
+
+  const sectionTitle = (t: string) => (
+    <h2 className="ag-h" style={{ margin: 0 }}>{t}</h2>
+  );
 
   return (
-    <Container size="xl" py="xl" pb={mobileCartBarSpace || undefined}>
+    <div style={page}>
       <style>{STORE_STYLES}</style>
 
-      {/*
-        Un solo Stack plano (header → buscador → pestañas → grilla): la barra
-        de pestañas sticky necesita que su contenedor abarque hasta el final
-        de la grilla, si no, se queda sin espacio para "pegarse" y se va con
-        el resto al hacer scroll (el contenedor anterior solo envolvía el
-        buscador, apenas ~100px de alto).
-      */}
-      <Stack gap="md">
+      <div className="ag-stack" style={{ gap: 16 }}>
         {headerBlock}
 
         {products.length > 0 && (
-          <TextInput
-            placeholder="Buscar productos..."
-            aria-label="Buscar productos"
-            leftSection={<IconSearch size={16} />}
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-            radius="md"
-            size="md"
-            maw={480}
-            w="100%"
-            mx="auto"
-          />
-        )}
-
-        {products.length > 0 && categories.length >= 2 && (
-          // Pestañas con subrayado, fijas debajo del buscador al hacer scroll
-          // (top = alto del header fijo de la app, 50px — ver App.tsx).
-          <Box style={{ position: "sticky", top: 50, zIndex: 20, background: "var(--mantine-color-body)" }}>
-            <Box
-              className={isMobile ? "store-tabs-bar store-category-scroll" : "store-tabs-bar"}
-              style={{ justifyContent: isMobile ? "flex-start" : "center" }}
-            >
-              <button
-                type="button"
-                className="store-tab"
-                data-active={categoryFilter === ALL_CATEGORIES}
-                onClick={() => setCategoryFilter(ALL_CATEGORIES)}
-              >
-                Todas
-              </button>
-              {categories.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="store-tab"
-                  data-active={categoryFilter === c}
-                  onClick={() => setCategoryFilter(c)}
-                >
-                  {c}
+          <div className="store-filters">
+            <TextInput
+              placeholder="Buscar productos"
+              aria-label="Buscar productos"
+              leftSection={<IconSearch size={16} />}
+              rightSection={
+                search ? (
+                  <button type="button" className="store-icon-btn" aria-label="Borrar búsqueda" onClick={() => setSearch("")}>
+                    <IconX size={14} />
+                  </button>
+                ) : null
+              }
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+              style={{ width: isMobile ? "100%" : 320, flex: "none" }}
+            />
+            {categories.length >= 2 && (
+              <div className="store-chips" role="group" aria-label="Categorías">
+                <button type="button" className="ag-chip" aria-pressed={categoryFilter === ALL_CATEGORIES} onClick={() => setCategoryFilter(ALL_CATEGORIES)}>
+                  Todas <span className="count">{products.length}</span>
                 </button>
-              ))}
-            </Box>
-          </Box>
+                {categories.map((c) => (
+                  <button key={c} type="button" className="ag-chip" aria-pressed={categoryFilter === c} onClick={() => setCategoryFilter(c)}>
+                    {c} <span className="count">{products.filter((p) => p.category?.trim() === c).length}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {!canPay && products.length > 0 && (
-          <Alert icon={<IconAlertCircle size={18} />} color="yellow" variant="light">
-            Los pedidos en línea no están disponibles en este momento. Comunícate
-            con el negocio para comprar.
-          </Alert>
+          <div className="ag-alert ag-alert--info">
+            <IconInfoCircle size={20} />
+            <div>Los pedidos en línea no están disponibles en este momento. Comunícate con el negocio para comprar.</div>
+          </div>
         )}
 
         {/* ── Catálogo ── */}
         {products.length === 0 ? (
-          <Center mih="30vh">
-            <Stack align="center" gap="sm">
-              <ThemeIcon size={64} radius="xl" variant="light" color="gray">
-                <IconBuildingStore size={36} />
-              </ThemeIcon>
-              <Text fw={600}>Aún no hay productos disponibles</Text>
-              <Text size="sm" c="dimmed" ta="center">
-                Vuelve pronto: el negocio está preparando su catálogo.
-              </Text>
-            </Stack>
-          </Center>
+          emptyState("Aún no hay productos", "Vuelve pronto: el negocio está preparando su catálogo.")
         ) : filteredProducts.length === 0 ? (
-          <Center mih="30vh">
-            <Stack align="center" gap="sm">
-              <ThemeIcon size={64} radius="xl" variant="light" color="gray">
-                <IconSearchOff size={36} />
-              </ThemeIcon>
-              <Text fw={600}>No encontramos productos</Text>
-              <Text size="sm" c="dimmed" ta="center">
-                Prueba con otra búsqueda o cambia de categoría.
-              </Text>
-              <Button
-                variant="light"
-                size="xs"
-                onClick={() => {
-                  setSearch("");
-                  setCategoryFilter(ALL_CATEGORIES);
-                }}
-              >
-                Limpiar filtros
-              </Button>
-            </Stack>
-          </Center>
-        ) : (
-          <SimpleGrid cols={{ base: 2, sm: 3, lg: 4 }} spacing={{ base: "sm", sm: "lg" }}>
-            {filteredProducts.map((product) => {
-              const qty = cartQty(product._id);
-              return (
-                <Card
-                  key={product._id}
-                  withBorder
-                  shadow="xs"
-                  radius="lg"
-                  padding={isMobile ? "sm" : "lg"}
-                  className="store-product-card"
-                  style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}
-                  onClick={() => navigate(`/tienda/producto/${product._id}`)}
-                >
-                  {/* Imagen (o placeholder) siempre presente: mantiene las
-                      tarjetas alineadas aunque solo algunos productos la tengan.
-                      Área 1:1 (estándar de producto) para minimizar recortes. */}
-                  <Card.Section style={{ position: "relative", overflow: "hidden" }}>
-                    <AspectRatio ratio={1}>
-                      {product.imageUrl ? (
-                        <Image
-                          className="store-product-img"
-                          src={storeImageSrc(product.imageUrl)}
-                          alt={product.name}
-                          fit="cover"
-                          style={
-                            product.outOfStock
-                              ? { filter: "grayscale(1) opacity(0.6)" }
-                              : undefined
-                          }
-                        />
-                      ) : (
-                        <Center
-                          className="store-product-img"
-                          bg="var(--mantine-color-gray-1)"
-                          style={
-                            product.outOfStock
-                              ? { filter: "grayscale(1) opacity(0.6)" }
-                              : undefined
-                          }
-                        >
-                          <IconBuildingStore
-                            size={44}
-                            color="var(--mantine-color-gray-5)"
-                          />
-                        </Center>
-                      )}
-                    </AspectRatio>
-                    {product.category && (
-                      <Badge
-                        size="sm"
-                        variant="white"
-                        style={{
-                          position: "absolute",
-                          top: 8,
-                          left: 8,
-                          boxShadow: "var(--mantine-shadow-xs)",
-                        }}
-                      >
-                        {product.category}
-                      </Badge>
-                    )}
-                    {product.featured && (
-                      <Badge
-                        size="sm"
-                        color="yellow"
-                        variant="filled"
-                        style={{
-                          position: "absolute",
-                          top: 8,
-                          right: 8,
-                          boxShadow: "var(--mantine-shadow-xs)",
-                        }}
-                      >
-                        Destacado
-                      </Badge>
-                    )}
-                    {product.outOfStock && (
-                      <Center style={{ position: "absolute", inset: 0 }}>
-                        <Badge size="lg" color="dark" variant="filled">
-                          Agotado
-                        </Badge>
-                      </Center>
-                    )}
-                  </Card.Section>
-
-                  <Stack gap={6} mt="md" style={{ flexGrow: 1 }}>
-                    {product.brand && (
-                      <Text
-                        size="xs"
-                        c="dimmed"
-                        tt="uppercase"
-                        fw={600}
-                        lts={0.5}
-                        lineClamp={1}
-                      >
-                        {product.brand}
-                      </Text>
-                    )}
-                    <Text fw={600} lineClamp={1}>
-                      {product.name}
-                    </Text>
-                    {product.description && (
-                      <Text size="sm" c="dimmed" lineClamp={2}>
-                        {product.description}
-                      </Text>
-                    )}
-
-                    <Text size="xl" fw={800} c="var(--mantine-primary-color-filled)" mt="auto" pt={6}>
-                      {formatCurrency(product.salePrice, currency)}
-                    </Text>
-
-                    {qty === 0 ? (
-                      <Button
-                        fullWidth
-                        variant="filled"
-                        radius="md"
-                        leftSection={<IconShoppingCart size={16} />}
-                        disabled={!!product.outOfStock || !canPay}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addToCart(product);
-                        }}
-                      >
-                        Agregar
-                      </Button>
-                    ) : (
-                      <Group gap="xs" wrap="nowrap" onClick={(e) => e.stopPropagation()}>
-                        <ActionIcon
-                          variant="light"
-                          size="lg"
-                          radius="md"
-                          aria-label="Quitar uno"
-                          onClick={() => changeQty(product._id, -1)}
-                        >
-                          <IconMinus size={16} />
-                        </ActionIcon>
-                        <Text fw={700} ta="center" style={{ flex: 1 }}>
-                          {qty}
-                        </Text>
-                        <ActionIcon
-                          variant="light"
-                          size="lg"
-                          radius="md"
-                          aria-label="Agregar uno"
-                          onClick={() => changeQty(product._id, 1)}
-                        >
-                          <IconPlus size={16} />
-                        </ActionIcon>
-                      </Group>
-                    )}
-                  </Stack>
-                </Card>
-              );
-            })}
-          </SimpleGrid>
-        )}
-      </Stack>
-
-      {/* ── Botón del carrito: barra inferior en móvil (más fácil de tocar con
-          el pulgar), pill flotante en desktop ── */}
-      {cart.length > 0 &&
-        (isMobile ? (
-          <Affix position={{ bottom: 0, left: 0, right: 0 }} zIndex={150}>
-            <Box
-              p="sm"
-              style={{
-                background: "var(--mantine-color-body)",
-                borderTop: "1px solid var(--mantine-color-gray-3)",
-                boxShadow: "var(--mantine-shadow-lg)",
-                paddingBottom: "calc(var(--mantine-spacing-sm) + env(safe-area-inset-bottom, 0px))",
+          emptyState(
+            "No encontramos productos",
+            "Prueba con otra búsqueda o cambia de categoría.",
+            <Button
+              variant="default"
+              size="xs"
+              onClick={() => {
+                setSearch("");
+                setCategoryFilter(ALL_CATEGORIES);
               }}
             >
-              <Button
-                fullWidth
-                size="md"
-                radius="md"
-                leftSection={<IconShoppingCart size={18} />}
-                rightSection={
-                  <Badge size="sm" variant="white" circle>
-                    {itemCount}
-                  </Badge>
-                }
-                onClick={() => setCartOpen(true)}
-              >
-                Ver pedido · {formatCurrency(total, currency)}
-              </Button>
-            </Box>
-          </Affix>
-        ) : (
-          <Affix position={{ bottom: 20, right: 20 }} zIndex={150}>
-            <Button
-              size="md"
-              radius="xl"
-              leftSection={<IconShoppingCart size={18} />}
-              rightSection={
-                <Badge size="sm" variant="white" circle>
-                  {itemCount}
-                </Badge>
-              }
-              style={{ boxShadow: "var(--mantine-shadow-lg)" }}
-              onClick={() => setCartOpen(true)}
-            >
-              {formatCurrency(total, currency)}
+              Limpiar filtros
             </Button>
-          </Affix>
+          )
+        ) : (
+          <div className="store-grid">
+            {filteredProducts.map((product) => {
+              const qty = cartQty(product._id);
+              const soldOut = !!product.outOfStock;
+              const open = () => navigate(`/tienda/producto/${product._id}`);
+              return (
+                <div
+                  key={product._id}
+                  className="ag-card store-card"
+                  data-soldout={soldOut || undefined}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={product.name}
+                  onClick={open}
+                  onKeyDown={(e) => e.key === "Enter" && open()}
+                >
+                  <div className="store-card__img ag-photo">
+                    {product.imageUrl ? (
+                      <img src={storeImageSrc(product.imageUrl)} alt="" loading="lazy" />
+                    ) : (
+                      <IconPhoto size={32} />
+                    )}
+                    {(product.featured || soldOut) && (
+                      <div className="store-card__badges">
+                        {soldOut ? (
+                          <span className="ag-badge ag-badge--danger">Agotado</span>
+                        ) : (
+                          <span className="ag-badge">Destacado</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="store-card__body">
+                    {product.brand && <div className="store-card__brand">{product.brand}</div>}
+                    <div className="store-card__name">{product.name}</div>
+                    <div className="store-card__foot">
+                      <span className="ag-price">{formatCurrency(product.salePrice, currency)}</span>
+                      {!soldOut && canPay && (
+                        <button
+                          type="button"
+                          className="store-add"
+                          data-count={qty > 0 || undefined}
+                          aria-label={qty > 0 ? `${qty} en tu pedido. Agregar otro ${product.name}` : `Agregar ${product.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(product);
+                          }}
+                        >
+                          {qty > 0 ? qty : <IconPlus size={16} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Acceso al pedido: barra inferior en móvil, botón flotante en desktop ── */}
+      {cart.length > 0 &&
+        !cartOpen &&
+        !checkoutOpen &&
+        (isMobile ? (
+          <div className="store-bottom-bar">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>
+                {countLabel(itemCount)} · <span className="ag-num">{formatCurrency(total, currency)}</span>
+              </div>
+              <div className="ag-subtle">Envío: lo coordina el negocio</div>
+            </div>
+            <Button onClick={() => setCartOpen(true)}>Ver pedido</Button>
+          </div>
+        ) : (
+          <button type="button" className="store-fab" onClick={() => setCartOpen(true)}>
+            <IconShoppingBag size={18} />
+            Ver pedido
+            <span className="store-fab__count ag-num">{itemCount}</span>
+          </button>
         ))}
 
-      {/* ── Carrito (Drawer) ── */}
+      {/* ── Pedido ── */}
       <Drawer
         opened={cartOpen}
         onClose={() => setCartOpen(false)}
-        position="right"
-        size={isMobile ? "100%" : 420}
+        position={isMobile ? "bottom" : "right"}
+        size={isMobile ? "auto" : 420}
+        radius={isMobile ? "lg" : 0}
         title={
-          <Group gap="xs">
-            <IconShoppingCart size={20} />
-            <Text fw={700}>Tu pedido</Text>
-          </Group>
+          <b style={{ fontSize: 16 }}>
+            Tu pedido{itemCount > 0 && <span className="ag-muted" style={{ fontWeight: 400 }}> · {countLabel(itemCount)}</span>}
+          </b>
         }
+        styles={isMobile ? { content: { flex: "0 0 auto", height: "auto", maxHeight: "88dvh" } } : undefined}
       >
-        {cart.length === 0 ? (
-          <Stack align="center" gap="sm" py="xl">
-            <ThemeIcon size={64} radius="xl" variant="light" color="gray">
-              <IconShoppingCart size={36} />
-            </ThemeIcon>
-            <Text fw={600}>Tu carrito está vacío</Text>
-            <Text size="sm" c="dimmed" ta="center">
-              Agrega productos del catálogo para armar tu pedido.
-            </Text>
-            <Button variant="light" size="xs" onClick={() => setCartOpen(false)}>
-              Ver productos
-            </Button>
-          </Stack>
-        ) : (
-          <Stack gap="md">
-            <Stack gap="sm">
-              {cart.map((i) => (
-                <Group key={i.product._id} wrap="nowrap" align="flex-start" gap="sm">
-                  {i.product.imageUrl ? (
-                    <Image
-                      src={storeImageSrc(i.product.imageUrl)}
-                      alt={i.product.name}
-                      w={48}
-                      h={48}
-                      radius="md"
-                      fit="cover"
-                      style={{ flexShrink: 0 }}
-                    />
-                  ) : (
-                    <Center
-                      w={48}
-                      h={48}
-                      bg="var(--mantine-color-gray-1)"
-                      style={{
-                        borderRadius: "var(--mantine-radius-md)",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <IconBuildingStore
-                        size={22}
-                        color="var(--mantine-color-gray-5)"
-                      />
-                    </Center>
-                  )}
-                  <Box style={{ flex: 1, minWidth: 0 }}>
-                    <Text size="sm" fw={600} lineClamp={1}>
-                      {i.product.name}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {formatCurrency(i.product.salePrice, currency)} c/u
-                    </Text>
-                    <Group gap={6} mt={6} wrap="nowrap">
-                      <ActionIcon
-                        variant="light"
-                        size="sm"
-                        radius="md"
-                        aria-label="Quitar uno"
-                        onClick={() => changeQty(i.product._id, -1)}
-                      >
-                        <IconMinus size={12} />
-                      </ActionIcon>
-                      <Text size="sm" fw={600} w={24} ta="center">
-                        {i.quantity}
-                      </Text>
-                      <ActionIcon
-                        variant="light"
-                        size="sm"
-                        radius="md"
-                        aria-label="Agregar uno"
-                        onClick={() => changeQty(i.product._id, 1)}
-                      >
-                        <IconPlus size={12} />
-                      </ActionIcon>
-                    </Group>
-                  </Box>
-                  <Stack gap={4} align="flex-end">
-                    <Text size="sm" fw={700}>
-                      {formatCurrency(i.product.salePrice * i.quantity, currency)}
-                    </Text>
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      size="sm"
-                      aria-label="Quitar del carrito"
-                      onClick={() => removeFromCart(i.product._id)}
-                    >
-                      <IconTrash size={14} />
-                    </ActionIcon>
-                  </Stack>
-                </Group>
-              ))}
-            </Stack>
-
-            <Divider />
-
-            <Group justify="space-between" align="center">
-              <Text fw={600}>Total</Text>
-              <Text fw={800} size="xl">
-                {formatCurrency(total, currency)}
-              </Text>
-            </Group>
-
-            <Button
-              fullWidth
-              size="md"
-              leftSection={<IconShoppingCart size={18} />}
-              disabled={!canPay}
-              onClick={() => {
-                setCartOpen(false);
-                openCheckout();
-              }}
-            >
-              Hacer pedido
-            </Button>
-
-            {payHints.length > 0 && (
-              <Group gap="md" justify="center">
-                {payHints.map(({ Icon, label }) => (
-                  <Group key={label} gap={4} wrap="nowrap">
-                    <Icon size={14} color="var(--mantine-color-dimmed)" />
-                    <Text size="xs" c="dimmed">
-                      {label}
-                    </Text>
-                  </Group>
-                ))}
-              </Group>
-            )}
-          </Stack>
-        )}
+        {cartContent}
       </Drawer>
 
-      {/* ── Modal de checkout ── */}
+      {/* ── Hacer pedido ── */}
       <Modal
         opened={checkoutOpen}
         onClose={closeCheckout}
-        title={<Text fw={700}>Completar pedido</Text>}
+        title={<b style={{ fontSize: 16 }}>Hacer pedido</b>}
         centered
         size="lg"
         radius="lg"
         fullScreen={isMobile}
       >
-        <Stack gap="md">
-          <Divider label="Tus datos" labelPosition="left" />
+        <div className="ag-stack" style={{ gap: 20 }}>
+          <div className="ag-stack" style={{ gap: 10 }}>
+            {sectionTitle("Tus datos")}
 
-          {/* Identificador configurado por la organización (siempre primero) */}
-          {identifierField === "phone" && (
-            <Stack gap={6}>
+            {/* Identificador configurado por la organización (siempre primero) */}
+            {identifierField === "phone" && (
+              <>
+                <InternationalPhoneInput
+                  label={phoneCfg.label || IDENTIFIER_LABELS.phone}
+                  value={form.phone_e164 || form.phone}
+                  organizationDefaultCountry={orgCountry}
+                  onChange={(e164, country, valid) => {
+                    setField("phone_e164", e164 ?? "");
+                    setField("phone", e164 ?? "");
+                    setField("phone_country", country ?? "CO");
+                    setPhoneValid(valid);
+                    setPhoneError(null);
+                  }}
+                  onBlur={handlePhoneBlur}
+                  error={phoneError}
+                  required
+                  compact
+                />
+                <LookupFeedback />
+              </>
+            )}
+            {identifierField === "email" && (
+              <>
+                <TextInput
+                  label={emailCfg.label || IDENTIFIER_LABELS.email}
+                  placeholder="tu@correo.com"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setField("email", e.currentTarget.value)}
+                  onBlur={handleEmailBlur}
+                  error={emailError}
+                  required
+                  disabled={isLookingUp}
+                />
+                <LookupFeedback />
+              </>
+            )}
+            {identifierField === "documentId" && (
+              <>
+                <TextInput
+                  label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
+                  placeholder="Cédula, pasaporte…"
+                  value={form.documentId}
+                  onChange={(e) => setField("documentId", e.currentTarget.value)}
+                  onBlur={handleDocumentIdBlur}
+                  required
+                  disabled={isLookingUp}
+                />
+                <LookupFeedback />
+              </>
+            )}
+
+            <TextInput
+              label="Nombre completo"
+              placeholder="Tu nombre"
+              required
+              value={form.name}
+              onChange={(e) => setField("name", e.currentTarget.value)}
+              disabled={isLookingUp}
+            />
+
+            {/* Teléfono: siempre obligatorio para coordinar el pedido */}
+            {identifierField !== "phone" && (
               <InternationalPhoneInput
                 label={phoneCfg.label || IDENTIFIER_LABELS.phone}
                 value={form.phone_e164 || form.phone}
@@ -1192,332 +959,147 @@ export default function PublicStorePage() {
                   setField("phone", e164 ?? "");
                   setField("phone_country", country ?? "CO");
                   setPhoneValid(valid);
-                  setPhoneError(null);
                 }}
-                onBlur={handlePhoneBlur}
-                error={phoneError}
                 required
                 compact
               />
-              <LookupFeedback />
-            </Stack>
-          )}
-          {identifierField === "email" && (
-            <Stack gap={6}>
+            )}
+            {emailCfg.enabled && identifierField !== "email" && (
               <TextInput
                 label={emailCfg.label || IDENTIFIER_LABELS.email}
-                placeholder="Ingresa tu correo"
+                placeholder={emailCfg.required ? "tu@correo.com" : "Opcional"}
                 type="email"
                 value={form.email}
                 onChange={(e) => setField("email", e.currentTarget.value)}
                 onBlur={handleEmailBlur}
                 error={emailError}
-                required
-                disabled={isLookingUp}
+                required={emailCfg.required}
               />
-              <LookupFeedback />
-            </Stack>
-          )}
-          {identifierField === "documentId" && (
-            <Stack gap={6}>
+            )}
+            {documentIdCfg.enabled && identifierField !== "documentId" && (
               <TextInput
                 label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
-                placeholder="Cédula, pasaporte, etc."
+                placeholder={documentIdCfg.required ? "Cédula, pasaporte…" : "Opcional"}
                 value={form.documentId}
                 onChange={(e) => setField("documentId", e.currentTarget.value)}
-                onBlur={handleDocumentIdBlur}
-                required
-                disabled={isLookingUp}
+                required={documentIdCfg.required}
               />
-              <LookupFeedback />
-            </Stack>
-          )}
-          {documentIdCfg.enabled && identifierField !== "documentId" && (
-            <TextInput
-              label={documentIdCfg.label || IDENTIFIER_LABELS.documentId}
-              placeholder="opcional"
-              value={form.documentId}
-              onChange={(e) => setField("documentId", e.currentTarget.value)}
-              required={documentIdCfg.required}
-            />
-          )}
+            )}
 
-          {/* Nombre (siempre) */}
-          <TextInput
-            label="Nombre completo"
-            placeholder="Tu nombre"
-            required
-            value={form.name}
-            onChange={(e) => setField("name", e.currentTarget.value)}
-            disabled={isLookingUp}
-          />
+            <DynamicFormFields fields={customFields} values={customFieldValues} onChange={handleCustomFieldChange} disabled={isLookingUp} />
+          </div>
 
-          {/* Teléfono: siempre obligatorio para coordinar el pedido */}
-          {identifierField !== "phone" && (
-            <InternationalPhoneInput
-              label={phoneCfg.label || IDENTIFIER_LABELS.phone}
-              value={form.phone_e164 || form.phone}
-              organizationDefaultCountry={orgCountry}
-              onChange={(e164, country, valid) => {
-                setField("phone_e164", e164 ?? "");
-                setField("phone", e164 ?? "");
-                setField("phone_country", country ?? "CO");
-                setPhoneValid(valid);
-              }}
-              required
-              compact
-            />
-          )}
-          {emailCfg.enabled && identifierField !== "email" && (
-            <TextInput
-              label={emailCfg.label || IDENTIFIER_LABELS.email}
-              placeholder="opcional"
-              type="email"
-              value={form.email}
-              onChange={(e) => setField("email", e.currentTarget.value)}
-              onBlur={handleEmailBlur}
-              error={emailError}
-              required={emailCfg.required}
-            />
-          )}
-
-          {/* Campos personalizados de la organización */}
-          <DynamicFormFields
-            fields={customFields}
-            values={customFieldValues}
-            onChange={handleCustomFieldChange}
-            disabled={isLookingUp}
-          />
-
-          <Divider label="Entrega" labelPosition="left" />
-
-          {/* Modalidad de entrega */}
-          <Radio.Group
-            value={deliveryMode}
-            onChange={(v) => setDeliveryMode(v as DeliveryMode)}
-            aria-label="Modalidad de entrega"
-          >
-            <Group grow gap="sm" align="stretch">
-              {deliveryModes.pickup && (
-              <Radio.Card
-                value="pickup"
-                radius="md"
-                p="sm"
-                className="store-option-card"
-              >
-                <Stack gap={6} align="center" ta="center">
-                  <ThemeIcon variant="light" size="lg" radius="md">
-                    <IconBuildingStore size={20} />
-                  </ThemeIcon>
-                  <div>
-                    <Text size="sm" fw={600}>
-                      Retiro en local
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Recoges tu pedido en el negocio
-                    </Text>
-                  </div>
-                </Stack>
-              </Radio.Card>
-              )}
-              {deliveryModes.delivery && (
-              <Radio.Card
-                value="delivery"
-                radius="md"
-                p="sm"
-                className="store-option-card"
-              >
-                <Stack gap={6} align="center" ta="center">
-                  <ThemeIcon variant="light" size="lg" radius="md">
-                    <IconTruckDelivery size={20} />
-                  </ThemeIcon>
-                  <div>
-                    <Text size="sm" fw={600}>
-                      Domicilio
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Te lo llevamos a tu dirección
-                    </Text>
-                  </div>
-                </Stack>
-              </Radio.Card>
-              )}
-            </Group>
-          </Radio.Group>
-          {deliveryMode === "delivery" && (
-            <Stack gap={6}>
-              <Textarea
-                label="Dirección de entrega"
-                placeholder="Calle, número, barrio, referencias..."
-                required
-                value={address}
-                onChange={(e) => setAddress(e.currentTarget.value)}
-                minRows={2}
-                autosize
-              />
-              <Button
-                variant="subtle"
-                size="xs"
-                leftSection={<IconMapPin size={14} />}
-                onClick={() => setShowMap((v) => !v)}
-                style={{ alignSelf: "flex-start" }}
-              >
-                {showMap ? "Ocultar mapa" : "Ubicar en el mapa (opcional)"}
-              </Button>
-              <Collapse in={showMap}>
-                <AddressMapPicker
-                  lat={deliveryLat}
-                  lng={deliveryLng}
-                  defaultCenter={organization?.location}
-                  onChange={({ lat, lng, address: pickedAddress }) => {
-                    setDeliveryLat(lat);
-                    setDeliveryLng(lng);
-                    if (pickedAddress) setAddress(pickedAddress);
-                  }}
+          <div className="ag-stack" style={{ gap: 10 }}>
+            {sectionTitle("Entrega")}
+            <div role="radiogroup" aria-label="Entrega" style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
+              {deliveryModes.pickup &&
+                option(deliveryMode === "pickup", () => setDeliveryMode("pickup"), "Recoger en el local", "Pasas por tu pedido al negocio.", "pickup")}
+              {deliveryModes.delivery &&
+                option(deliveryMode === "delivery", () => setDeliveryMode("delivery"), "Domicilio", "Te lo llevan a tu dirección.", "delivery")}
+            </div>
+            {deliveryMode === "delivery" && (
+              <>
+                <Textarea
+                  label="Dirección de entrega"
+                  placeholder="Calle, número, barrio, referencias"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.currentTarget.value)}
+                  minRows={2}
+                  autosize
                 />
-              </Collapse>
-            </Stack>
-          )}
-          <Textarea
-            label="Notas para el pedido"
-            placeholder="Información adicional (opcional)"
-            value={deliveryNotes}
-            onChange={(e) => setDeliveryNotes(e.currentTarget.value)}
-            minRows={2}
-            autosize
-          />
-
-          <Divider label="Pago" labelPosition="left" />
-
-          {/* Vía de pago (solo las disponibles) */}
-          <Radio.Group
-            value={payMethod ?? ""}
-            onChange={(v) => setPayMethod(v as PayMethod)}
-            aria-label="Vía de pago"
-          >
-            <Stack gap="xs">
-              {hasMp && (
-                <Radio.Card
-                  value="mp"
-                  radius="md"
-                  p="sm"
-                  className="store-option-card"
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  size="xs"
+                  leftSection={<IconMapPin size={14} />}
+                  onClick={() => setShowMap((v) => !v)}
+                  style={{ alignSelf: "flex-start" }}
                 >
-                  <Group wrap="nowrap" gap="sm">
-                    <ThemeIcon variant="light" size="lg" radius="md">
-                      <IconCreditCard size={20} />
-                    </ThemeIcon>
-                    <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={600}>
-                        Mercado Pago
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        Paga online con tarjeta o saldo
-                      </Text>
-                    </div>
-                    <Radio.Indicator />
-                  </Group>
-                </Radio.Card>
-              )}
-              {hasReceipt && (
-                <Radio.Card
-                  value="receipt"
-                  radius="md"
-                  p="sm"
-                  className="store-option-card"
-                >
-                  <Group wrap="nowrap" gap="sm">
-                    <ThemeIcon variant="light" size="lg" radius="md">
-                      <IconReceipt2 size={20} />
-                    </ThemeIcon>
-                    <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={600}>
-                        Transferencia
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        Sube tu comprobante
-                      </Text>
-                    </div>
-                    <Radio.Indicator />
-                  </Group>
-                </Radio.Card>
-              )}
-              {hasCod && (
-                <Radio.Card
-                  value="cod"
-                  radius="md"
-                  p="sm"
-                  className="store-option-card"
-                >
-                  <Group wrap="nowrap" gap="sm">
-                    <ThemeIcon variant="light" size="lg" radius="md">
-                      <IconCash size={20} />
-                    </ThemeIcon>
-                    <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={600}>
-                        Contraentrega
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {deliveryMode === "delivery" ? "Paga al recibir tu pedido" : "Paga al recoger tu pedido"}
-                      </Text>
-                    </div>
-                    <Radio.Indicator />
-                  </Group>
-                </Radio.Card>
-              )}
-            </Stack>
-          </Radio.Group>
+                  {showMap ? "Ocultar mapa" : "Ubicar en el mapa (opcional)"}
+                </Button>
+                <Collapse in={showMap}>
+                  <AddressMapPicker
+                    lat={deliveryLat}
+                    lng={deliveryLng}
+                    defaultCenter={organization?.location}
+                    onChange={({ lat, lng, address: pickedAddress }) => {
+                      setDeliveryLat(lat);
+                      setDeliveryLng(lng);
+                      if (pickedAddress) setAddress(pickedAddress);
+                    }}
+                  />
+                </Collapse>
+              </>
+            )}
+            <Textarea
+              label="Notas para el pedido"
+              placeholder="Opcional"
+              value={deliveryNotes}
+              onChange={(e) => setDeliveryNotes(e.currentTarget.value)}
+              minRows={2}
+              autosize
+            />
+          </div>
 
-          <Divider label="Resumen" labelPosition="left" />
+          <div className="ag-stack" style={{ gap: 10 }}>
+            {sectionTitle("Pago")}
+            <div role="radiogroup" aria-label="Pago" className="ag-stack" style={{ gap: 8 }}>
+              {hasMp && option(payMethod === "mp", () => setPayMethod("mp"), "Pagar en línea", "Tarjeta, PSE o saldo con Mercado Pago.", "mp")}
+              {hasReceipt &&
+                option(payMethod === "receipt", () => setPayMethod("receipt"), "Transferencia", "Te mostramos los datos y subes tu comprobante.", "receipt")}
+              {hasCod &&
+                option(
+                  payMethod === "cod",
+                  () => setPayMethod("cod"),
+                  "Contra entrega",
+                  deliveryMode === "delivery" ? "Pagas al recibir tu pedido." : "Pagas al recoger tu pedido.",
+                  "cod"
+                )}
+            </div>
+          </div>
 
-          {/* Resumen compacto del pedido */}
-          <Paper withBorder radius="md" p="sm">
-            <Stack gap={4}>
+          <div className="ag-stack" style={{ gap: 10 }}>
+            {sectionTitle("Resumen")}
+            <div className="ag-card" style={{ padding: 14, background: "var(--surface-muted)" }}>
               {cart.map((i) => (
-                <Group key={i.product._id} justify="space-between" wrap="nowrap">
-                  <Text size="sm" style={{ flex: 1, minWidth: 0 }} lineClamp={1}>
-                    {i.quantity}× {i.product.name}
-                  </Text>
-                  <Text size="sm" fw={500}>
-                    {formatCurrency(i.product.salePrice * i.quantity, currency)}
-                  </Text>
-                </Group>
+                <div key={i.product._id} className="ag-row" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 8, fontSize: 14, padding: "2px 0" }}>
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {i.quantity} × {i.product.name}
+                  </span>
+                  <span className="ag-num">{formatCurrency(i.product.salePrice * i.quantity, currency)}</span>
+                </div>
               ))}
-              <Divider my={4} />
-              <Group justify="space-between">
-                <Text fw={700}>Total</Text>
-                <Text fw={800}>{formatCurrency(total, currency)}</Text>
-              </Group>
-            </Stack>
-          </Paper>
+              <div className="ag-row" style={{ justifyContent: "space-between", fontSize: 14, padding: "2px 0" }}>
+                <span className="ag-muted">Envío</span>
+                <span className="ag-muted">Lo coordina el negocio</span>
+              </div>
+              <div className="ag-row" style={{ justifyContent: "space-between", borderTop: "1px solid var(--line)", marginTop: 8, paddingTop: 8 }}>
+                <b>Total</b>
+                <span className="ag-price">{formatCurrency(total, currency)}</span>
+              </div>
+            </div>
+          </div>
 
           {formError && (
-            <Alert color="red" variant="light" icon={<IconAlertCircle size={16} />}>
-              {formError}
-            </Alert>
+            <div className="ag-alert ag-alert--danger">
+              <IconInfoCircle size={20} />
+              <div>{formError}</div>
+            </div>
           )}
 
-          <Button
-            fullWidth
-            size="md"
-            loading={submitting}
-            leftSection={<IconShoppingCart size={16} />}
-            onClick={handleOrder}
-          >
-            {payMethod === "cod"
-              ? "Confirmar pedido"
-              : `Pagar ${formatCurrency(total, currency)}`}
-          </Button>
-          <Text size="xs" c="dimmed" ta="center">
-            {payMethod === "mp" &&
-              "Serás redirigido a Mercado Pago para completar el pago de forma segura."}
-            {payMethod === "receipt" &&
-              "A continuación verás los datos para realizar tu pago y subir el comprobante."}
-            {payMethod === "cod" &&
-              "Pagas al recibir tu pedido. El negocio te contactará para coordinar la entrega."}
-          </Text>
-        </Stack>
+          <div className="ag-stack" style={{ gap: 6 }}>
+            <Button fullWidth size="md" loading={submitting} onClick={handleOrder}>
+              {submitLabel}
+            </Button>
+            <div className="ag-subtle" style={{ textAlign: "center" }}>
+              {payMethod === "mp" && "Te llevamos a Mercado Pago para pagar de forma segura."}
+              {payMethod === "receipt" && "En el siguiente paso verás los datos para pagar y subir tu comprobante."}
+              {payMethod === "cod" && "El negocio te contactará para coordinar la entrega."}
+            </div>
+          </div>
+        </div>
       </Modal>
-    </Container>
+    </div>
   );
 }

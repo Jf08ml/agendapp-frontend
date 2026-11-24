@@ -1,133 +1,73 @@
-import {
-  Stack, Group, Button, Text, Paper, ThemeIcon, SimpleGrid,
-  Title, Center, Box, Badge, List,
-} from "@mantine/core";
-import {
-  IconRocket, IconCheck, IconBrandWhatsapp, IconCalendar,
-  IconUsers, IconSettings, IconStar,
-} from "@tabler/icons-react";
+// Final de la configuración (rediseño, ConfiguracionInicial): «Tu negocio está
+// listo», con lo configurado y lo que se saltó, e «Ir a mi agenda», donde sigue la
+// lista Primeros pasos.
+import { Button } from "@mantine/core";
+import { IconCalendar, IconCheck, IconMinus } from "@tabler/icons-react";
 
 interface Props {
   onFinish: () => void;
   saving: boolean;
+  configured?: string[];
+  skipped?: string[];
 }
 
-const NEXT_STEPS = [
-  {
-    icon: <IconCalendar size={18} />,
-    color: "blue",
-    title: "Crea tu primera cita",
-    description: "Toca un día del calendario y la columna de tu profesional. En menos de un minuto verás tu agenda funcionando.",
-  },
-  {
-    icon: <IconBrandWhatsapp size={18} />,
-    color: "green",
-    title: "Conecta tu WhatsApp",
-    description: "Vincula tu número de WhatsApp para enviar confirmaciones y recordatorios automáticos a tus clientes.",
-  },
-  {
-    icon: <IconUsers size={18} />,
-    color: "violet",
-    title: "Agrega más profesionales",
-    description: "Invita a todos los miembros de tu equipo con sus horarios y servicios específicos.",
-  },
-  {
-    icon: <IconSettings size={18} />,
-    color: "orange",
-    title: "Personaliza los mensajes",
-    description: "Edita los templates de WhatsApp para que los mensajes suenen con la voz de tu marca.",
-  },
-];
-
-export default function StepFinish({ onFinish, saving }: Props) {
+export default function StepFinish({ onFinish, saving, configured = [], skipped = [] }: Props) {
   return (
-    <Stack gap="xl" align="center">
-      {/* Hero de celebración */}
-      <Center>
-        <Stack align="center" gap="md">
-          <Box
-            style={{
-              width: 96,
-              height: 96,
-              borderRadius: "50%",
-              background: "var(--mantine-color-green-1)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <ThemeIcon size={64} radius="50%" color="green" variant="filled">
-              <IconCheck size={36} />
-            </ThemeIcon>
-          </Box>
-          <Stack gap={4} align="center">
-            <Title order={2} ta="center">¡Tu negocio está listo!</Title>
-            <Text c="dimmed" size="md" ta="center" maw={480}>
-              Completaste la configuración inicial. Ya puedes comenzar a recibir citas y gestionar tu negocio desde la plataforma.
-            </Text>
-          </Stack>
-          <Badge size="lg" color="green" variant="light" leftSection={<IconStar size={14} />}>
-            Configuración completada
-          </Badge>
-        </Stack>
-      </Center>
-
-      {/* Resumen de lo configurado */}
-      <Paper withBorder p="md" radius="md" w="100%">
-        <Group gap="xs" mb="sm">
-          <IconRocket size={18} />
-          <Text fw={700} size="sm">Lo que configuraste hoy:</Text>
-        </Group>
-        <List
-          spacing="xs"
-          size="sm"
-          icon={<ThemeIcon size={18} radius="xl" color="green" variant="light"><IconCheck size={12} /></ThemeIcon>}
+    <div className="ag-stack" style={{ gap: 20 }}>
+      <div style={{ textAlign: "center" }}>
+        <span
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 999,
+            display: "inline-grid",
+            placeItems: "center",
+            background: "var(--success-soft)",
+            color: "var(--success)",
+          }}
         >
-          <List.Item>Primer servicio y su duración, precio y descripción</List.Item>
-          <List.Item>Primer profesional con acceso a la plataforma</List.Item>
-          <List.Item>Modo de aprobación de reservas en línea</List.Item>
-          <List.Item>Mensaje de bienvenida y diseño de página pública</List.Item>
-          <List.Item>Horario de atención y días laborales</List.Item>
-          <List.Item>Identidad visual (logo, colores, branding)</List.Item>
-          <List.Item>Política de cancelación y recordatorios automáticos</List.Item>
-        </List>
-      </Paper>
+          <IconCheck size={30} />
+        </span>
+        <h2 className="ag-h" style={{ margin: "12px 0 4px", fontSize: 22 }}>Tu negocio está listo</h2>
+        <div className="ag-muted" style={{ fontSize: 14, maxWidth: 460, margin: "0 auto" }}>
+          Ya puedes recibir citas. En la agenda te espera la lista «Primeros pasos» con lo que sigue.
+        </div>
+      </div>
 
-      {/* Próximos pasos */}
-      <Box w="100%">
-        <Text fw={700} size="sm" mb="md">Próximos pasos recomendados:</Text>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          {NEXT_STEPS.map((step, i) => (
-            <Paper key={i} withBorder p="sm" radius="md">
-              <Group gap="sm" align="flex-start">
-                <ThemeIcon size="md" radius="md" color={step.color} variant="light">
-                  {step.icon}
-                </ThemeIcon>
-                <Box style={{ flex: 1 }}>
-                  <Text fw={600} size="sm">{step.title}</Text>
-                  <Text size="xs" c="dimmed" mt={2}>{step.description}</Text>
-                </Box>
-              </Group>
-            </Paper>
-          ))}
-        </SimpleGrid>
-      </Box>
+      {(configured.length > 0 || skipped.length > 0) && (
+        <div className="ag-card" style={{ padding: 16 }}>
+          {configured.length > 0 && (
+            <>
+              <b style={{ display: "block", fontSize: 14, marginBottom: 8 }}>Lo que configuraste</b>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+                {configured.map((c) => (
+                  <li key={c} className="ag-row" style={{ gap: 6, fontSize: 14 }}>
+                    <IconCheck size={15} color="var(--success)" /> {c}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {skipped.length > 0 && (
+            <>
+              <b style={{ display: "block", fontSize: 14, margin: "14px 0 8px" }}>Lo que saltaste</b>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                {skipped.map((c) => (
+                  <li key={c} className="ag-row" style={{ gap: 6, fontSize: 14, color: "var(--ink-muted)" }}>
+                    <IconMinus size={15} /> {c} <span className="ag-subtle">· lo completas en Ajustes</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
-      <Button
-        size="lg"
-        leftSection={<IconCalendar size={20} />}
-        onClick={onFinish}
-        loading={saving}
-        fullWidth
-        maw={400}
-      >
-        Ir a mi agenda y crear mi primera cita
-      </Button>
-
-      <Text size="xs" c="dimmed" ta="center">
-        Tu configuración ha sido guardada. Puedes ajustar cualquier detalle desde{" "}
-        <Text span fw={600}>Configuración del negocio</Text> en el menú lateral.
-      </Text>
-    </Stack>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Button size="md" leftSection={<IconCalendar size={18} />} onClick={onFinish} loading={saving}>
+          Ir a mi agenda
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -6,13 +6,15 @@ import { Appointment } from "../../../services/appointmentService";
 import { formatInTimezone } from "../../../utils/timezoneUtils";
 
 const BRAND = {
-  deep: "#1E3A8A",
-  cream: "#FAF7F2",
-  surface: "#FFFFFF",
-  ink: "#101526",
-  body: "#404760",
-  muted: "#8B92A6",
-  line: "#E7E2D6",
+  deep: "var(--brand)",
+  deepText: "var(--brand-text)",
+  onDeep: "var(--on-brand)",
+  cream: "var(--surface-muted)",
+  surface: "var(--surface-raised)",
+  ink: "var(--ink)",
+  body: "var(--ink-muted)",
+  muted: "var(--ink-subtle)",
+  line: "var(--line)",
 };
 
 interface DayDetailPanelProps {
@@ -98,15 +100,14 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
         minHeight: 0,
       }}
     >
-      {/* Stats card */}
+      {/* Stats card: neutra (la marca se reserva para lo seleccionado y la acción principal) */}
       <Box
         style={{
-          background: BRAND.deep,
-          backgroundImage:
-            "radial-gradient(circle at 90% 0%, rgba(255,255,255,0.08), transparent 60%)",
+          background: "var(--surface-raised)",
+          border: "1px solid var(--line)",
           borderRadius: 16,
           padding: 18,
-          color: "#fff",
+          color: "var(--ink)",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -117,7 +118,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
           style={{
             fontSize: 10.5,
             letterSpacing: 2,
-            opacity: 0.7,
+            color: "var(--ink-muted)",
             textTransform: "uppercase",
             fontWeight: 700,
           }}
@@ -157,7 +158,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
                 style={{
                   width: 5,
                   height: `${h}%`,
-                  background: "rgba(255,255,255,0.6)",
+                  background: "var(--ink-muted)",
                   borderRadius: 2,
                   minHeight: 3,
                 }}
@@ -165,7 +166,7 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
             ))}
           </Box>
         </Box>
-        <Text style={{ fontSize: 12, opacity: 0.85, fontWeight: 500 }}>
+        <Text style={{ fontSize: 12, color: "var(--ink-muted)", fontWeight: 500 }}>
           {format(currentDate, "MMMM yyyy", { locale: es })}
         </Text>
       </Box>
@@ -367,14 +368,14 @@ const DayDetailPanel: React.FC<DayDetailPanelProps> = ({
           onClick={() => onCreateAppointment(selectedDay)}
           style={{
             background: BRAND.deep,
-            color: "#fff",
+            color: BRAND.onDeep,
             borderRadius: 10,
             padding: "11px 14px",
             fontSize: 13,
             fontWeight: 600,
             textAlign: "center",
             cursor: "pointer",
-            boxShadow: "0 2px 6px rgba(30,58,138,0.2)",
+            boxShadow: "var(--shadow-sm)",
             flexShrink: 0,
             transition: "opacity 0.12s",
             userSelect: "none",

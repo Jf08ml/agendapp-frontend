@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Title,
   Card,
   Group,
   Button,
@@ -13,13 +12,11 @@ import {
   TextInput,
   Badge,
   Menu,
-  Tooltip,
   SegmentedControl,
   Skeleton,
   Center,
   Stack,
   Paper,
-  Tabs,
   List,
   Image,
 } from "@mantine/core";
@@ -29,11 +26,11 @@ import {
   BsPencil,
   BsSearch,
   BsThreeDotsVertical,
-  BsPlusCircle,
   BsCheckCircle,
   BsXCircle,
 } from "react-icons/bs";
-import { IconPackage, IconUserPlus, IconUsers } from "@tabler/icons-react";
+import { IconCircleCheck, IconCircleOff, IconClock, IconPackage, IconPlus, IconUserPlus } from "@tabler/icons-react";
+import CatalogTabs from "../../../components/catalog/CatalogTabs";
 import { showNotification } from "@mantine/notifications";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
@@ -65,6 +62,8 @@ const AdminPackages: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch] = useDebouncedValue(searchTerm, 250);
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
+  // Segmento Paquetes · Vendidos a clientes (antes pestañas)
+  const [view, setView] = useState<"templates" | "assigned">("templates");
   const [initialLoaded, setInitialLoaded] = useState(false);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -297,32 +296,39 @@ const AdminPackages: React.FC = () => {
     return cls?.name || "Clase";
   };
 
+  // Catálogo › Paquetes (PaquetesPanel): pestañas del catálogo + una sola acción filled
   const HeaderBar = (
-    <Card withBorder radius="md" p="md" mb="md" shadow="sm">
-      <Group justify="space-between" align="center" wrap="nowrap">
-        <Group gap="xs">
-          <IconPackage size={28} />
-          <Title order={isMobile ? 3 : 2}>Paquetes de Sesiones</Title>
-        </Group>
+    <div className="ag-stack" style={{ gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+      <CatalogTabs counts={{ packages: packages.length }} />
+      <div className="ag-pagehead">
+        <SegmentedControl
+          value={view}
+          onChange={(v) => setView(v as "templates" | "assigned")}
+          data={[
+            { label: "Paquetes", value: "templates" },
+            { label: "Vendidos a clientes", value: "assigned" },
+          ]}
+          size="sm"
+        />
+        <span className="grow" />
         <Button
-          leftSection={<BsPlusCircle size={18} />}
+          leftSection={<IconPlus size={16} />}
           onClick={() => {
             setIsCreateModalOpen(true);
             setEditingPackage(null);
           }}
-          size={isMobile ? "sm" : "md"}
         >
-          {isMobile ? "Nuevo" : "Nuevo Paquete"}
+          Nuevo paquete
         </Button>
-      </Group>
-    </Card>
+      </div>
+    </div>
   );
 
   // Buscador + filtro de esta pestaña únicamente (plantillas). Vive dentro
   // del panel para que no parezca un buscador global que también debería
   // aplicar a "Paquetes asignados" — esa pestaña tiene el suyo propio.
   const TemplatesToolbar = (
-    <Group wrap="wrap" gap="sm" align="end" mb="md">
+    <Group wrap="wrap" gap="sm" align="center" mb="md">
       <TextInput
         leftSection={<BsSearch />}
         placeholder="Buscar plantillas por nombre o descripción..."
@@ -333,20 +339,18 @@ const AdminPackages: React.FC = () => {
           minWidth: isMobile ? "100%" : 240,
         }}
       />
-      <Box style={{ flex: isMobile ? "1 1 100%" : "0 0 auto" }}>
-        <Text size="xs" fw={500} mb={4}>Estado</Text>
-        <SegmentedControl
-          value={status}
-          onChange={(v: any) => setStatus(v)}
-          data={[
-            { label: "Todos", value: "all" },
-            { label: "Activos", value: "active" },
-            { label: "Inactivos", value: "inactive" },
-          ]}
-          size={isMobile ? "xs" : "sm"}
-          fullWidth={isMobile}
-        />
-      </Box>
+      {/* Mismo segmento compacto de Servicios */}
+      <SegmentedControl
+        aria-label="Estado"
+        value={status}
+        onChange={(v: any) => setStatus(v)}
+        data={[
+          { label: "Activos", value: "active" },
+          { label: "Inactivos", value: "inactive" },
+          { label: "Todos", value: "all" },
+        ]}
+        size="xs"
+      />
     </Group>
   );
 
@@ -365,6 +369,25 @@ const AdminPackages: React.FC = () => {
             </Grid.Col>
           ))}
         </Grid>
+      ) : packages.length === 0 ? (
+        <div className="ag-card">
+          <div className="ag-empty">
+            <div className="ag-empty__icon">
+              <IconPackage size={24} />
+            </div>
+            <h3>Crea tu primer paquete</h3>
+            <p>Vende varias sesiones por adelantado.</p>
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => {
+                setIsCreateModalOpen(true);
+                setEditingPackage(null);
+              }}
+            >
+              Nuevo paquete
+            </Button>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <Center mih={240}>
           <Stack align="center" gap="xs">
@@ -401,22 +424,13 @@ const AdminPackages: React.FC = () => {
                 )}
                 <Group justify="space-between" mb="sm">
                   <Group gap="xs">
-                    <Badge
-                      variant="filled"
-                      color={pkg.isActive ? "green" : "gray"}
-                      leftSection={
-                        pkg.isActive ? (
-                          <BsCheckCircle size={12} />
-                        ) : (
-                          <BsXCircle size={12} />
-                        )
-                      }
-                    >
+                    <span className={`ag-badge${pkg.isActive ? " ag-badge--success" : ""}`}>
+                      {pkg.isActive ? <IconCircleCheck size={12} stroke={2} /> : <IconCircleOff size={12} stroke={2} />}
                       {pkg.isActive ? "Activo" : "Inactivo"}
-                    </Badge>
-                    <Badge variant="light" color="blue">
-                      {pkg.validityDays} días
-                    </Badge>
+                    </span>
+                    <span className="ag-badge">
+                      <IconClock size={12} stroke={2} /> Vigencia {pkg.validityDays} días
+                    </span>
                   </Group>
                   <Menu shadow="md" width={200} position="bottom-end">
                     <Menu.Target>
@@ -534,27 +548,21 @@ const AdminPackages: React.FC = () => {
 
                 <Group justify="space-between" align="center">
                   {(pkg.tiers?.length ?? 0) > 0 ? (
-                    <Badge color="teal" variant="light" size="xl" radius="md">
-                      Desde {formatCurrency(Math.min(...pkg.tiers!.map((t) => t.price)), currency)}
-                    </Badge>
+                    <b className="ag-price">Desde {formatCurrency(Math.min(...pkg.tiers!.map((t) => t.price)), currency)}</b>
                   ) : (
-                    <Badge color="teal" variant="light" size="xl" radius="md">
-                      {formatCurrency(pkg.price ?? 0, currency)}
-                    </Badge>
+                    <b className="ag-price">{formatCurrency(pkg.price ?? 0, currency)}</b>
                   )}
-                  <Tooltip label="Asignar a cliente">
-                    <ActionIcon
-                      variant="light"
-                      color="teal"
-                      size="lg"
-                      onClick={() => {
-                        setAssigningPackage(pkg);
-                        setIsAssignModalOpen(true);
-                      }}
-                    >
-                      <IconUserPlus size={20} />
-                    </ActionIcon>
-                  </Tooltip>
+                  <Button
+                    variant="default"
+                    size="xs"
+                    leftSection={<IconUserPlus size={14} />}
+                    onClick={() => {
+                      setAssigningPackage(pkg);
+                      setIsAssignModalOpen(true);
+                    }}
+                  >
+                    Asignar a cliente
+                  </Button>
                 </Group>
               </Card>
             </Grid.Col>
@@ -565,28 +573,26 @@ const AdminPackages: React.FC = () => {
   );
 
   return (
-    <Box>
+    <Box p={{ base: "sm", md: "lg" }}>
       {HeaderBar}
 
-      <Tabs defaultValue="templates" keepMounted={false}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="templates" leftSection={<IconPackage size={16} />}>
-            Plantillas de paquetes
-          </Tabs.Tab>
-          <Tabs.Tab value="assigned" leftSection={<IconUsers size={16} />}>
-            Paquetes asignados
-          </Tabs.Tab>
-        </Tabs.List>
-
-        <Tabs.Panel value="templates">
+      {view === "templates" ? (
+        <>
           {TemplatesToolbar}
           {PackageTemplatesContent}
-        </Tabs.Panel>
-
-        <Tabs.Panel value="assigned">
-          <ClientPackagesTab currency={currency} />
-        </Tabs.Panel>
-      </Tabs>
+        </>
+      ) : (
+        <ClientPackagesTab
+          currency={currency}
+          emptyAction={
+            packages.length === 0
+              ? { label: "Nuevo paquete", onClick: () => { setIsCreateModalOpen(true); setEditingPackage(null); } }
+              : packages.length === 1
+                ? { label: "Asignar a cliente", onClick: () => { setAssigningPackage(packages[0]); setIsAssignModalOpen(true); } }
+                : { label: "Asignar a cliente", onClick: () => setView("templates") }
+          }
+        />
+      )}
 
       <ModalCreateEditPackage
         isOpen={isCreateModalOpen}

@@ -21,7 +21,6 @@ import {
   Grid,
   Switch,
   NumberInput,
-  Divider,
 } from "@mantine/core";
 import { BiPlus, BiEdit, BiTrash, BiInfoCircle } from "react-icons/bi";
 import { uploadImage } from "../../../../../services/imageService";
@@ -46,7 +45,11 @@ interface PaymentMethodsTabProps {
 export default function PaymentMethodsTab({
   form,
   isEditing,
-}: PaymentMethodsTabProps) {
+  part,
+}: PaymentMethodsTabProps & {
+  /** "methods": Cobros › Métodos de pago; "deposits": Cobros › Abonos. */
+  part?: "methods" | "deposits";
+}) {
   const methods = form.values.paymentMethods || [];
   const requireDeposit = form.values.requireReservationDeposit ?? false;
   const depositPercentage = form.values.reservationDepositPercentage ?? 50;
@@ -167,6 +170,7 @@ export default function PaymentMethodsTab({
         </Alert>
       )}
       
+      {part !== "methods" && (<>
       {/* Configuración de depósito para reservas */}
       <Card withBorder padding="md">
         <Stack gap="md">
@@ -284,11 +288,13 @@ export default function PaymentMethodsTab({
         </Card>
       )}
 
-      <Divider />
+      </>)}
+      {part !== "deposits" && (<>
+
 
       <Group justify="space-between">
         <Text size="lg" fw={600}>
-          Métodos de Pago Configurados
+          Métodos de pago
         </Text>
         {isEditing && (
           <Button
@@ -296,7 +302,7 @@ export default function PaymentMethodsTab({
             onClick={() => handleOpenModal()}
             variant="light"
           >
-            Agregar Método
+            Agregar método
           </Button>
         )}
       </Group>
@@ -307,7 +313,7 @@ export default function PaymentMethodsTab({
             <Text c="dimmed" ta="center">
               No hay métodos de pago configurados.
               <br />
-              Haz clic en "Agregar Método" para comenzar.
+              Haz clic en "Agregar método" para comenzar.
             </Text>
           </Card>
         ) : (
@@ -374,6 +380,7 @@ export default function PaymentMethodsTab({
           ))
         )}
       </Stack>
+      </>)}
 
       {/* Modal para agregar/editar método */}
       <Modal

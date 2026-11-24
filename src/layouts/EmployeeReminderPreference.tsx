@@ -51,8 +51,7 @@ const EmployeeReminderPreference = () => {
       console.error("Error al actualizar la preferencia de recordatorio:", error);
       setPreferences(previous);
       showNotification({
-        title: "❌ Error",
-        message: "No se pudo actualizar el recordatorio de cita",
+        message: "No pudimos guardar tu recordatorio de citas. Inténtalo de nuevo.",
         color: "red",
       });
     }
