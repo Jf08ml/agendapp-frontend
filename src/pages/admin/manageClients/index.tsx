@@ -28,7 +28,7 @@ import { usePermissions } from "../../../hooks/usePermissions";
 import { computeNavPermissions } from "../../../layouts/adminNavigation";
 import { IoAddCircleOutline } from "react-icons/io5";
 import { BsSearch } from "react-icons/bs";
-import { IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical, IconInfoCircle } from "@tabler/icons-react";
+import { IconFileDownload, IconFileUpload, IconRefresh, IconAlertTriangle, IconDotsVertical, IconInfoCircle } from "@tabler/icons-react";
 import {
   deleteClient,
   forceDeleteClient,
@@ -40,12 +40,15 @@ import {
   decrementLoyalty,
   Client,
   getClientsByOrganizationId,
+  getClientStats,
 } from "../../../services/clientService";
 import { showNotification } from "@mantine/notifications";
 import { openConfirmModal } from "@mantine/modals";
 import { useSelector } from "react-redux";
 import { RootState } from "../../../app/store";
 import { useDebouncedValue, useDisclosure, useMediaQuery } from "@mantine/hooks";
+import * as XLSX from "xlsx";
+import { exportRows, inSegment, SEGMENTS, type ClientStat, type Segment } from "./clientSegments";
 
 // Minúsculas y sin tildes: "jose" encuentra "José"
 const normalizeSearch = (s: string) =>
@@ -79,6 +82,9 @@ const ClientsDashboard = () => {
   const [openModal, setOpenModal] = useState(false);
   const [openBulkUploadModal, setOpenBulkUploadModal] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
+  // Segmentos (Fase 3): cifras por cliente del servidor; null mientras cargan
+  const [stats, setStats] = useState<Record<string, ClientStat> | null>(null);
+  const [segment, setSegment] = useState<Segment>("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [debounced] = useDebouncedValue(searchTerm, 250);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +135,17 @@ const ClientsDashboard = () => {
     if (organizationId) void fetchClients();
   }, [organizationId]);
 
+  useEffect(() => {
+    if (!organizationId) return;
+    let alive = true;
+    getClientStats().then((s) => {
+      if (alive) setStats(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [organizationId]);
+
   // Busca en cualquier dato del cliente: antes solo nombre y teléfono, así que en
   // negocios que identifican a sus clientes por documento (u otro campo) no se
   // podía encontrar a nadie por ese dato.
@@ -160,18 +177,47 @@ const ClientsDashboard = () => {
 
   // Filtros de fidelidad: premio listo = tiene un beneficio por servicios o por
   // referidos sin canjear (los mismos campos que muestran «Premio listo» en la fila).
+  // Segmentos (Frecuentes, Inactivos, Cumpleaños, Con paquete) con su conteo
+  const segmentCounts = useMemo(() => {
+    const now = new Date();
+    return Object.fromEntries(
+      SEGMENTS.map(({ key }) => [key, filteredClients.filter((c) => inSegment(c, stats?.[c._id], key, now)).length])
+    ) as Record<Segment, number>;
+  }, [filteredClients, stats]);
+  const segmentClients = useMemo(() => {
+    if (segment === "todos") return filteredClients;
+    const now = new Date();
+    return filteredClients.filter((c) => inSegment(c, stats?.[c._id], segment, now));
+  }, [filteredClients, stats, segment]);
+
   const loyaltyCounts = useMemo(
     () => ({
-      todos: filteredClients.length,
-      premio: filteredClients.filter(hasReward).length,
-      progreso: filteredClients.filter(inProgress).length,
+      todos: segmentClients.length,
+      premio: segmentClients.filter(hasReward).length,
+      progreso: segmentClients.filter(inProgress).length,
     }),
-    [filteredClients]
+    [segmentClients]
   );
   const visibleClients = useMemo(() => {
-    if (!loyaltyEnabled || loyaltyFilter === "todos") return filteredClients;
-    return filteredClients.filter(loyaltyFilter === "premio" ? hasReward : inProgress);
-  }, [filteredClients, loyaltyEnabled, loyaltyFilter]);
+    if (!loyaltyEnabled || loyaltyFilter === "todos") return segmentClients;
+    return segmentClients.filter(loyaltyFilter === "premio" ? hasReward : inProgress);
+  }, [segmentClients, loyaltyEnabled, loyaltyFilter]);
+
+  // Exportar la lista que se ve (Fase 3)
+  const handleExport = () => {
+    const rows = exportRows(visibleClients, stats || {});
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes");
+    const label = SEGMENTS.find((s) => s.key === segment)?.label ?? "Todos";
+    const slug = label
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+    XLSX.writeFile(wb, `clientes-${slug}.xlsx`);
+  };
 
   const handleRegisterService = async (clientId: string) => {
     try {
@@ -386,6 +432,27 @@ const ClientsDashboard = () => {
     }
   };
 
+  // Sin cifras aún, solo «Todos» y «Cumpleaños» (que no las necesita) se pueden usar
+  const segmentReady = (key: Segment) => !!stats || key === "todos" || key === "cumpleanos";
+  const segmentChips = (
+    <div className="ag-tabs" style={{ marginBottom: "var(--space-3)", flexWrap: "wrap" }} role="tablist" aria-label="Segmentos de clientes">
+      {SEGMENTS.map(({ key, label }) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          className="ag-chip"
+          aria-selected={segment === key}
+          onClick={() => setSegment(key)}
+          disabled={!segmentReady(key)}
+          style={{ cursor: "pointer" }}
+        >
+          {label} <span className="count">{segmentReady(key) ? segmentCounts[key] : "…"}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   const loyaltyChips = loyaltyEnabled && (
     <div className="ag-tabs" style={{ marginBottom: "var(--space-3)" }} role="tablist" aria-label="Filtrar clientes del programa">
       {(
@@ -500,12 +567,16 @@ const ClientsDashboard = () => {
                     >
                       Carga masiva
                     </Menu.Item>
+                    <Menu.Item leftSection={<IconFileDownload size={16} />} onClick={handleExport} disabled={visibleClients.length === 0}>
+                      Exportar lista ({visibleClients.length})
+                    </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
               </Group>
             </Flex>
           </Box>
 
+          {segmentChips}
           {loyaltyChips}
 
           {isLoading ? (
@@ -517,6 +588,7 @@ const ClientsDashboard = () => {
           ) : (
             <ClientList
                 clients={visibleClients}
+                stats={stats}
                 onDeleteClient={handleDeleteClient}
                 onForceDeleteClient={handleForceDeleteClient}
                 onMergeClient={handleOpenMerge}

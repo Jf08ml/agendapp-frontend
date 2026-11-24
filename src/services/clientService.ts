@@ -1,6 +1,7 @@
 import axios from "axios";
 import { apiClient } from "./axiosConfig";
 import { handleAxiosError } from "../utils/handleAxiosError";
+import type { ClientStat } from "../pages/admin/manageClients/clientSegments";
 
 // Entrada del historial de recompensas
 export interface RewardHistoryEntry {
@@ -140,6 +141,16 @@ export const getClients = async (): Promise<Client[]> => {
 };
 
 // Obtener clientes por organizationId
+/** Cifras por cliente (Fase 3): última visita, visitas, total gastado, paquete activo. {} si falla. */
+export const getClientStats = async (): Promise<Record<string, ClientStat>> => {
+  try {
+    const response = await apiClient.get<Response<Record<string, ClientStat>>>("/stats");
+    return response.data.data || {};
+  } catch {
+    return {};
+  }
+};
+
 export const getClientsByOrganizationId = async (
   organizationId: string
 ): Promise<Client[]> => {
