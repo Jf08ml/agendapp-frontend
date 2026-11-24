@@ -4,8 +4,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Collapse } from "@mantine/core";
-import { IconCalendarEvent, IconCalendarPlus, IconChevronDown, IconChevronUp, IconClock, IconLock, IconSchool, IconUser } from "@tabler/icons-react";
-import type { MyBookings, MyBookingType } from "../../services/clientBookingsService";
+import { IconCalendarEvent, IconCalendarPlus, IconChevronDown, IconChevronUp, IconClock, IconLock, IconPackage, IconSchool, IconUser } from "@tabler/icons-react";
+import type { MyBookings, MyBookingType, MyPackage } from "../../services/clientBookingsService";
 import { bookingFormatters, TYPE_NOUN } from "./bookingFormat";
 import RescheduleCard from "../public/RescheduleCard";
 
@@ -41,6 +41,13 @@ const HISTORY_BADGE: Record<string, { label: string; tone: Tone }> = {
   cancelled: { label: "Cancelada", tone: "neutral" },
   cancelled_by_customer: { label: "Cancelada", tone: "neutral" },
   cancelled_by_admin: { label: "Cancelada", tone: "neutral" },
+};
+
+const PACKAGE_BADGE: Record<MyPackage["state"], { label: string; tone: Tone }> = {
+  active: { label: "Activo", tone: "success" },
+  expiring: { label: "Vence pronto", tone: "warning" },
+  exhausted: { label: "Sin sesiones", tone: "neutral" },
+  expired: { label: "Vencido", tone: "neutral" },
 };
 
 const badgeClass = (tone: Tone) => (tone === "neutral" ? "ag-badge" : `ag-badge ag-badge--${tone}`);
@@ -200,6 +207,47 @@ const MyBookingsView: React.FC<Props> = ({ data, onCancel, notice, footer, resch
             ) : undefined
           )}
           {classes.length ? classes.map(renderRow) : empty("No tienes clases próximas.")}
+        </section>
+      )}
+
+      {/* Mis paquetes (Fase 3): solo llegan con el enlace personal */}
+      {(data.packages?.length ?? 0) > 0 && (
+        <section className="ag-stack" style={{ gap: 10 }}>
+          {sectionTitle(
+            "Mis paquetes",
+            <Button component={Link} to="/comprar-paquete" size="xs" variant="default" leftSection={<IconPackage size={14} />}>
+              Comprar paquete
+            </Button>
+          )}
+          {data.packages!.map((p) => {
+            const ended = p.state === "exhausted" || p.state === "expired";
+            const badge = PACKAGE_BADGE[p.state];
+            return (
+              <article key={p.id} className="ag-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, opacity: ended ? 0.75 : 1 }}>
+                <div className="ag-row" style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "nowrap" }}>
+                  <b style={{ fontSize: 15, minWidth: 0 }}>
+                    {p.name}
+                    {p.tierLabel ? ` · ${p.tierLabel}` : ""}
+                  </b>
+                  <span className={badgeClass(badge.tone)} style={{ flex: "none" }}>{badge.label}</span>
+                </div>
+                {p.items.map((it) => (
+                  <div key={it.name} style={{ display: "grid", gap: 4 }}>
+                    <div className="ag-row" style={{ justifyContent: "space-between", gap: 8, fontSize: 14 }}>
+                      <span>{it.name}</span>
+                      <span className="ag-num">
+                        {it.remaining === 0 ? "Sin sesiones" : `Te ${it.remaining === 1 ? "queda 1" : `quedan ${it.remaining}`} de ${it.total}`}
+                      </span>
+                    </div>
+                    <div aria-hidden="true" style={{ height: 6, borderRadius: 99, background: "var(--surface-hover)", overflow: "hidden" }}>
+                      <span style={{ display: "block", height: "100%", width: `${it.total ? Math.round((it.remaining / it.total) * 100) : 0}%`, background: "var(--brand)" }} />
+                    </div>
+                  </div>
+                ))}
+                {meta(IconCalendarEvent, `${p.state === "expired" ? "Venció el" : "Vence el"} ${dayLabel(p.expirationDate).replace(/^./, (c) => c.toLowerCase())}`)}
+              </article>
+            );
+          })}
         </section>
       )}
 

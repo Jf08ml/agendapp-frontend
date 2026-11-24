@@ -45,6 +45,17 @@ export interface MyHistoryItem {
   status: string;
 }
 
+/** Paquete del cliente (solo con el enlace personal; Fase 3). */
+export interface MyPackage {
+  id: string;
+  name: string;
+  tierLabel: string | null;
+  purchaseDate: string;
+  expirationDate: string;
+  state: "active" | "expiring" | "exhausted" | "expired";
+  items: { name: string; remaining: number; total: number }[];
+}
+
 export interface MyBookings {
   /** true en la consulta por teléfono: se ve pero no se cancela (eso pide el enlace). */
   readOnly: boolean;
@@ -62,6 +73,8 @@ export interface MyBookings {
   pendingReservations: MyPendingReservation[];
   classes: MyClassEnrollment[];
   history: MyHistoryItem[];
+  /** Vacío en la consulta por teléfono. Ausente si el backend es anterior. */
+  packages?: MyPackage[];
 }
 
 export type MyBookingType = "appointment" | "reservation" | "enrollment";
