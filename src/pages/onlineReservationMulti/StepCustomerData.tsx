@@ -15,7 +15,7 @@ import { DateInput } from "@mantine/dates";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   getClientByIdentifier,
-  updateClient,
+  updateClientPublic,
 } from "../../services/clientService";
 import { useSelector } from "react-redux";
 import { RootState } from "../../app/store";
@@ -301,7 +301,16 @@ const StepCustomerData: React.FC<StepCustomerDataProps> = ({
         });
       if (Object.keys(clientScopeValues).length > 0) updates.customFieldValues = clientScopeValues;
 
-      if (Object.keys(updates).length > 0) await updateClient(clientId, updates);
+      // El dato con el que se identificó (el servidor lo exige para dejar editar)
+      const identifierValue =
+        identifierField === "phone"
+          ? phoneE164 || ""
+          : identifierField === "email"
+            ? (customerDetails.email || "").trim()
+            : (customerDetails.documentId || "").trim();
+      if (Object.keys(updates).length > 0 && identifierValue) {
+        await updateClientPublic(clientId, { field: identifierField, value: identifierValue }, updates);
+      }
       return true;
     } catch {
       return false;
