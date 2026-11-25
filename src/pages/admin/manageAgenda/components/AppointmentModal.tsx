@@ -119,7 +119,8 @@ const ExtraEmployeeBlockEditor: React.FC<{
   timeFormat: string;
   onChange: (updated: ExtraBlock) => void;
   onRemove: () => void;
-}> = ({ block, blockIndex, employees, timeFormat, onChange, onRemove }) => {
+  showErrors?: boolean;
+}> = ({ block, blockIndex, employees, timeFormat, onChange, onRemove, showErrors }) => {
   const [serviceSearch, setServiceSearch] = useState("");
 
   const availableServices = block.employee
@@ -174,6 +175,7 @@ const ExtraEmployeeBlockEditor: React.FC<{
         value={block.employee?._id || ""}
         onChange={handleEmployeeChange}
         searchable
+        error={showErrors && !block.employee ? "Selecciona un profesional" : undefined}
         mb="sm"
         styles={{ input: { borderRadius: 8 } }}
       />
@@ -237,6 +239,10 @@ const ExtraEmployeeBlockEditor: React.FC<{
           </ScrollArea.Autosize>
           )}
         </Box>
+      )}
+
+      {showErrors && block.employee && block.services.length === 0 && (
+        <Text size="xs" c="red" mb="sm">Selecciona al menos un servicio</Text>
       )}
 
       <Grid gutter="sm">
@@ -348,6 +354,32 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
   // Multi-profesional
   const [extraBlocks, setExtraBlocks] = useState<ExtraBlock[]>([]);
   const isMultiMode = extraBlocks.length > 0;
+
+  // ✅ Validación antes de guardar: antes, si faltaba p. ej. el servicio, el botón
+  // quedaba "cargando" para siempre sin decir qué faltaba.
+  const [showMissing, setShowMissing] = useState(false);
+  useEffect(() => {
+    if (opened) setShowMissing(false);
+  }, [opened, appointment?._id]);
+  const missingClient = !newAppointment.client?._id;
+  const missingEmployee = !newAppointment.employee?._id;
+  const missingServices = !newAppointment.services?.length;
+  const missingDates = !newAppointment.startDate || !newAppointment.endDate;
+  const missingFields: string[] = [
+    ...(missingClient ? ["el cliente"] : []),
+    ...(missingEmployee ? [isMultiMode ? "el profesional 1" : "el profesional"] : []),
+    ...(missingServices ? [isMultiMode ? "los servicios del profesional 1" : "al menos un servicio"] : []),
+    ...(missingDates ? ["la fecha y hora"] : []),
+    ...(isMultiMode && !appointment
+      ? extraBlocks.flatMap((b, idx) =>
+          !b.employee
+            ? [`el profesional ${idx + 2}`]
+            : !b.services.length
+              ? [`los servicios del profesional ${idx + 2}`]
+              : [],
+        )
+      : []),
+  ];
 
   // Estado para paquetes de sesiones del cliente
   const [availablePackages, setAvailablePackages] = useState<Record<string, ClientPackage[]>>({});
@@ -1165,6 +1197,7 @@ ${clientServices}`;
                     // No limpiar el searchQuery en blur, solo cuando se selecciona
                     // Esto evita que se borre mientras el usuario escribe
                   }}
+                  error={showMissing && missingClient ? "Selecciona un cliente" : undefined}
                   rightSection={loadingClients ? <Loader size="xs" /> : null}
                   nothingFoundMessage={
                     loadingClients ? (
@@ -1206,6 +1239,7 @@ ${clientServices}`;
                   onChange={(value) => onEmployeeChange(value)}
                   searchable
                   required
+                  error={showMissing && missingEmployee ? "Selecciona un profesional" : undefined}
                   styles={{
                     input: {
                       borderRadius: 8,
@@ -1274,6 +1308,7 @@ ${clientServices}`;
             <Checkbox.Group
               size="lg"
               required
+              error={showMissing && missingServices ? "Selecciona al menos un servicio" : undefined}
               value={
                 // Array de IDs seleccionados
                 newAppointment.services
@@ -1444,6 +1479,7 @@ ${clientServices}`;
               blockIndex={idx + 2}
               employees={employees}
               timeFormat={timeFormat}
+              showErrors={showMissing}
               onChange={(updated) =>
                 setExtraBlocks((prev) => prev.map((b) => (b.id === block.id ? updated : b)))
               }
@@ -2249,6 +2285,16 @@ ${clientServices}`;
             </Button>
             <Button
               onClick={async () => {
+                if (missingFields.length > 0) {
+                  setShowMissing(true);
+                  notifications.show({
+                    title: "Falta información",
+                    message: `Completa ${missingFields.join(", ").replace(/, ([^,]*)$/, " y $1")} para ${appointment ? "guardar la cita" : "crear la cita"}.`,
+                    color: "orange",
+                    autoClose: 5000,
+                  });
+                  return;
+                }
                 // 👥 Multi-profesional
                 if (!appointment && isMultiMode) {
                   const block0: EmployeeBlockData | null =

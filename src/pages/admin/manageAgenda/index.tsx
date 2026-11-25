@@ -1219,6 +1219,17 @@ const ScheduleView: React.FC = () => {
         setCreatingAppointment(false);
         closeModal();
         fetchAppointmentsForMonth(currentDate);
+      } else {
+        // El modal ya valida antes de llamar; esto es solo un respaldo para que el
+        // botón nunca se quede "cargando" sin decir nada.
+        setCreatingAppointment(false);
+        showNotification({
+          title: "Falta información",
+          message: "Completa cliente, profesional, al menos un servicio y la fecha y hora.",
+          color: "orange",
+          autoClose: 5000,
+          position: "top-right",
+        });
       }
     } catch (error: any) {
       const conflictData = error?.response?.data?.data;
