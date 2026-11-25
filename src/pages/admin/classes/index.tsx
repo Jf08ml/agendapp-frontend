@@ -50,6 +50,8 @@ import ClassWhatsappTemplates from "./components/ClassWhatsappTemplates";
 import ClassCalendar from "./components/ClassCalendar";
 import { toSpanishMeridiem } from "../../../utils/timeFormatUtils";
 import { formatCurrency } from "../../../utils/formatCurrency";
+import { usePermissions } from "../../../hooks/usePermissions";
+import { canEditBusinessSettings } from "../../../constants/settingsPermissions";
 import {
   CLASS_TABS, ENROLLMENT_FILTERS, badgeClass, enrollmentState, occupancy, paymentState,
   resolveClassTab, sessionState, toggleAllVisible, toggleOne,
@@ -75,6 +77,9 @@ const startOfWeek = (d: dayjs.Dayjs) => d.startOf("day").subtract((d.day() + 6) 
 // ══════════════════════════════════════════════════════
 
 export default function ManageClasses() {
+  // Los ajustes de clases son ajustes del negocio: solo con permiso de administración
+  const { hasPermission } = usePermissions();
+  const canEditSettings = canEditBusinessSettings(hasPermission);
   const dispatch = useAppDispatch();
   const organizationId = useAppSelector((s: RootState) => s.auth.organizationId);
   const organization = useAppSelector((s: RootState) => s.organization.organization);
@@ -881,7 +886,7 @@ export default function ManageClasses() {
       </div>
       {busy ? <span style={{ flex: "none" }}><Loader size="xs" /></span> : null}
       <span style={{ flex: "none", paddingTop: 2 }}>
-        <Switch checked={checked} onChange={(e) => onChange(e.currentTarget.checked)} disabled={disabled} aria-label={label} />
+        <Switch checked={checked} onChange={(e) => onChange(e.currentTarget.checked)} disabled={disabled || !canEditSettings} aria-label={label} />
       </span>
     </div>
   );
@@ -889,6 +894,9 @@ export default function ManageClasses() {
   const policyCard = (
     <div className="ag-card" style={{ padding: "var(--space-2) var(--space-4)" }}>
       <h3 style={{ margin: "var(--space-2) 0 0", font: "600 15px/22px var(--mantine-font-family)" }}>Política de inscripción</h3>
+      {!canEditSettings && (
+        <div className="ag-subtle" style={{ marginTop: 4 }}>Solo un administrador puede cambiar estos ajustes.</div>
+      )}
       {switchRow(
         "Confirmar automáticamente si hay cupo",
         canAutoConfirmClasses
