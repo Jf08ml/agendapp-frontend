@@ -244,6 +244,24 @@ export const createClient = async (
 };
 
 // Actualizar un cliente
+/**
+ * Reserva en línea: el cliente ya identificado actualiza sus datos de contacto.
+ * Debe repetir el dato con el que se identificó (teléfono, correo o documento);
+ * el servidor no deja cambiar ese dato ni el negocio. Antes se usaba la edición
+ * del panel, que era pública.
+ */
+export const updateClientPublic = async (
+  clientId: string,
+  identifier: { field: "phone" | "email" | "documentId"; value: string },
+  updates: Partial<Client> & { customFieldValues?: Record<string, unknown> }
+): Promise<void> => {
+  try {
+    await apiClient.put(`/public/${clientId}`, { ...updates, identifier });
+  } catch (error) {
+    handleAxiosError(error, "No se pudieron actualizar tus datos");
+  }
+};
+
 export const updateClient = async (
   clientId: string,
   updatedData: Partial<Client>
