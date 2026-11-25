@@ -1,3 +1,5 @@
+import { trackPixelsBooking } from "./orgPixels";
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
@@ -44,6 +46,8 @@ export function trackReservationConversion(analyticsConfig?: {
   googleAdsId?: string;
   googleAdsConversionLabel?: string;
 }): void {
+  // Píxeles de Meta y TikTok (si el negocio los configuró y se cargaron)
+  trackPixelsBooking();
   if (!window.gtag) return;
   const adsId = analyticsConfig?.googleAdsId?.trim();
   const label = analyticsConfig?.googleAdsConversionLabel?.trim();

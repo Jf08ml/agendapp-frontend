@@ -254,6 +254,10 @@ export interface Organization {
     gaMeasurementId?: string;
     googleAdsId?: string;
     googleAdsConversionLabel?: string;
+    /** Píxel de Meta (Facebook/Instagram Ads), solo dígitos. */
+    metaPixelId?: string;
+    /** Píxel de TikTok Ads. */
+    tiktokPixelId?: string;
   };
   reminderSettings?: ReminderSettings;
   autoMarkAttended?: boolean;

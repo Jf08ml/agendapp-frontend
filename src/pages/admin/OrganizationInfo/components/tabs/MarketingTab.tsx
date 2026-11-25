@@ -1,5 +1,5 @@
 import { SimpleGrid, Stack, TextInput, Text, Alert, Accordion, List, Anchor } from "@mantine/core";
-import { IconBrandGoogle, IconTarget, IconInfoCircle, IconHelpCircle, IconCircleCheck } from "@tabler/icons-react";
+import { IconBrandGoogle, IconTarget, IconInfoCircle, IconHelpCircle, IconCircleCheck, IconBrandMeta, IconBrandTiktok } from "@tabler/icons-react";
 import SectionCard from "../SectionCard";
 import type { UseFormReturnType } from "@mantine/form";
 import type { FormValues } from "../../schema";
@@ -12,6 +12,40 @@ export default function MarketingTab({
   isEditing: boolean;
 }) {
   const hasAdsId = !!form.values.analyticsConfig?.googleAdsId;
+
+  const pixels = (
+    <SectionCard
+      title="Píxeles de Meta y TikTok"
+      description="Mide las visitas y las reservas que llegan desde tus anuncios en Facebook, Instagram o TikTok."
+      icon={<IconBrandMeta size={16} />}
+      iconColor="indigo"
+    >
+      <Stack gap="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+          <TextInput
+            label="ID del píxel de Meta"
+            description="En el Administrador de eventos de Meta → Orígenes de datos → tu píxel. Solo números."
+            placeholder="1234567890123456"
+            leftSection={<IconBrandMeta size={16} />}
+            {...form.getInputProps("analyticsConfig.metaPixelId")}
+            disabled={!isEditing}
+          />
+          <TextInput
+            label="ID del píxel de TikTok"
+            description="En TikTok Ads Manager → Herramientas → Eventos → tu píxel."
+            placeholder="C4ABCD1234EFGH5678IJ"
+            leftSection={<IconBrandTiktok size={16} />}
+            {...form.getInputProps("analyticsConfig.tiktokPixelId")}
+            disabled={!isEditing}
+          />
+        </SimpleGrid>
+        <Text size="xs" c="dimmed">
+          Se cargan solo en las páginas que ven tus clientes (no en tu panel). Registramos la visita y, cuando alguien
+          completa una reserva desde tu web, el evento «Schedule» en Meta y «SubmitForm» en TikTok.
+        </Text>
+      </Stack>
+    </SectionCard>
+  );
 
   return (
     <Stack gap="md">
@@ -160,6 +194,7 @@ export default function MarketingTab({
           ocurren fuera del navegador.
         </Text>
       </Alert>
+      {pixels}
     </Stack>
   );
 }

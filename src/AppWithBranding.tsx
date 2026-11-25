@@ -18,6 +18,8 @@ import { CustomLoaderHtml } from "./components/customLoader/CustomLoaderHtml";
 import App from "./App";
 import { extractTenantFromHost } from "./utils/domainUtils";
 import { registerOrgGoogleTags } from "./utils/orgGoogleTags";
+import { registerOrgPixels } from "./utils/orgPixels";
+import { isClientFacingPath } from "./utils/seasonalTheme";
 
 // Idioma global de fechas: dayjs en español para todo el bundle (antes dependía de
 // qué módulo cargara primero y llamara dayjs.locale("es")). Los selectores de
@@ -143,6 +145,13 @@ export default function AppWithBranding() {
       hasSentInitialPageView.current = true;
     }
   }, [organization?.name, organization?.analyticsConfig]);
+
+  // Píxeles de Meta y TikTok del negocio (Fase 3): solo en páginas del cliente,
+  // nunca en el panel; registran la visita al cargar.
+  useEffect(() => {
+    if (!organization?._id || !isClientFacingPath(window.location.pathname)) return;
+    registerOrgPixels(organization.analyticsConfig);
+  }, [organization?._id, organization?.analyticsConfig]);
 
   useEffect(() => {
     if (organization?.branding?.themeColor) {
